@@ -6,7 +6,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
+from app.infrastructure.database import models  # noqa: F401
 from app.infrastructure.database.base import Base
+
 
 
 config = context.config
