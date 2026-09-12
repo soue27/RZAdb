@@ -47,3 +47,10 @@ class RoomCategory(StrEnum):
     I = "I"
     II = "II"
     III = "III"
+
+
+class OTDPurpose(StrEnum):
+    RZA = "rza"
+    SA = "sa"
+    PA = "pa"
+    RA = "ra"
