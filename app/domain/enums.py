@@ -21,3 +21,29 @@ class OperationalCurrentType(StrEnum):
     PERMANENT = "permanent"
     RECTIFIED = "rectified"
     ALTERNATING = "alternating"
+
+
+class URZAStatus(StrEnum):
+    IN_OPERATION = "in_operation"
+    IN_REPAIR = "in_repair"
+    DECOMMISSIONED = "decommissioned"
+    RESERVE = "reserve"
+
+
+class ElementBase(StrEnum):
+    ELECTROMECHANICAL = "electromechanical"
+    MICROELECTRONIC = "microelectronic"
+    MICROPROCESSOR = "microprocessor"
+
+
+class URZACategory(StrEnum):
+    I = "I"
+    II = "II"
+    III = "III"
+    IV = "IV"
+
+
+class RoomCategory(StrEnum):
+    I = "I"
+    II = "II"
+    III = "III"
