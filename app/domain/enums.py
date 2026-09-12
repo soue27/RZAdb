@@ -15,3 +15,9 @@ class HighestVoltage(StrEnum):
     KV_10 = "10"
     KV_6 = "6"
     KV_0_4 = "0.4"
+
+
+class OperationalCurrentType(StrEnum):
+    PERMANENT = "permanent"
+    RECTIFIED = "rectified"
+    ALTERNATING = "alternating"
