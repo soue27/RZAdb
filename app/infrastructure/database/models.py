@@ -5,6 +5,7 @@ from app.domain.urza import URZA
 from app.domain.otd import OTD
 from app.domain.user import User
 from app.domain.rza_settings import SettingsForm
+from app.domain.file import File
 
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "Substation",
     "URZA",
     "User",
+    "File",
 ]
