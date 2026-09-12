@@ -54,3 +54,18 @@ class OTDPurpose(StrEnum):
     SA = "sa"
     PA = "pa"
     RA = "ra"
+
+
+class AccessCategory(StrEnum):
+    I = "I"
+    II = "II"
+    III = "III"
+    IV = "IV"
+
+
+class UserRole(StrEnum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    SPECIALIST = "specialist"
+    MANAGER = "manager"
+    ENGINEER = "engineer"

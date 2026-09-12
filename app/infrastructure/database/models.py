@@ -3,6 +3,7 @@ from app.domain.enterprise import Enterprise
 from app.domain.substation import Substation
 from app.domain.urza import URZA
 from app.domain.otd import OTD
+from app.domain.user import User
 
 
 __all__ = [
@@ -11,4 +12,5 @@ __all__ = [
     "OTD",
     "Substation",
     "URZA",
+    "User",
 ]
