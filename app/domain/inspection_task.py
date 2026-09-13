@@ -14,6 +14,11 @@ from app.infrastructure.database.mixins import (
     UUIDMixin,
 )
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.domain.inspection import Inspection
+
 
 class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Задача на проведение осмотра подстанции."""

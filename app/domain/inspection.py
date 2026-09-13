@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import date
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Text
+from sqlalchemy import Date, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
@@ -9,9 +10,6 @@ from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import TimestampMixin, UUIDMixin
-from app.domain.inspection_task import InspectionTask
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.domain.inspection_task import InspectionTask
@@ -49,10 +47,6 @@ class Inspection(UUIDMixin, TimestampMixin, Base):
     )
     created_by: Mapped[UUID] = mapped_column(
         ForeignKey("users.id"),
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
         nullable=False,
     )
 

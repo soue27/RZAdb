@@ -28,7 +28,7 @@ class InspectionHistory(UUIDMixin, Base):
         Enum(
             TaskStatus,
             name="task_status",
-            values_callable=lambda enum: [item.value for item in enum],
+            values_callable=lambda enum: [item.value for item in TaskStatus],
         ),
         nullable=True,
     )
@@ -36,7 +36,7 @@ class InspectionHistory(UUIDMixin, Base):
         Enum(
             TaskStatus,
             name="task_status",
-            values_callable=lambda enum: [item.value for item in enum],
+            values_callable=lambda enum: [item.value for item in TaskStatus],
         ),
         nullable=True,
     )
