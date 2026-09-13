@@ -8,6 +8,7 @@ from app.domain.rza_settings import SettingsForm
 from app.domain.file import File
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
+from app.domain.settings_record import SettingsRecord
 
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "File",
     "Task",
     "TaskHistory",
+    "SettingsRecord",
 ]
