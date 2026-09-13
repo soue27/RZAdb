@@ -69,3 +69,34 @@ class UserRole(StrEnum):
     SPECIALIST = "specialist"
     MANAGER = "manager"
     ENGINEER = "engineer"
+
+
+class TaskWorkType(StrEnum):
+    OTD = "otd"
+    SETTINGS = "settings"
+    SCHEMES = "schemes"
+    MAINTENANCE = "maintenance"
+    PROGRAM = "program"
+
+
+class MaintenanceType(StrEnum):
+    V = "В"
+    K = "К"
+    K1 = "К1"
+    N = "Н"
+    T = "Т"
+    TK = "ТК"
+    O = "О"
+    OSM = "ОСМ"
+    VP = "ВП"
+    PP = "ПП"
+
+
+class TaskStatus(StrEnum):
+    CREATED = "created"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    UNDER_REVIEW = "under_review"
+    CLOSED = "closed"
+    REJECTED = "rejected"

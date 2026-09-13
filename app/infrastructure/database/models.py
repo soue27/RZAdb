@@ -6,6 +6,7 @@ from app.domain.otd import OTD
 from app.domain.user import User
 from app.domain.rza_settings import SettingsForm
 from app.domain.file import File
+from app.domain.task import Task
 
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "URZA",
     "User",
     "File",
+    "Task",
 ]
