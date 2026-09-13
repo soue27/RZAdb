@@ -100,3 +100,9 @@ class TaskStatus(StrEnum):
     UNDER_REVIEW = "under_review"
     CLOSED = "closed"
     REJECTED = "rejected"
+
+
+class ProgramType(StrEnum):
+    COMMISSIONING = "commissioning"
+    DECOMMISSIONING = "decommissioning"
+    WORK = "work"
