@@ -6,6 +6,7 @@ import pytest
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
+from app.domain.otd import OTDVersion
 
 
 class FakeTaskRepository:
@@ -15,6 +16,7 @@ class FakeTaskRepository:
         self.tasks = []
         self.history = []
         self.session = self
+        self.otd_versions = []
 
     def add(self, entity) -> None:
         if entity.__class__.__name__ == "TaskHistory":
@@ -36,6 +38,17 @@ class FakeTaskRepository:
 
     async def save(self, task):
         return task
+
+    async def get_otd_version_by_task_id(self, task_id):
+        """Возвращает версию ОТД, связанную с указанной задачей."""
+        return next(
+            (
+                version
+                for version in self.otd_versions
+                if version.task_id == task_id
+            ),
+            None,
+        )
 
 
 @pytest.fixture
@@ -513,3 +526,199 @@ async def test_reassign_task_requires_new_assignee(
             assigned_to=engineer_id,
             actor_id=uuid4(),
         )
+
+@pytest.mark.asyncio
+async def test_complete_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    created_at = datetime(2026, 9, 13, 10, 0)
+    assigned_at = datetime(2026, 9, 13, 12, 0)
+    completed_at = datetime(2026, 9, 15, 14, 30)
+
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=created_at,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+        assigned_at=assigned_at,
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    # Результат ОТД необходим для успешного завершения задачи.
+    otd_version = OTDVersion(
+        otd_id=uuid4(),
+        version_number=1,
+        effective_date=completed_at.date(),
+        urza_service_life=10,
+        urza_purpose="rza",
+        task_id=task.id,
+    )
+
+    repository.otd_versions.append(otd_version)
+
+    await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert task.status == TaskStatus.COMPLETED
+    assert task.completed_at == completed_at
+
+    assert len(repository.history) == 5
+
+    history = repository.history[4]
+
+    assert history.task_id == task.id
+    assert history.event_type == "completed"
+    assert history.old_status == TaskStatus.IN_PROGRESS
+    assert history.new_status == TaskStatus.COMPLETED
+    assert history.actor_id == engineer_id
+    assert history.created_at == completed_at
+
+
+@pytest.mark.asyncio
+async def test_complete_task_only_by_assigned_engineer(
+    service: TaskService,
+) -> None:
+    """Проверяет, что завершить задачу может только её исполнитель."""
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    with pytest.raises(ValueError, match="назначенный инженер"):
+        await service.complete_task(
+            task=task,
+            actor_id=uuid4(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_complete_task_rejects_invalid_status(
+    service: TaskService,
+) -> None:
+    """Проверяет, что завершение разрешено только для задачи в работе."""
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    engineer_id = uuid4()
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="Недопустимый переход"):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_otd_task_requires_otd_version(
+    service: TaskService,
+) -> None:
+    """Проверяет, что ОТД-задачу нельзя завершить без результата ОТД."""
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    with pytest.raises(ValueError, match="ОТД"):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_otd_task_with_otd_version(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    """Проверяет завершение ОТД-задачи при наличии результата ОТД."""
+    engineer_id = uuid4()
+    completed_at = datetime(2026, 9, 15, 14, 30)
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    # Версия ОТД является результатом выполнения этой задачи.
+    otd_version = OTDVersion(
+        otd_id=uuid4(),
+        version_number=1,
+        effective_date=completed_at.date(),
+        urza_service_life=10,
+        urza_purpose="rza",
+        task_id=task.id,
+    )
+
+    repository.otd_versions.append(otd_version)
+
+    await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert task.status == TaskStatus.COMPLETED
+    assert task.completed_at == completed_at

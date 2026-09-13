@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.task import Task
@@ -26,3 +27,13 @@ class TaskRepository:
         await self.session.flush()
         await self.session.refresh(task)
         return task
+
+    async def get_otd_version_by_task_id(self, task_id: UUID):
+        """Находит версию ОТД, созданную в рамках указанной задачи."""
+        from app.domain.otd import OTDVersion
+
+        result = await self.session.execute(
+            select(OTDVersion).where(OTDVersion.task_id == task_id)
+        )
+
+        return result.scalar_one_or_none()

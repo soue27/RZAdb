@@ -157,6 +157,62 @@ class TaskService:
 
         return task
 
+    async def complete_task(
+            self,
+            *,
+            task: Task,
+            actor_id: UUID,
+            completed_at: datetime | None = None,
+    ) -> Task:
+        """Завершает выполнение задачи после проверки результата работы."""
+        # Завершить задачу может только назначенный ей инженер.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Завершить задачу может только назначенный инженер."
+            )
+
+        # На этом этапе разрешён только переход IN_PROGRESS -> COMPLETED.
+        validate_transition(
+            task.status,
+            TaskStatus.COMPLETED,
+        )
+
+        # Для ОТД результатом выполнения является новая версия ОТД,
+        # созданная в рамках этой задачи.
+        if task.work_type == TaskWorkType.OTD:
+            otd_version = await self.task_repository.get_otd_version_by_task_id(
+                task.id
+            )
+
+            if otd_version is None:
+                raise ValueError(
+                    "Для завершения задачи ОТД необходимо сохранить результат ОТД."
+                )
+
+        completion_time = completed_at or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = completion_time
+
+        await self.task_repository.save(task)
+
+        # История нужна для аудита действий и последующего отображения
+        # хронологии работы с задачей.
+        history = TaskHistory(
+            task_id=task.id,
+            event_type="completed",
+            old_status=old_status,
+            new_status=TaskStatus.COMPLETED,
+            actor_id=actor_id,
+            comment=None,
+            created_at=completion_time,
+        )
+
+        self.task_repository.session.add(history)
+
+        return task
+
     async def reject_task(
         self,
         *,
