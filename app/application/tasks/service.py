@@ -104,3 +104,55 @@ class TaskService:
         self.task_repository.session.add(history)
 
         return task
+
+
+    async def accept_task(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+        accepted_at: datetime | None = None,
+    ) -> Task:
+        # Принять задачу может только назначенный ей инженер.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Принять задачу может только назначенный инженер."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.IN_PROGRESS,
+        )
+
+        acceptance_time = accepted_at or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS
+
+        await self.task_repository.save(task)
+
+        # Сохраняем отдельное событие принятия, хотя статус меняется
+        # только один раз: это позволяет восстановить реальную историю действий.
+        accepted_history = TaskHistory(
+            task_id=task.id,
+            event_type="accepted",
+            old_status=old_status,
+            new_status=TaskStatus.IN_PROGRESS,
+            actor_id=actor_id,
+            comment=None,
+            created_at=acceptance_time,
+        )
+        self.task_repository.session.add(accepted_history)
+
+        started_history = TaskHistory(
+            task_id=task.id,
+            event_type="started",
+            old_status=TaskStatus.IN_PROGRESS,
+            new_status=TaskStatus.IN_PROGRESS,
+            actor_id=actor_id,
+            comment=None,
+            created_at=acceptance_time,
+        )
+        self.task_repository.session.add(started_history)
+
+        return task

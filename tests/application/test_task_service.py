@@ -195,3 +195,118 @@ async def test_assign_task_rejects_invalid_status(
             actor_id=uuid4(),
             assigned_at=datetime(2026, 9, 13, 13, 0),
         )
+
+
+@pytest.mark.asyncio
+async def test_accept_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    created_at = datetime(2026, 9, 13, 10, 0)
+    assigned_at = datetime(2026, 9, 13, 12, 0)
+    accepted_at = datetime(2026, 9, 14, 9, 30)
+
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=created_at,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+        assigned_at=assigned_at,
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+        accepted_at=accepted_at,
+    )
+
+    assert task.status == TaskStatus.IN_PROGRESS
+
+    # Acceptance deadline не меняется после принятия.
+    assert task.acceptance_deadline_at == datetime(2026, 9, 14, 12, 0)
+
+    # Основной deadline также остаётся от даты создания.
+    assert task.deadline_at == datetime(2026, 9, 20, 10, 0)
+
+    assert len(repository.history) == 4
+
+    accepted_history = repository.history[2]
+    assert accepted_history.event_type == "accepted"
+    assert accepted_history.old_status == TaskStatus.ASSIGNED
+    assert accepted_history.new_status == TaskStatus.IN_PROGRESS
+    assert accepted_history.actor_id == engineer_id
+    assert accepted_history.created_at == accepted_at
+
+    started_history = repository.history[3]
+    assert started_history.event_type == "started"
+    assert started_history.old_status == TaskStatus.IN_PROGRESS
+    assert started_history.new_status == TaskStatus.IN_PROGRESS
+    assert started_history.actor_id == engineer_id
+    assert started_history.created_at == accepted_at
+
+
+@pytest.mark.asyncio
+async def test_accept_task_only_by_assigned_engineer(
+    service: TaskService,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=datetime(2026, 9, 13, 10, 0),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+        assigned_at=datetime(2026, 9, 13, 12, 0),
+    )
+
+    with pytest.raises(ValueError, match="назначенный инженер"):
+        await service.accept_task(
+            task=task,
+            actor_id=uuid4(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_accept_task_rejects_invalid_status(
+    service: TaskService,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=datetime(2026, 9, 13, 10, 0),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+        assigned_at=datetime(2026, 9, 13, 12, 0),
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    with pytest.raises(ValueError, match="Недопустимый переход"):
+        await service.accept_task(
+            task=task,
+            actor_id=engineer_id,
+        )
