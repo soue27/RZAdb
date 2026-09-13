@@ -10,6 +10,7 @@ from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.settings_record import SettingsRecord
 from app.domain.schema import SchemaForm, SchemaRecord
+from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
 
 
 __all__ = [
@@ -26,4 +27,6 @@ __all__ = [
     "SettingsRecord",
     "SchemaForm",
     "SchemaRecord",
+    "RZAInstruction",
+    "RZAInstructionVersion",
 ]
