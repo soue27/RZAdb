@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.task import Task
+from app.domain.settings_record import SettingsRecord
 
 
 class TaskRepository:
@@ -34,6 +35,19 @@ class TaskRepository:
 
         result = await self.session.execute(
             select(OTDVersion).where(OTDVersion.task_id == task_id)
+        )
+
+        return result.scalar_one_or_none()
+
+    async def get_settings_record_by_task_id(
+            self,
+            task_id: UUID,
+    ) -> SettingsRecord | None:
+        """Находит запись уставок, созданную в рамках указанной задачи."""
+        result = await self.session.execute(
+            select(SettingsRecord).where(
+                SettingsRecord.task_id == task_id,
+            )
         )
 
         return result.scalar_one_or_none()

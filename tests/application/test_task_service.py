@@ -7,6 +7,8 @@ from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.otd import OTDVersion
+from app.domain.settings_record import SettingsRecord
+from app.domain.task import Task
 
 
 class FakeTaskRepository:
@@ -17,6 +19,7 @@ class FakeTaskRepository:
         self.history = []
         self.session = self
         self.otd_versions = []
+        self.settings_records = []
 
     def add(self, entity) -> None:
         if entity.__class__.__name__ == "TaskHistory":
@@ -46,6 +49,17 @@ class FakeTaskRepository:
                 version
                 for version in self.otd_versions
                 if version.task_id == task_id
+            ),
+            None,
+        )
+
+    async def get_settings_record_by_task_id(self, task_id):
+        """Возвращает запись уставок, связанную с указанной задачей."""
+        return next(
+            (
+                record
+                for record in self.settings_records
+                if record.task_id == task_id
             ),
             None,
         )
@@ -722,3 +736,75 @@ async def test_complete_otd_task_with_otd_version(
 
     assert task.status == TaskStatus.COMPLETED
     assert task.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_settings_task_requires_settings_record(
+    service: TaskService,
+) -> None:
+    """Проверяет, что задачу по уставкам нельзя завершить без результата."""
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SETTINGS,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    await service.accept_task(
+        task=task,
+        actor_id=engineer_id,
+    )
+
+    with pytest.raises(ValueError, match="устав"):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_settings_task_with_result() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SETTINGS,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    settings_record = SettingsRecord(
+        settings_form_id=uuid4(),
+        change_date=datetime.now().date(),
+        parameter_name="Ток срабатывания",
+        initial_setting="5 A",
+        new_setting="6 A",
+        change_reason="Изменение уставки",
+        created_by=engineer_id,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.settings_records.append(settings_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at

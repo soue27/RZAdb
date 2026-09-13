@@ -189,6 +189,18 @@ class TaskService:
                     "Для завершения задачи ОТД необходимо сохранить результат ОТД."
                 )
 
+        # Для уставок результатом выполнения является SettingsRecord,
+        # созданный в рамках этой задачи.
+        if task.work_type == TaskWorkType.SETTINGS:
+            settings_record = (
+                await self.task_repository.get_settings_record_by_task_id(task.id)
+            )
+
+            if settings_record is None:
+                raise ValueError(
+                    "Для завершения задачи по уставкам необходимо сохранить результат уставок."
+                )
+
         completion_time = completed_at or datetime.now().astimezone()
 
         old_status = task.status
