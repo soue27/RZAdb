@@ -9,6 +9,7 @@ from app.domain.file import File
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.settings_record import SettingsRecord
+from app.domain.schema import SchemaForm, SchemaRecord
 
 
 __all__ = [
@@ -23,4 +24,6 @@ __all__ = [
     "Task",
     "TaskHistory",
     "SettingsRecord",
+    "SchemaForm",
+    "SchemaRecord",
 ]
