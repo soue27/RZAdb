@@ -13,11 +13,7 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.domain.inspection import Inspection
+from app.domain.inspection import Inspection
 
 
 class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -75,6 +71,7 @@ class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         foreign_keys=[assigned_to],
     )
     inspection: Mapped["Inspection | None"] = relationship(
+        "Inspection",
         back_populates="inspection_task",
         uselist=False,
     )
