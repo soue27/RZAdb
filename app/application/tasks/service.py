@@ -5,7 +5,7 @@ from app.application.tasks.repository import TaskRepository
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
-from app.application.tasks.workflow import validate_transition
+from app.application.tasks.workflow import validate_transition, validate_reason
 
 
 class TaskService:
@@ -154,5 +154,46 @@ class TaskService:
             created_at=acceptance_time,
         )
         self.task_repository.session.add(started_history)
+
+        return task
+
+    async def reject_task(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+        reason: str,
+        rejected_at: datetime | None = None,
+    ) -> Task:
+        # Отклонить задачу может только назначенный инженер.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Отклонить задачу может только назначенный инженер."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.REJECTED,
+        )
+        validate_reason(reason)
+
+        rejection_time = rejected_at or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = TaskStatus.REJECTED
+
+        await self.task_repository.save(task)
+
+        history = TaskHistory(
+            task_id=task.id,
+            event_type="rejected",
+            old_status=old_status,
+            new_status=TaskStatus.REJECTED,
+            actor_id=actor_id,
+            comment=reason.strip(),
+            created_at=rejection_time,
+        )
+
+        self.task_repository.session.add(history)
 
         return task

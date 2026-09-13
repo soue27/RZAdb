@@ -310,3 +310,105 @@ async def test_accept_task_rejects_invalid_status(
             task=task,
             actor_id=engineer_id,
         )
+
+
+@pytest.mark.asyncio
+async def test_reject_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    created_at = datetime(2026, 9, 13, 10, 0)
+    assigned_at = datetime(2026, 9, 13, 12, 0)
+    rejected_at = datetime(2026, 9, 14, 9, 30)
+
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=created_at,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+        assigned_at=assigned_at,
+    )
+
+    original_deadline = task.deadline_at
+
+    await service.reject_task(
+        task=task,
+        actor_id=engineer_id,
+        reason="Не могу выполнить задание в установленный срок.",
+        rejected_at=rejected_at,
+    )
+
+    assert task.status == TaskStatus.REJECTED
+    assert task.deadline_at == original_deadline
+
+    assert len(repository.history) == 3
+
+    history = repository.history[2]
+
+    assert history.task_id == task.id
+    assert history.event_type == "rejected"
+    assert history.old_status == TaskStatus.ASSIGNED
+    assert history.new_status == TaskStatus.REJECTED
+    assert history.actor_id == engineer_id
+    assert history.comment == "Не могу выполнить задание в установленный срок."
+    assert history.created_at == rejected_at
+
+
+@pytest.mark.asyncio
+async def test_reject_task_requires_reason(
+    service: TaskService,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="Причина обязательна"):
+        await service.reject_task(
+            task=task,
+            actor_id=engineer_id,
+            reason="   ",
+        )
+
+
+@pytest.mark.asyncio
+async def test_reject_task_only_by_assigned_engineer(
+    service: TaskService,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="назначенный инженер"):
+        await service.reject_task(
+            task=task,
+            actor_id=uuid4(),
+            reason="Нет возможности выполнить.",
+        )
