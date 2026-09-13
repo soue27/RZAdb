@@ -5,6 +5,7 @@ from app.application.tasks.repository import TaskRepository
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
+from app.application.tasks.workflow import validate_transition
 
 
 class TaskService:
@@ -61,6 +62,43 @@ class TaskService:
             actor_id=created_by,
             comment=None,
             created_at=created_at,
+        )
+
+        self.task_repository.session.add(history)
+
+        return task
+
+    async def assign_task(
+            self,
+            *,
+            task: Task,
+            assigned_to: UUID,
+            actor_id: UUID,
+            assigned_at: datetime | None = None,
+    ) -> Task:
+        # Назначение возможно только из CREATED; переназначение обработаем отдельно.
+        validate_transition(
+            task.status,
+            TaskStatus.ASSIGNED,
+        )
+
+        assignment_time = assigned_at or datetime.now().astimezone()
+
+        task.assigned_to = assigned_to
+        task.assigned_at = assignment_time
+        task.acceptance_deadline_at = assignment_time + timedelta(days=1)
+        task.status = TaskStatus.ASSIGNED
+
+        await self.task_repository.save(task)
+
+        history = TaskHistory(
+            task_id=task.id,
+            event_type="assigned",
+            old_status=TaskStatus.CREATED,
+            new_status=TaskStatus.ASSIGNED,
+            actor_id=actor_id,
+            comment=None,
+            created_at=assignment_time,
         )
 
         self.task_repository.session.add(history)

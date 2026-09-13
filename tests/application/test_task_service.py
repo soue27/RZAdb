@@ -123,3 +123,75 @@ async def test_create_maintenance_task(
 
     assert task.work_type == TaskWorkType.MAINTENANCE
     assert task.maintenance_type == MaintenanceType.K1
+
+
+@pytest.mark.asyncio
+async def test_assign_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    created_at = datetime(2026, 9, 13, 10, 0)
+    assigned_at = datetime(2026, 9, 14, 15, 30)
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=created_at,
+    )
+
+    original_deadline = task.deadline_at
+    assigned_to = uuid4()
+    actor_id = uuid4()
+
+    await service.assign_task(
+        task=task,
+        assigned_to=assigned_to,
+        actor_id=actor_id,
+        assigned_at=assigned_at,
+    )
+
+    assert task.status == TaskStatus.ASSIGNED
+    assert task.assigned_to == assigned_to
+    assert task.assigned_at == assigned_at
+    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 15, 30)
+
+    # Основной deadline считается от создания и при назначении не меняется.
+    assert task.deadline_at == original_deadline
+
+    assert len(repository.history) == 2
+
+    history = repository.history[1]
+
+    assert history.task_id == task.id
+    assert history.event_type == "assigned"
+    assert history.old_status == TaskStatus.CREATED
+    assert history.new_status == TaskStatus.ASSIGNED
+    assert history.actor_id == actor_id
+    assert history.created_at == assigned_at
+
+@pytest.mark.asyncio
+async def test_assign_task_rejects_invalid_status(
+    service: TaskService,
+) -> None:
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=datetime(2026, 9, 13, 10, 0),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=uuid4(),
+        actor_id=uuid4(),
+        assigned_at=datetime(2026, 9, 13, 12, 0),
+    )
+
+    with pytest.raises(ValueError, match="Недопустимый переход"):
+        await service.assign_task(
+            task=task,
+            assigned_to=uuid4(),
+            actor_id=uuid4(),
+            assigned_at=datetime(2026, 9, 13, 13, 0),
+        )
