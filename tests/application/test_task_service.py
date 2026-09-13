@@ -1,0 +1,125 @@
+from datetime import datetime
+from uuid import uuid4
+
+import pytest
+
+from app.application.tasks.repository import TaskRepository
+from app.application.tasks.service import TaskService
+from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
+
+
+class FakeTaskRepository:
+    """Минимальный repository для тестирования бизнес-логики без PostgreSQL."""
+
+    def __init__(self) -> None:
+        self.tasks = []
+        self.history = []
+        self.session = self
+
+    def add(self, entity) -> None:
+        if entity.__class__.__name__ == "TaskHistory":
+            self.history.append(entity)
+
+    async def create(self, task) -> None:
+        # UUID генерируется SQLAlchemy default только при INSERT,
+        # поэтому для fake repository задаём его вручную.
+        if task.id is None:
+            task.id = uuid4()
+
+        self.tasks.append(task)
+
+    async def get_by_id(self, task_id):
+        return next(
+            (task for task in self.tasks if task.id == task_id),
+            None,
+        )
+
+    async def save(self, task):
+        return task
+
+
+@pytest.fixture
+def repository() -> FakeTaskRepository:
+    return FakeTaskRepository()
+
+
+@pytest.fixture
+def service(repository: FakeTaskRepository) -> TaskService:
+    return TaskService(repository)
+
+
+@pytest.mark.asyncio
+async def test_create_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    now = datetime(2026, 9, 13, 10, 0)
+
+    urza_id = uuid4()
+    created_by = uuid4()
+
+    task = await service.create_task(
+        urza_id=urza_id,
+        work_type=TaskWorkType.OTD,
+        created_by=created_by,
+        now=now,
+    )
+
+    assert task.urza_id == urza_id
+    assert task.work_type == TaskWorkType.OTD
+    assert task.created_by == created_by
+    assert task.status == TaskStatus.CREATED
+    assert task.created_at == now
+    assert task.deadline_at == datetime(2026, 9, 20, 10, 0)
+    assert task.maintenance_type is None
+
+    assert len(repository.history) == 1
+
+    history = repository.history[0]
+
+    assert history.task_id == task.id
+    assert history.event_type == "created"
+    assert history.old_status is None
+    assert history.new_status == TaskStatus.CREATED
+    assert history.actor_id == created_by
+    assert history.created_at == now
+
+
+@pytest.mark.asyncio
+async def test_create_maintenance_task_requires_maintenance_type(
+    service: TaskService,
+) -> None:
+    with pytest.raises(ValueError, match="maintenance_type"):
+        await service.create_task(
+            urza_id=uuid4(),
+            work_type=TaskWorkType.MAINTENANCE,
+            created_by=uuid4(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_non_maintenance_task_cannot_have_maintenance_type(
+    service: TaskService,
+) -> None:
+    with pytest.raises(ValueError, match="maintenance_type"):
+        await service.create_task(
+            urza_id=uuid4(),
+            work_type=TaskWorkType.OTD,
+            created_by=uuid4(),
+            maintenance_type=MaintenanceType.V,
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_maintenance_task(
+    service: TaskService,
+) -> None:
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        created_by=uuid4(),
+        maintenance_type=MaintenanceType.K1,
+    )
+
+    assert task.work_type == TaskWorkType.MAINTENANCE
+    assert task.maintenance_type == MaintenanceType.K1
