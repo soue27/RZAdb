@@ -14,6 +14,7 @@ from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 from app.domain.maintenance import TORecord
 from app.domain.program import Program
+from app.domain.maintenance_period_rule import MaintenancePeriodRule
 
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "URZAInstructionVersion",
     "TORecord",
     "Program",
+    "MaintenancePeriodRule",
 ]
