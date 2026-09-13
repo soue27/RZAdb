@@ -64,12 +64,12 @@ class SchemaRecord(UUIDMixin, Base):
 
     scan_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
-        nullable=False,
+        nullable=True,
     )
 
     editable_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
-        nullable=False,
+        nullable=True,
     )
 
     signed_form_file_id: Mapped[UUID] = mapped_column(
@@ -84,11 +84,11 @@ class SchemaRecord(UUIDMixin, Base):
 
     schema_form: Mapped[SchemaForm] = relationship()
     creator: Mapped[User] = relationship()
-    scan_file: Mapped[File] = relationship(
+    scan_file: Mapped[File | None] = relationship(
         foreign_keys=[scan_file_id],
     )
 
-    editable_file: Mapped[File] = relationship(
+    editable_file: Mapped[File | None] = relationship(
         foreign_keys=[editable_file_id],
     )
 

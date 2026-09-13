@@ -9,6 +9,9 @@ from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.otd import OTDVersion
 from app.domain.settings_record import SettingsRecord
 from app.domain.task import Task
+from app.domain.schema import SchemaRecord
+from app.domain.program import Program, ProgramType
+from app.domain.maintenance import TORecord
 
 
 class FakeTaskRepository:
@@ -20,6 +23,9 @@ class FakeTaskRepository:
         self.session = self
         self.otd_versions = []
         self.settings_records = []
+        self.schema_records = []
+        self.programs = []
+        self.to_records = []
 
     def add(self, entity) -> None:
         if entity.__class__.__name__ == "TaskHistory":
@@ -59,6 +65,39 @@ class FakeTaskRepository:
             (
                 record
                 for record in self.settings_records
+                if record.task_id == task_id
+            ),
+            None,
+        )
+
+    async def get_schema_record_by_task_id(self, task_id):
+        """Возвращает запись схем, связанную с указанной задачей."""
+        return next(
+            (
+                record
+                for record in self.schema_records
+                if record.task_id == task_id
+            ),
+            None,
+        )
+
+    async def get_program_by_task_id(self, task_id):
+        """Возвращает программу, связанную с указанной задачей."""
+        return next(
+            (
+                program
+                for program in self.programs
+                if program.task_id == task_id
+            ),
+            None,
+        )
+
+    async def get_to_record_by_task_id(self, task_id):
+        """Возвращает запись ТО, связанную с указанной задачей."""
+        return next(
+            (
+                record
+                for record in self.to_records
                 if record.task_id == task_id
             ),
             None,
@@ -808,3 +847,553 @@ async def test_complete_settings_task_with_result() -> None:
 
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_schemes_task_requires_schema_record() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SCHEMES,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="Для завершения задачи по схемам необходимо сохранить результат схем",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_schemes_task_with_scan_and_signed_form() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SCHEMES,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    schema_record = SchemaRecord(
+        schema_form_id=uuid4(),
+        schema_number="СХ-001",
+        schema_name="Схема защиты линии",
+        change_description="Изменение схемы",
+        change_justification="Изменение оборудования",
+        upload_date=datetime.now().date(),
+        created_by=engineer_id,
+        scan_file_id=uuid4(),
+        editable_file_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.schema_records.append(schema_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+
+@pytest.mark.asyncio
+async def test_complete_schemes_task_requires_signed_form() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SCHEMES,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    schema_record = SchemaRecord(
+        schema_form_id=uuid4(),
+        schema_number="СХ-001",
+        schema_name="Схема защиты линии",
+        change_description="Изменение схемы",
+        change_justification="Изменение оборудования",
+        upload_date=datetime.now().date(),
+        created_by=engineer_id,
+        scan_file_id=uuid4(),
+        editable_file_id=None,
+        signed_form_file_id=None,
+        task_id=task.id,
+    )
+    repository.schema_records.append(schema_record)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="подписан",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_schemes_task_requires_scan_or_editable_file() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SCHEMES,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    schema_record = SchemaRecord(
+        schema_form_id=uuid4(),
+        schema_number="СХ-001",
+        schema_name="Схема защиты линии",
+        change_description="Изменение схемы",
+        change_justification="Изменение оборудования",
+        upload_date=datetime.now().date(),
+        created_by=engineer_id,
+        scan_file_id=None,
+        editable_file_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.schema_records.append(schema_record)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="скан или редактируемый файл",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_schemes_task_with_editable_and_signed_form() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.SCHEMES,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    schema_record = SchemaRecord(
+        schema_form_id=uuid4(),
+        schema_number="СХ-002",
+        schema_name="Схема автоматики",
+        change_description="Изменение схемы",
+        change_justification="Изменение оборудования",
+        upload_date=datetime.now().date(),
+        created_by=engineer_id,
+        scan_file_id=None,
+        editable_file_id=uuid4(),
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.schema_records.append(schema_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_program_task_requires_program() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.PROGRAM,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="Для завершения задачи по программе необходимо сохранить программу",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_program_task_with_scan() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.PROGRAM,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    program = Program(
+        urza_id=task.urza_id,
+        program_type=ProgramType.COMMISSIONING,
+        program_number="ПР-001",
+        scan_file_id=uuid4(),
+        editable_file_id=None,
+        task_id=task.id,
+    )
+    repository.programs.append(program)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_program_task_with_scan() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.PROGRAM,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    program = Program(
+        urza_id=task.urza_id,
+        program_type=ProgramType.COMMISSIONING,
+        program_number="ПР-001",
+        scan_file_id=uuid4(),
+        editable_file_id=None,
+        task_id=task.id,
+    )
+    repository.programs.append(program)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_maintenance_task_requires_to_record() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="Для завершения задачи по ТО необходимо сохранить результат ТО",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+
+@pytest.mark.asyncio
+async def test_complete_maintenance_task_requires_protocol() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    to_record = TORecord(
+        urza_id=task.urza_id,
+        maintenance_date=datetime.now().date(),
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        scan_protocol_id=None,
+        editable_protocol_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.to_records.append(to_record)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+        ValueError,
+        match="протокол",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+@pytest.mark.asyncio
+async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.TK,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    to_record = TORecord(
+        urza_id=task.urza_id,
+        maintenance_date=datetime.now().date(),
+        maintenance_type=MaintenanceType.TK,
+        created_by=engineer_id,
+        scan_protocol_id=None,
+        editable_protocol_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.to_records.append(to_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "maintenance_type",
+    [
+        MaintenanceType.O,
+        MaintenanceType.OSM,
+    ],
+)
+async def test_complete_maintenance_task_without_protocol_for_non_protocol_types(
+    maintenance_type: MaintenanceType,
+) -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=maintenance_type,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    to_record = TORecord(
+        urza_id=task.urza_id,
+        maintenance_date=datetime.now().date(),
+        maintenance_type=maintenance_type,
+        created_by=engineer_id,
+        scan_protocol_id=None,
+        editable_protocol_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.to_records.append(to_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_maintenance_task_with_protocol() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    to_record = TORecord(
+        urza_id=task.urza_id,
+        maintenance_date=datetime.now().date(),
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        scan_protocol_id=uuid4(),
+        editable_protocol_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.to_records.append(to_record)
+
+    service = TaskService(repository)
+
+    completed_at = datetime.now().astimezone()
+
+    result = await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=completed_at,
+    )
+
+    assert result.status == TaskStatus.COMPLETED
+    assert result.completed_at == completed_at
+
+@pytest.mark.asyncio
+async def test_complete_maintenance_task_requires_matching_maintenance_type() -> None:
+    engineer_id = uuid4()
+
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+
+    # Результат относится к другому виду ТО, чем сама задача.
+    to_record = TORecord(
+        urza_id=task.urza_id,
+        maintenance_date=datetime.now().date(),
+        maintenance_type=MaintenanceType.TK,
+        created_by=engineer_id,
+        scan_protocol_id=uuid4(),
+        editable_protocol_id=None,
+        signed_form_file_id=uuid4(),
+        task_id=task.id,
+    )
+    repository.to_records.append(to_record)
+
+    service = TaskService(repository)
+
+    with pytest.raises(
+            ValueError,
+            match="Вид ТО в результате не соответствует виду ТО в задаче",
+    ):
+        await service.complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )

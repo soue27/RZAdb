@@ -191,6 +191,34 @@ class TaskService:
 
         # Для уставок результатом выполнения является SettingsRecord,
         # созданный в рамках этой задачи.
+        if task.work_type == TaskWorkType.SCHEMES:
+            schema_record = (
+                await self.task_repository.get_schema_record_by_task_id(task.id)
+            )
+
+            if schema_record is None:
+                raise ValueError(
+                    "Для завершения задачи по схемам необходимо сохранить результат схем."
+                )
+
+            # Подписанный формуляр обязателен для завершения работы по схемам.
+            if schema_record.signed_form_file_id is None:
+                raise ValueError(
+                    "Для завершения задачи по схемам необходим подписанный формуляр."
+                )
+
+            # Должен быть хотя бы один рабочий вариант схемы:
+            # скан или редактируемый файл.
+            if (
+                    schema_record.scan_file_id is None
+                    and schema_record.editable_file_id is None
+            ):
+                raise ValueError(
+                    "Для завершения задачи по схемам необходим скан или редактируемый файл."
+                )
+
+        # Для схем результатом выполнения является SchemaRecord,
+        # созданный в рамках этой задачи.
         if task.work_type == TaskWorkType.SETTINGS:
             settings_record = (
                 await self.task_repository.get_settings_record_by_task_id(task.id)
@@ -199,6 +227,46 @@ class TaskService:
             if settings_record is None:
                 raise ValueError(
                     "Для завершения задачи по уставкам необходимо сохранить результат уставок."
+                )
+
+        # Для ТО результатом выполнения является TORecord,
+        # созданный в рамках этой задачи.
+        if task.work_type == TaskWorkType.MAINTENANCE:
+            to_record = await self.task_repository.get_to_record_by_task_id(task.id)
+
+            if to_record is None:
+                raise ValueError(
+                    "Для завершения задачи по ТО необходимо сохранить результат ТО."
+                )
+
+            # Результат должен соответствовать виду ТО, указанному в задаче.
+            if to_record.maintenance_type != task.maintenance_type:
+                raise ValueError(
+                    "Вид ТО в результате не соответствует виду ТО в задаче."
+                )
+
+            # Для большинства видов ТО скан протокола обязателен.
+            # ТК, О и ОСМ выполняются без протокола.
+            protocol_not_required = {
+                MaintenanceType.TK,
+                MaintenanceType.O,
+                MaintenanceType.OSM,
+            }
+
+            if task.maintenance_type not in protocol_not_required:
+                if to_record.scan_protocol_id is None:
+                    raise ValueError(
+                        "Для завершения задачи по ТО необходим скан протокола."
+                    )
+
+        # Для программы результатом выполнения является Program,
+        # созданная в рамках этой задачи.
+        if task.work_type == TaskWorkType.PROGRAM:
+            program = await self.task_repository.get_program_by_task_id(task.id)
+
+            if program is None:
+                raise ValueError(
+                    "Для завершения задачи по программе необходимо сохранить программу."
                 )
 
         completion_time = completed_at or datetime.now().astimezone()
