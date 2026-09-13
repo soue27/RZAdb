@@ -11,6 +11,7 @@ from app.domain.task_history import TaskHistory
 from app.domain.settings_record import SettingsRecord
 from app.domain.schema import SchemaForm, SchemaRecord
 from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
+from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 
 
 __all__ = [
@@ -29,4 +30,6 @@ __all__ = [
     "SchemaRecord",
     "RZAInstruction",
     "RZAInstructionVersion",
+    "URZAInstruction",
+    "URZAInstructionVersion",
 ]
