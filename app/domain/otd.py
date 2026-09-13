@@ -1,5 +1,6 @@
 from datetime import date
 from uuid import UUID
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (Date, Enum, ForeignKey,
                         Integer, SmallInteger, String, UniqueConstraint)
@@ -127,4 +128,14 @@ class OTDVersion(
         nullable=False,
     )
 
+    task_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("tasks.id"),
+        nullable=True,
+    )
+
+
     otd: Mapped[OTD] = relationship()
+
+    if TYPE_CHECKING:
+        from app.domain.task import Task
+    task: Mapped["Task | None"] = relationship()
