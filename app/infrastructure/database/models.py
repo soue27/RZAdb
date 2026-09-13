@@ -7,6 +7,7 @@ from app.domain.user import User
 from app.domain.rza_settings import SettingsForm
 from app.domain.file import File
 from app.domain.task import Task
+from app.domain.task_history import TaskHistory
 
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "User",
     "File",
     "Task",
+    "TaskHistory",
 ]
