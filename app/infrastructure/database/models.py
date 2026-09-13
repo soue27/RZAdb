@@ -12,6 +12,7 @@ from app.domain.settings_record import SettingsRecord
 from app.domain.schema import SchemaForm, SchemaRecord
 from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
+from app.domain.maintenance import TORecord
 
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "RZAInstructionVersion",
     "URZAInstruction",
     "URZAInstructionVersion",
+    "TORecord",
 ]
