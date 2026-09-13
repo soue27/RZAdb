@@ -412,3 +412,104 @@ async def test_reject_task_only_by_assigned_engineer(
             actor_id=uuid4(),
             reason="Нет возможности выполнить.",
         )
+
+
+@pytest.mark.asyncio
+async def test_reassign_task(
+    service: TaskService,
+    repository: FakeTaskRepository,
+) -> None:
+    created_at = datetime(2026, 9, 13, 10, 0)
+    first_assigned_at = datetime(2026, 9, 13, 12, 0)
+    reassigned_at = datetime(2026, 9, 14, 9, 30)
+
+    first_engineer_id = uuid4()
+    second_engineer_id = uuid4()
+    manager_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+        now=created_at,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=first_engineer_id,
+        actor_id=manager_id,
+        assigned_at=first_assigned_at,
+    )
+
+    original_deadline = task.deadline_at
+
+    await service.reassign_task(
+        task=task,
+        assigned_to=second_engineer_id,
+        actor_id=manager_id,
+        assigned_at=reassigned_at,
+    )
+
+    assert task.status == TaskStatus.ASSIGNED
+    assert task.assigned_to == second_engineer_id
+    assert task.assigned_at == reassigned_at
+
+    # Срок принятия начинается заново для нового назначения.
+    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 9, 30)
+
+    # Срок выполнения всей задачи от создания НЕ меняется.
+    assert task.deadline_at == original_deadline
+
+    assert len(repository.history) == 3
+
+    history = repository.history[2]
+
+    assert history.task_id == task.id
+    assert history.event_type == "reassigned"
+    assert history.old_status == TaskStatus.ASSIGNED
+    assert history.new_status == TaskStatus.ASSIGNED
+    assert history.actor_id == manager_id
+    assert history.created_at == reassigned_at
+
+
+@pytest.mark.asyncio
+async def test_reassign_task_only_in_assigned_status(
+    service: TaskService,
+) -> None:
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="назначенную задачу"):
+        await service.reassign_task(
+            task=task,
+            assigned_to=uuid4(),
+            actor_id=uuid4(),
+        )
+
+@pytest.mark.asyncio
+async def test_reassign_task_requires_new_assignee(
+    service: TaskService,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=uuid4(),
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="отличаться"):
+        await service.reassign_task(
+            task=task,
+            assigned_to=engineer_id,
+            actor_id=uuid4(),
+        )

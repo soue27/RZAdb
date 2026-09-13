@@ -197,3 +197,50 @@ class TaskService:
         self.task_repository.session.add(history)
 
         return task
+
+
+    async def reassign_task(
+        self,
+        *,
+        task: Task,
+        assigned_to: UUID,
+        actor_id: UUID,
+        assigned_at: datetime | None = None,
+    ) -> Task:
+        # Переназначение допустимо только для уже назначенной задачи.
+        if task.status != TaskStatus.ASSIGNED:
+            raise ValueError(
+                "Переназначить можно только назначенную задачу."
+            )
+
+        assignment_time = assigned_at or datetime.now().astimezone()
+
+        previous_assignee = task.assigned_to
+
+        if previous_assignee == assigned_to:
+            raise ValueError(
+                "Новый исполнитель должен отличаться от текущего."
+            )
+
+        task.assigned_to = assigned_to
+        task.assigned_at = assignment_time
+
+        # Основной deadline намеренно не меняем:
+        # он считается от создания задачи и не зависит от переназначения.
+        task.acceptance_deadline_at = assignment_time + timedelta(days=1)
+
+        await self.task_repository.save(task)
+
+        history = TaskHistory(
+            task_id=task.id,
+            event_type="reassigned",
+            old_status=TaskStatus.ASSIGNED,
+            new_status=TaskStatus.ASSIGNED,
+            actor_id=actor_id,
+            comment=None,
+            created_at=assignment_time,
+        )
+
+        self.task_repository.session.add(history)
+
+        return task
