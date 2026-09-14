@@ -217,3 +217,84 @@ async def test_cannot_assign_already_assigned_task() -> None:
             actor_id=manager.id,
             assignee_id=engineer.id,
         )
+
+@pytest.mark.asyncio
+async def test_assigned_engineer_can_accept_inspection_task() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    service = InspectionTaskService(repository, user_repository)
+
+    manager = make_user(UserRole.MANAGER)
+    engineer = make_user(UserRole.ENGINEER)
+
+    user_repository.users[manager.id] = manager
+    user_repository.users[engineer.id] = engineer
+
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+
+    task = await service.create(
+        substation_id=uuid4(),
+        created_by=manager.id,
+        now=now,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=manager.id,
+        assignee_id=engineer.id,
+        now=now,
+    )
+
+    accepted_task = await service.accept(
+        task.id,
+        actor_id=engineer.id,
+        now=now,
+    )
+
+    assert accepted_task.status == TaskStatus.IN_PROGRESS
+    assert accepted_task.assigned_to == engineer.id
+    assert accepted_task.acceptance_deadline_at == now + timedelta(days=1)
+    assert accepted_task.deadline_at == now + timedelta(days=7)
+
+    assert len(repository.history) == 2
+
+    history = repository.history[1]
+
+    assert history.event_type == "accepted"
+    assert history.old_status == TaskStatus.ASSIGNED
+    assert history.new_status == TaskStatus.IN_PROGRESS
+    assert history.actor_id == engineer.id
+
+@pytest.mark.asyncio
+async def test_only_assigned_executor_can_accept_inspection_task() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    service = InspectionTaskService(repository, user_repository)
+
+    manager = make_user(UserRole.MANAGER)
+    engineer = make_user(UserRole.ENGINEER)
+    another_engineer = make_user(UserRole.ENGINEER)
+
+    user_repository.users[manager.id] = manager
+    user_repository.users[engineer.id] = engineer
+    user_repository.users[another_engineer.id] = another_engineer
+
+    task = await service.create(
+        substation_id=uuid4(),
+        created_by=manager.id,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=manager.id,
+        assignee_id=engineer.id,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="только назначенный исполнитель",
+    ):
+        await service.accept(
+            task.id,
+            actor_id=another_engineer.id,
+        )

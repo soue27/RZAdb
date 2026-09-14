@@ -120,3 +120,61 @@ class InspectionTaskService:
         await self.repository.add_history(history)
 
         return task
+
+    async def accept(
+        self,
+        task_id: UUID,
+        *,
+        actor_id: UUID,
+        now: datetime | None = None,
+    ) -> InspectionTask:
+        """Принимает назначенную задачу осмотра в работу."""
+
+        task = await self.repository.get_by_id(task_id)
+
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        actor = await self.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            raise ValueError("Исполнитель не найден.")
+
+        # Принять задачу может только Engineer или Manager.
+        if actor.role not in {
+            UserRole.ENGINEER,
+            UserRole.MANAGER,
+        }:
+            raise ValueError(
+                "Принять задачу осмотра может только Engineer или Manager."
+            )
+
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Принять задачу может только назначенный исполнитель."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.IN_PROGRESS,
+        )
+
+        current_time = now or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS
+
+        await self.repository.save(task)
+
+        history = InspectionHistory(
+            inspection_task_id=task.id,
+            event_type="accepted",
+            old_status=old_status,
+            new_status=TaskStatus.IN_PROGRESS,
+            actor_id=actor_id,
+            created_at=current_time,
+        )
+
+        await self.repository.add_history(history)
+
+        return task
