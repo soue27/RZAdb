@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.inspection_task import InspectionTask
 from app.domain.inspection_history import InspectionHistory
+from app.domain.inspection import Inspection
 
 
 class InspectionTaskRepository:
@@ -33,4 +34,14 @@ class InspectionTaskRepository:
         self.session.add(history)
         await self.session.flush()
         return history
+
+    async def create_inspection(
+            self,
+            inspection: Inspection,
+    ) -> Inspection:
+        # Результат осмотра сохраняем вместе с задачей в одной транзакции.
+        self.session.add(inspection)
+        await self.session.flush()
+        await self.session.refresh(inspection)
+        return inspection
 

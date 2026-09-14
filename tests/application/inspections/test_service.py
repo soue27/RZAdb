@@ -1,5 +1,5 @@
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from uuid import uuid4
 
 import pytest
@@ -14,6 +14,7 @@ class FakeInspectionTaskRepository:
         self.created_task = None
         self.tasks = {}
         self.history = []
+        self.inspections = []
 
     async def create(self, task):
         self.created_task = task
@@ -30,6 +31,10 @@ class FakeInspectionTaskRepository:
     async def add_history(self, history):
         self.history.append(history)
         return history
+
+    async def create_inspection(self, inspection):
+        self.inspections.append(inspection)
+        return inspection
 
 
 class FakeUserRepository:
@@ -297,4 +302,146 @@ async def test_only_assigned_executor_can_accept_inspection_task() -> None:
         await service.accept(
             task.id,
             actor_id=another_engineer.id,
+        )
+
+@pytest.mark.asyncio
+async def test_assigned_engineer_can_complete_inspection_task() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    service = InspectionTaskService(repository, user_repository)
+
+    manager = make_user(UserRole.MANAGER)
+    engineer = make_user(UserRole.ENGINEER)
+
+    user_repository.users[manager.id] = manager
+    user_repository.users[engineer.id] = engineer
+
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+
+    task = await service.create(
+        substation_id=uuid4(),
+        created_by=manager.id,
+        now=now,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=manager.id,
+        assignee_id=engineer.id,
+        now=now,
+    )
+
+    await service.accept(
+        task.id,
+        actor_id=engineer.id,
+        now=now,
+    )
+
+    completed_task = await service.complete(
+        task.id,
+        actor_id=engineer.id,
+        inspection_date=date(2026, 9, 14),
+        remarks="Замечаний не выявлено.",
+        now=now,
+    )
+
+    assert completed_task.status == TaskStatus.COMPLETED
+    assert completed_task.completed_at == now
+
+    assert len(repository.inspections) == 1
+
+    inspection = repository.inspections[0]
+
+    assert inspection.substation_id == task.substation_id
+    assert inspection.inspection_task_id == task.id
+    assert inspection.inspection_date == date(2026, 9, 14)
+    assert inspection.remarks == "Замечаний не выявлено."
+    assert inspection.scan_file_id is None
+    assert inspection.editable_file_id is None
+    assert inspection.created_by == engineer.id
+
+    assert len(repository.history) == 3
+
+    history = repository.history[2]
+
+    assert history.event_type == "completed"
+    assert history.old_status == TaskStatus.IN_PROGRESS
+    assert history.new_status == TaskStatus.COMPLETED
+    assert history.actor_id == engineer.id
+
+@pytest.mark.asyncio
+async def test_inspection_cannot_be_completed_without_remarks() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    service = InspectionTaskService(repository, user_repository)
+
+    manager = make_user(UserRole.MANAGER)
+    engineer = make_user(UserRole.ENGINEER)
+
+    user_repository.users[manager.id] = manager
+    user_repository.users[engineer.id] = engineer
+
+    task = await service.create(
+        substation_id=uuid4(),
+        created_by=manager.id,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=manager.id,
+        assignee_id=engineer.id,
+    )
+
+    await service.accept(
+        task.id,
+        actor_id=engineer.id,
+    )
+
+    with pytest.raises(ValueError, match="замечания"):
+        await service.complete(
+            task.id,
+            actor_id=engineer.id,
+            inspection_date=date(2026, 9, 14),
+            remarks="   ",
+        )
+
+@pytest.mark.asyncio
+async def test_only_assigned_executor_can_complete_inspection() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    service = InspectionTaskService(repository, user_repository)
+
+    manager = make_user(UserRole.MANAGER)
+    engineer = make_user(UserRole.ENGINEER)
+    another_engineer = make_user(UserRole.ENGINEER)
+
+    user_repository.users[manager.id] = manager
+    user_repository.users[engineer.id] = engineer
+    user_repository.users[another_engineer.id] = another_engineer
+
+    task = await service.create(
+        substation_id=uuid4(),
+        created_by=manager.id,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=manager.id,
+        assignee_id=engineer.id,
+    )
+
+    await service.accept(
+        task.id,
+        actor_id=engineer.id,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="только назначенный исполнитель",
+    ):
+        await service.complete(
+            task.id,
+            actor_id=another_engineer.id,
+            inspection_date=date(2026, 9, 14),
+            remarks="Замечаний нет.",
         )

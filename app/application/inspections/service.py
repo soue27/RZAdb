@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from uuid import UUID
 
 from app.application.inspections.repository import InspectionTaskRepository
@@ -7,6 +7,7 @@ from app.application.users.repository import UserRepository
 from app.domain.enums import TaskStatus, UserRole
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
+from app.domain.inspection import Inspection
 
 
 class InspectionTaskService:
@@ -171,6 +172,84 @@ class InspectionTaskService:
             event_type="accepted",
             old_status=old_status,
             new_status=TaskStatus.IN_PROGRESS,
+            actor_id=actor_id,
+            created_at=current_time,
+        )
+
+        await self.repository.add_history(history)
+
+        return task
+
+    async def complete(
+            self,
+            task_id: UUID,
+            *,
+            actor_id: UUID,
+            inspection_date: date,
+            remarks: str,
+            scan_file_id: UUID | None = None,
+            editable_file_id: UUID | None = None,
+            now: datetime | None = None,
+    ) -> InspectionTask:
+        """Завершает осмотр и сохраняет его результат."""
+
+        task = await self.repository.get_by_id(task_id)
+
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        actor = await self.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            raise ValueError("Исполнитель не найден.")
+
+        # Выполнить осмотр может только назначенный исполнитель.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Завершить осмотр может только назначенный исполнитель."
+            )
+
+        if actor.role not in {
+            UserRole.ENGINEER,
+            UserRole.MANAGER,
+        }:
+            raise ValueError(
+                "Выполнить осмотр может только Engineer или Manager."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.COMPLETED,
+        )
+
+        if not remarks or not remarks.strip():
+            raise ValueError("Необходимо указать замечания по результатам осмотра.")
+
+        current_time = now or datetime.now().astimezone()
+
+        inspection = Inspection(
+            substation_id=task.substation_id,
+            inspection_task_id=task.id,
+            inspection_date=inspection_date,
+            remarks=remarks,
+            scan_file_id=scan_file_id,
+            editable_file_id=editable_file_id,
+            created_by=actor_id,
+        )
+
+        await self.repository.create_inspection(inspection)
+
+        old_status = task.status
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = current_time
+
+        await self.repository.save(task)
+
+        history = InspectionHistory(
+            inspection_task_id=task.id,
+            event_type="completed",
+            old_status=old_status,
+            new_status=TaskStatus.COMPLETED,
             actor_id=actor_id,
             created_at=current_time,
         )
