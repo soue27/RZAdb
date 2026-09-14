@@ -2,24 +2,27 @@ from datetime import datetime, timedelta, date
 from uuid import UUID
 
 from app.application.inspections.repository import InspectionTaskRepository
-from app.application.inspections.workflow import validate_transition
+from app.application.inspections.workflow import validate_transition, validate_reason
 from app.application.users.repository import UserRepository
 from app.domain.enums import TaskStatus, UserRole
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
 from app.domain.inspection import Inspection
+from app.application.substations.repository import SubstationRepository
 
 
 class InspectionTaskService:
     """Бизнес-логика задач осмотра подстанций."""
 
     def __init__(
-        self,
-        repository: InspectionTaskRepository,
-        user_repository: UserRepository,
+            self,
+            repository: InspectionTaskRepository,
+            user_repository: UserRepository,
+            substation_repository: SubstationRepository,
     ) -> None:
         self.repository = repository
         self.user_repository = user_repository
+        self.substation_repository = substation_repository
 
     async def create(
         self,
@@ -251,6 +254,145 @@ class InspectionTaskService:
             old_status=old_status,
             new_status=TaskStatus.COMPLETED,
             actor_id=actor_id,
+            created_at=current_time,
+        )
+
+        await self.repository.add_history(history)
+
+        return task
+
+    async def send_to_review(
+        self,
+        task_id: UUID,
+        *,
+        actor_id: UUID,
+        now: datetime | None = None,
+    ) -> InspectionTask:
+        """Передаёт завершённый осмотр на проверку Manager."""
+
+        task = await self.repository.get_by_id(task_id)
+
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        actor = await self.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            raise ValueError("Исполнитель не найден.")
+
+        # Только назначенный исполнитель может передать свою работу на проверку.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Передать задачу на проверку может только назначенный исполнитель."
+            )
+
+        if actor.role not in {
+            UserRole.ENGINEER,
+            UserRole.MANAGER,
+        }:
+            raise ValueError(
+                "Передать осмотр на проверку может только Engineer или Manager."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.UNDER_REVIEW,
+        )
+
+        current_time = now or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = TaskStatus.UNDER_REVIEW
+
+        await self.repository.save(task)
+
+        history = InspectionHistory(
+            inspection_task_id=task.id,
+            event_type="sent_to_review",
+            old_status=old_status,
+            new_status=TaskStatus.UNDER_REVIEW,
+            actor_id=actor_id,
+            created_at=current_time,
+        )
+
+        await self.repository.add_history(history)
+
+        return task
+
+    async def review(
+            self,
+            task_id: UUID,
+            *,
+            actor_id: UUID,
+            approve: bool,
+            reason: str | None = None,
+            now: datetime | None = None,
+    ) -> InspectionTask:
+        """Проверяет результат осмотра и принимает или возвращает его."""
+
+        task = await self.repository.get_by_id(task_id)
+
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        actor = await self.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            raise ValueError("Проверяющий пользователь не найден.")
+
+        # Проверять результат осмотра может только Manager.
+        if actor.role != UserRole.MANAGER:
+            raise ValueError("Проверять результат осмотра может только Manager.")
+
+        # Manager не может проверить осмотр, который выполнял он сам.
+        if task.assigned_to == actor_id:
+            raise ValueError(
+                "Manager не может проверять собственный результат осмотра."
+            )
+
+        substation = await self.substation_repository.get_by_id(
+            task.substation_id,
+        )
+
+        if substation is None:
+            raise ValueError("Подстанция задачи не найдена.")
+
+        # Проверяющий должен относиться к тому же производственному отделению,
+        # что и подстанция.
+        if actor.enterprise_id != substation.enterprise_id:
+            raise ValueError(
+                "Проверяющий Manager должен относиться к тому же "
+                "производственному отделению."
+            )
+
+        new_status = (
+            TaskStatus.CLOSED
+            if approve
+            else TaskStatus.IN_PROGRESS
+        )
+
+        validate_transition(task.status, new_status)
+
+        if not approve:
+            validate_reason(reason)
+
+        current_time = now or datetime.now().astimezone()
+
+        old_status = task.status
+        task.status = new_status
+
+        if approve:
+            task.closed_at = current_time
+
+        await self.repository.save(task)
+
+        history = InspectionHistory(
+            inspection_task_id=task.id,
+            event_type="review_approved" if approve else "review_rejected",
+            old_status=old_status,
+            new_status=new_status,
+            actor_id=actor_id,
+            comment=reason,
             created_at=current_time,
         )
 
