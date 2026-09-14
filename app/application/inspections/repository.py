@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.inspection_task import InspectionTask
+from app.domain.inspection_history import InspectionHistory
 
 
 class InspectionTaskRepository:
@@ -26,4 +27,10 @@ class InspectionTaskRepository:
         await self.session.flush()
         await self.session.refresh(task)
         return task
+
+    async def add_history(self, history: InspectionHistory) -> InspectionHistory:
+        # История нужна для аудита каждого изменения состояния задачи.
+        self.session.add(history)
+        await self.session.flush()
+        return history
 
