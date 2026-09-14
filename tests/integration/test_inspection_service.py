@@ -667,3 +667,295 @@ async def test_send_inspection_to_review_with_real_postgresql(
     assert review_history.old_status == TaskStatus.COMPLETED
     assert review_history.new_status == TaskStatus.UNDER_REVIEW
     assert review_history.actor_id == engineer.id
+
+@pytest.mark.asyncio
+async def test_review_approve_inspection_with_real_postgresql(
+    db_session,
+) -> None:
+    """Проверяем одобрение результата осмотра Manager-ом."""
+
+    department = Enterprise(
+        id=uuid4(),
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Тестовое ПО — одобрение",
+        short_name="ПО Approval",
+    )
+
+    creator = User(
+        id=uuid4(),
+        full_name="Иванов Иван Иванович",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    engineer = User(
+        id=uuid4(),
+        full_name="Петров Петр Петрович",
+        role=UserRole.ENGINEER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    reviewer = User(
+        id=uuid4(),
+        full_name="Сидоров Сидор Сидорович",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    substation = Substation(
+        id=uuid4(),
+        enterprise_id=department.id,
+        highest_voltage=HighestVoltage.KV_110,
+        dispatch_name="ПС Approval",
+    )
+
+    db_session.add_all(
+        [
+            department,
+            creator,
+            engineer,
+            reviewer,
+            substation,
+        ]
+    )
+    await db_session.flush()
+
+    task_repository = InspectionTaskRepository(db_session)
+    user_repository = UserRepository(db_session)
+    substation_repository = SubstationRepository(db_session)
+
+    service = InspectionTaskService(
+        task_repository,
+        user_repository,
+        substation_repository,
+    )
+
+    created_at = datetime.now(timezone.utc)
+    assigned_at = created_at + timedelta(hours=1)
+    accepted_at = assigned_at + timedelta(hours=1)
+    completed_at = accepted_at + timedelta(hours=2)
+    review_at = completed_at + timedelta(hours=1)
+
+    task = await service.create(
+        substation_id=substation.id,
+        created_by=creator.id,
+        now=created_at,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=creator.id,
+        assignee_id=engineer.id,
+        now=assigned_at,
+    )
+
+    await service.accept(
+        task.id,
+        actor_id=engineer.id,
+        now=accepted_at,
+    )
+
+    await service.complete(
+        task.id,
+        actor_id=engineer.id,
+        inspection_date=completed_at.date(),
+        remarks="Замечаний не выявлено",
+        now=completed_at,
+    )
+
+    await service.send_to_review(
+        task.id,
+        actor_id=engineer.id,
+        now=review_at,
+    )
+
+    result = await service.review(
+        task.id,
+        actor_id=reviewer.id,
+        approve=True,
+        now=review_at + timedelta(hours=1),
+    )
+
+    assert result.status == TaskStatus.CLOSED
+    assert result.closed_at == review_at + timedelta(hours=1)
+    assert result.assigned_to == engineer.id
+    assert result.completed_at == completed_at
+
+    history_result = await db_session.execute(
+        select(InspectionHistory)
+        .where(
+            InspectionHistory.inspection_task_id == task.id
+        )
+        .order_by(InspectionHistory.created_at)
+    )
+    history_records = history_result.scalars().all()
+
+    assert len(history_records) == 5
+
+    review_history = history_records[-1]
+
+    assert review_history.event_type == "review_approved"
+    assert review_history.old_status == TaskStatus.UNDER_REVIEW
+    assert review_history.new_status == TaskStatus.CLOSED
+    assert review_history.actor_id == reviewer.id
+    assert review_history.comment is None
+
+@pytest.mark.asyncio
+async def test_review_return_inspection_with_real_postgresql(
+    db_session,
+) -> None:
+    """Проверяем возврат результата осмотра исполнителю."""
+
+    department = Enterprise(
+        id=uuid4(),
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Тестовое ПО — возврат",
+        short_name="ПО Return",
+    )
+
+    creator = User(
+        id=uuid4(),
+        full_name="Иванов Иван Иванович",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    engineer = User(
+        id=uuid4(),
+        full_name="Петров Петр Петрович",
+        role=UserRole.ENGINEER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    reviewer = User(
+        id=uuid4(),
+        full_name="Сидоров Сидор Сидорович",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    substation = Substation(
+        id=uuid4(),
+        enterprise_id=department.id,
+        highest_voltage=HighestVoltage.KV_110,
+        dispatch_name="ПС Return",
+    )
+
+    db_session.add_all(
+        [
+            department,
+            creator,
+            engineer,
+            reviewer,
+            substation,
+        ]
+    )
+    await db_session.flush()
+
+    task_repository = InspectionTaskRepository(db_session)
+    user_repository = UserRepository(db_session)
+    substation_repository = SubstationRepository(db_session)
+
+    service = InspectionTaskService(
+        task_repository,
+        user_repository,
+        substation_repository,
+    )
+
+    created_at = datetime.now(timezone.utc)
+    assigned_at = created_at + timedelta(hours=1)
+    accepted_at = assigned_at + timedelta(hours=1)
+    completed_at = accepted_at + timedelta(hours=2)
+    review_at = completed_at + timedelta(hours=1)
+
+    task = await service.create(
+        substation_id=substation.id,
+        created_by=creator.id,
+        now=created_at,
+    )
+
+    await service.assign(
+        task.id,
+        actor_id=creator.id,
+        assignee_id=engineer.id,
+        now=assigned_at,
+    )
+
+    await service.accept(
+        task.id,
+        actor_id=engineer.id,
+        now=accepted_at,
+    )
+
+    await service.complete(
+        task.id,
+        actor_id=engineer.id,
+        inspection_date=completed_at.date(),
+        remarks="Требуется уточнить состояние контактов.",
+        now=completed_at,
+    )
+
+    await service.send_to_review(
+        task.id,
+        actor_id=engineer.id,
+        now=review_at,
+    )
+
+    return_reason = "Необходимо дополнить описание выявленных замечаний."
+    returned_at = review_at + timedelta(hours=1)
+
+    result = await service.review(
+        task.id,
+        actor_id=reviewer.id,
+        approve=False,
+        reason=return_reason,
+        now=returned_at,
+    )
+
+    assert result.status == TaskStatus.IN_PROGRESS
+
+    # Возврат на доработку не сбрасывает сроки и время завершения
+    # предыдущего результата.
+    assert result.assigned_to == engineer.id
+    assert result.completed_at == completed_at
+    assert result.closed_at is None
+    assert result.assigned_at == assigned_at
+    assert result.acceptance_deadline_at == assigned_at + timedelta(days=1)
+    assert result.deadline_at == created_at + timedelta(days=7)
+
+    history_result = await db_session.execute(
+        select(InspectionHistory)
+        .where(
+            InspectionHistory.inspection_task_id == task.id
+        )
+        .order_by(InspectionHistory.created_at)
+    )
+    history_records = history_result.scalars().all()
+
+    assert len(history_records) == 5
+
+    review_history = history_records[-1]
+
+    assert review_history.event_type == "review_rejected"
+    assert review_history.old_status == TaskStatus.UNDER_REVIEW
+    assert review_history.new_status == TaskStatus.IN_PROGRESS
+    assert review_history.actor_id == reviewer.id
+    assert review_history.comment == return_reason
