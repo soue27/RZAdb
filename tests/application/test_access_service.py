@@ -731,3 +731,159 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
         assert result is False
 
         await session.rollback()
+
+@pytest.mark.asyncio
+async def test_superadmin_can_access_any_enterprise() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+        superadmin = User(
+            full_name="Superadmin",
+            role=UserRole.SUPERADMIN,
+            email="superadmin-enterprise@test.local",
+            password_hash="hash",
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([enterprise, superadmin])
+        await session.flush()
+
+        repository = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await repository.can_access_enterprise(
+            user_id=superadmin.id,
+            enterprise_id=enterprise.id,
+        )
+
+        assert result is True
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_can_access_own_enterprise() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-enterprise@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add(engineer)
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=engineer.id,
+            enterprise_id=enterprise.id,
+        )
+
+        assert result is True
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_cannot_access_another_enterprise() -> None:
+    async with async_session_factory() as session:
+        own_enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Own Department",
+            short_name="Own Department",
+        )
+        another_enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Another Department",
+            short_name="Another Department",
+        )
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-another-enterprise@test.local",
+            password_hash="hash",
+            enterprise=own_enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([another_enterprise, engineer])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=engineer.id,
+            enterprise_id=another_enterprise.id,
+        )
+
+        assert result is False
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_can_access_descendant_enterprise() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Holding",
+            short_name="Holding",
+        )
+        branch = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch",
+            short_name="Branch",
+            parent=holding,
+        )
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+            parent=branch,
+        )
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-descendant@test.local",
+            password_hash="hash",
+            access_category=AccessCategory.IV,
+            enterprise=holding,
+            active=True,
+        )
+
+        session.add_all([department, specialist])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department.id,
+        )
+
+        assert result is True
+        await session.rollback()
