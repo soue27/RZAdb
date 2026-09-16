@@ -5,6 +5,7 @@ from app.application.substations.repository import SubstationRepository
 from app.application.users.repository import UserRepository
 from app.application.connections.repository import ConnectionRepository
 from app.domain.enums import EnterpriseType, UserRole
+from app.application.urzas.repository import URZARepository
 
 
 class AccessService:
@@ -16,11 +17,13 @@ class AccessService:
             substation_repository: SubstationRepository,
             enterprise_repository: EnterpriseRepository,
             connection_repository: ConnectionRepository,
+            urza_repository: URZARepository,
     ) -> None:
         self.user_repository = user_repository
         self.substation_repository = substation_repository
         self.enterprise_repository = enterprise_repository
         self.connection_repository = connection_repository
+        self.urza_repository = urza_repository
 
     async def can_access_enterprise(
         self,
@@ -102,6 +105,46 @@ class AccessService:
         """Проверяет доступ пользователя к присоединению."""
 
         connection = await self.connection_repository.get_by_id(connection_id)
+
+        if connection is None:
+            return False
+
+        if connection.deleted_at is not None:
+            return False
+
+        substation = await self.substation_repository.get_by_id(
+            connection.substation_id,
+        )
+
+        if substation is None:
+            return False
+
+        if substation.deleted_at is not None:
+            return False
+
+        return await self.can_access_enterprise(
+            user_id=user_id,
+            enterprise_id=substation.enterprise_id,
+        )
+
+    async def can_access_urza(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+    ) -> bool:
+        """Проверяет доступ пользователя к устройству РЗА."""
+
+        urza = await self.urza_repository.get_by_id(urza_id)
+
+        if urza is None:
+            return False
+
+        if urza.deleted_at is not None:
+            return False
+
+        connection = await self.connection_repository.get_by_id(
+            urza.connection_id,
+        )
 
         if connection is None:
             return False

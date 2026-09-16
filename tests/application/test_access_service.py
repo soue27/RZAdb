@@ -1,5 +1,5 @@
 from uuid6 import uuid7
-
+from datetime import date, datetime, UTC
 import pytest
 
 from app.application.access.service import AccessService
@@ -17,8 +17,16 @@ from app.domain.user import User
 from app.infrastructure.database.engine import async_session_factory
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.connections.repository import ConnectionRepository
+from app.application.urzas.repository import URZARepository
 from app.domain.connection import Connection
 from app.domain.enums import OperationalCurrentType
+from app.domain.enums import (
+    ElementBase,
+    RoomCategory,
+    URZACategory,
+    URZAStatus,
+)
+from app.domain.urza import URZA
 
 
 @pytest.mark.asyncio
@@ -54,6 +62,7 @@ async def test_superadmin_can_access_any_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -98,6 +107,7 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -154,6 +164,7 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -198,6 +209,7 @@ async def test_admin_can_access_substation_of_own_department() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -243,6 +255,7 @@ async def test_manager_can_access_substation_of_own_department() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -277,6 +290,7 @@ async def test_unknown_user_cannot_access_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
 
         )
 
@@ -322,6 +336,7 @@ async def test_inactive_user_cannot_access_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -360,6 +375,7 @@ async def test_user_cannot_access_unknown_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -406,6 +422,7 @@ async def test_deleted_user_cannot_access_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -453,6 +470,7 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -498,6 +516,7 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -556,6 +575,7 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -615,6 +635,7 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -696,6 +717,7 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -740,6 +762,7 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_substation(
@@ -776,6 +799,7 @@ async def test_superadmin_can_access_any_enterprise() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await repository.can_access_enterprise(
@@ -812,6 +836,7 @@ async def test_engineer_can_access_own_enterprise() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -853,6 +878,7 @@ async def test_engineer_cannot_access_another_enterprise() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -901,6 +927,7 @@ async def test_specialist_can_access_descendant_enterprise() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -939,6 +966,7 @@ async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -975,6 +1003,7 @@ async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -1013,6 +1042,7 @@ async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> N
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -1057,6 +1087,7 @@ async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -1124,6 +1155,7 @@ async def test_specialist_can_access_departments_in_different_branches() -> None
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result_a = await service.can_access_enterprise(
@@ -1197,6 +1229,7 @@ async def test_specialist_cannot_access_department_in_another_branch() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         own_department = await service.can_access_enterprise(
@@ -1253,6 +1286,7 @@ async def test_engineer_can_access_connection_in_own_department() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_connection(
@@ -1324,6 +1358,7 @@ async def test_engineer_cannot_access_connection_in_another_department() -> None
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         own_result = await service.can_access_connection(
@@ -1394,6 +1429,7 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_connection(
@@ -1486,6 +1522,7 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         own_result = await service.can_access_connection(
@@ -1544,6 +1581,7 @@ async def test_can_access_connection_returns_false_for_deleted_connection() -> N
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_connection(
@@ -1597,11 +1635,639 @@ async def test_can_access_connection_returns_false_for_deleted_substation() -> N
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
         )
 
         result = await service.can_access_connection(
             user_id=engineer.id,
             connection_id=connection.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_can_access_urza_of_own_department() -> None:
+    async with async_session_factory() as session:
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Своё ПО",
+            short_name="СВОЁ ПО",
+        )
+
+        engineer = User(
+            full_name="Инженер",
+            role=UserRole.ENGINEER,
+            email=f"engineer-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=department,
+            access_category=AccessCategory.III,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Своего ПО",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        session.add_all([
+            department,
+            engineer,
+            substation,
+            connection,
+            urza,
+        ])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=engineer.id,
+            urza_id=urza.id,
+        )
+
+        assert result is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_cannot_access_urza_of_another_department() -> None:
+    async with async_session_factory() as session:
+        own_department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Своё ПО",
+            short_name="СВОЁ ПО",
+        )
+
+        another_department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Другое ПО",
+            short_name="ДРУГОЕ ПО",
+        )
+
+        engineer = User(
+            full_name="Инженер",
+            role=UserRole.ENGINEER,
+            email=f"engineer-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=own_department,
+            access_category=AccessCategory.III,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=another_department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Другого ПО",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        session.add_all(
+            [
+                own_department,
+                another_department,
+                engineer,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=engineer.id,
+            urza_id=urza.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_cannot_access_deleted_urza() -> None:
+    async with async_session_factory() as session:
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Своё ПО",
+            short_name="СВОЁ ПО",
+        )
+
+        engineer = User(
+            full_name="Инженер",
+            role=UserRole.ENGINEER,
+            email=f"engineer-deleted-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=department,
+            access_category=AccessCategory.III,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Своего ПО",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="Удалённое РЗА",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        urza.deleted_at = datetime.now(UTC)
+
+        session.add_all(
+            [
+                department,
+                engineer,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=engineer.id,
+            urza_id=urza.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_cannot_access_urza_of_deleted_connection() -> None:
+    async with async_session_factory() as session:
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Своё ПО",
+            short_name="СВОЁ ПО",
+        )
+
+        engineer = User(
+            full_name="Инженер",
+            role=UserRole.ENGINEER,
+            email=f"engineer-deleted-connection-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=department,
+            access_category=AccessCategory.III,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Своего ПО",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Удалённое присоединение",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        connection.deleted_at = datetime.now(UTC)
+
+        session.add_all(
+            [
+                department,
+                engineer,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=engineer.id,
+            urza_id=urza.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_cannot_access_urza_of_deleted_substation() -> None:
+    async with async_session_factory() as session:
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Своё ПО",
+            short_name="СВОЁ ПО",
+        )
+
+        engineer = User(
+            full_name="Инженер",
+            role=UserRole.ENGINEER,
+            email=f"engineer-deleted-substation-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=department,
+            access_category=AccessCategory.III,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="Удалённая ПС",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        substation.deleted_at = datetime.now(UTC)
+
+        session.add_all(
+            [
+                department,
+                engineer,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=engineer.id,
+            urza_id=urza.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_superadmin_can_access_urza_of_any_department() -> None:
+    async with async_session_factory() as session:
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Другое ПО",
+            short_name="ДРУГОЕ ПО",
+        )
+
+        superadmin = User(
+            full_name="Суперадминистратор",
+            role=UserRole.SUPERADMIN,
+            email=f"superadmin-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.I,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Другого ПО",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        session.add_all(
+            [
+                department,
+                superadmin,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=superadmin.id,
+            urza_id=urza.id,
+        )
+
+        assert result is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_can_access_urza_in_holding_descendant() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Холдинг",
+            short_name="ХОЛДИНГ",
+        )
+
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            parent=holding,
+            full_name="ПО Холдинга",
+            short_name="ПО ХОЛДИНГА",
+        )
+
+        specialist = User(
+            full_name="Специалист",
+            role=UserRole.SPECIALIST,
+            email=f"specialist-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=holding,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Холдинга",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        session.add_all(
+            [
+                holding,
+                department,
+                specialist,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=specialist.id,
+            urza_id=urza.id,
+        )
+
+        assert result is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_cannot_access_urza_in_another_branch() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Холдинг",
+            short_name="ХОЛДИНГ",
+        )
+
+        own_branch = Enterprise(
+            type=EnterpriseType.BRANCH,
+            parent=holding,
+            full_name="Свой филиал",
+            short_name="СВОЙ ФИЛИАЛ",
+        )
+
+        another_branch = Enterprise(
+            type=EnterpriseType.BRANCH,
+            parent=holding,
+            full_name="Другой филиал",
+            short_name="ДРУГОЙ ФИЛИАЛ",
+        )
+
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            parent=another_branch,
+            full_name="ПО другого филиала",
+            short_name="ПО ДРУГОГО ФИЛИАЛА",
+        )
+
+        specialist = User(
+            full_name="Специалист",
+            role=UserRole.SPECIALIST,
+            email=f"specialist-other-branch-urza-{uuid7()}@test.local",
+            password_hash="test-password-hash",
+            enterprise=own_branch,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="ПС Другого филиала",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Присоединение 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        urza = URZA(
+            connection=connection,
+            dispatch_name="РЗА-1",
+            rdu_subordination=False,
+            inventory_number=None,
+            commissioning_date=date(2020, 1, 1),
+            status=URZAStatus.IN_OPERATION,
+            element_base=ElementBase.MICROPROCESSOR,
+            category=URZACategory.II,
+            room_category=RoomCategory.I,
+            complexity=False,
+        )
+
+        session.add_all(
+            [
+                holding,
+                own_branch,
+                another_branch,
+                department,
+                specialist,
+                substation,
+                connection,
+                urza,
+            ]
+        )
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        )
+
+        result = await service.can_access_urza(
+            user_id=specialist.id,
+            urza_id=urza.id,
         )
 
         assert result is False
