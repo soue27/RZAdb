@@ -16,6 +16,9 @@ from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.engine import async_session_factory
 from app.application.enterprises.repository import EnterpriseRepository
+from app.application.connections.repository import ConnectionRepository
+from app.domain.connection import Connection
+from app.domain.enums import OperationalCurrentType
 
 
 @pytest.mark.asyncio
@@ -50,6 +53,7 @@ async def test_superadmin_can_access_any_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -93,6 +97,7 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -148,6 +153,7 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -191,6 +197,7 @@ async def test_admin_can_access_substation_of_own_department() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -235,6 +242,7 @@ async def test_manager_can_access_substation_of_own_department() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -268,6 +276,8 @@ async def test_unknown_user_cannot_access_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+
         )
 
         result = await service.can_access_substation(
@@ -311,6 +321,7 @@ async def test_inactive_user_cannot_access_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -348,6 +359,7 @@ async def test_user_cannot_access_unknown_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -393,6 +405,7 @@ async def test_deleted_user_cannot_access_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -439,6 +452,7 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -483,6 +497,7 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -540,6 +555,7 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -598,6 +614,7 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -678,6 +695,7 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -721,6 +739,7 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_substation(
@@ -756,6 +775,7 @@ async def test_superadmin_can_access_any_enterprise() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await repository.can_access_enterprise(
@@ -791,6 +811,7 @@ async def test_engineer_can_access_own_enterprise() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -831,6 +852,7 @@ async def test_engineer_cannot_access_another_enterprise() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -878,6 +900,7 @@ async def test_specialist_can_access_descendant_enterprise() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -915,6 +938,7 @@ async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -950,6 +974,7 @@ async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -987,6 +1012,7 @@ async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> N
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -1030,6 +1056,7 @@ async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
             user_repository=UserRepository(session),
             substation_repository=SubstationRepository(session),
             enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
         )
 
         result = await service.can_access_enterprise(
@@ -1038,4 +1065,545 @@ async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
         )
 
         assert result is False
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_can_access_departments_in_different_branches() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Holding",
+            short_name="Holding",
+        )
+
+        branch_a = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch A",
+            short_name="Branch A",
+            parent=holding,
+        )
+        branch_b = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch B",
+            short_name="Branch B",
+            parent=holding,
+        )
+
+        department_a = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department A",
+            short_name="Department A",
+            parent=branch_a,
+        )
+        department_b = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department B",
+            short_name="Department B",
+            parent=branch_b,
+        )
+
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-two-branches@test.local",
+            password_hash="hash",
+            enterprise=holding,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([
+            department_a,
+            department_b,
+            specialist,
+        ])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        result_a = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department_a.id,
+        )
+        result_b = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department_b.id,
+        )
+
+        assert result_a is True
+        assert result_b is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_cannot_access_department_in_another_branch() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Holding",
+            short_name="Holding",
+        )
+
+        branch_a = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch A",
+            short_name="Branch A",
+            parent=holding,
+        )
+        branch_b = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch B",
+            short_name="Branch B",
+            parent=holding,
+        )
+
+        department_a = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department A",
+            short_name="Department A",
+            parent=branch_a,
+        )
+        department_b = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department B",
+            short_name="Department B",
+            parent=branch_b,
+        )
+
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-branch-boundary@test.local",
+            password_hash="hash",
+            enterprise=branch_a,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([
+            department_a,
+            department_b,
+            specialist,
+        ])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        own_department = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department_a.id,
+        )
+        foreign_department = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department_b.id,
+        )
+
+        assert own_department is True
+        assert foreign_department is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_can_access_connection_in_own_department() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+
+        substation = Substation(
+            enterprise=enterprise,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="PS-110",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Connection 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-connection@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([connection, engineer])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        result = await service.can_access_connection(
+            user_id=engineer.id,
+            connection_id=connection.id,
+        )
+
+        assert result is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_engineer_cannot_access_connection_in_another_department() -> None:
+    async with async_session_factory() as session:
+        own_enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Own Department",
+            short_name="Own Department",
+        )
+        another_enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Another Department",
+            short_name="Another Department",
+        )
+
+        own_substation = Substation(
+            enterprise=own_enterprise,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="Own PS",
+        )
+        another_substation = Substation(
+            enterprise=another_enterprise,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="Another PS",
+        )
+
+        own_connection = Connection(
+            substation=own_substation,
+            dispatch_name="Own Connection",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+        another_connection = Connection(
+            substation=another_substation,
+            dispatch_name="Another Connection",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-foreign-connection@test.local",
+            password_hash="hash",
+            enterprise=own_enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([
+            own_connection,
+            another_connection,
+            engineer,
+        ])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        own_result = await service.can_access_connection(
+            user_id=engineer.id,
+            connection_id=own_connection.id,
+        )
+        foreign_result = await service.can_access_connection(
+            user_id=engineer.id,
+            connection_id=another_connection.id,
+        )
+
+        assert own_result is True
+        assert foreign_result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_can_access_connection_in_own_branch() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Holding",
+            short_name="Holding",
+        )
+
+        branch = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch",
+            short_name="Branch",
+            parent=holding,
+        )
+
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+            parent=branch,
+        )
+
+        substation = Substation(
+            enterprise=department,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="PS-110",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Connection 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-connection@test.local",
+            password_hash="hash",
+            enterprise=branch,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([connection, specialist])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        result = await service.can_access_connection(
+            user_id=specialist.id,
+            connection_id=connection.id,
+        )
+
+        assert result is True
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_cannot_access_connection_in_another_branch() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Holding",
+            short_name="Holding",
+        )
+
+        branch_a = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch A",
+            short_name="Branch A",
+            parent=holding,
+        )
+        branch_b = Enterprise(
+            type=EnterpriseType.BRANCH,
+            full_name="Branch B",
+            short_name="Branch B",
+            parent=holding,
+        )
+
+        department_a = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department A",
+            short_name="Department A",
+            parent=branch_a,
+        )
+        department_b = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department B",
+            short_name="Department B",
+            parent=branch_b,
+        )
+
+        substation_a = Substation(
+            enterprise=department_a,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="PS-A",
+        )
+        substation_b = Substation(
+            enterprise=department_b,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="PS-B",
+        )
+
+        connection_a = Connection(
+            substation=substation_a,
+            dispatch_name="Connection A",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+        connection_b = Connection(
+            substation=substation_b,
+            dispatch_name="Connection B",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-foreign-connection@test.local",
+            password_hash="hash",
+            enterprise=branch_a,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([
+            connection_a,
+            connection_b,
+            specialist,
+        ])
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        own_result = await service.can_access_connection(
+            user_id=specialist.id,
+            connection_id=connection_a.id,
+        )
+        foreign_result = await service.can_access_connection(
+            user_id=specialist.id,
+            connection_id=connection_b.id,
+        )
+
+        assert own_result is True
+        assert foreign_result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_can_access_connection_returns_false_for_deleted_connection() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+
+        substation = Substation(
+            enterprise=enterprise,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="PS-110",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Connection 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-deleted-connection@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([connection, engineer])
+        await session.flush()
+
+        connection.deleted_at = connection.created_at
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        result = await service.can_access_connection(
+            user_id=engineer.id,
+            connection_id=connection.id,
+        )
+
+        assert result is False
+
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_can_access_connection_returns_false_for_deleted_substation() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+
+        substation = Substation(
+            enterprise=enterprise,
+            highest_voltage=HighestVoltage.KV_110,
+            dispatch_name="Deleted PS",
+        )
+
+        connection = Connection(
+            substation=substation,
+            dispatch_name="Connection 1",
+            rdu_subordination=False,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )
+
+        engineer = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="engineer-deleted-substation@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([connection, engineer])
+        await session.flush()
+
+        substation.deleted_at = substation.created_at
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            connection_repository=ConnectionRepository(session),
+        )
+
+        result = await service.can_access_connection(
+            user_id=engineer.id,
+            connection_id=connection.id,
+        )
+
+        assert result is False
+
         await session.rollback()

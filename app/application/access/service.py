@@ -3,6 +3,7 @@ from uuid import UUID
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.substations.repository import SubstationRepository
 from app.application.users.repository import UserRepository
+from app.application.connections.repository import ConnectionRepository
 from app.domain.enums import EnterpriseType, UserRole
 
 
@@ -10,14 +11,16 @@ class AccessService:
     """Проверяет права пользователя на объекты системы."""
 
     def __init__(
-        self,
-        user_repository: UserRepository,
-        substation_repository: SubstationRepository,
-        enterprise_repository: EnterpriseRepository,
+            self,
+            user_repository: UserRepository,
+            substation_repository: SubstationRepository,
+            enterprise_repository: EnterpriseRepository,
+            connection_repository: ConnectionRepository,
     ) -> None:
         self.user_repository = user_repository
         self.substation_repository = substation_repository
         self.enterprise_repository = enterprise_repository
+        self.connection_repository = connection_repository
 
     async def can_access_enterprise(
         self,
@@ -79,6 +82,36 @@ class AccessService:
         """Проверяет доступ пользователя к подстанции."""
 
         substation = await self.substation_repository.get_by_id(substation_id)
+
+        if substation is None:
+            return False
+
+        if substation.deleted_at is not None:
+            return False
+
+        return await self.can_access_enterprise(
+            user_id=user_id,
+            enterprise_id=substation.enterprise_id,
+        )
+
+    async def can_access_connection(
+            self,
+            user_id: UUID,
+            connection_id: UUID,
+    ) -> bool:
+        """Проверяет доступ пользователя к присоединению."""
+
+        connection = await self.connection_repository.get_by_id(connection_id)
+
+        if connection is None:
+            return False
+
+        if connection.deleted_at is not None:
+            return False
+
+        substation = await self.substation_repository.get_by_id(
+            connection.substation_id,
+        )
 
         if substation is None:
             return False
