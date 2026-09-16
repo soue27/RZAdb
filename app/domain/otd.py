@@ -7,6 +7,7 @@ from sqlalchemy import (Date, Enum, ForeignKey,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.urza import URZA
+from app.domain.task import Task
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
@@ -136,6 +137,4 @@ class OTDVersion(
 
     otd: Mapped[OTD] = relationship()
 
-    if TYPE_CHECKING:
-        from app.domain.task import Task
     task: Mapped["Task | None"] = relationship()
