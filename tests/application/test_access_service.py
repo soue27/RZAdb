@@ -887,3 +887,155 @@ async def test_specialist_can_access_descendant_enterprise() -> None:
 
         assert result is True
         await session.rollback()
+
+@pytest.mark.asyncio
+async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+        user = User(
+            full_name="Deleted User",
+            role=UserRole.ENGINEER,
+            email="deleted-enterprise@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add(user)
+        await session.flush()
+
+        user.deleted_at = user.created_at
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=user.id,
+            enterprise_id=enterprise.id,
+        )
+
+        assert result is False
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+        )
+        user = User(
+            full_name="Inactive User",
+            role=UserRole.ENGINEER,
+            email="inactive-enterprise@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=False,
+        )
+
+        session.add(user)
+        await session.flush()
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=user.id,
+            enterprise_id=enterprise.id,
+        )
+
+        assert result is False
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Deleted Department",
+            short_name="Deleted Department",
+        )
+        user = User(
+            full_name="Engineer",
+            role=UserRole.ENGINEER,
+            email="deleted-enterprise-target@test.local",
+            password_hash="hash",
+            enterprise=enterprise,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add(user)
+        await session.flush()
+
+        enterprise.deleted_at = enterprise.created_at
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=user.id,
+            enterprise_id=enterprise.id,
+        )
+
+        assert result is False
+        await session.rollback()
+
+@pytest.mark.asyncio
+async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
+    async with async_session_factory() as session:
+        holding = Enterprise(
+            type=EnterpriseType.HOLDING,
+            full_name="Deleted Holding",
+            short_name="Deleted Holding",
+        )
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Department",
+            short_name="Department",
+            parent=holding,
+        )
+        specialist = User(
+            full_name="Specialist",
+            role=UserRole.SPECIALIST,
+            email="specialist-deleted-holding@test.local",
+            password_hash="hash",
+            enterprise=holding,
+            access_category=AccessCategory.IV,
+            active=True,
+        )
+
+        session.add_all([department, specialist])
+        await session.flush()
+
+        holding.deleted_at = holding.created_at
+
+        service = AccessService(
+            user_repository=UserRepository(session),
+            substation_repository=SubstationRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+        )
+
+        result = await service.can_access_enterprise(
+            user_id=specialist.id,
+            enterprise_id=department.id,
+        )
+
+        assert result is False
+        await session.rollback()
