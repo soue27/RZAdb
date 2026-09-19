@@ -2,10 +2,10 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.application.tasks.repository import TaskRepository
+from app.application.tasks.workflow import validate_reason, validate_transition
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
-from app.application.tasks.workflow import validate_transition, validate_reason
 
 
 class TaskService:
@@ -253,11 +253,13 @@ class TaskService:
                 MaintenanceType.OSM,
             }
 
-            if task.maintenance_type not in protocol_not_required:
-                if to_record.scan_protocol_id is None:
-                    raise ValueError(
-                        "Для завершения задачи по ТО необходим скан протокола."
-                    )
+            if (
+                    task.maintenance_type not in protocol_not_required
+                    and to_record.scan_protocol_id is None
+            ):
+                raise ValueError(
+                    "Для завершения задачи по ТО необходим скан протокола."
+                )
 
         # Для программы результатом выполнения является Program,
         # созданная в рамках этой задачи.

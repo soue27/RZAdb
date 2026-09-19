@@ -3,11 +3,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.task import Task
-from app.domain.settings_record import SettingsRecord
-from app.domain.schema import SchemaRecord
-from app.domain.program import Program
 from app.domain.maintenance import TORecord
+from app.domain.program import Program
+from app.domain.schema import SchemaRecord
+from app.domain.settings_record import SettingsRecord
+from app.domain.task import Task
 
 
 class TaskRepository:

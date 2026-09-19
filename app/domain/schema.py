@@ -4,9 +4,9 @@ from uuid import UUID
 from sqlalchemy import Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.urza import URZA
 from app.domain.file import File
 from app.domain.task import Task
+from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import UUIDMixin

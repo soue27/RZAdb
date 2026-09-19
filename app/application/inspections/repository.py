@@ -2,9 +2,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.inspection_task import InspectionTask
-from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection import Inspection
+from app.domain.inspection_history import InspectionHistory
+from app.domain.inspection_task import InspectionTask
 
 
 class InspectionTaskRepository:

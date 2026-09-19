@@ -1,6 +1,5 @@
 from app.domain.enums import TaskStatus
 
-
 ALLOWED_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
     TaskStatus.CREATED: frozenset({TaskStatus.ASSIGNED}),
     TaskStatus.ASSIGNED: frozenset({

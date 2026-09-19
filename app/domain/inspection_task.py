@@ -5,6 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enums import TaskStatus
+from app.domain.inspection import Inspection
 from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
@@ -13,7 +14,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-from app.domain.inspection import Inspection
 
 
 class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

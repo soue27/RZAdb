@@ -1,11 +1,11 @@
 from uuid import UUID
 
+from app.application.connections.repository import ConnectionRepository
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.substations.repository import SubstationRepository
-from app.application.users.repository import UserRepository
-from app.application.connections.repository import ConnectionRepository
-from app.domain.enums import EnterpriseType, UserRole
 from app.application.urzas.repository import URZARepository
+from app.application.users.repository import UserRepository
+from app.domain.enums import EnterpriseType, UserRole
 
 
 class AccessService:

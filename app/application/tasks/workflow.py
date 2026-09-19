@@ -1,6 +1,5 @@
 from app.domain.enums import TaskStatus
 
-
 # Описываем только допустимые переходы между статусами.
 # Это держит правила workflow отдельно от БД и HTTP-слоя.
 ALLOWED_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {

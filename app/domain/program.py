@@ -8,7 +8,11 @@ from app.domain.file import File
 from app.domain.task import Task
 from app.domain.urza import URZA
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
 class Program(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

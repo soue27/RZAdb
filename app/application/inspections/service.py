@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from app.application.inspections.repository import InspectionTaskRepository
-from app.application.inspections.workflow import validate_transition, validate_reason
+from app.application.inspections.workflow import validate_reason, validate_transition
+from app.application.substations.repository import SubstationRepository
 from app.application.users.repository import UserRepository
 from app.domain.enums import TaskStatus, UserRole
+from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
-from app.domain.inspection import Inspection
-from app.application.substations.repository import SubstationRepository
 
 
 class InspectionTaskService:

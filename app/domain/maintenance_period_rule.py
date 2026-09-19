@@ -1,8 +1,9 @@
+from sqlalchemy import Enum, Integer, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.domain.enums import ElementBase, RoomCategory
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import UUIDMixin
-from sqlalchemy import Enum, Integer, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
 
 
 class MaintenancePeriodRule(UUIDMixin, Base):

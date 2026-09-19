@@ -7,10 +7,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.domain.enums import MaintenanceType
 from app.domain.file import File
 from app.domain.task import Task
-from app.domain.user import User
 from app.domain.urza import URZA
+from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
 class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

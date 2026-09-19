@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import Date, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.substation import Substation
 from app.domain.file import File
+from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import UUIDMixin

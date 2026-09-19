@@ -1,20 +1,26 @@
 from datetime import date
 from uuid import UUID
-from typing import TYPE_CHECKING
 
-from sqlalchemy import (Date, Enum, ForeignKey,
-                        Integer, SmallInteger, String, UniqueConstraint)
+from sqlalchemy import (
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.urza import URZA
+from app.domain.enums import OTDPurpose
 from app.domain.task import Task
+from app.domain.urza import URZA
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
     TimestampMixin,
     UUIDMixin,
 )
-from app.domain.enums import OTDPurpose
 
 
 class OTD(
