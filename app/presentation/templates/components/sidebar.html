@@ -2,6 +2,17 @@
     id="app-sidebar"
     class="app-sidebar bg-white border-end"
 >
+    <button
+        type="button"
+        id="sidebar-collapse"
+        class="sidebar-collapse-button"
+        title="Свернуть панель"
+        aria-label="Свернуть панель"
+    >
+        <span class="material-icons">
+            chevron_left
+        </span>
+    </button>
     <!-- Search -->
     <div class="sidebar-search">
         <div class="input-group">
@@ -715,4 +726,11 @@
         </div>
 
     </div>
+        <div
+        id="sidebar-resizer"
+        class="sidebar-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Изменить ширину панели"
+    ></div>
 </aside>

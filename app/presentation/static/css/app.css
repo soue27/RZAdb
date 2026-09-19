@@ -121,11 +121,18 @@ body {
    --------------------------------------------------------- */
 
 .app-sidebar {
+    position: relative;
+    z-index: 25;
+
     width: 340px;
     flex: 0 0 340px;
 
+    min-width: 280px;
+    max-width: 520px;
+
     min-height: calc(100vh - 60px);
 
+    overflow-x: visible;
     overflow-y: auto;
 
     background-color: var(--rzadb-surface);
@@ -567,4 +574,175 @@ body {
 
 .app-content {
     min-width: 0;
+}
+
+/* ---------------------------------------------------------
+   Sidebar resize / collapse
+   --------------------------------------------------------- */
+
+.app-sidebar {
+    position: relative;
+
+    width: 340px;
+    flex: 0 0 340px;
+
+    min-width: 280px;
+    max-width: 520px;
+
+    transition:
+        width 0.2s ease,
+        flex-basis 0.2s ease;
+}
+
+
+/*
+ * Resize handle
+ */
+
+.sidebar-resizer {
+    position: absolute;
+
+    top: 0;
+    right: -3px;
+    bottom: 0;
+
+    width: 6px;
+
+    cursor: col-resize;
+
+    z-index: 20;
+}
+
+.sidebar-resizer:hover {
+    background-color: var(--rzadb-primary);
+    opacity: 0.35;
+}
+
+
+/*
+ * Collapse button
+ */
+
+.sidebar-collapse-button {
+    position: absolute;
+
+    top: 50%;
+    right: -17px;
+
+    width: 36px;
+    height: 36px;
+
+    z-index: 30;
+
+    transform: translateY(-50%);
+
+    border: 1px solid #cfd4da;
+    border-radius: 50%;
+
+    background-color: #e9ecef;
+    color: #5f6b76;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    box-shadow: 0 2px 6px rgb(0 0 0 / 10%);
+
+    cursor: pointer;
+}
+
+.sidebar-collapse-button:hover {
+    background-color: #dee2e6;
+    color: var(--rzadb-primary);
+    border-color: #adb5bd;
+}
+
+.sidebar-collapse-button .material-icons {
+    font-size: 21px;
+}
+
+
+/*
+ * Collapse button
+ */
+
+.sidebar-collapse-button {
+    position: absolute;
+
+    top: 50%;
+    right: -17px;
+
+    width: 36px;
+    height: 36px;
+
+    z-index: 30;
+
+    transform: translateY(-50%);
+
+    border: 1px solid #cfd4da;
+    border-radius: 50%;
+
+    background-color: #e9ecef;
+    color: #5f6b76;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    box-shadow: 0 2px 6px rgb(0 0 0 / 10%);
+
+    cursor: pointer;
+}
+
+.sidebar-collapse-button:hover {
+    background-color: #dee2e6;
+    color: var(--rzadb-primary);
+    border-color: #adb5bd;
+}
+
+.sidebar-collapse-button .material-icons {
+    font-size: 21px;
+}
+
+
+/*
+ * Collapsed state
+ */
+
+.app-sidebar.is-collapsed {
+    width: 0;
+    flex-basis: 0;
+    min-width: 0;
+    max-width: 0;
+
+    overflow: visible;
+
+    border-right: 0 !important;
+}
+
+.app-sidebar.is-collapsed .sidebar-search,
+.app-sidebar.is-collapsed .app-sidebar-tree,
+.app-sidebar.is-collapsed .sidebar-resizer {
+    display: none;
+}
+
+
+/*
+ * Larger button when sidebar is collapsed
+ */
+
+.app-sidebar.is-collapsed .sidebar-collapse-button {
+    right: -27px;
+
+    width: 54px;
+    height: 54px;
+}
+
+.app-sidebar.is-collapsed .sidebar-collapse-button .material-icons {
+    font-size: 30px;
+    transform: rotate(180deg);
 }
