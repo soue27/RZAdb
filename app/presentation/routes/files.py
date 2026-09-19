@@ -6,7 +6,7 @@ from fastapi import File as FastAPIFile
 from fastapi.responses import Response
 
 from app.application.files.service import FileService
-from app.presentation.dependencies import get_file_service
+from app.presentation.dependencies.services import get_file_service
 from app.presentation.schemas.files import FileResponse
 
 router = APIRouter(prefix="/files", tags=["files"])

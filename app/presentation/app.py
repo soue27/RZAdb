@@ -5,6 +5,7 @@ from app.core.config import get_settings
 from app.presentation.routes.files import router as files_router
 from app.presentation.routes.health import router as health_router
 from app.presentation.routes.users import router as users_router
+from app.presentation.routes.auth import router as auth_router
 
 
 def create_app() -> FastAPI:
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(users_router)
     app.include_router(files_router)
+    app.include_router(auth_router)
 
     return app
 
