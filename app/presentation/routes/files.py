@@ -1,7 +1,9 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi import File as FastAPIFile
+from fastapi.responses import Response
 
 from app.application.files.service import FileService
 from app.presentation.dependencies import get_file_service
@@ -31,3 +33,21 @@ async def upload_file(
     )
 
     return FileResponse.model_validate(saved_file)
+
+@router.get("/{file_id}")
+async def download_file(
+    file_id: UUID,
+    file_service: Annotated[FileService, Depends(get_file_service)],
+) -> Response:
+    try:
+        content = await file_service.download(file_id=file_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Файл не найден.",
+        ) from exc
+
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+    )

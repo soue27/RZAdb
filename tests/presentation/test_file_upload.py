@@ -1,4 +1,9 @@
+
+from uuid import uuid4
+
+import pytest
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from app.presentation.app import app
 
@@ -35,6 +40,7 @@ def test_upload_file() -> None:
     assert "uploaded_at" in data
     assert "s3_key" not in data
 
+
 def test_upload_file_without_file() -> None:
     client = TestClient(app)
 
@@ -46,6 +52,7 @@ def test_upload_file_without_file() -> None:
     )
 
     assert response.status_code == 422
+
 
 def test_upload_file_without_display_name() -> None:
     client = TestClient(app)
@@ -62,3 +69,56 @@ def test_upload_file_without_display_name() -> None:
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_download_file() -> None:
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+        content = b"test pdf content"
+
+        upload_response = await client.post(
+            "/files",
+            files={
+                "file": (
+                    "scan.pdf",
+                    content,
+                    "application/pdf",
+                ),
+            },
+            data={
+                "display_name": "ПС Тестовая — ТО — 2026-09-19",
+            },
+        )
+
+        assert upload_response.status_code == 200
+
+        file_id = upload_response.json()["id"]
+
+        download_response = await client.get(f"/files/{file_id}")
+
+        assert download_response.status_code == 200
+        assert download_response.content == content
+        assert (
+            download_response.headers["content-type"]
+            == "application/octet-stream"
+        )
+
+
+@pytest.mark.asyncio
+async def test_download_missing_file() -> None:
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+        response = await client.get(f"/files/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Файл не найден."}
+
