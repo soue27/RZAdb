@@ -1,6 +1,5 @@
-from uuid6 import uuid7
-
 from fastapi.testclient import TestClient
+from uuid6 import uuid7
 
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User

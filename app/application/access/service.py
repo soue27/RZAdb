@@ -25,6 +25,61 @@ class AccessService:
         self.connection_repository = connection_repository
         self.urza_repository = urza_repository
 
+    async def get_accessible_enterprise_roots(
+        self,
+        user_id: UUID,
+    ) -> list:
+        """Возвращает предприятия, с которых начинается видимое пользователю дерево."""
+
+        user = await self.user_repository.get_by_id(user_id)
+
+        if user is None:
+            return []
+
+        if not user.active or user.deleted_at is not None:
+            return []
+
+        enterprises = await self.enterprise_repository.get_all_active()
+
+        if user.role is UserRole.SUPERADMIN:
+            return [
+                enterprise
+                for enterprise in enterprises
+                if enterprise.type is EnterpriseType.HOLDING
+                and enterprise.parent_id is None
+            ]
+
+        if user.enterprise_id is None:
+            return []
+
+        user_enterprise = await self.enterprise_repository.get_by_id(
+            user.enterprise_id,
+        )
+
+        if user_enterprise is None or user_enterprise.deleted_at is not None:
+            return []
+
+        if user.role is UserRole.SPECIALIST:
+            if user_enterprise.type not in {
+                EnterpriseType.HOLDING,
+                EnterpriseType.BRANCH,
+            }:
+                return []
+
+            return [user_enterprise]
+
+        if user.role in {
+            UserRole.ADMIN,
+            UserRole.MANAGER,
+            UserRole.ENGINEER,
+        }:
+            if user_enterprise.type is not EnterpriseType.DEPARTMENT:
+                return []
+
+            return [user_enterprise]
+
+        return []
+
     async def can_access_enterprise(
         self,
         user_id: UUID,

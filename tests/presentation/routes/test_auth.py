@@ -2,8 +2,7 @@ from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
-from app.application.auth.service import AuthService
-from app.application.auth.service import InvalidCredentialsError
+from app.application.auth.service import AuthService, InvalidCredentialsError
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User
 from app.presentation.app import app

@@ -1,11 +1,9 @@
-from uuid6 import uuid7
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from starlette.requests import Request
-from starlette.responses import Response
-
 from fastapi import HTTPException
+from starlette.requests import Request
+from uuid6 import uuid7
 
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User
@@ -84,9 +82,8 @@ async def test_get_current_user_when_user_not_found() -> None:
     with patch(
         "app.presentation.auth.dependencies.UserRepository",
         return_value=repository,
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(request, session)
+    ), pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, session)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Пользователь не найден или неактивен."
@@ -106,9 +103,8 @@ async def test_get_current_user_when_user_inactive() -> None:
     with patch(
         "app.presentation.auth.dependencies.UserRepository",
         return_value=repository,
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(request, session)
+    ), pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, session)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Пользователь не найден или неактивен."

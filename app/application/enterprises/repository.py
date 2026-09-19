@@ -15,10 +15,20 @@ class EnterpriseRepository:
     async def get_by_id(self, enterprise_id: UUID) -> Enterprise | None:
         return await self.session.get(Enterprise, enterprise_id)
 
+    async def get_all_active(self) -> list[Enterprise]:
+        """Возвращает все неудалённые предприятия."""
+        result = await self.session.scalars(
+            select(Enterprise)
+            .where(Enterprise.deleted_at.is_(None))
+            .order_by(Enterprise.full_name)
+        )
+
+        return list(result)
+
     async def is_ancestor_or_same(
-            self,
-            ancestor_id: UUID,
-            enterprise_id: UUID,
+        self,
+        ancestor_id: UUID,
+        enterprise_id: UUID,
     ) -> bool:
         """Проверяет, является ли предприятие предком или самим предприятием."""
 
