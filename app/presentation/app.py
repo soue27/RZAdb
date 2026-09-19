@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from fastapi.staticfiles import StaticFiles
+
 from app.core.config import get_settings
 from app.presentation.routes.auth import router as auth_router
 from app.presentation.routes.files import router as files_router
@@ -15,6 +17,12 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         debug=settings.debug,
+    )
+
+    app.mount(
+        "/static",
+        StaticFiles(directory="app/presentation/static"),
+        name="static",
     )
 
     app.add_middleware(

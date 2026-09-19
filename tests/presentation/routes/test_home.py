@@ -42,9 +42,8 @@ def test_home_authenticated() -> None:
         response = client.get("/")
 
         assert response.status_code == 200
-        assert response.json() == {
-            "message": "RZAdb",
-            "user": "Тестовый пользователь",
-        }
+        assert "text/html" in response.headers["content-type"]
+        assert "RZAdb" in response.text
+        assert "Тестовый пользователь" in response.text
     finally:
         app.dependency_overrides.clear()
