@@ -172,10 +172,11 @@ async def test_download_file(
         return_value=content,
     )
 
-    result = await service.download(
+    saved_file, result = await service.download(
         file_id=file_id,
     )
 
+    assert saved_file is file
     assert result == content
 
     repository.get_by_id.assert_awaited_once_with(

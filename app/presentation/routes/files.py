@@ -40,7 +40,7 @@ async def download_file(
     file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> Response:
     try:
-        content = await file_service.download(file_id=file_id)
+        file, content = await file_service.download(file_id=file_id)
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -49,5 +49,10 @@ async def download_file(
 
     return Response(
         content=content,
-        media_type="application/octet-stream",
+        media_type=file.mime_type,
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{file.original_name}"'
+            ),
+        },
     )

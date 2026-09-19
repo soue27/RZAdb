@@ -103,9 +103,10 @@ async def test_download_file() -> None:
 
         assert download_response.status_code == 200
         assert download_response.content == content
+        assert download_response.headers["content-type"] == "application/pdf"
         assert (
-            download_response.headers["content-type"]
-            == "application/octet-stream"
+                download_response.headers["content-disposition"]
+                == 'attachment; filename="scan.pdf"'
         )
 
 

@@ -59,19 +59,14 @@ class FileService:
 
         return file
 
-    async def download(
-            self,
-            *,
-            file_id: UUID,
-    ) -> bytes:
+    async def download(self, *, file_id: UUID) -> tuple[File, bytes]:
         file = await self.repository.get_by_id(file_id)
-
         if file is None:
             raise FileNotFoundError(file_id)
 
-        return await self.storage.download(
-            key=file.s3_key,
-        )
+        content = await self.storage.download(key=file.s3_key)
+
+        return file, content
 
     async def archive(
         self,
