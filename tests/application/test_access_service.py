@@ -1,32 +1,31 @@
-from uuid6 import uuid7
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
+
 import pytest
+from uuid6 import uuid7
 
 from app.application.access.service import AccessService
+from app.application.connections.repository import ConnectionRepository
+from app.application.enterprises.repository import EnterpriseRepository
 from app.application.substations.repository import SubstationRepository
+from app.application.urzas.repository import URZARepository
 from app.application.users.repository import UserRepository
+from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
+    ElementBase,
     EnterpriseType,
     HighestVoltage,
-    UserRole,
-)
-from app.domain.substation import Substation
-from app.domain.user import User
-from app.infrastructure.database.engine import async_session_factory
-from app.application.enterprises.repository import EnterpriseRepository
-from app.application.connections.repository import ConnectionRepository
-from app.application.urzas.repository import URZARepository
-from app.domain.connection import Connection
-from app.domain.enums import OperationalCurrentType
-from app.domain.enums import (
-    ElementBase,
+    OperationalCurrentType,
     RoomCategory,
     URZACategory,
     URZAStatus,
+    UserRole,
 )
+from app.domain.substation import Substation
 from app.domain.urza import URZA
+from app.domain.user import User
+from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio

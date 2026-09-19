@@ -1,9 +1,8 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
-from datetime import UTC, datetime
-from uuid6 import uuid7
-
 import pytest
+from uuid6 import uuid7
 
 from app.application.files.service import FileService
 from app.domain.file import File

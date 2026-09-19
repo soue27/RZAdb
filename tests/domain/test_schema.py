@@ -1,5 +1,6 @@
-from app.domain.schema import SchemaForm, SchemaRecord
 from datetime import date
+
+from app.domain.schema import SchemaForm, SchemaRecord
 
 
 def test_schema_form_model() -> None:

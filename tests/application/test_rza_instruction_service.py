@@ -1,7 +1,8 @@
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock
-from uuid6 import uuid7
+
 import pytest
+from uuid6 import uuid7
 
 from app.application.rza_instructions.service import RZAInstructionService
 from app.domain.rza_instruction import (

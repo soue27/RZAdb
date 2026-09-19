@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -20,7 +20,7 @@ async def test_s3_key_must_be_unique() -> None:
             extension=".pdf",
             size=1024,
             mime_type="application/pdf",
-            uploaded_at=datetime.now(timezone.utc),
+            uploaded_at=datetime.now(UTC),
         )
 
         second_file = File(
@@ -30,7 +30,7 @@ async def test_s3_key_must_be_unique() -> None:
             extension=".pdf",
             size=2048,
             mime_type="application/pdf",
-            uploaded_at=datetime.now(timezone.utc),
+            uploaded_at=datetime.now(UTC),
         )
 
         session.add(first_file)

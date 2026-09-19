@@ -1,8 +1,9 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
 
+from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
     EnterpriseType,
@@ -10,7 +11,6 @@ from app.domain.enums import (
     TaskStatus,
     UserRole,
 )
-from app.domain.enterprise import Enterprise
 from app.domain.inspection import Inspection
 from app.domain.inspection_task import InspectionTask
 from app.domain.substation import Substation
@@ -48,7 +48,7 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         substation_id=substation.id,
         created_by=manager.id,
         status=TaskStatus.CREATED,
-        deadline_at=datetime.now(timezone.utc),
+        deadline_at=datetime.now(UTC),
     )
 
     db_session.add_all(

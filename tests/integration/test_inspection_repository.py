@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
 from app.application.inspections.repository import InspectionTaskRepository
+from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
     EnterpriseType,
@@ -11,7 +12,6 @@ from app.domain.enums import (
     TaskStatus,
     UserRole,
 )
-from app.domain.enterprise import Enterprise
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
@@ -59,7 +59,7 @@ async def test_inspection_task_repository(
         substation_id=substation.id,
         created_by=manager.id,
         status=TaskStatus.CREATED,
-        deadline_at=datetime.now(timezone.utc),
+        deadline_at=datetime.now(UTC),
     )
 
     # create()
@@ -92,7 +92,7 @@ async def test_inspection_task_repository(
         old_status=TaskStatus.CREATED,
         new_status=TaskStatus.ASSIGNED,
         actor_id=manager.id,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
     saved_history = await repository.add_history(history)
@@ -105,7 +105,7 @@ async def test_inspection_task_repository(
         id=uuid4(),
         substation_id=substation.id,
         inspection_task_id=task.id,
-        inspection_date=datetime.now(timezone.utc).date(),
+        inspection_date=datetime.now(UTC).date(),
         remarks="Замечаний не выявлено",
         created_by=manager.id,
     )

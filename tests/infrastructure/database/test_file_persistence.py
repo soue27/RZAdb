@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -10,7 +10,7 @@ from app.infrastructure.database.engine import async_session_factory
 
 @pytest.mark.asyncio
 async def test_file_can_be_persisted() -> None:
-    uploaded_at = datetime.now(timezone.utc)
+    uploaded_at = datetime.now(UTC)
     s3_key = f"files/test/{uuid4()}.pdf"
 
     async with async_session_factory() as session:

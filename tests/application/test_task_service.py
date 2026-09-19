@@ -3,15 +3,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
+from app.domain.maintenance import TORecord
 from app.domain.otd import OTDVersion
+from app.domain.program import Program, ProgramType
+from app.domain.schema import SchemaRecord
 from app.domain.settings_record import SettingsRecord
 from app.domain.task import Task
-from app.domain.schema import SchemaRecord
-from app.domain.program import Program, ProgramType
-from app.domain.maintenance import TORecord
 
 
 class FakeTaskRepository:

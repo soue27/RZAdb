@@ -1,7 +1,5 @@
 import pytest
 
-from uuid6 import uuid7
-
 from app.application.connections.repository import ConnectionRepository
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise

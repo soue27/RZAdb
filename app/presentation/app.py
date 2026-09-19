@@ -4,12 +4,14 @@ from fastapi import Depends, FastAPI
 
 from app.application.files.service import FileService
 from app.presentation.dependencies import get_file_service
+from app.presentation.routes.files import router as files_router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="RZAdb",
     )
+    app.include_router(files_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

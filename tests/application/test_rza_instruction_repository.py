@@ -1,14 +1,16 @@
 from unittest.mock import AsyncMock, MagicMock
-from uuid6 import uuid7
-import pytest
 
+import pytest
+from uuid6 import uuid7
+
+from app.application.rza_instructions.repository import (
+    RZAInstructionRepository,
+)
 from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
 )
-from app.application.rza_instructions.repository import (
-    RZAInstructionRepository,
-)
+
 
 @pytest.mark.asyncio
 async def test_get_by_id():

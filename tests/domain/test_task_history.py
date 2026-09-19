@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.domain.enums import TaskStatus
 from app.domain.task_history import TaskHistory
 
 
 def test_task_history_model() -> None:
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
 
     history = TaskHistory(
         event_type="created",

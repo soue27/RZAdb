@@ -1,10 +1,9 @@
-from unittest.mock import AsyncMock, MagicMock
 from datetime import date
+from unittest.mock import AsyncMock
 
 import pytest
 from uuid6 import uuid7
 
-from app.application.settings.repository import SettingsRepository
 from app.application.settings.service import SettingsService
 from app.domain.rza_settings import SettingsForm
 

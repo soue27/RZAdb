@@ -4,6 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class FileUploadForm(BaseModel):
+    display_name: str
+    extension: str
+    mime_type: str
+
+
 class FileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

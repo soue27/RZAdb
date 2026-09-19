@@ -1,5 +1,4 @@
-from app.domain.rza_instruction import RZAInstruction
-from app.domain.rza_instruction import RZAInstructionVersion
+from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
 
 
 def test_rza_instruction_model() -> None:

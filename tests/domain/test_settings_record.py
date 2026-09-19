@@ -1,10 +1,10 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from app.domain.settings_record import SettingsRecord
 
 
 def test_settings_record_model() -> None:
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
 
     record = SettingsRecord(
         change_date=date(2026, 9, 13),

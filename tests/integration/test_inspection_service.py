@@ -1,12 +1,14 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from app.application.inspections.repository import InspectionTaskRepository
 from app.application.inspections.service import InspectionTaskService
 from app.application.substations.repository import SubstationRepository
 from app.application.users.repository import UserRepository
+from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
     EnterpriseType,
@@ -14,13 +16,10 @@ from app.domain.enums import (
     TaskStatus,
     UserRole,
 )
-from app.domain.enterprise import Enterprise
+from app.domain.inspection import Inspection
+from app.domain.inspection_history import InspectionHistory
 from app.domain.substation import Substation
 from app.domain.user import User
-from sqlalchemy import select
-
-from app.domain.inspection_history import InspectionHistory
-from app.domain.inspection import Inspection
 
 
 @pytest.mark.asyncio
@@ -72,7 +71,7 @@ async def test_create_inspection_task_with_real_postgresql(
         substation_repository,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     task = await service.create(
         substation_id=substation.id,
@@ -161,7 +160,7 @@ async def test_assign_inspection_task_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=2)
 
     task = await service.create(
@@ -262,7 +261,7 @@ async def test_accept_inspection_task_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=2)
     accepted_at = assigned_at + timedelta(hours=1)
 
@@ -372,7 +371,7 @@ async def test_complete_inspection_task_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=2)
     accepted_at = assigned_at + timedelta(hours=1)
     completed_at = accepted_at + timedelta(hours=3)
@@ -505,7 +504,7 @@ async def test_cannot_complete_inspection_without_remarks(
         substation_repository,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     task = await service.create(
         substation_id=substation.id,
@@ -601,7 +600,7 @@ async def test_send_inspection_to_review_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=1)
     accepted_at = assigned_at + timedelta(hours=1)
     completed_at = accepted_at + timedelta(hours=2)
@@ -739,7 +738,7 @@ async def test_review_approve_inspection_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=1)
     accepted_at = assigned_at + timedelta(hours=1)
     completed_at = accepted_at + timedelta(hours=2)
@@ -880,7 +879,7 @@ async def test_review_return_inspection_with_real_postgresql(
         substation_repository,
     )
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     assigned_at = created_at + timedelta(hours=1)
     accepted_at = assigned_at + timedelta(hours=1)
     completed_at = accepted_at + timedelta(hours=2)

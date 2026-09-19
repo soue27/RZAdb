@@ -2,8 +2,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.domain.enums import EnterpriseType
 from app.domain.enterprise import Enterprise
+from app.domain.enums import EnterpriseType
 
 
 @pytest.mark.asyncio

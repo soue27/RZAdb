@@ -1,9 +1,9 @@
 
-from unittest.mock import AsyncMock, MagicMock
-from uuid6 import uuid7
 from datetime import date
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.otd.repository import OTDRepository
 from app.domain.enums import OTDPurpose

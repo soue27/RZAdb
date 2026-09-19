@@ -1,8 +1,8 @@
+from datetime import date
 from unittest.mock import AsyncMock
 
 import pytest
 from uuid6 import uuid7
-from datetime import date
 
 from app.application.schema.service import SchemaService
 from app.domain.schema import SchemaForm

@@ -1,8 +1,8 @@
 from datetime import date
 from unittest.mock import AsyncMock
-from uuid6 import uuid7
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.urzas.repository import URZARepository
 from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus

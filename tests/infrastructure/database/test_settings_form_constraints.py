@@ -1,8 +1,10 @@
+from datetime import date
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from datetime import date
-
+from app.domain.connection import Connection
+from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     ElementBase,
     EnterpriseType,
@@ -12,8 +14,6 @@ from app.domain.enums import (
     URZACategory,
     URZAStatus,
 )
-from app.domain.enterprise import Enterprise
-from app.domain.connection import Connection
 from app.domain.rza_settings import SettingsForm
 from app.domain.substation import Substation
 from app.domain.urza import URZA

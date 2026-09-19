@@ -1,7 +1,7 @@
 from pathlib import Path
-from uuid6 import uuid7
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService

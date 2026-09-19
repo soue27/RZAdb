@@ -1,14 +1,11 @@
-from unittest.mock import AsyncMock
-from uuid6 import uuid7
-
 from datetime import date
-
-from app.domain.enums import OTDPurpose
+from unittest.mock import AsyncMock
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.otd.service import OTDService
-
+from app.domain.enums import OTDPurpose
 from app.domain.otd import OTD, OTDVersion
 
 

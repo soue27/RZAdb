@@ -46,3 +46,27 @@ def test_file_response_does_not_expose_s3_key() -> None:
     response = FileResponse.model_validate(file)
 
     assert not hasattr(response, "s3_key")
+
+from app.presentation.schemas.files import FileUploadForm
+
+
+def test_file_upload_form_accepts_valid_data() -> None:
+    form = FileUploadForm(
+        display_name="ПС Тестовая — ТО — 2026-09-19",
+        extension=".pdf",
+        mime_type="application/pdf",
+    )
+
+    assert form.display_name == "ПС Тестовая — ТО — 2026-09-19"
+    assert form.extension == ".pdf"
+    assert form.mime_type == "application/pdf"
+
+
+def test_file_upload_form_accepts_extension_without_dot() -> None:
+    form = FileUploadForm(
+        display_name="test",
+        extension="pdf",
+        mime_type="application/pdf",
+    )
+
+    assert form.extension == "pdf"

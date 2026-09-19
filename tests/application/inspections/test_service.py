@@ -1,14 +1,13 @@
 
-from datetime import datetime, timedelta, timezone, date
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 
 from app.application.inspections.service import InspectionTaskService
-from app.domain.enums import AccessCategory, TaskStatus, UserRole
-from app.domain.user import User
-from app.domain.enums import HighestVoltage
+from app.domain.enums import AccessCategory, HighestVoltage, TaskStatus, UserRole
 from app.domain.substation import Substation
+from app.domain.user import User
 
 
 class FakeInspectionTaskRepository:
@@ -94,7 +93,7 @@ async def test_create_inspection_task() -> None:
     manager = make_user(UserRole.MANAGER)
     user_repository.users[manager.id] = manager
 
-    now = datetime(2026, 9, 13, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=uuid4(),
@@ -148,7 +147,7 @@ async def test_assign_inspection_task() -> None:
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=uuid4(),
@@ -292,7 +291,7 @@ async def test_assigned_engineer_can_accept_inspection_task() -> None:
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=uuid4(),
@@ -383,7 +382,7 @@ async def test_assigned_engineer_can_complete_inspection_task() -> None:
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=uuid4(),
@@ -540,7 +539,7 @@ async def test_assigned_engineer_can_send_inspection_to_review() -> None:
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=uuid4(),
@@ -711,7 +710,7 @@ async def test_manager_can_approve_inspection() -> None:
     user_repository.users[engineer.id] = engineer
     substation_repository.substations[substation_id] = substation
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=substation_id,
@@ -794,7 +793,7 @@ async def test_manager_can_return_inspection_for_revision() -> None:
     user_repository.users[engineer.id] = engineer
     substation_repository.substations[substation_id] = substation
 
-    now = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
 
     task = await service.create(
         substation_id=substation_id,
