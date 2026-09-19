@@ -189,7 +189,7 @@ class TaskService:
                     "Для завершения задачи ОТД необходимо сохранить результат ОТД."
                 )
 
-        # Для уставок результатом выполнения является SettingsRecord,
+        # Для схем результатом выполнения является SchemaRecord,
         # созданный в рамках этой задачи.
         if task.work_type == TaskWorkType.SCHEMES:
             schema_record = (
@@ -217,7 +217,7 @@ class TaskService:
                     "Для завершения задачи по схемам необходим скан или редактируемый файл."
                 )
 
-        # Для схем результатом выполнения является SchemaRecord,
+        # Для уставок результатом выполнения является SettingsRecord,
         # созданный в рамках этой задачи.
         if task.work_type == TaskWorkType.SETTINGS:
             settings_record = (

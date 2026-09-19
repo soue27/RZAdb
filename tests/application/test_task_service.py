@@ -1115,45 +1115,6 @@ async def test_complete_program_task_with_scan() -> None:
     assert result.completed_at == completed_at
 
 @pytest.mark.asyncio
-async def test_complete_program_task_with_scan() -> None:
-    engineer_id = uuid4()
-
-    task = Task(
-        id=uuid4(),
-        urza_id=uuid4(),
-        work_type=TaskWorkType.PROGRAM,
-        created_by=engineer_id,
-        assigned_to=engineer_id,
-        status=TaskStatus.IN_PROGRESS,
-    )
-
-    repository = FakeTaskRepository()
-    repository.tasks.append(task)
-
-    program = Program(
-        urza_id=task.urza_id,
-        program_type=ProgramType.COMMISSIONING,
-        program_number="ПР-001",
-        scan_file_id=uuid4(),
-        editable_file_id=None,
-        task_id=task.id,
-    )
-    repository.programs.append(program)
-
-    service = TaskService(repository)
-
-    completed_at = datetime.now().astimezone()
-
-    result = await service.complete_task(
-        task=task,
-        actor_id=engineer_id,
-        completed_at=completed_at,
-    )
-
-    assert result.status == TaskStatus.COMPLETED
-    assert result.completed_at == completed_at
-
-@pytest.mark.asyncio
 async def test_complete_maintenance_task_requires_to_record() -> None:
     engineer_id = uuid4()
 
