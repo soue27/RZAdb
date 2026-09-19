@@ -1,9 +1,7 @@
-# AGENTS.md --- База данных РЗА (RZAdb)
-
 ## 1. Назначение проекта
 
-RZAdb --- веб-приложение для учёта оборудования РЗА, формуляров,
-документов, заданий и фактически выполненных работ.
+RZAdb --- внутреннее веб-приложение для учёта оборудования РЗА,
+формуляров, документов, заданий и фактически выполненных работ.
 
 Основная иерархия:
 
@@ -16,9 +14,10 @@ RZAdb --- веб-приложение для учёта оборудования
                 └── УРЗА
 ```
 
-Отдельные домены уровня ПС: схемы селективности, инструкции по РЗА,
-инспекции ПС. Инспекция ПС --- отдельный домен и не является обычным
-Task.
+Отдельные домены уровня ПС: - схемы селективности; - инструкции по
+РЗА; - инспекции ПС.
+
+Инспекция ПС --- отдельный домен и не является обычным Task.
 
 ## 2. Технологический стек
 
@@ -40,19 +39,21 @@ Task.
 -   Docker
 -   GitHub Actions
 -   structlog
+-   `pwdlib[argon2]` для хеширования паролей
 
-Локальная разработка использует PostgreSQL Homebrew. Рабочая БД:
-`rzadb`.
+Локальная разработка использует PostgreSQL Homebrew.
+
+Рабочая локальная БД: `rzadb`.
 
 ## 3. Архитектурные принципы
 
--   Разделять domain/model, repositories, services, API и UI.
+-   Разделять `domain/model`, `repositories`, `services`, API и UI.
 -   Бизнес-правила не размещать в Jinja-шаблонах или роутерах.
 -   Доступ централизовать через `AccessService`.
 -   Для критичных операций сохранять аудит.
 -   Использовать soft delete там, где это предусмотрено.
--   Файлы не хранить в PostgreSQL: БД хранит метаданные и ссылки,
-    содержимое --- в S3.
+-   Файлы не хранить в PostgreSQL: БД хранит метаданные, содержимое ---
+    object storage.
 -   Не использовать полиморфный `File(owner_type, owner_id)`, если
     возможны обычные FK.
 -   Использовать UUID7 через `uuid6`.
@@ -64,6 +65,8 @@ Task.
 -   В нетривиальных функциях оставлять короткие комментарии «что и
     зачем».
 -   Не комментировать очевидный код и простые модели без необходимости.
+-   Не дублировать уже реализованные доменные модели.
+-   Не смешивать authentication, authorization и domain business rules.
 
 ## 4. Структура приложения
 
@@ -76,14 +79,15 @@ app/
 └── presentation/
 ```
 
-Инфраструктура БД:
+Infrastructure database:
 
 ``` text
 app/infrastructure/database/
 ├── base.py
 ├── engine.py
 ├── mixins.py
-└── models.py
+├── models.py
+└── session.py
 ```
 
 Используются async engine и `async_sessionmaker`.
@@ -92,184 +96,256 @@ app/infrastructure/database/
 
 Настройки --- через `pydantic-settings`.
 
-Основные переменные: - `DATABASE_URL` - `DEBUG` - в дальнейшем timezone
-и параметры S3/email.
+Основные переменные: - `DATABASE_URL`; - `DEBUG`; - `SESSION_SECRET` для
+подписанной cookie-сессии; - в дальнейшем параметры S3/email и другие
+инфраструктурные настройки.
 
-`.env` не коммитить. В репозитории --- `.env.example`.
+`.env` не коммитить.
+
+В репозитории хранится `.env.example`.
+
+Секрет сессии никогда не хранить в Git.
 
 ## 6. Идентификаторы и время
 
-Основные сущности используют UUID7. Где предусмотрено общей моделью: -
-`id` - `created_at` - `created_by` - `updated_at` - `updated_by` -
-`deleted_at` - `deleted_by`
+Основные сущности используют UUID7.
 
-Текущие mixins: `UUIDMixin`, `TimestampMixin`, `SoftDeleteMixin`.
+Текущие mixins: - `UUIDMixin`; - `TimestampMixin`; - `SoftDeleteMixin`.
 
 `created_by`/`updated_by` пока не универсализированы через общий FK
 из-за циклических зависимостей.
 
-Временные метки timezone-aware. Преобразования timezone централизовать.
+Временные метки timezone-aware.
 
-## 7. Роли и область доступа
+Преобразования timezone централизовать.
 
-Роли: - Superadmin - Admin - Specialist - Manager - Engineer
+## 7. Authentication
 
-Привязка: - Specialist → Holding или Branch. - Admin/Manager/Engineer →
-Production Department. - Superadmin → без enterprise binding.
+Authentication и authorization разделены.
 
-Права: - Specialist --- просмотр/скачивание. - Admin ---
-создание/изменение; удаление по правилам подтверждения. - Manager ---
-иерархия, задания, проверка. - Engineer --- выполнение заданий и работа
-с формулярами. - Superadmin --- полный доступ.
+### Authentication
+
+Используется: - email + password; - `UserRepository.get_by_email()`; -
+`PasswordService`; - `AuthService`; - Argon2 через `pwdlib`.
+
+`AuthService` должен возвращать `User` только если: - пользователь
+найден; - `active=True`; - `deleted_at is None`; - пароль корректен.
+
+Для всех неуспешных случаев используется единая ошибка
+`InvalidCredentialsError`.
+
+### Session
+
+Для MVP и рабочего внутреннего продукта согласован **вариант A ---
+signed cookie session**.
+
+Не использовать JWT без отдельного решения.
+
+Cookie: - `HttpOnly`; - `SameSite=Lax`; - `Secure=True` при HTTPS; -
+секрет из `SESSION_SECRET`.
+
+В cookie не хранить чувствительные данные и права как источник истины.
+
+Бизнес-логика не должна зависеть от конкретной реализации session
+storage.
+
+Будущая замена на server-side sessions, AD/LDAP/SSO должна быть возможна
+без переписывания `AuthService` и `AccessService`.
+
+Текущее состояние: - `UserRepository.get_by_email()` --- реализован; -
+`PasswordService` --- реализован; - `AuthService` --- реализован; -
+application tests authentication --- зелёные; - HTTP
+login/logout/session middleware --- следующий блок.
+
+## 8. Authorization и роли
+
+Роли: - Superadmin; - Admin; - Specialist; - Manager; - Engineer.
+
+Привязка: - Specialist → Holding или Branch; - Admin/Manager/Engineer →
+Production Department; - Superadmin → без enterprise binding.
 
 Все, кроме Superadmin, работают только в пределах своего предприятия и
 подчинённых объектов.
 
-## 8. Документальные домены
+`AccessService` --- единственная централизованная точка проверки
+доступа.
 
-Для УРЗА: 1. ОТД 2. Уставки 3. Схемы 4. ТО 5. Программы 6. Инструкция
-УРЗА
+Реализованы проверки: - enterprise; - substation; - connection; - URZA.
 
-Для ПС: 7. Схемы селективности 8. Инструкции по РЗА 9. Инспекции ПС
+Не дублировать эти правила в роутерах и шаблонах.
+
+## 9. Документальные домены
+
+Для URZA: 1. ОТД; 2. Уставки; 3. Схемы; 4. ТО; 5. Программы; 6.
+Инструкция URZA.
+
+Для ПС: 7. Схемы селективности; 8. Инструкции по РЗА; 9. Инспекции ПС.
 
 Не объединять домены в универсальную таблицу.
 
-## 9. Формуляры и файлы
+Не создавать повторно: - `RZAInstruction`; - `URZAInstruction`; -
+`SchemaForm`; - `SettingsForm`; - `File`; - другие уже существующие
+модели.
 
-Формуляр --- логический контейнер; запись --- событие/операция/версия.
+## 10. Формуляры и файлы
 
-Файлы хранятся в S3-compatible storage. В БД --- `File` и явные FK: -
-`scan_file_id` - `editable_file_id` - `signed_form_file_id` - и т. п.
+Формуляр --- логический контейнер.
 
-Не использовать polymorphic owner.
+Запись --- событие/операция/версия.
 
-Системный S3 key строится автоматически по контексту
-ПС/присоединения/УРЗА/типа документа/даты.
+Файлы: - PostgreSQL хранит metadata; - содержимое хранится через
+`ObjectStorage`; - домены используют явные FK; - polymorphic owner
+запрещён.
 
-## 10. ОТД
+### ObjectStorage
 
-Один `OTD` на УРЗА:
+Интерфейс:
+
+``` text
+ObjectStorage
+├── LocalObjectStorage
+└── YandexS3ObjectStorage
+```
+
+Сейчас используется `LocalObjectStorage` для dev/test.
+
+Путь dev: `data/uploads/`.
+
+Целевой production storage --- S3-compatible, в том числе Yandex S3.
+
+`FileService` не должен зависеть от конкретного storage backend.
+
+S3 key генерируется приложением.
+
+При переходе hot → cold: - `File.id` не меняется; - доменная история не
+меняется; - целостность должна быть проверена до удаления hot-копии.
+
+## 11. ОТД
+
+Один `OTD` на URZA.
 
 ``` text
 OTD
 └── OTDVersion
 ```
 
-Каждая версия --- полный снимок. Старые версии сохраняются. Скан,
-editable-файл и отдельная подпись не требуются.
+Каждая версия --- полный снимок.
 
-## 11. Уставки
+Старые версии сохраняются.
 
-Один `SettingsForm` на УРЗА. `SettingsRecord` содержит дату, параметр,
-исходную и новую уставку, причину, автора, `signed_form_file_id`,
-`task_id` nullable.
+Скан/editable/signed form не требуются.
 
-Каждая запись --- только изменённые параметры. Скан подписанного
-формуляра обязателен. Отдельный протокол не формируется.
+Реализовано.
 
-## 12. Схемы
+## 12. Уставки
 
-Один `SchemaForm` на УРЗА. Текущий тип --- Исполнительная.
+Один `SettingsForm` на URZA.
+
+`SettingsRecord` содержит дату, параметр, исходную и новую уставку,
+причину, автора, `signed_form_file_id`, `task_id`.
+
+Скан подписанного формуляра обязателен.
+
+Реализовано.
+
+## 13. Схемы URZA
+
+Один `SchemaForm` на URZA.
+
+Текущий тип --- Исполнительная.
+
 `SchemaRecord` содержит номер, название, описание/обоснование изменения,
 дату загрузки, автора, scan/editable/signed form, `task_id`.
 
-Текущий согласованный комплект: скан схемы, редактируемая схема,
-подписанный формуляр.
+Текущий согласованный комплект: - scan; - editable; - signed form.
 
-Селективность ПС --- отдельный домен; детальная модель пока не
-финализирована.
+Реализовано.
 
-## 13. Инструкция по РЗА
+Селективность ПС --- отдельный домен и пока не финализирована.
 
-`RZAInstruction` --- логический контейнер на ПС:
+## 14. Инструкция по РЗА
+
+`RZAInstruction` --- логический контейнер на ПС.
 
 ``` text
 RZAInstruction
 └── RZAInstructionVersion
 ```
 
-`substation_id` --- UNIQUE.
+`substation_id` UNIQUE.
 
-Версия: - `version_number` - `effective_date` - `change_description`
-nullable - `change_justification` nullable - `created_at` -
-`created_by` - `scan_file_id` - `editable_file_id` nullable в текущей
-реализации
+Новая редакция создаёт новую версию.
 
-Новая редакция создаёт новую версию. Старые версии сохраняются.
-Отдельный signed form не требуется.
+Editable-файл nullable.
 
-Важно: модели `RZAInstruction` и `RZAInstructionVersion` уже существуют
-в текущем коде. Не создавать их повторно.
+Signed form не требуется.
 
-## 14. Инструкция УРЗА
+**Реализовано.**
 
-Логический контейнер на УРЗА:
+## 15. Инструкция URZA
 
 ``` text
-URZAInstructionForm
-└── URZAInstructionRecord
+URZAInstruction
+└── URZAInstructionVersion
 ```
 
-Версия содержит номер, дату действия, описание/обоснование, дату
-загрузки, автора, scan/editable files и `task_id` nullable. Новые версии
-сохраняются. При создании из Task `task_id` устанавливается
-автоматически.
+Один контейнер на URZA.
 
-## 15. ТО
+Версии сохраняются.
 
-`TORecord` --- одно фактически выполненное мероприятие. Типы: В, К, К1,
-Н, Т, ТК, О, ОСМ, ВП, ПП.
+`task_id` nullable.
 
-Правила: - signed form обязателен; - протокол обязателен для типов, где
-он требуется; - для ТК, О, ОСМ протокол не нужен; - даже для них signed
-form обязателен; - deviations по умолчанию `Не выявлено`; - measures по
-умолчанию `Не требуется`; - `task_id` nullable.
+При создании из Task связь устанавливается автоматически.
 
-Планирование ТО не входит в первую версию. Период ТО зависит от
-категории помещения и элементной базы; `complexity` не влияет.
-Использовать `MaintenancePeriodRule`, а не hard-coded if/else. После 25
-лет UI показывает необходимость решения о продлении/замене.
+**Реализовано.**
 
-## 16. Программы
+## 16. ТО
 
-`Program` связана с УРЗА. Типы: commissioning, decommissioning, work.
-Одна УРЗА может иметь несколько программ одного типа.
+`TORecord` --- фактическое мероприятие.
 
-Скан обязателен, editable nullable, `task_id` nullable. `program_number`
---- внешний номер. Отдельный signed form не нужен. Для сложной УРЗА
-обязательны все три типа. Удаление допускается после подтверждения;
-Superadmin может удалить напрямую.
+Типы: - В; - К; - К1; - Н; - Т; - ТК; - О; - ОСМ; - ВП; - ПП.
 
-## 17. Иерархия
+Правила: - signed form обязателен; - для ТК/О/ОСМ протокол не
+требуется; - для остальных требующих типов протокол обязателен; -
+deviations = `Не выявлено` по умолчанию; - measures = `Не требуется` по
+умолчанию.
 
-`Enterprise` представляет Holding, Branch, Production Department. Только
-Production Department содержит Substation.
+Планирование ТО не входит в MVP.
 
-Substation: - enterprise_id - highest_voltage - dispatch_name - SAP
-nullable - ASUREO nullable - latitude/longitude/address nullable
+Использовать `MaintenancePeriodRule`.
 
-Напряжения: 500, 220, 110, 35, 10, 6, 0.4 кВ.
+## 17. Программы
 
-Connection: - substation_id - dispatch_name - SAP/ASUREO nullable -
-RDU - operational current: permanent/rectified/alternating
+Типы: - commissioning; - decommissioning; - work.
 
-Имя Connection уникально в Production Department.
+Скан обязателен.
 
-URZA: - принадлежит Connection; - dispatch name уникален внутри
-Connection; - inventory nullable; - commissioning date; - status; -
-element base; - category; - room category; - complexity; - вычисляемые
-title и maintenance period.
+Editable nullable.
 
-## 18. Title URZA
+Signed form отдельно не нужен.
 
-Вычисляется из: `Холдинг + Филиал + ПО + ПС + Присоединение + УРЗА`. Не
-редактируется.
+Для сложной URZA нужны все три типа.
+
+Реализовано.
+
+## 18. Иерархия
+
+`Enterprise`: - Holding; - Branch; - Production Department.
+
+Только Production Department содержит Substation.
+
+`Connection` принадлежит Substation.
+
+`URZA` принадлежит Connection.
+
+Dispatch name: - Connection --- уникален в Production Department; - URZA
+--- уникален в Connection.
 
 ## 19. Task
 
-Одно задание --- один тип работы с одной УРЗА. Типы: OTD, SETTINGS,
-SCHEMES, MAINTENANCE, PROGRAM. Для MAINTENANCE `maintenance_type`
-обязателен.
+Одно задание --- один тип работы с одной URZA.
+
+Типы: - OTD; - SETTINGS; - SCHEMES; - MAINTENANCE; - PROGRAM.
 
 Workflow:
 
@@ -279,129 +355,149 @@ CREATED → ASSIGNED → IN_PROGRESS → COMPLETED → UNDER_REVIEW → CLOSED
 
 Дополнительно: - ASSIGNED → REJECTED; - UNDER_REVIEW → IN_PROGRESS.
 
-Причина обязательна при отклонении и возврате на доработку. После
-возврата --- сразу IN_PROGRESS, повторное принятие не требуется.
+Причина обязательна при reject/return.
 
-Срок выполнения --- 7 дней от создания. Срок принятия --- 1 день от
-назначения. Продление не предусмотрено. Переназначение не пересчитывает
-deadline.
+Срок выполнения --- 7 дней.
 
-После истечения acceptance deadline статус остаётся ASSIGNED,
-руководитель уведомляется, инженер всё ещё может принять/отклонить.
+Acceptance deadline --- 1 день от назначения.
 
-Просроченность --- состояние по времени, не отдельный workflow-статус.
+Продление не предусмотрено.
+
+Переназначение не пересчитывает deadline.
+
+Просроченность --- состояние, не отдельный статус.
 
 ## 20. Результат Task
 
-Нельзя завершить Task только кнопкой. Перед COMPLETED система проверяет
-обязательный результат по work type и, для ТО, maintenance type.
+Перед `COMPLETED` проверять комплектность результата.
 
-Записи формуляров имеют nullable `task_id`. Из Task → связь ставится
-автоматически. Вне Task → `task_id = NULL`.
+Не разрешать завершение Task только кнопкой.
+
+`task_id`: - из Task → устанавливается автоматически; - вне Task → NULL.
+
+Остаётся TODO: проверка, что `task_id` и `urza_id` результата совпадают
+по URZA.
 
 ## 21. TaskHistory
 
-Неизменяемая история: - task_id - event_type - old_status - new_status -
-actor_id - comment - created_at
+История неизменяема.
 
-Фиксируются создание, назначение, переназначение, принятие, отклонение,
-начало работы, просрочка, выполнение, доработка, возврат, подтверждение,
-закрытие и удаление ошибочного задания.
+Фиксировать изменения workflow и критичные действия.
+
+Не удалять историю вместе с Task.
 
 ## 22. Инспекции ПС
 
-Инспекция --- отдельный домен уровня Substation:
+Inspection --- отдельный домен уровня Substation.
+
+Не использовать обычный Task как замену Inspection.
+
+Реализованы: - models; - workflow; - repository; - service; -
+integration tests.
+
+Исполнитель --- Engineer/Manager.
+
+Reviewer --- Manager того же Production Department.
+
+Нельзя проверять собственную инспекцию.
+
+## 23. Архивирование
+
+Использовать soft delete там, где это предусмотрено.
+
+Для File архивирование: - не удаляет DB metadata; - устанавливает
+`deleted_at`; - записывает `deleted_by`; - HTTP archive/delete endpoint
+должен использовать `current_user`.
+
+Каскадное архивирование должно сохранять состояние ветки для корректного
+восстановления.
+
+## 24. Тестирование
+
+Использовать: - pytest; - pytest-asyncio; - реальный PostgreSQL для
+integration tests.
+
+После каждого логического изменения:
 
 ``` text
-Substation
-├── InspectionTask
-│   └── InspectionHistory
-└── Inspection
+изменение
+→ focused tests
+→ полный suite
+→ при необходимости alembic check
+→ commit
+→ push
 ```
 
-InspectionTask: - substation_id - created_by - assigned_to - status -
-created_at - assigned_at - acceptance_deadline_at - deadline_at -
-completed_at - closed_at
+Текущий известный полный результат: **311 passed**.
 
-Inspection: - substation_id - `inspection_task_id` UNIQUE -
-inspection_date - remarks - scan_file_id nullable - editable_file_id
-nullable - created_by - created_at/updated_at
+`uv run ruff check app` --- зелёный.
 
-Workflow:
-`CREATED → ASSIGNED → IN_PROGRESS → COMPLETED → UNDER_REVIEW → CLOSED`
-плюс ASSIGNED → REJECTED и UNDER_REVIEW → IN_PROGRESS.
+Не тратить время на старый Ruff technical debt в неизменённых тестах,
+если он не относится к текущему изменению.
 
-Исполнитель --- Engineer или Manager. Проверяющий --- Manager того же
-Production Department. Manager не может проверять собственную инспекцию.
+## 25. Alembic
 
-Обязательны `inspection_date` и `remarks`; файлы необязательны. Причина
-обязательна при reject/return.
+Изменения схемы выполнять через Alembic.
 
-Уже реализованы модели, workflow, repository/service и integration tests
-с PostgreSQL. Последний известный результат полного набора: **121
-passed**.
+Alembic находится в каталоге `migrations`.
 
-## 23. Уведомления
+Не искать каталог `alembic/` как источник истины.
 
-`Notification`: - user_id - type - title - message - task_id nullable -
-created_at - read_at nullable
+После изменения моделей, которое затрагивает БД: 1. migration; 2.
+registration в `app/infrastructure/database/models.py`; 3.
+`alembic check`; 4. integration tests.
 
-`read_at = NULL` --- непрочитано. После просмотра уведомление исчезает
-из основного списка, но остаётся в БД.
+## 26. Git workflow
 
-Email обязателен: - новое задание; - напоминания; - просрочка; -
-непринятое задание; - действия руководителя.
+Правило:
 
-Напоминания: за 3, 2 и 1 день до deadline, затем просрочка.
-Статистические рассылки --- второй этап.
+``` text
+изменение
+→ тест
+→ зелёный результат
+→ commit
+→ push
+```
 
-## 24. Архив и удаление
+После каждого логического блока давать точные команды:
 
-Для архивируемых ПС/Connection/URZA используется soft delete. Каскадное
-архивирование требует сохранения состояния потомков до операции.
+``` bash
+git add ...
+git commit -m "..."
+git push
+```
 
-Task: - ошибочное задание можно удалить до начала работы; - после
-IN_PROGRESS физическое удаление запрещено; - закрытые задания
-сохраняются; - удаление фиксируется в истории; - Superadmin имеет полный
-доступ.
+Не просить пользователя присылать `git status`, если это не требуется
+для диагностики.
 
-Для других объектов действует подтверждаемое удаление по ролям.
+## 27. MVP --- актуальный порядок
 
-## 25. Тестирование
-
-Использовать pytest/pytest-asyncio и реальный PostgreSQL для integration
-tests. Тестовая транзакция откатывается после каждого теста. После
-изменения логики: тест → зелёный результат → следующий блок.
-
-Известный результат: **121 passed**.
-
-## 26. Alembic
-
-Изменения схемы БД выполнять через Alembic. После миграции проверять
-модели и связанные integration tests.
-
-## 27. Git workflow
-
-Работать так: `изменение → тест → зелёный результат → commit → push`.
-
-После логического блока давать точные команды `git add`,
-`git commit -m`, `git push`. Не просить пользователя присылать
-`git status`, если это не нужно для конкретной диагностики.
-
-## 28. Приоритет MVP
-
-1.  AccessService и права.
-2.  Оставшиеся domain/application services.
-3.  Автоматическая проверка комплектности Task.
-4.  File/S3 service.
-5.  UI Jinja2 + HTMX.
+1.  Authentication:
+    -   session middleware;
+    -   login/logout;
+    -   `current_user`.
+2.  Authorization integration в HTTP/UI.
+3.  Оставшиеся application services.
+4.  HTTP archive/delete для File.
+5.  Jinja2 + HTMX UI.
 6.  Notifications/email.
-7.  Backup и hot/cold storage.
-8.  Детальная селективность ПС.
-9.  Остальные открытые вопросы.
+7.  Yandex S3.
+8.  Backup и hot/cold lifecycle.
+9.  Детальная селективность ПС.
+10. Остальные открытые вопросы.
 
-Codex подключать, когда появляется большой объём повторяющегося кода, а
-не ради самой автоматизации.
+## 28. TODO после MVP
+
+-   Схемы подстанции --- отдельная сущность уровня Substation, 0..N, без
+    фиксированной классификации.
+-   Детальная селективность ПС.
+-   Yandex S3.
+-   hot/cold lifecycle.
+-   backup/recovery.
+-   AD/LDAP/SSO при необходимости.
+-   notifications/email.
+-   дополнительные типы схем/программ после отдельного решения.
+-   статистические email-рассылки второго этапа.
 
 ## 29. Не делать без отдельного решения
 
@@ -411,6 +507,7 @@ Codex подключать, когда появляется большой об�
 -   продление deadline;
 -   отдельный контроль просроченных заданий;
 -   регистрацию пользователей;
+-   JWT как основной механизм браузерной сессии;
 -   новые сущности/поля без согласования;
 -   новые типы схем/программ без доменного решения.
 

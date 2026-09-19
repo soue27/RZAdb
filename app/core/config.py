@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "RZAdb"
     debug: bool = False
     database_url: str
+    session_secret: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -18,3 +19,5 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
