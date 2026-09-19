@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import Depends, FastAPI
 
 from app.application.files.service import FileService
@@ -15,7 +17,10 @@ def create_app() -> FastAPI:
 
     @app.get("/di-check")
     async def di_check(
-        file_service: FileService = Depends(get_file_service),
+        file_service: Annotated[
+            FileService,
+            Depends(get_file_service),
+        ],
     ) -> dict[str, str]:
         return {
             "status": "ok",
