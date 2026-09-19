@@ -1,0 +1,718 @@
+<aside
+    id="app-sidebar"
+    class="app-sidebar bg-white border-end"
+>
+    <!-- Search -->
+    <div class="sidebar-search">
+        <div class="input-group">
+            <span class="input-group-text">
+                <span class="material-icons">
+                    search
+                </span>
+            </span>
+
+            <input
+                type="search"
+                class="form-control"
+                placeholder="Поиск по объектам..."
+                aria-label="Поиск по объектам"
+            >
+        </div>
+    </div>
+
+
+    <!-- Tree -->
+    <div class="app-sidebar-tree">
+
+        <!-- =================================================
+             HOLDING
+             ================================================= -->
+
+        <div class="tree-node">
+
+            <button
+                type="button"
+                class="tree-toggle"
+                data-bs-toggle="collapse"
+                data-bs-target="#tree-holding"
+                aria-expanded="true"
+            >
+                <span class="material-icons tree-chevron">
+                    expand_more
+                </span>
+
+                <span class="material-icons tree-icon">
+                    corporate_fare
+                </span>
+
+                <span class="tree-label">
+                    Россети Урал
+                </span>
+            </button>
+
+
+            <div
+                id="tree-holding"
+                class="collapse show tree-children"
+            >
+
+                <!-- =================================================
+                     BRANCH
+                     ================================================= -->
+
+                <div class="tree-node">
+
+                    <button
+                        type="button"
+                        class="tree-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-branch"
+                        aria-expanded="true"
+                    >
+                        <span class="material-icons tree-chevron">
+                            expand_more
+                        </span>
+
+                        <span class="material-icons tree-icon">
+                            apartment
+                        </span>
+
+                        <span class="tree-label">
+                            Свердловский филиал
+                        </span>
+                    </button>
+
+
+                    <div
+                        id="tree-branch"
+                        class="collapse show tree-children"
+                    >
+
+                        <!-- =================================================
+                             PRODUCTION DEPARTMENT
+                             ================================================= -->
+
+                        <div class="tree-node">
+
+                            <button
+                                type="button"
+                                class="tree-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#tree-department"
+                                aria-expanded="true"
+                            >
+                                <span class="material-icons tree-chevron">
+                                    expand_more
+                                </span>
+
+                                <span class="material-icons tree-icon">
+                                    business
+                                </span>
+
+                                <span class="tree-label">
+                                    ПО Центральные сети
+                                </span>
+                            </button>
+
+
+                            <div
+                                id="tree-department"
+                                class="collapse show tree-children"
+                            >
+
+                                <!-- =================================================
+                                     SUBSTATION
+                                     ================================================= -->
+
+                                <div class="tree-node">
+
+                                    <button
+                                        type="button"
+                                        class="tree-toggle tree-substation active"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#tree-substation-1"
+                                        aria-expanded="true"
+                                    >
+                                        <span class="material-icons tree-chevron">
+                                            expand_more
+                                        </span>
+
+                                        <span class="material-icons tree-icon">
+                                            domain
+                                        </span>
+
+                                        <span class="tree-label">
+                                            ПС Свердловская
+                                        </span>
+                                    </button>
+
+
+                                    <div
+                                        id="tree-substation-1"
+                                        class="collapse show tree-children"
+                                    >
+
+                                        <!-- =================================================
+                                             CONNECTION
+                                             ================================================= -->
+
+                                        <div class="tree-node">
+
+                                            <button
+                                                type="button"
+                                                class="tree-toggle"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#tree-connection-1"
+                                                aria-expanded="true"
+                                            >
+                                                <span class="material-icons tree-chevron">
+                                                    expand_more
+                                                </span>
+
+                                                <span class="material-icons tree-icon">
+                                                    electrical_services
+                                                </span>
+
+                                                <span class="tree-label">
+                                                    ВЛ 110 кВ Северная
+                                                </span>
+                                            </button>
+
+
+                                            <div
+                                                id="tree-connection-1"
+                                                class="collapse show tree-children"
+                                            >
+
+                                                <!-- URZA -->
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        ДЗЛ-110
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        АПВ-110
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        ТЗНП
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        УРОВ
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        СМПР
+                                                    </span>
+                                                </button>
+
+                                            </div>
+                                        </div>
+
+
+                                        <!-- CONNECTION -->
+                                        <div class="tree-node">
+
+                                            <button
+                                                type="button"
+                                                class="tree-toggle"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#tree-connection-2"
+                                                aria-expanded="true"
+                                            >
+                                                <span class="material-icons tree-chevron">
+                                                    expand_more
+                                                </span>
+
+                                                <span class="material-icons tree-icon">
+                                                    electrical_services
+                                                </span>
+
+                                                <span class="tree-label">
+                                                    Т-1 110/10 кВ
+                                                </span>
+                                            </button>
+
+
+                                            <div
+                                                id="tree-connection-2"
+                                                class="collapse show tree-children"
+                                            >
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        ДЗТ
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        МТЗ
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        АПВ
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        РЗН
+                                                    </span>
+                                                </button>
+
+                                            </div>
+                                        </div>
+
+
+                                        <!-- CONNECTION -->
+                                        <div class="tree-node">
+
+                                            <button
+                                                type="button"
+                                                class="tree-toggle"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#tree-connection-3"
+                                                aria-expanded="false"
+                                            >
+                                                <span class="material-icons tree-chevron">
+                                                    expand_more
+                                                </span>
+
+                                                <span class="material-icons tree-icon">
+                                                    electrical_services
+                                                </span>
+
+                                                <span class="tree-label">
+                                                    Т-2 110/10 кВ
+                                                </span>
+                                            </button>
+
+
+                                            <div
+                                                id="tree-connection-3"
+                                                class="collapse tree-children"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        ДЗТ
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+
+                                        <!-- CONNECTION -->
+                                        <div class="tree-node">
+
+                                            <button
+                                                type="button"
+                                                class="tree-toggle"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#tree-connection-4"
+                                                aria-expanded="false"
+                                            >
+                                                <span class="material-icons tree-chevron">
+                                                    expand_more
+                                                </span>
+
+                                                <span class="material-icons tree-icon">
+                                                    electrical_services
+                                                </span>
+
+                                                <span class="tree-label">
+                                                    СВ 110 кВ
+                                                </span>
+                                            </button>
+
+
+                                            <div
+                                                id="tree-connection-4"
+                                                class="collapse tree-children"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    class="tree-item"
+                                                >
+                                                    <span class="tree-icon-spacer"></span>
+
+                                                    <span class="material-icons tree-icon">
+                                                        memory
+                                                    </span>
+
+                                                    <span class="tree-label">
+                                                        МТЗ
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+
+                                <!-- =================================================
+                                     OTHER SUBSTATIONS
+                                     ================================================= -->
+
+                                <div class="tree-node">
+
+                                    <button
+                                        type="button"
+                                        class="tree-toggle"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#tree-substation-2"
+                                        aria-expanded="false"
+                                    >
+                                        <span class="material-icons tree-chevron">
+                                            expand_more
+                                        </span>
+
+                                        <span class="material-icons tree-icon">
+                                            domain
+                                        </span>
+
+                                        <span class="tree-label">
+                                            ПС Центральная
+                                        </span>
+                                    </button>
+
+
+                                    <div
+                                        id="tree-substation-2"
+                                        class="collapse tree-children"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="tree-item"
+                                        >
+                                            <span class="tree-icon-spacer"></span>
+
+                                            <span class="material-icons tree-icon">
+                                                electrical_services
+                                            </span>
+
+                                            <span class="tree-label">
+                                                ВЛ 110 кВ Центральная
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+
+                                <div class="tree-node">
+
+                                    <button
+                                        type="button"
+                                        class="tree-toggle"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#tree-substation-3"
+                                        aria-expanded="false"
+                                    >
+                                        <span class="material-icons tree-chevron">
+                                            expand_more
+                                        </span>
+
+                                        <span class="material-icons tree-icon">
+                                            domain
+                                        </span>
+
+                                        <span class="tree-label">
+                                            ПС Южная
+                                        </span>
+                                    </button>
+
+                                </div>
+
+
+                                <div class="tree-node">
+
+                                    <button
+                                        type="button"
+                                        class="tree-toggle"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#tree-substation-4"
+                                        aria-expanded="false"
+                                    >
+                                        <span class="material-icons tree-chevron">
+                                            expand_more
+                                        </span>
+
+                                        <span class="material-icons tree-icon">
+                                            domain
+                                        </span>
+
+                                        <span class="tree-label">
+                                            ПС Восточная
+                                        </span>
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        </div>
+
+
+                        <!-- OTHER DEPARTMENTS -->
+
+                        <div class="tree-node">
+
+                            <button
+                                type="button"
+                                class="tree-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#tree-department-west"
+                                aria-expanded="false"
+                            >
+                                <span class="material-icons tree-chevron">
+                                    expand_more
+                                </span>
+
+                                <span class="material-icons tree-icon">
+                                    business
+                                </span>
+
+                                <span class="tree-label">
+                                    ПО Западные сети
+                                </span>
+                            </button>
+
+                        </div>
+
+
+                        <div class="tree-node">
+
+                            <button
+                                type="button"
+                                class="tree-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#tree-department-east"
+                                aria-expanded="false"
+                            >
+                                <span class="material-icons tree-chevron">
+                                    expand_more
+                                </span>
+
+                                <span class="material-icons tree-icon">
+                                    business
+                                </span>
+
+                                <span class="tree-label">
+                                    ПО Восточные сети
+                                </span>
+                            </button>
+
+                        </div>
+
+                    </div>
+                </div>
+
+
+                <!-- OTHER BRANCHES -->
+
+                <div class="tree-node">
+
+                    <button
+                        type="button"
+                        class="tree-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-branch-chelyabinsk"
+                        aria-expanded="false"
+                    >
+                        <span class="material-icons tree-chevron">
+                            expand_more
+                        </span>
+
+                        <span class="material-icons tree-icon">
+                            apartment
+                        </span>
+
+                        <span class="tree-label">
+                            Челябинский филиал
+                        </span>
+                    </button>
+
+                </div>
+
+
+                <div class="tree-node">
+
+                    <button
+                        type="button"
+                        class="tree-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-branch-perm"
+                        aria-expanded="false"
+                    >
+                        <span class="material-icons tree-chevron">
+                            expand_more
+                        </span>
+
+                        <span class="material-icons tree-icon">
+                            apartment
+                        </span>
+
+                        <span class="tree-label">
+                            Пермский филиал
+                        </span>
+                    </button>
+
+                </div>
+
+
+                <div class="tree-node">
+
+                    <button
+                        type="button"
+                        class="tree-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-branch-tyumen"
+                        aria-expanded="false"
+                    >
+                        <span class="material-icons tree-chevron">
+                            expand_more
+                        </span>
+
+                        <span class="material-icons tree-icon">
+                            apartment
+                        </span>
+
+                        <span class="tree-label">
+                            Тюменский филиал
+                        </span>
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- =================================================
+             ARCHIVE
+             ================================================= -->
+
+        <div class="tree-archive">
+
+            <button
+                type="button"
+                class="tree-item"
+            >
+                <span class="material-icons tree-icon">
+                    inventory_2
+                </span>
+
+                <span class="tree-label">
+                    Архив
+                </span>
+
+                <span class="material-icons tree-archive-arrow">
+                    chevron_right
+                </span>
+            </button>
+
+        </div>
+
+    </div>
+</aside>

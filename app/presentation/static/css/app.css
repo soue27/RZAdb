@@ -115,3 +115,456 @@ body {
 .rzadb-surface-soft {
     background-color: var(--rzadb-primary-soft);
 }
+
+/* ---------------------------------------------------------
+   Sidebar
+   --------------------------------------------------------- */
+
+.app-sidebar {
+    width: 340px;
+    flex: 0 0 340px;
+
+    min-height: calc(100vh - 60px);
+
+    overflow-y: auto;
+
+    background-color: var(--rzadb-surface);
+}
+
+
+/* ---------------------------------------------------------
+   Search
+   --------------------------------------------------------- */
+
+.sidebar-search {
+    padding: 12px 14px;
+
+    border-bottom: 1px solid var(--rzadb-border);
+}
+
+.sidebar-search .input-group-text {
+    background-color: var(--rzadb-surface);
+    border-color: var(--rzadb-border);
+
+    padding: 0 8px;
+
+    color: var(--rzadb-text-secondary);
+}
+
+.sidebar-search .input-group-text .material-icons {
+    font-size: 20px;
+}
+
+.sidebar-search .form-control {
+    height: 38px;
+
+    border-color: var(--rzadb-border);
+
+    font-size: 0.875rem;
+
+    box-shadow: none;
+}
+
+.sidebar-search .form-control:focus {
+    border-color: var(--rzadb-primary);
+
+    box-shadow: 0 0 0 2px var(--rzadb-primary-soft);
+}
+
+
+/* ---------------------------------------------------------
+   Tree
+   --------------------------------------------------------- */
+
+.app-sidebar-tree {
+    padding: 8px 10px 16px;
+
+    font-size: 0.875rem;
+}
+
+
+/* ---------------------------------------------------------
+   Tree structure
+   --------------------------------------------------------- */
+
+.tree-node {
+    position: relative;
+}
+
+
+/*
+ * Children container.
+ */
+.tree-children {
+    position: relative;
+
+    margin-left: 16px;
+    padding-left: 16px;
+}
+
+
+/*
+ * Vertical connector.
+ */
+.tree-children::before {
+    content: "";
+
+    position: absolute;
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+
+    width: 1px;
+
+    background-color: var(--rzadb-border);
+}
+
+
+/*
+ * Horizontal connector for each child.
+ */
+.tree-children > .tree-node::before,
+.tree-children > .tree-item::before {
+    content: "";
+
+    position: absolute;
+
+    top: 17px;
+    left: -16px;
+
+    width: 16px;
+    height: 1px;
+
+    background-color: var(--rzadb-border);
+}
+
+
+/*
+ * Hide vertical line below the last child.
+ */
+.tree-children > .tree-node:last-child::after,
+.tree-children > .tree-item:last-child::after {
+    content: "";
+
+    position: absolute;
+
+    left: -17px;
+    top: 18px;
+    bottom: 0;
+
+    width: 2px;
+
+    background-color: var(--rzadb-surface);
+}
+
+
+/* ---------------------------------------------------------
+   Tree controls
+   --------------------------------------------------------- */
+
+.tree-toggle,
+.tree-item {
+    position: relative;
+
+    width: 100%;
+    min-height: 34px;
+
+    padding: 4px 6px;
+
+    border: 0;
+    border-radius: 5px;
+
+    background: transparent;
+
+    display: flex;
+    align-items: center;
+
+    text-align: left;
+
+    color: var(--rzadb-text);
+
+    font-size: 0.875rem;
+
+    line-height: 1.2;
+
+    transition:
+        background-color 0.12s ease,
+        color 0.12s ease;
+}
+
+
+.tree-toggle:hover,
+.tree-item:hover {
+    background-color: var(--rzadb-primary-soft);
+
+    color: var(--rzadb-primary);
+}
+
+
+.tree-toggle.active,
+.tree-item.active {
+    background-color: var(--rzadb-primary-soft);
+
+    color: var(--rzadb-primary);
+
+    font-weight: 500;
+}
+
+
+/* ---------------------------------------------------------
+   Chevron
+   --------------------------------------------------------- */
+
+.tree-chevron {
+    width: 18px;
+    min-width: 18px;
+
+    margin-right: 2px;
+
+    font-size: 18px;
+
+    color: var(--rzadb-text-secondary);
+
+    transition:
+        transform 0.12s ease,
+        color 0.12s ease;
+}
+
+
+/*
+ * expand_more = ▼
+ *
+ * expanded:
+ *     ▼
+ *
+ * collapsed:
+ *     ▶
+ */
+.tree-toggle[aria-expanded="false"] .tree-chevron {
+    transform: rotate(-90deg);
+}
+
+
+.tree-toggle[aria-expanded="true"] .tree-chevron {
+    transform: rotate(0);
+}
+
+
+.tree-toggle:hover .tree-chevron,
+.tree-toggle.active .tree-chevron {
+    color: var(--rzadb-primary);
+}
+
+
+/* ---------------------------------------------------------
+   Object icons
+   --------------------------------------------------------- */
+
+.tree-icon {
+    width: 21px;
+    min-width: 21px;
+
+    margin-right: 7px;
+
+    font-size: 18px;
+
+    color: var(--rzadb-text-secondary);
+}
+
+
+.tree-toggle:hover .tree-icon,
+.tree-toggle.active .tree-icon,
+.tree-item:hover .tree-icon,
+.tree-item.active .tree-icon {
+    color: var(--rzadb-primary);
+}
+
+
+/*
+ * URZA doesn't need an additional chevron,
+ * but must align with the tree hierarchy.
+ */
+.tree-icon-spacer {
+    width: 18px;
+    min-width: 18px;
+
+    margin-right: 2px;
+}
+
+
+/* ---------------------------------------------------------
+   Labels
+   --------------------------------------------------------- */
+
+.tree-label {
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------
+   Substation
+   --------------------------------------------------------- */
+
+.tree-substation {
+    font-weight: 500;
+}
+
+
+/* ---------------------------------------------------------
+   URZA
+   --------------------------------------------------------- */
+
+.tree-item {
+    min-height: 32px;
+
+    font-size: 0.85rem;
+}
+
+
+/* ---------------------------------------------------------
+   Archive
+   --------------------------------------------------------- */
+
+.tree-archive {
+    margin-top: 12px;
+    padding-top: 8px;
+
+    border-top: 1px solid var(--rzadb-border);
+}
+
+
+.tree-archive-arrow {
+    margin-left: auto;
+
+    font-size: 18px;
+
+    color: var(--rzadb-text-secondary);
+}
+
+
+/* ---------------------------------------------------------
+   Tree arrows
+   --------------------------------------------------------- */
+
+.tree-chevron {
+    width: 20px;
+    min-width: 20px;
+
+    margin-right: 2px;
+
+    font-size: 20px;
+
+    color: var(--rzadb-text-secondary);
+
+    transition:
+        transform 0.15s ease,
+        color 0.15s ease;
+}
+
+
+/*
+ * expand_more = ▼
+ *
+ * When collapsed, rotate 90 degrees:
+ *
+ * ▼  →  ▶
+ */
+.tree-toggle[aria-expanded="false"] .tree-chevron {
+    transform: rotate(-90deg);
+}
+
+
+.tree-toggle[aria-expanded="true"] .tree-chevron {
+    transform: rotate(0);
+}
+
+
+.tree-toggle:hover .tree-chevron,
+.tree-toggle.active .tree-chevron {
+    color: var(--rzadb-primary);
+}
+
+
+/* ---------------------------------------------------------
+   Tree icons
+   --------------------------------------------------------- */
+
+.tree-icon {
+    width: 24px;
+    min-width: 24px;
+
+    margin-right: 8px;
+
+    font-size: 20px;
+
+    color: var(--rzadb-text-secondary);
+}
+
+
+.tree-toggle:hover .tree-icon,
+.tree-toggle.active .tree-icon,
+.tree-item:hover .tree-icon,
+.tree-item.active .tree-icon {
+    color: var(--rzadb-primary);
+}
+
+
+/* ---------------------------------------------------------
+   Tree labels
+   --------------------------------------------------------- */
+
+.tree-label {
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------
+   Connection level
+   --------------------------------------------------------- */
+
+.tree-connection {
+    min-height: 38px;
+
+    font-size: 0.9rem;
+}
+
+
+/* ---------------------------------------------------------
+   Archive
+   --------------------------------------------------------- */
+
+.tree-archive {
+    margin-top: 16px;
+    padding-top: 12px;
+
+    border-top: 1px solid var(--rzadb-border);
+}
+
+
+.tree-archive-arrow {
+    margin-left: auto;
+
+    color: var(--rzadb-text-secondary);
+}
+
+/* ---------------------------------------------------------
+   Application layout
+   --------------------------------------------------------- */
+
+.app-layout {
+    display: flex;
+    min-height: calc(100vh - 60px);
+}
+
+.app-content {
+    min-width: 0;
+}

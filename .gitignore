@@ -8,9 +8,10 @@ wheels/
 .idea
 .env
 
+
 # Virtual environments
 .venv
-
+/data
 
 
 # Test

@@ -40,9 +40,15 @@
 
     {% include "components/topbar.html" %}
 
-    <main>
-        {% block body %}{% endblock %}
-    </main>
+    <div class="app-layout">
+
+        {% include "components/sidebar.html" %}
+
+        <main class="app-content flex-grow-1">
+            {% block body %}{% endblock %}
+        </main>
+
+    </div>
 
     <script
         src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
