@@ -1,17 +1,17 @@
-from typing import Annotated
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.auth.password import PasswordService
 from app.application.auth.service import AuthService
+from app.application.files.repository import FileRepository
+from app.application.files.service import FileService
 from app.application.users.repository import UserRepository
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
-from app.application.files.repository import FileRepository
-from app.application.files.service import FileService
 
 
 def get_object_storage() -> ObjectStorage:

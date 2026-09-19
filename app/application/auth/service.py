@@ -1,4 +1,3 @@
-from uuid import UUID
 
 from app.application.auth.password import PasswordService
 from app.application.users.repository import UserRepository

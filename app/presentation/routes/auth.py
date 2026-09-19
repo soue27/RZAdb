@@ -46,7 +46,14 @@ async def login(
 async def logout(request: Request) -> RedirectResponse:
     request.session.clear()
 
-    return RedirectResponse(
+    response = RedirectResponse(
         url="/auth/login",
         status_code=status.HTTP_303_SEE_OTHER,
     )
+    response.delete_cookie(
+        key="session",
+        httponly=True,
+        samesite="lax",
+    )
+
+    return response
