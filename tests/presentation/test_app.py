@@ -12,15 +12,3 @@ def test_health() -> None:
     assert response.json() == {
         "status": "ok",
     }
-
-
-def test_file_service_dependency() -> None:
-    client = TestClient(app)
-
-    response = client.get("/di-check")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "service": "FileService",
-    }

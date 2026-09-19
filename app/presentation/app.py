@@ -1,35 +1,30 @@
-from typing import Annotated
-
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.application.files.service import FileService
 from app.core.config import get_settings
-from app.presentation.dependencies import get_file_service
 from app.presentation.routes.files import router as files_router
+from app.presentation.routes.health import router as health_router
+from app.presentation.routes.users import router as users_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="RZAdb")
+    settings = get_settings()
+
+    app = FastAPI(
+        title=settings.app_name,
+        debug=settings.debug,
+    )
 
     app.add_middleware(
         SessionMiddleware,
-        secret_key=get_settings().session_secret,
+        secret_key=settings.session_secret,
         https_only=False,
         same_site="lax",
     )
 
+    app.include_router(health_router)
+    app.include_router(users_router)
     app.include_router(files_router)
-
-    @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get("/di-check")
-    async def di_check(
-        file_service: Annotated[FileService, Depends(get_file_service)],
-    ) -> dict[str, str]:
-        return {"status": "ok", "service": type(file_service).__name__}
 
     return app
 
