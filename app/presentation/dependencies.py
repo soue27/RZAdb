@@ -8,3 +8,4 @@ def get_object_storage() -> ObjectStorage:
     return LocalObjectStorage(
         root=Path("data/uploads"),
     )
+
