@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Вход — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container">
+    <div class="row min-vh-100 align-items-center justify-content-center">
+        <div class="col-12 col-sm-10 col-md-6 col-lg-4">
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <div class="text-center mb-4">
+                        <span class="material-icons fs-1 text-primary">
+                            electrical_services
+                        </span>
+
+                        <h1 class="h4 mt-2 mb-1">
+                            RZAdb
+                        </h1>
+
+                        <p class="text-body-secondary mb-0">
+                            Вход в систему
+                        </p>
+                    </div>
+
+                    <form
+                        action="/auth/login"
+                        method="post"
+                    >
+                        <div class="mb-3">
+                            <label
+                                for="email"
+                                class="form-label"
+                            >
+                                Email
+                            </label>
+
+                            <input
+                                type="email"
+                                class="form-control"
+                                id="email"
+                                name="email"
+                                autocomplete="username"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-4">
+                            <label
+                                for="password"
+                                class="form-label"
+                            >
+                                Пароль
+                            </label>
+
+                            <input
+                                type="password"
+                                class="form-control"
+                                id="password"
+                                name="password"
+                                autocomplete="current-password"
+                                required
+                            >
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary w-100"
+                        >
+                            Войти
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

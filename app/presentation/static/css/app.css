@@ -1,7 +1,117 @@
 :root {
     font-family: "Roboto", sans-serif;
+
+    --rzadb-primary: #0068b3;
+    --rzadb-primary-hover: #005a9c;
+    --rzadb-primary-soft: #eef6fc;
+
+    --rzadb-background: #f5f7f9;
+    --rzadb-surface: #ffffff;
+
+    --rzadb-text: #263238;
+    --rzadb-text-secondary: #687782;
+
+    --rzadb-border: #e1e7ec;
+
+    --rzadb-success: #198754;
+    --rzadb-warning: #f0a500;
+    --rzadb-danger: #d9363e;
 }
 
 body {
     font-family: "Roboto", sans-serif;
+    color: var(--rzadb-text);
+    background-color: var(--rzadb-background);
+}
+
+
+/* ---------------------------------------------------------
+   Topbar
+   --------------------------------------------------------- */
+
+.topbar {
+    min-height: 60px;
+    background-color: var(--rzadb-surface);
+    border-bottom: 1px solid var(--rzadb-border);
+}
+
+.topbar-brand {
+    color: var(--rzadb-primary);
+}
+
+.topbar-brand:hover {
+    color: var(--rzadb-primary-hover);
+}
+
+.topbar-control {
+    height: 40px;
+}
+
+.topbar-icon-control {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.topbar-user {
+    line-height: 1.2;
+}
+
+.topbar-user-name {
+    font-weight: 500;
+}
+
+.topbar-user-role {
+    font-size: 0.875rem;
+}
+
+
+/* ---------------------------------------------------------
+   RZAdb buttons
+   --------------------------------------------------------- */
+
+.rzadb-btn-primary {
+    color: #ffffff;
+    background-color: var(--rzadb-primary);
+    border-color: var(--rzadb-primary);
+}
+
+.rzadb-btn-primary:hover,
+.rzadb-btn-primary:focus {
+    color: #ffffff;
+    background-color: var(--rzadb-primary-hover);
+    border-color: var(--rzadb-primary-hover);
+}
+
+
+/* ---------------------------------------------------------
+   Links
+   --------------------------------------------------------- */
+
+.rzadb-link {
+    color: var(--rzadb-primary);
+    text-decoration: none;
+}
+
+.rzadb-link:hover {
+    color: var(--rzadb-primary-hover);
+    text-decoration: underline;
+}
+
+
+/* ---------------------------------------------------------
+   Application surface
+   --------------------------------------------------------- */
+
+.rzadb-surface {
+    background-color: var(--rzadb-surface);
+    border: 1px solid var(--rzadb-border);
+}
+
+.rzadb-surface-soft {
+    background-color: var(--rzadb-primary-soft);
 }

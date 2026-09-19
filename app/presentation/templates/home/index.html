@@ -1,23 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}RZAdb{% endblock %}
+{% block title %}Главная — RZAdb{% endblock %}
 
 {% block body %}
-<div class="container py-5">
-    <div class="card">
-        <div class="card-body">
-            <h1 class="card-title">
-                RZAdb
-            </h1>
+<div class="container-fluid px-4 py-4">
 
-            <p class="card-text">
-                Добро пожаловать, {{ current_user.full_name }}.
-            </p>
+    <div class="mb-4">
+        <h1 class="h3 mb-1">База данных РЗА</h1>
 
-            <p class="text-body-secondary mb-0">
+        <p class="text-body-secondary mb-0">
+            Добро пожаловать, {{ current_user.full_name }}.
+        </p>
+    </div>
+
+    <div class="rzadb-surface-soft rounded-3 p-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="material-icons text-primary">
+                info
+            </span>
+
+            <span>
                 Интерфейс базы данных РЗА находится в разработке.
-            </p>
+            </span>
         </div>
     </div>
+
 </div>
 {% endblock %}

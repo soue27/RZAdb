@@ -1,5 +1,3 @@
-from fastapi.testclient import TestClient
-
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
@@ -18,9 +16,12 @@ def test_login_page() -> None:
     response = client.get("/auth/login")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "Login page",
-    }
+    assert "text/html" in response.headers["content-type"]
+    assert "RZAdb" in response.text
+    assert "Вход в систему" in response.text
+    assert 'name="email"' in response.text
+    assert 'name="password"' in response.text
+
 
 def test_login_success() -> None:
     user = User(

@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 from app.application.auth.service import AuthService, InvalidCredentialsError
 from app.presentation.dependencies.services import get_auth_service
@@ -11,11 +12,16 @@ router = APIRouter(
     tags=["auth"],
 )
 
+templates = Jinja2Templates(
+    directory="app/presentation/templates",
+)
 
 @router.get("/login")
-async def login_page() -> dict[str, str]:
-    return {"message": "Login page"}
-
+async def login_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/login.html",
+    )
 
 @router.post("/login")
 async def login(

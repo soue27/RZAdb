@@ -1,0 +1,117 @@
+<nav class="navbar bg-white topbar">
+    <div class="container-fluid px-4">
+
+        <!-- Logo -->
+        <a
+            href="/"
+            class="navbar-brand topbar-brand d-flex align-items-center gap-2 mb-0"
+        >
+            <span class="material-icons">
+                electrical_services
+            </span>
+
+            <span class="fw-medium">
+                RZAdb
+            </span>
+        </a>
+
+
+        <!-- Right side -->
+        <div class="d-flex align-items-center gap-2 ms-auto">
+
+            <!-- Tasks -->
+            <a
+                href="/tasks"
+                class="btn rzadb-btn-primary topbar-control
+                       d-flex align-items-center gap-2"
+            >
+                <span class="material-icons fs-5">
+                    assignment
+                </span>
+
+                <span>
+                    Задания
+                </span>
+            </a>
+
+
+            <!-- Notifications -->
+            <button
+                type="button"
+                class="btn btn-light border topbar-icon-control
+                       position-relative"
+                title="Уведомления"
+            >
+                <span class="material-icons">
+                    notifications
+                </span>
+
+                {% if notification_count|default(0) > 0 %}
+                    <span
+                        class="position-absolute top-0 start-100
+                               translate-middle badge rounded-pill bg-danger"
+                    >
+                        {{ notification_count }}
+                    </span>
+                {% endif %}
+            </button>
+
+
+            <!-- Divider -->
+            <div class="vr mx-2"></div>
+
+
+            <!-- User -->
+            {% if current_user %}
+                <div class="topbar-user text-end d-none d-md-block">
+                    <div class="topbar-user-name">
+                        {{ current_user.full_name }}
+                    </div>
+
+                    <div class="topbar-user-role text-body-secondary">
+                        {{ current_user.role.value }}
+                    </div>
+                </div>
+            {% endif %}
+
+
+            <!-- Theme -->
+            <button
+                type="button"
+                class="btn btn-light border topbar-icon-control"
+                id="theme-toggle"
+                title="Изменить тему"
+            >
+                <span
+                    class="material-icons"
+                    id="theme-icon"
+                >
+                    dark_mode
+                </span>
+            </button>
+
+
+            <!-- Logout -->
+            <form
+                action="/auth/logout"
+                method="post"
+                class="d-inline"
+            >
+                <button
+                    type="submit"
+                    class="btn btn-outline-danger topbar-control
+                           d-flex align-items-center gap-2"
+                >
+                    <span class="material-icons fs-5">
+                        logout
+                    </span>
+
+                    <span class="d-none d-sm-inline">
+                        Выйти
+                    </span>
+                </button>
+            </form>
+
+        </div>
+    </div>
+</nav>

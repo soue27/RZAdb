@@ -1,7 +1,6 @@
 from fastapi import FastAPI
-from starlette.middleware.sessions import SessionMiddleware
-
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
 from app.presentation.routes.auth import router as auth_router
