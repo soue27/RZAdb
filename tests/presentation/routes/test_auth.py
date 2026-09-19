@@ -93,3 +93,35 @@ def test_login_invalid_credentials() -> None:
 
     finally:
         app.dependency_overrides.clear()
+
+def test_logout() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/auth/logout",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
+
+def test_logout_clears_session() -> None:
+    client = TestClient(app)
+
+    client.cookies.set(
+        "session",
+        "temporary",
+    )
+
+    response = client.post(
+        "/auth/logout",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
+
+    set_cookie = response.headers.get("set-cookie")
+
+    assert set_cookie is not None
+    assert "session=" in set_cookie

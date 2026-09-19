@@ -41,3 +41,12 @@ async def login(
         url="/",
         status_code=status.HTTP_303_SEE_OTHER,
     )
+
+@router.post("/logout")
+async def logout(request: Request) -> RedirectResponse:
+    request.session.clear()
+
+    return RedirectResponse(
+        url="/auth/login",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
