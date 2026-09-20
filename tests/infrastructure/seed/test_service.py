@@ -2,7 +2,8 @@ import pytest
 from sqlalchemy import func, select
 
 from app.domain.enterprise import Enterprise
-from app.domain.enums import EnterpriseType
+from app.domain.enums import EnterpriseType, HighestVoltage
+from app.domain.substation import Substation
 from app.infrastructure.database.engine import async_session_factory
 from app.infrastructure.seed.service import RZACSVSeedService
 
@@ -343,5 +344,129 @@ async def test_get_or_create_department_returns_existing_department() -> None:
             assert result.id == department.id
             assert result.short_name == "Существующее"
             assert result.sap_code == "OLD-SAP"
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_substation_creates_substation() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные сети",
+            )
+
+            session.add(department)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            substation = await service.get_or_create_substation(
+                {
+                    "substation_dispatch_name": "ПС Свердловская",
+                    "substation_highest_voltage": "110",
+                    "substation_sap_code": "PS-001",
+                    "substation_asureo_code": "ASUREO-001",
+                    "substation_address": "г. Екатеринбург",
+                    "substation_latitude": "56.123456",
+                    "substation_longitude": "60.123456",
+                },
+                department_id=department.id,
+            )
+
+            assert substation.id is not None
+            assert substation.enterprise_id == department.id
+            assert substation.dispatch_name == "ПС Свердловская"
+            assert substation.highest_voltage.value == "110"
+            assert substation.sap_code == "PS-001"
+            assert substation.asureo_code == "ASUREO-001"
+            assert str(substation.latitude) == "56.123456"
+            assert str(substation.longitude) == "60.123456"
+            assert substation.address == "г. Екатеринбург"
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_substation_returns_existing_substation() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+                sap_code="OLD-SAP",
+            )
+
+            session.add(substation)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            result = await service.get_or_create_substation(
+                {
+                    "substation_dispatch_name": "ПС Свердловская",
+                    "substation_highest_voltage": "220",
+                    "substation_sap_code": "NEW-SAP",
+                },
+                department_id=department.id,
+            )
+
+            assert result.id == substation.id
+            assert result.highest_voltage == HighestVoltage.KV_110
+            assert result.sap_code == "OLD-SAP"
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_substation_ignores_deleted_substation() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+
+            session.add(department)
+            await session.flush()
+
+            deleted_substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+                deleted_at=func.now(),
+            )
+
+            session.add(deleted_substation)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            result = await service.get_or_create_substation(
+                {
+                    "substation_dispatch_name": "ПС Свердловская",
+                    "substation_highest_voltage": "110",
+                },
+                department_id=department.id,
+            )
+
+            assert result.id != deleted_substation.id
+            assert result.deleted_at is None
         finally:
             await transaction.rollback()

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.enterprise import Enterprise
 from app.domain.enums import EnterpriseType
 from app.domain.substation import Substation
+from app.infrastructure.seed.parser import CSVRowParser
 
 
 class RZACSVSeedService:
@@ -124,6 +125,56 @@ class RZACSVSeedService:
 
         return department
 
+    async def get_or_create_substation(
+        self,
+        row: dict[str, str],
+        department_id: UUID,
+    ) -> Substation:
+        """Находит существующую подстанцию или создаёт новую."""
+
+        dispatch_name = row["substation_dispatch_name"].strip()
+
+        result = await self.session.execute(
+            select(Substation).where(
+                Substation.enterprise_id == department_id,
+                Substation.dispatch_name == dispatch_name,
+                Substation.deleted_at.is_(None),
+            )
+        )
+
+        substation = result.scalar_one_or_none()
+
+        if substation is not None:
+            return substation
+
+        substation = Substation(
+            enterprise_id=department_id,
+            highest_voltage=CSVRowParser.highest_voltage(
+                row["substation_highest_voltage"]
+            ),
+            dispatch_name=dispatch_name,
+            sap_code=CSVRowParser.optional_string(
+                row.get("substation_sap_code", "")
+            ),
+            asureo_code=CSVRowParser.optional_string(
+                row.get("substation_asureo_code", "")
+            ),
+            latitude=CSVRowParser.decimal(
+                row.get("substation_latitude", "")
+            ),
+            longitude=CSVRowParser.decimal(
+                row.get("substation_longitude", "")
+            ),
+            address=CSVRowParser.optional_string(
+                row.get("substation_address", "")
+            ),
+        )
+
+        self.session.add(substation)
+
+        await self.session.flush()
+
+        return substation
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:
