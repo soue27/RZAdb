@@ -5,6 +5,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.access.service import AccessService
+from app.application.objects.resolver import ObjectResolver
 from app.application.auth.password import PasswordService
 from app.application.auth.service import AuthService
 from app.application.connections.repository import ConnectionRepository
@@ -15,6 +16,7 @@ from app.application.substations.repository import SubstationRepository
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.users.repository import UserRepository
+from app.application.objects.service import ObjectService
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
@@ -22,6 +24,7 @@ from app.infrastructure.storage.local import LocalObjectStorage
 
 def get_object_storage() -> ObjectStorage:
     return LocalObjectStorage(root=Path("data/uploads"))
+
 
 def get_file_service(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -33,6 +36,7 @@ def get_file_service(
         repository=repository,
         storage=storage,
     )
+
 
 def get_password_service() -> PasswordService:
     return PasswordService()
@@ -47,18 +51,49 @@ def get_auth_service(
         password_service=password_service,
     )
 
+def get_access_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> AccessService:
+    return AccessService(
+        user_repository=UserRepository(session),
+        substation_repository=SubstationRepository(session),
+        enterprise_repository=EnterpriseRepository(session),
+        connection_repository=ConnectionRepository(session),
+        urza_repository=URZARepository(session),
+    )
+
+
 def get_tree_service(
     session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> TreeService:
     return TreeService(
         enterprise_repository=EnterpriseRepository(session),
         substation_repository=SubstationRepository(session),
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
-        access_service=AccessService(
-            user_repository=UserRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_object_resolver(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ObjectResolver:
+    return ObjectResolver(
+        substation_repository=SubstationRepository(session),
+        connection_repository=ConnectionRepository(session),
+        urza_repository=URZARepository(session),
+    )
+
+
+def get_object_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> ObjectService:
+    return ObjectService(
+        access_service=access_service,
+        object_resolver=ObjectResolver(
             substation_repository=SubstationRepository(session),
-            enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
             urza_repository=URZARepository(session),
         ),
