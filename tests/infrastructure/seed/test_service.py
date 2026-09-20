@@ -823,3 +823,146 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
         finally:
             await transaction.rollback()
 
+@pytest.mark.asyncio
+async def test_import_row_creates_full_hierarchy() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            service = RZACSVSeedService(session)
+
+            row = {
+                "holding_full_name": "Россети Урал",
+                "holding_short_name": "Россети Урал",
+                "holding_sap_code": "HOLDING-001",
+                "branch_full_name": "Свердловский филиал",
+                "branch_short_name": "Свердловский",
+                "branch_sap_code": "BRANCH-001",
+                "department_full_name": "ПО Центральные сети",
+                "department_short_name": "Центральные сети",
+                "department_sap_code": "DEPT-001",
+                "substation_dispatch_name": "ПС Свердловская",
+                "substation_highest_voltage": "110",
+                "substation_sap_code": "PS-001",
+                "substation_asureo_code": "ASUREO-001",
+                "substation_address": "г. Екатеринбург",
+                "substation_latitude": "56.123456",
+                "substation_longitude": "60.123456",
+                "connection_dispatch_name": "ВЛ 110 кВ Свердловская",
+                "connection_sap_code": "CON-001",
+                "connection_asureo_code": "ASUREO-CON-001",
+                "connection_rdu_subordination": "да",
+                "operational_current_type": "permanent",
+                "urza_dispatch_name": "ДЗЛ-110",
+                "urza_rdu_subordination": "да",
+                "urza_inventory_number": "INV-001",
+                "urza_commissioning_date": "2024-05-15",
+                "urza_status": "in_operation",
+                "urza_element_base": "microprocessor",
+                "urza_category": "II",
+                "urza_room_category": "I",
+                "urza_complexity": "нет",
+            }
+
+            urza = await service.import_row(row)
+
+            assert urza.dispatch_name == "ДЗЛ-110"
+            assert urza.inventory_number == "INV-001"
+            assert urza.status == URZAStatus.IN_OPERATION
+            assert urza.element_base == ElementBase.MICROPROCESSOR
+            assert urza.category == URZACategory.II
+            assert urza.room_category == RoomCategory.I
+            assert urza.complexity is False
+
+            connection = await session.get(Connection, urza.connection_id)
+
+            assert connection is not None
+            assert connection.dispatch_name == "ВЛ 110 кВ Свердловская"
+
+            substation = await session.get(
+                Substation,
+                connection.substation_id,
+            )
+
+            assert substation is not None
+            assert substation.dispatch_name == "ПС Свердловская"
+
+            department = await session.get(
+                Enterprise,
+                substation.enterprise_id,
+            )
+
+            assert department is not None
+            assert department.type == EnterpriseType.DEPARTMENT
+            assert department.full_name == "ПО Центральные сети"
+
+            branch = await session.get(
+                Enterprise,
+                department.parent_id,
+            )
+
+            assert branch is not None
+            assert branch.type == EnterpriseType.BRANCH
+            assert branch.full_name == "Свердловский филиал"
+
+            holding = await session.get(
+                Enterprise,
+                branch.parent_id,
+            )
+
+            assert holding is not None
+            assert holding.type == EnterpriseType.HOLDING
+            assert holding.full_name == "Россети Урал"
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_import_row_is_idempotent() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            service = RZACSVSeedService(session)
+
+            row = {
+                "holding_full_name": "Тестовый холдинг",
+                "holding_short_name": "Тестовый",
+                "branch_full_name": "Тестовый филиал",
+                "branch_short_name": "Филиал",
+                "department_full_name": "Тестовое ПО",
+                "department_short_name": "ПО",
+                "substation_dispatch_name": "ПС Тестовая",
+                "substation_highest_voltage": "110",
+                "connection_dispatch_name": "ВЛ Тестовая",
+                "connection_rdu_subordination": "нет",
+                "operational_current_type": "rectified",
+                "urza_dispatch_name": "ДЗЛ-Тест",
+                "urza_rdu_subordination": "нет",
+                "urza_inventory_number": "",
+                "urza_commissioning_date": "2025-01-01",
+                "urza_status": "reserve",
+                "urza_element_base": "microprocessor",
+                "urza_category": "III",
+                "urza_room_category": "II",
+                "urza_complexity": "нет",
+            }
+
+            first = await service.import_row(row)
+            second = await service.import_row(row)
+
+            assert second.id == first.id
+            assert second.connection_id == first.connection_id
+
+            result = await session.execute(
+                select(func.count())
+                .select_from(URZA)
+                .where(
+                    URZA.dispatch_name == "ДЗЛ-Тест",
+                    URZA.deleted_at.is_(None),
+                )
+            )
+
+            assert result.scalar_one() == 1
+        finally:
+            await transaction.rollback()
+

@@ -274,6 +274,39 @@ class RZACSVSeedService:
 
         return urza
 
+    async def import_row(
+        self,
+        row: dict[str, str],
+    ) -> URZA:
+        """Импортирует одну строку CSV по всей иерархии РЗА."""
+
+        holding = await self.get_or_create_holding(row)
+
+        branch = await self.get_or_create_branch(
+            row,
+            holding_id=holding.id,
+        )
+
+        department = await self.get_or_create_department(
+            row,
+            branch_id=branch.id,
+        )
+
+        substation = await self.get_or_create_substation(
+            row,
+            department_id=department.id,
+        )
+
+        connection = await self.get_or_create_connection(
+            row,
+            substation_id=substation.id,
+        )
+
+        return await self.get_or_create_urza(
+            row,
+            connection_id=connection.id,
+        )
+
     @staticmethod
     def _optional_string(value: str | None) -> str | None:
         if value is None:
