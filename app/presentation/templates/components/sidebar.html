@@ -206,6 +206,9 @@
                         class="tree-item"
                         data-object-type="urza"
                         data-object-id="{{ urza.id }}"
+                        hx-get="/objects/urza/{{ urza.id }}"
+                        hx-target="#object-content"
+                        hx-swap="innerHTML"
                     >
                         <span class="tree-icon-spacer"></span>
 
