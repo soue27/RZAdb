@@ -1,8 +1,9 @@
 import pytest
 from sqlalchemy import func, select
 
+from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
-from app.domain.enums import EnterpriseType, HighestVoltage
+from app.domain.enums import EnterpriseType, HighestVoltage, OperationalCurrentType
 from app.domain.substation import Substation
 from app.infrastructure.database.engine import async_session_factory
 from app.infrastructure.seed.service import RZACSVSeedService
@@ -468,5 +469,153 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
 
             assert result.id != deleted_substation.id
             assert result.deleted_at is None
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_connection_creates_connection() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            connection = await service.get_or_create_connection(
+                {
+                    "connection_dispatch_name": "ВЛ 110 кВ Свердловская",
+                    "connection_sap_code": "CON-001",
+                    "connection_asureo_code": "ASUREO-CON-001",
+                    "connection_rdu_subordination": "да",
+                    "operational_current_type": "permanent",
+                },
+                substation_id=substation.id,
+            )
+
+            assert connection.id is not None
+            assert connection.substation_id == substation.id
+            assert connection.dispatch_name == "ВЛ 110 кВ Свердловская"
+            assert connection.sap_code == "CON-001"
+            assert connection.asureo_code == "ASUREO-CON-001"
+            assert connection.rdu_subordination is True
+            assert (
+                connection.operational_current_type
+                == OperationalCurrentType.PERMANENT
+            )
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_connection_parses_values() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            connection = await service.get_or_create_connection(
+                {
+                    "connection_dispatch_name": "Трансформатор Т-1",
+                    "connection_sap_code": "",
+                    "connection_asureo_code": "",
+                    "connection_rdu_subordination": "нет",
+                    "operational_current_type": "rectified",
+                },
+                substation_id=substation.id,
+            )
+
+            assert connection.rdu_subordination is False
+            assert (
+                connection.operational_current_type
+                == OperationalCurrentType.RECTIFIED
+            )
+            assert connection.sap_code is None
+            assert connection.asureo_code is None
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_connection_returns_existing_connection() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            connection = Connection(
+                substation_id=substation.id,
+                dispatch_name="ВЛ 110 кВ Свердловская",
+                sap_code="OLD-SAP",
+                rdu_subordination=True,
+                operational_current_type=OperationalCurrentType.PERMANENT,
+            )
+            session.add(connection)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            result = await service.get_or_create_connection(
+                {
+                    "connection_dispatch_name": "ВЛ 110 кВ Свердловская",
+                    "connection_sap_code": "NEW-SAP",
+                    "connection_asureo_code": "NEW-ASUREO",
+                    "connection_rdu_subordination": "нет",
+                    "operational_current_type": "rectified",
+                },
+                substation_id=substation.id,
+            )
+
+            assert result.id == connection.id
+            assert result.sap_code == "OLD-SAP"
+            assert result.rdu_subordination is True
+            assert (
+                result.operational_current_type
+                == OperationalCurrentType.PERMANENT
+            )
         finally:
             await transaction.rollback()

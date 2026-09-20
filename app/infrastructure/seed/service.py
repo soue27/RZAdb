@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import EnterpriseType
 from app.domain.substation import Substation
@@ -175,6 +176,51 @@ class RZACSVSeedService:
         await self.session.flush()
 
         return substation
+
+    async def get_or_create_connection(
+            self,
+            row: dict[str, str],
+            substation_id: UUID,
+    ) -> Connection:
+        """Находит существующее присоединение или создаёт новое."""
+
+        dispatch_name = row["connection_dispatch_name"].strip()
+
+        result = await self.session.execute(
+            select(Connection).where(
+                Connection.substation_id == substation_id,
+                Connection.dispatch_name == dispatch_name,
+                Connection.deleted_at.is_(None),
+            )
+        )
+
+        connection = result.scalar_one_or_none()
+
+        if connection is not None:
+            return connection
+
+        connection = Connection(
+            substation_id=substation_id,
+            dispatch_name=dispatch_name,
+            sap_code=CSVRowParser.optional_string(
+                row.get("connection_sap_code", "")
+            ),
+            asureo_code=CSVRowParser.optional_string(
+                row.get("connection_asureo_code", "")
+            ),
+            rdu_subordination=CSVRowParser.boolean(
+                row["connection_rdu_subordination"]
+            ),
+            operational_current_type=CSVRowParser.operational_current_type(
+                row["operational_current_type"]
+            ),
+        )
+
+        self.session.add(connection)
+
+        await self.session.flush()
+
+        return connection
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:
