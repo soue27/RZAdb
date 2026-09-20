@@ -5,8 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
-from app.domain.enums import EnterpriseType
+from app.domain.enums import (
+    EnterpriseType,
+)
 from app.domain.substation import Substation
+from app.domain.urza import URZA
 from app.infrastructure.seed.parser import CSVRowParser
 
 
@@ -221,6 +224,55 @@ class RZACSVSeedService:
         await self.session.flush()
 
         return connection
+
+    async def get_or_create_urza(
+            self,
+            row: dict[str, str],
+            connection_id: UUID,
+    ) -> URZA:
+        """Находит существующую УРЗА или создаёт новую."""
+
+        dispatch_name = row["urza_dispatch_name"].strip()
+
+        result = await self.session.execute(
+            select(URZA).where(
+                URZA.connection_id == connection_id,
+                URZA.dispatch_name == dispatch_name,
+                URZA.deleted_at.is_(None),
+            )
+        )
+
+        urza = result.scalar_one_or_none()
+
+        if urza is not None:
+            return urza
+
+        urza = URZA(
+            connection_id=connection_id,
+            dispatch_name=dispatch_name,
+            rdu_subordination=CSVRowParser.boolean(
+                row["urza_rdu_subordination"]
+            ),
+            inventory_number=CSVRowParser.optional_string(
+                row.get("urza_inventory_number", "")
+            ),
+            commissioning_date=CSVRowParser.date(
+                row["urza_commissioning_date"]
+            ),
+            status=CSVRowParser.urza_status(row["urza_status"]),
+            element_base=CSVRowParser.element_base(row["urza_element_base"]),
+            category=CSVRowParser.urza_category(row["urza_category"]),
+            room_category=CSVRowParser.room_category(
+                row["urza_room_category"]
+            ),
+            complexity=CSVRowParser.boolean(row["urza_complexity"]),
+        )
+
+        self.session.add(urza)
+
+        await self.session.flush()
+
+        return urza
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:

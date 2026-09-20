@@ -1,10 +1,21 @@
+from datetime import date
+
 import pytest
 from sqlalchemy import func, select
 
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
-from app.domain.enums import EnterpriseType, HighestVoltage, OperationalCurrentType
+from app.domain.enums import (
+    ElementBase,
+    EnterpriseType,
+    HighestVoltage,
+    OperationalCurrentType,
+    RoomCategory,
+    URZACategory,
+    URZAStatus,
+)
 from app.domain.substation import Substation
+from app.domain.urza import URZA
 from app.infrastructure.database.engine import async_session_factory
 from app.infrastructure.seed.service import RZACSVSeedService
 
@@ -619,3 +630,196 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
             )
         finally:
             await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_urza_creates_urza() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            connection = Connection(
+                substation_id=substation.id,
+                dispatch_name="ВЛ 110 кВ Свердловская",
+                rdu_subordination=True,
+                operational_current_type=OperationalCurrentType.PERMANENT,
+            )
+            session.add(connection)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            urza = await service.get_or_create_urza(
+                {
+                    "urza_dispatch_name": "ДЗЛ-110",
+                    "urza_rdu_subordination": "да",
+                    "urza_inventory_number": "INV-001",
+                    "urza_commissioning_date": "2024-05-15",
+                    "urza_status": "in_operation",
+                    "urza_element_base": "microprocessor",
+                    "urza_category": "II",
+                    "urza_room_category": "I",
+                    "urza_complexity": "нет",
+                },
+                connection_id=connection.id,
+            )
+
+            assert urza.id is not None
+            assert urza.connection_id == connection.id
+            assert urza.dispatch_name == "ДЗЛ-110"
+            assert urza.rdu_subordination is True
+            assert urza.inventory_number == "INV-001"
+            assert urza.commissioning_date == date(2024, 5, 15)
+            assert urza.status == URZAStatus.IN_OPERATION
+            assert urza.element_base == ElementBase.MICROPROCESSOR
+            assert urza.category == URZACategory.II
+            assert urza.room_category == RoomCategory.I
+            assert urza.complexity is False
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            connection = Connection(
+                substation_id=substation.id,
+                dispatch_name="ВЛ 110 кВ Свердловская",
+                rdu_subordination=False,
+                operational_current_type=OperationalCurrentType.RECTIFIED,
+            )
+            session.add(connection)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            urza = await service.get_or_create_urza(
+                {
+                    "urza_dispatch_name": "УРОВ",
+                    "urza_rdu_subordination": "нет",
+                    "urza_inventory_number": "",
+                    "urza_commissioning_date": "2025-01-10",
+                    "urza_status": "reserve",
+                    "urza_element_base": "microelectronic",
+                    "urza_category": "III",
+                    "urza_room_category": "II",
+                    "urza_complexity": "да",
+                },
+                connection_id=connection.id,
+            )
+
+            assert urza.inventory_number is None
+            assert urza.status == URZAStatus.RESERVE
+            assert urza.element_base == ElementBase.MICROELECTRONIC
+            assert urza.category == URZACategory.III
+            assert urza.room_category == RoomCategory.II
+            assert urza.complexity is True
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_urza_returns_existing_urza() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            department = Enterprise(
+                type=EnterpriseType.DEPARTMENT,
+                full_name="ПО Центральные сети",
+                short_name="Центральные",
+            )
+            session.add(department)
+            await session.flush()
+
+            substation = Substation(
+                enterprise_id=department.id,
+                highest_voltage=HighestVoltage.KV_110,
+                dispatch_name="ПС Свердловская",
+            )
+            session.add(substation)
+            await session.flush()
+
+            connection = Connection(
+                substation_id=substation.id,
+                dispatch_name="ВЛ 110 кВ Свердловская",
+                rdu_subordination=True,
+                operational_current_type=OperationalCurrentType.PERMANENT,
+            )
+            session.add(connection)
+            await session.flush()
+
+            urza = URZA(
+                connection_id=connection.id,
+                dispatch_name="ДЗЛ-110",
+                rdu_subordination=True,
+                inventory_number="OLD-001",
+                commissioning_date=date(2024, 5, 15),
+                status=URZAStatus.IN_OPERATION,
+                element_base=ElementBase.MICROPROCESSOR,
+                category=URZACategory.II,
+                room_category=RoomCategory.I,
+                complexity=False,
+            )
+            session.add(urza)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            result = await service.get_or_create_urza(
+                {
+                    "urza_dispatch_name": "ДЗЛ-110",
+                    "urza_rdu_subordination": "нет",
+                    "urza_inventory_number": "NEW-001",
+                    "urza_commissioning_date": "2026-01-01",
+                    "urza_status": "in_repair",
+                    "urza_element_base": "electromechanical",
+                    "urza_category": "IV",
+                    "urza_room_category": "III",
+                    "urza_complexity": "да",
+                },
+                connection_id=connection.id,
+            )
+
+            assert result.id == urza.id
+            assert result.inventory_number == "OLD-001"
+            assert result.status == URZAStatus.IN_OPERATION
+            assert result.element_base == ElementBase.MICROPROCESSOR
+            assert result.category == URZACategory.II
+            assert result.room_category == RoomCategory.I
+            assert result.complexity is False
+        finally:
+            await transaction.rollback()
+
