@@ -19,7 +19,17 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+environment = context.get_x_argument(as_dictionary=True).get("environment")
+
+if environment == "test":
+    from dotenv import load_dotenv
+
+    load_dotenv(".env.test", override=True)
+
+    get_settings.cache_clear()
+
 settings = get_settings()
+print(f"ALEMBIC DATABASE: {settings.database_url}")
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
