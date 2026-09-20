@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +46,43 @@ class RZACSVSeedService:
         await self.session.flush()
 
         return holding
+
+    async def get_or_create_branch(
+        self,
+        row: dict[str, str],
+        holding_id: UUID,
+    ) -> Enterprise:
+        """Находит существующий филиал или создаёт новый."""
+
+        full_name = row["branch_full_name"].strip()
+
+        result = await self.session.execute(
+            select(Enterprise).where(
+                Enterprise.type == EnterpriseType.BRANCH,
+                Enterprise.parent_id == holding_id,
+                Enterprise.full_name == full_name,
+                Enterprise.deleted_at.is_(None),
+            )
+        )
+
+        branch = result.scalar_one_or_none()
+
+        if branch is not None:
+            return branch
+
+        branch = Enterprise(
+            type=EnterpriseType.BRANCH,
+            parent_id=holding_id,
+            full_name=full_name,
+            short_name=row["branch_short_name"].strip(),
+            sap_code=self._optional_string(row.get("branch_sap_code")),
+        )
+
+        self.session.add(branch)
+
+        await self.session.flush()
+
+        return branch
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:

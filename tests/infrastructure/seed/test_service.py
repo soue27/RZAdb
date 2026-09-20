@@ -108,3 +108,93 @@ async def test_get_or_create_holding_ignores_deleted_holding() -> None:
             assert result.short_name == "Новый холдинг"
         finally:
             await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_branch_is_scoped_to_holding() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            first_holding = Enterprise(
+                type=EnterpriseType.HOLDING,
+                full_name="Первый холдинг",
+                short_name="Первый",
+            )
+            second_holding = Enterprise(
+                type=EnterpriseType.HOLDING,
+                full_name="Второй холдинг",
+                short_name="Второй",
+            )
+
+            session.add_all([first_holding, second_holding])
+            await session.flush()
+
+            first_branch = Enterprise(
+                type=EnterpriseType.BRANCH,
+                parent_id=first_holding.id,
+                full_name="Свердловский филиал",
+                short_name="Свердловский",
+            )
+
+            session.add(first_branch)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            second_branch = await service.get_or_create_branch(
+                {
+                    "branch_full_name": "Свердловский филиал",
+                    "branch_short_name": "Свердловский",
+                    "branch_sap_code": "",
+                },
+                holding_id=second_holding.id,
+            )
+
+            assert second_branch.id != first_branch.id
+            assert second_branch.parent_id == second_holding.id
+            assert second_branch.full_name == "Свердловский филиал"
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_get_or_create_branch_returns_existing_branch() -> None:
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            holding = Enterprise(
+                type=EnterpriseType.HOLDING,
+                full_name="Тестовый холдинг",
+                short_name="Тестовый",
+            )
+
+            session.add(holding)
+            await session.flush()
+
+            branch = Enterprise(
+                type=EnterpriseType.BRANCH,
+                parent_id=holding.id,
+                full_name="Существующий филиал",
+                short_name="Существующий",
+                sap_code="OLD-SAP",
+            )
+
+            session.add(branch)
+            await session.flush()
+
+            service = RZACSVSeedService(session)
+
+            result = await service.get_or_create_branch(
+                {
+                    "branch_full_name": "Существующий филиал",
+                    "branch_short_name": "Новое название",
+                    "branch_sap_code": "NEW-SAP",
+                },
+                holding_id=holding.id,
+            )
+
+            assert result.id == branch.id
+            assert result.short_name == "Существующий"
+            assert result.sap_code == "OLD-SAP"
+        finally:
+            await transaction.rollback()
