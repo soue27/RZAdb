@@ -300,6 +300,39 @@ body {
         color 0.12s ease;
 }
 
+.tree-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.tree-expand-button {
+    width: 20px;
+    min-width: 20px;
+    height: 32px;
+    padding: 0;
+    margin-right: 2px;
+    border: 0;
+    background: transparent;
+    color: var(--rzadb-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tree-expand-button:hover {
+    color: var(--rzadb-primary);
+}
+
+.tree-expand-button[aria-expanded="true"] .tree-chevron {
+    transform: rotate(90deg);
+}
+
+.tree-item-select {
+    flex: 1;
+    min-width: 0;
+}
+
 
 .tree-toggle:hover,
 .tree-item:hover {
