@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -11,15 +11,20 @@ from app.application.objects.service import ObjectService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_object_service
+from fastapi.templating import Jinja2Templates
 
 router = APIRouter(
     prefix="/objects",
     tags=["objects"],
 )
 
+templates = Jinja2Templates(
+    directory="app/presentation/templates",
+)
 
 @router.get("/{object_type}/{object_id}")
 async def get_object(
+    request: Request,
     object_type: str,
     object_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -42,4 +47,10 @@ async def get_object(
             detail="Объект не найден.",
         ) from exc
 
-    return selected_object
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/selected_object.html",
+        context={
+            "object": selected_object,
+        },
+    )

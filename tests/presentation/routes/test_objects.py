@@ -99,11 +99,9 @@ def test_get_object_returns_selected_object() -> None:
         )
 
         assert response.status_code == 200
-        assert response.json() == {
-            "object_type": "substation",
-            "id": str(object_id),
-            "name": "ПС Свердловская",
-        }
+        assert "text/html" in response.headers["content-type"]
+        assert "ПС Свердловская" in response.text
+        assert "substation" in response.text
     finally:
         app.dependency_overrides.clear()
 
