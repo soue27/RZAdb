@@ -160,27 +160,37 @@
     {% macro connection_node(connection) %}
         <div class="tree-node">
 
-            <button
-                type="button"
-                class="tree-toggle"
-                data-bs-toggle="collapse"
-                data-bs-target="#tree-connection-{{ connection.id }}"
-                aria-expanded="false"
-                data-object-type="connection"
-                data-object-id="{{ connection.id }}"
-            >
-                <span class="material-icons tree-chevron">
-                    chevron_right
-                </span>
+            <div class="tree-row">
 
-                <span class="material-icons tree-icon">
-                    electrical_services
-                </span>
+                <button
+                    type="button"
+                    class="tree-expand-button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#tree-connection-{{ connection.id }}"
+                    aria-expanded="false"
+                    aria-label="Развернуть {{ connection.dispatch_name }}"
+                >
+                    <span class="material-icons tree-chevron">
+                        chevron_right
+                    </span>
+                </button>
 
-                <span class="tree-label">
-                    {{ connection.dispatch_name }}
-                </span>
-            </button>
+                <button
+                    type="button"
+                    class="tree-item tree-item-select"
+                    data-object-type="connection"
+                    data-object-id="{{ connection.id }}"
+                >
+                    <span class="material-icons tree-icon">
+                        electrical_services
+                    </span>
+
+                    <span class="tree-label">
+                        {{ connection.dispatch_name }}
+                    </span>
+                </button>
+
+            </div>
 
             <div
                 id="tree-connection-{{ connection.id }}"
@@ -207,6 +217,7 @@
                 {% endfor %}
 
             </div>
+
         </div>
     {% endmacro %}
 

@@ -109,6 +109,47 @@ def make_tree_with_connection() -> tuple[
         "urza": str(urza_id),
     }
 
+def test_home_renders_separate_connection_expand_and_select_controls() -> None:
+    user = make_user()
+    tree, object_ids = make_tree_with_connection()
+
+    async def override_current_user() -> User:
+        return user
+
+    fake_tree_service = FakeTreeService(tree=tree)
+
+    def override_tree_service() -> FakeTreeService:
+        return fake_tree_service
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_tree_service] = override_tree_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.get("/")
+
+        assert response.status_code == 200
+
+        assert (
+            f'data-bs-target="#tree-connection-{object_ids["connection"]}"'
+            in response.text
+        )
+
+        assert (
+            f'data-object-type="connection"'
+            in response.text
+        )
+
+        assert (
+            f'data-object-id="{object_ids["connection"]}"'
+            in response.text
+        )
+
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_home_requires_authentication() -> None:
     client = TestClient(app)
 
