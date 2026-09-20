@@ -324,37 +324,37 @@ body {
    --------------------------------------------------------- */
 
 .tree-chevron {
-    width: 18px;
-    min-width: 18px;
+    width: 20px;
+    min-width: 20px;
 
     margin-right: 2px;
 
-    font-size: 18px;
+    font-size: 20px;
 
     color: var(--rzadb-text-secondary);
 
     transition:
-        transform 0.12s ease,
-        color 0.12s ease;
+        transform 0.15s ease,
+        color 0.15s ease;
 }
 
 
 /*
- * expand_more = ▼
- *
- * expanded:
- *     ▼
+ * chevron_right:
  *
  * collapsed:
  *     ▶
+ *
+ * expanded:
+ *     ▼
  */
 .tree-toggle[aria-expanded="false"] .tree-chevron {
-    transform: rotate(-90deg);
+    transform: rotate(0);
 }
 
 
 .tree-toggle[aria-expanded="true"] .tree-chevron {
-    transform: rotate(0);
+    transform: rotate(90deg);
 }
 
 
@@ -451,49 +451,6 @@ body {
     font-size: 18px;
 
     color: var(--rzadb-text-secondary);
-}
-
-
-/* ---------------------------------------------------------
-   Tree arrows
-   --------------------------------------------------------- */
-
-.tree-chevron {
-    width: 20px;
-    min-width: 20px;
-
-    margin-right: 2px;
-
-    font-size: 20px;
-
-    color: var(--rzadb-text-secondary);
-
-    transition:
-        transform 0.15s ease,
-        color 0.15s ease;
-}
-
-
-/*
- * expand_more = ▼
- *
- * When collapsed, rotate 90 degrees:
- *
- * ▼  →  ▶
- */
-.tree-toggle[aria-expanded="false"] .tree-chevron {
-    transform: rotate(-90deg);
-}
-
-
-.tree-toggle[aria-expanded="true"] .tree-chevron {
-    transform: rotate(0);
-}
-
-
-.tree-toggle:hover .tree-chevron,
-.tree-toggle.active .tree-chevron {
-    color: var(--rzadb-primary);
 }
 
 
