@@ -180,6 +180,9 @@
                     class="tree-item tree-item-select"
                     data-object-type="connection"
                     data-object-id="{{ connection.id }}"
+                    hx-get="/objects/connection/{{ connection.id }}"
+                    hx-target="#object-content"
+                    hx-swap="innerHTML"
                 >
                     <span class="material-icons tree-icon">
                         electrical_services
