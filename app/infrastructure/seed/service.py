@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from uuid import UUID
 
 from sqlalchemy import select
@@ -306,6 +307,17 @@ class RZACSVSeedService:
             row,
             connection_id=connection.id,
         )
+
+    async def import_rows(self, rows: Iterable[dict[str, str]]) -> int:
+        """Импортирует несколько строк CSV."""
+
+        count = 0
+
+        for row in rows:
+            await self.import_row(row)
+            count += 1
+
+        return count
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:

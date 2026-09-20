@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -17,6 +18,7 @@ from app.domain.enums import (
 from app.domain.substation import Substation
 from app.domain.urza import URZA
 from app.infrastructure.database.engine import async_session_factory
+from app.infrastructure.seed.csv_importer import CSVImporter
 from app.infrastructure.seed.service import RZACSVSeedService
 
 
@@ -963,6 +965,105 @@ async def test_import_row_is_idempotent() -> None:
             )
 
             assert result.scalar_one() == 1
+        finally:
+            await transaction.rollback()
+
+@pytest.mark.asyncio
+async def test_import_rows_creates_full_dataset() -> None:
+    importer = CSVImporter(Path("data/rzadb_test_data.csv"))
+    rows = importer.read_rows()
+
+    async with async_session_factory() as session:
+        transaction = await session.begin()
+
+        try:
+            service = RZACSVSeedService(session)
+
+            count = await service.import_rows(rows)
+
+            assert count == 56
+
+            # Проверяем импортированный холдинг.
+            holding = await session.scalar(
+                select(Enterprise).where(
+                    Enterprise.type == EnterpriseType.HOLDING,
+                    Enterprise.full_name == "Россети Урал",
+                    Enterprise.deleted_at.is_(None),
+                )
+            )
+
+            assert holding is not None
+
+            # Проверяем филиалы этого холдинга.
+            branches = (
+                await session.scalars(
+                    select(Enterprise).where(
+                        Enterprise.type == EnterpriseType.BRANCH,
+                        Enterprise.parent_id == holding.id,
+                        Enterprise.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+
+            assert len(branches) == 2
+
+            # Проверяем производственные отделения этих филиалов.
+            branch_ids = [branch.id for branch in branches]
+
+            departments = (
+                await session.scalars(
+                    select(Enterprise).where(
+                        Enterprise.type == EnterpriseType.DEPARTMENT,
+                        Enterprise.parent_id.in_(branch_ids),
+                        Enterprise.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+
+            assert len(departments) == 4
+
+            # Проверяем подстанции этих производственных отделений.
+            department_ids = [department.id for department in departments]
+
+            substations = (
+                await session.scalars(
+                    select(Substation).where(
+                        Substation.enterprise_id.in_(department_ids),
+                        Substation.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+
+            assert len(substations) == 8
+
+            # Проверяем присоединения этих подстанций.
+            substation_ids = [substation.id for substation in substations]
+
+            connections = (
+                await session.scalars(
+                    select(Connection).where(
+                        Connection.substation_id.in_(substation_ids),
+                        Connection.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+
+            assert len(connections) == 24
+
+            # Проверяем УРЗА этих присоединений.
+            connection_ids = [connection.id for connection in connections]
+
+            urzas = (
+                await session.scalars(
+                    select(URZA).where(
+                        URZA.connection_id.in_(connection_ids),
+                        URZA.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+
+            assert len(urzas) == 56
+
         finally:
             await transaction.rollback()
 
