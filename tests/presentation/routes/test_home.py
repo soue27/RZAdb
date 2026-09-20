@@ -248,3 +248,34 @@ def test_home_renders_object_attributes_for_tree_chain() -> None:
         )
     finally:
         app.dependency_overrides.clear()
+
+
+def test_home_renders_htmx_attributes_for_substation() -> None:
+    user = make_user()
+    tree, substation_id = make_tree_with_substation()
+
+    async def override_current_user() -> User:
+        return user
+
+    fake_tree_service = FakeTreeService(tree=tree)
+
+    def override_tree_service() -> FakeTreeService:
+        return fake_tree_service
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_tree_service] = override_tree_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert (
+            f'hx-get="/objects/substation/{substation_id}"'
+            in response.text
+        )
+        assert 'hx-target="#object-content"' in response.text
+        assert 'hx-swap="innerHTML"' in response.text
+    finally:
+        app.dependency_overrides.clear()

@@ -129,6 +129,9 @@
                     class="tree-item tree-item-select"
                     data-object-type="substation"
                     data-object-id="{{ substation.id }}"
+                    hx-get="/objects/substation/{{ substation.id }}"
+                    hx-target="#object-content"
+                    hx-swap="innerHTML"
                 >
                     <span class="material-icons tree-icon">
                         domain
