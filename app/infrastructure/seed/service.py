@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.enterprise import Enterprise
 from app.domain.enums import EnterpriseType
+from app.domain.substation import Substation
 
 
 class RZACSVSeedService:
@@ -83,6 +84,46 @@ class RZACSVSeedService:
         await self.session.flush()
 
         return branch
+
+    async def get_or_create_department(
+        self,
+        row: dict[str, str],
+        branch_id: UUID,
+    ) -> Enterprise:
+        """Находит существующее производственное отделение или создаёт новое."""
+
+        full_name = row["department_full_name"].strip()
+
+        result = await self.session.execute(
+            select(Enterprise).where(
+                Enterprise.type == EnterpriseType.DEPARTMENT,
+                Enterprise.parent_id == branch_id,
+                Enterprise.full_name == full_name,
+                Enterprise.deleted_at.is_(None),
+            )
+        )
+
+        department = result.scalar_one_or_none()
+
+        if department is not None:
+            return department
+
+        department = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            parent_id=branch_id,
+            full_name=full_name,
+            short_name=row["department_short_name"].strip(),
+            sap_code=self._optional_string(
+                row.get("department_sap_code")
+            ),
+        )
+
+        self.session.add(department)
+
+        await self.session.flush()
+
+        return department
+
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:
