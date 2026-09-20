@@ -3,25 +3,28 @@
 {% block title %}Главная — RZAdb{% endblock %}
 
 {% block body %}
-<div class="container-fluid px-4 py-4">
+<div class="container-fluid px-4 py-4 h-100">
 
-    <div class="mb-4">
-        <h1 class="h3 mb-1">База данных РЗА</h1>
+    <div
+        id="object-content"
+        class="h-100"
+    >
+        <div class="rzadb-surface-soft rounded-3 p-4">
+            <div class="d-flex align-items-center gap-3">
+                <span class="material-icons text-primary">
+                    info
+                </span>
 
-        <p class="text-body-secondary mb-0">
-            Добро пожаловать, {{ current_user.full_name }}.
-        </p>
-    </div>
+                <div>
+                    <h1 class="h5 mb-1">
+                        База данных РЗА
+                    </h1>
 
-    <div class="rzadb-surface-soft rounded-3 p-4">
-        <div class="d-flex align-items-center gap-3">
-            <span class="material-icons text-primary">
-                info
-            </span>
-
-            <span>
-                Интерфейс базы данных РЗА находится в разработке.
-            </span>
+                    <p class="text-body-secondary mb-0">
+                        Выберите объект в дереве слева.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
