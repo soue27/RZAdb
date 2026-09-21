@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.application.inspections.repository import InspectionTaskRepository
+from app.application.inspections.inspection_repository import InspectionRepository
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
@@ -114,3 +115,89 @@ async def test_inspection_task_repository(
 
     assert created_inspection.id == inspection.id
     assert created_inspection.inspection_task_id == task.id
+
+
+@pytest.mark.asyncio
+async def test_inspection_repository_get_by_substation_id(
+    db_session,
+) -> None:
+    """Проверяем получение результатов осмотров подстанции."""
+
+    department = Enterprise(
+        id=uuid4(),
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Тестовое ПО",
+        short_name="ПО Тест",
+    )
+
+    manager = User(
+        id=uuid4(),
+        full_name="Иванов Иван Иванович",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+    )
+
+    substation = Substation(
+        id=uuid4(),
+        enterprise_id=department.id,
+        highest_voltage=HighestVoltage.KV_110,
+        dispatch_name="ПС Осмотры",
+    )
+
+    db_session.add_all([department, manager, substation])
+    await db_session.flush()
+
+    first_task = InspectionTask(
+        id=uuid4(),
+        substation_id=substation.id,
+        created_by=manager.id,
+        status=TaskStatus.COMPLETED,
+        deadline_at=datetime.now(UTC),
+    )
+
+    second_task = InspectionTask(
+        id=uuid4(),
+        substation_id=substation.id,
+        created_by=manager.id,
+        status=TaskStatus.COMPLETED,
+        deadline_at=datetime.now(UTC),
+    )
+
+    db_session.add_all([first_task, second_task])
+    await db_session.flush()
+
+    first_inspection = Inspection(
+        id=uuid4(),
+        substation_id=substation.id,
+        inspection_task_id=first_task.id,
+        inspection_date=datetime(2026, 8, 1, tzinfo=UTC).date(),
+        remarks="Первый осмотр.",
+        created_by=manager.id,
+    )
+
+    second_inspection = Inspection(
+        id=uuid4(),
+        substation_id=substation.id,
+        inspection_task_id=second_task.id,
+        inspection_date=datetime(2026, 9, 1, tzinfo=UTC).date(),
+        remarks="Второй осмотр.",
+        created_by=manager.id,
+    )
+
+    db_session.add_all([first_inspection, second_inspection])
+    await db_session.flush()
+
+    repository = InspectionRepository(db_session)
+
+    inspections = await repository.get_by_substation_id(
+        substation.id,
+    )
+
+    assert len(inspections) == 2
+    assert inspections[0].id == second_inspection.id
+    assert inspections[1].id == first_inspection.id
+    assert inspections[0].inspection_date.isoformat() == "2026-09-01"
+    assert inspections[1].inspection_date.isoformat() == "2026-08-01"

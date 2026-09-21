@@ -58,8 +58,9 @@
             <button
                 type="button"
                 class="nav-link"
-                data-rzadb-tab
-                disabled
+                hx-get="/objects/substation/{{ substation.id }}/inspections"
+                hx-target="#substation-tab-content"
+                hx-swap="innerHTML"
             >
                 Осмотры
             </button>

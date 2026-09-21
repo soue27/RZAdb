@@ -3,12 +3,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
+from app.infrastructure.database import models  # noqa: F401
 from app.presentation.routes.auth import router as auth_router
 from app.presentation.routes.files import router as files_router
 from app.presentation.routes.health import router as health_router
 from app.presentation.routes.home import router as home_router
 from app.presentation.routes.users import router as users_router
 from app.presentation.routes.objects import router as objects_router
+
 
 
 def create_app() -> FastAPI:

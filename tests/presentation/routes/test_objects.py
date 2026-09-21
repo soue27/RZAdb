@@ -1,5 +1,6 @@
 from decimal import Decimal
 from uuid import UUID
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,13 +20,19 @@ from app.domain.enums import (
     UserRole,
 )
 from app.domain.user import User
+from app.domain.inspection import Inspection
+from app.domain.inspection_task import InspectionTask
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
+from app.application.inspections.inspection_service import InspectionService
+from app.domain.inspection import Inspection
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_inspection_service,
     get_object_service,
     get_substation_service,
 )
+
 
 
 
@@ -55,6 +62,20 @@ class FakeConnectionService:
         substation_id: UUID,
     ) -> list[ConnectionListItem]:
         return self.connections
+
+
+class FakeInspectionService:
+    def __init__(
+        self,
+        inspections: list[Inspection] | None = None,
+    ) -> None:
+        self.inspections = inspections or []
+
+    async def get_by_substation_id(
+        self,
+        substation_id: UUID,
+    ) -> list[Inspection]:
+        return self.inspections
 
 
 def make_user() -> User:
@@ -114,6 +135,13 @@ def override_substation_service(service: FakeSubstationService):
 
 def override_connection_service(service: FakeConnectionService):
     def dependency() -> FakeConnectionService:
+        return service
+
+    return dependency
+
+
+def override_inspection_service(service: FakeInspectionService):
+    def dependency() -> FakeInspectionService:
         return service
 
     return dependency
@@ -237,5 +265,58 @@ def test_get_object_rejects_invalid_uuid() -> None:
         )
 
         assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_substation_inspections_returns_inspections() -> None:
+    user = make_user()
+    substation_id = uuid7()
+
+    inspections = [
+        Inspection(
+            id=uuid7(),
+            substation_id=substation_id,
+            inspection_task_id=uuid7(),
+            inspection_date=date(2026, 9, 1),
+            remarks="Замечаний нет.",
+            created_by=user.id,
+        ),
+        Inspection(
+            id=uuid7(),
+            substation_id=substation_id,
+            inspection_task_id=uuid7(),
+            inspection_date=date(2026, 8, 1),
+            remarks="Обнаружено замечание.",
+            created_by=user.id,
+        ),
+    ]
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="substation",
+                id=substation_id,
+                name="ПС Центральная",
+            ),
+        )
+    )
+    app.dependency_overrides[get_inspection_service] = (
+        override_inspection_service(
+            FakeInspectionService(inspections),
+        )
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.get(
+            f"/objects/substation/{substation_id}/inspections",
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
     finally:
         app.dependency_overrides.clear()

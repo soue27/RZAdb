@@ -1,0 +1,69 @@
+<div>
+    {% if inspections %}
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Дата осмотра</th>
+                        <th>Замечания</th>
+                        <th>Документы</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for inspection in inspections %}
+                        <tr>
+                            <td class="text-nowrap">
+                                {{ inspection.inspection_date.strftime("%d.%m.%Y") }}
+                            </td>
+
+                            <td>
+                                {{ inspection.remarks }}
+                            </td>
+
+                            <td>
+                                {% if inspection.scan_file_id or inspection.editable_file_id %}
+                                    <div class="d-flex gap-2">
+                                        {% if inspection.scan_file_id %}
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                disabled
+                                            >
+                                                <span class="material-icons align-middle me-1">
+                                                    visibility
+                                                </span>
+                                                Просмотр
+                                            </button>
+                                        {% endif %}
+
+                                        {% if inspection.editable_file_id %}
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                disabled
+                                            >
+                                                <span class="material-icons align-middle me-1">
+                                                    download
+                                                </span>
+                                                Скачать
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-body-secondary">
+                                        —
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-body-secondary py-4 text-center">
+            Осмотров пока нет.
+        </div>
+    {% endif %}
+</div>
