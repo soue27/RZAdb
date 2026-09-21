@@ -5,20 +5,28 @@ import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.connections.schemas import ConnectionListItem
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
 from app.application.objects.schemas import SelectedObject
 from app.application.substations.schemas import SubstationDetails
-from app.domain.enums import AccessCategory, HighestVoltage, UserRole
+from app.domain.enums import (
+    AccessCategory,
+    HighestVoltage,
+    OperationalCurrentType,
+    UserRole,
+)
 from app.domain.user import User
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
+    get_connection_service,
     get_object_service,
     get_substation_service,
 )
+
 
 
 class FakeSubstationService:
@@ -33,6 +41,20 @@ class FakeSubstationService:
             latitude=Decimal("56.838900"),
             longitude=Decimal("60.605700"),
         )
+
+
+class FakeConnectionService:
+    def __init__(
+        self,
+        connections: list[ConnectionListItem] | None = None,
+    ) -> None:
+        self.connections = connections or []
+
+    async def get_by_substation_id(
+        self,
+        substation_id: UUID,
+    ) -> list[ConnectionListItem]:
+        return self.connections
 
 
 def make_user() -> User:
@@ -90,6 +112,13 @@ def override_substation_service(service: FakeSubstationService):
     return dependency
 
 
+def override_connection_service(service: FakeConnectionService):
+    def dependency() -> FakeConnectionService:
+        return service
+
+    return dependency
+
+
 def test_get_object_requires_authentication() -> None:
     app.dependency_overrides.clear()
 
@@ -118,6 +147,9 @@ def test_get_object_returns_selected_object() -> None:
     )
     app.dependency_overrides[get_substation_service] = (
         override_substation_service(FakeSubstationService())
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(FakeConnectionService())
     )
 
     try:
@@ -192,6 +224,9 @@ def test_get_object_rejects_invalid_uuid() -> None:
     )
     app.dependency_overrides[get_substation_service] = (
         override_substation_service(FakeSubstationService())
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(FakeConnectionService())
     )
 
     try:

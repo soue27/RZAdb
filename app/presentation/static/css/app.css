@@ -4,6 +4,7 @@
     --rzadb-primary: #0068b3;
     --rzadb-primary-hover: #005a9c;
     --rzadb-primary-soft: #eef6fc;
+    --rzadb-secondary: #687782;
 
     --rzadb-background: #f5f7f9;
     --rzadb-surface: #ffffff;
@@ -16,6 +17,7 @@
     --rzadb-success: #198754;
     --rzadb-warning: #f0a500;
     --rzadb-danger: #d9363e;
+
 }
 
 body {
@@ -742,4 +744,29 @@ body {
     border: 1px solid var(--rzadb-border);
     border-radius: 12px;
     padding: 24px;
+}
+
+
+/* =========================================================
+   RZAdb tabs
+   ========================================================= */
+
+.rzadb-tabs .nav-link {
+    color: var(--rzadb-text);
+    border-color: transparent;
+}
+
+.rzadb-tabs .nav-link:hover:not(:disabled) {
+    color: var(--rzadb-primary);
+}
+
+.rzadb-tabs .nav-link.active {
+    color: var(--rzadb-primary);
+    border-color: var(--rzadb-border) var(--rzadb-border) var(--rzadb-surface);
+    font-weight: 500;
+}
+
+.rzadb-tabs .nav-link:disabled {
+    color: var(--rzadb-secondary);
+    cursor: not-allowed;
 }

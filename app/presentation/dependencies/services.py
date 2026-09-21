@@ -21,6 +21,7 @@ from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
 from app.application.substations.service import SubstationService
 from app.application.substations.repository import SubstationRepository
+from app.application.connections.service import ConnectionService
 
 
 def get_object_storage() -> ObjectStorage:
@@ -106,4 +107,12 @@ def get_substation_service(
 ) -> SubstationService:
     return SubstationService(
         repository=SubstationRepository(session),
+    )
+
+
+def get_connection_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ConnectionService:
+    return ConnectionService(
+        repository=ConnectionRepository(session),
     )

@@ -16,6 +16,8 @@ from app.presentation.dependencies.services import (
     get_object_service,
     get_substation_service,
 )
+from app.application.connections.service import ConnectionService
+from app.presentation.dependencies.services import get_connection_service
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter(
@@ -52,7 +54,9 @@ async def get_object(
             return templates.TemplateResponse(
                 request=request,
                 name="objects/substation.html",
-                context={"substation": substation},
+                context={
+                    "substation": substation,
+                },
             )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -72,3 +76,5 @@ async def get_object(
             "object": selected_object,
         },
     )
+
+
