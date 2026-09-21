@@ -1,21 +1,19 @@
 document.addEventListener("click", (event) => {
-    const tab = event.target.closest("[data-rzadb-tab]");
+    const tab = event.target.closest(".nav-tabs .nav-link");
 
-    if (!tab) {
+    if (!tab || tab.disabled) {
         return;
     }
 
-    const tabsContainer = tab.closest("[data-rzadb-tabs]");
+    const tabList = tab.closest(".nav-tabs");
 
-    if (!tabsContainer) {
+    if (!tabList) {
         return;
     }
 
-    tabsContainer
-        .querySelectorAll("[data-rzadb-tab]")
-        .forEach((item) => {
-            item.classList.remove("active");
-        });
+    tabList
+        .querySelectorAll(".nav-link")
+        .forEach((item) => item.classList.remove("active"));
 
     tab.classList.add("active");
 });

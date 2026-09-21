@@ -121,3 +121,42 @@ async def get_substation_inspections(
             "inspections": inspections,
         },
     )
+
+
+@router.get("/substation/{substation_id}/details")
+async def get_substation_details(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[
+        SubstationService,
+        Depends(get_substation_service),
+    ],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="substation",
+            object_id=substation_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+
+    substation = await substation_service.get_details(substation_id)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/substation_details.html",
+        context={
+            "substation": substation,
+        },
+    )

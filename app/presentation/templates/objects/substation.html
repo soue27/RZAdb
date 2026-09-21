@@ -2,7 +2,6 @@
     <!-- =========================================================
          HEADER
          ========================================================= -->
-
     <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
         <div>
             <div class="text-body-secondary small mb-1">
@@ -42,13 +41,18 @@
     <!-- =========================================================
          TABS
          ========================================================= -->
-
-    <ul class="nav nav-tabs rzadb-tabs mb-4" data-rzadb-tabs>
+    <ul
+        class="nav nav-tabs rzadb-tabs mb-4"
+        data-rzadb-tabs
+    >
         <li class="nav-item">
             <button
                 type="button"
                 class="nav-link active"
                 data-rzadb-tab
+                hx-get="/objects/substation/{{ substation.id }}/details"
+                hx-target="#substation-tab-content"
+                hx-swap="innerHTML"
             >
                 Основные сведения
             </button>
@@ -58,6 +62,7 @@
             <button
                 type="button"
                 class="nav-link"
+                data-rzadb-tab
                 hx-get="/objects/substation/{{ substation.id }}/inspections"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
@@ -93,56 +98,7 @@
     <!-- =========================================================
          TAB CONTENT
          ========================================================= -->
-
     <div id="substation-tab-content">
-        <dl class="row mb-0">
-            <dt class="col-sm-4">
-                Наивысшее напряжение
-            </dt>
-
-            <dd class="col-sm-8">
-                {{ substation.highest_voltage.value }} кВ
-            </dd>
-
-
-            <dt class="col-sm-4">
-                SAP
-            </dt>
-
-            <dd class="col-sm-8">
-                {{ substation.sap_code or "—" }}
-            </dd>
-
-
-            <dt class="col-sm-4">
-                АСУЕО
-            </dt>
-
-            <dd class="col-sm-8">
-                {{ substation.asureo_code or "—" }}
-            </dd>
-
-
-            <dt class="col-sm-4">
-                Адрес
-            </dt>
-
-            <dd class="col-sm-8">
-                {{ substation.address or "—" }}
-            </dd>
-
-
-            <dt class="col-sm-4">
-                Координаты
-            </dt>
-
-            <dd class="col-sm-8">
-                {% if substation.latitude is not none and substation.longitude is not none %}
-                    {{ substation.latitude }}, {{ substation.longitude }}
-                {% else %}
-                    —
-                {% endif %}
-            </dd>
-        </dl>
+        {% include "objects/substation_details.html" %}
     </div>
 </div>
