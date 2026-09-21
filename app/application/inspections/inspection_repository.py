@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.inspection import Inspection
@@ -19,16 +20,17 @@ class InspectionRepository:
         return await self.session.get(Inspection, inspection_id)
 
     async def get_by_substation_id(
-        self,
-        substation_id: UUID,
+            self,
+            substation_id: UUID,
     ) -> list[Inspection]:
         """Возвращает результаты осмотров указанной подстанции."""
-
         result = await self.session.scalars(
             select(Inspection)
-            .where(
-                Inspection.substation_id == substation_id,
+            .options(
+                selectinload(Inspection.scan_file),
+                selectinload(Inspection.editable_file),
             )
+            .where(Inspection.substation_id == substation_id)
             .order_by(Inspection.inspection_date.desc())
         )
 

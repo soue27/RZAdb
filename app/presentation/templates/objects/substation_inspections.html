@@ -13,42 +13,67 @@
                 <tbody>
                     {% for inspection in inspections %}
                         <tr>
+                            <!-- Дата -->
                             <td class="text-nowrap">
                                 {{ inspection.inspection_date.strftime("%d.%m.%Y") }}
                             </td>
 
+                            <!-- Замечания -->
                             <td>
                                 {{ inspection.remarks }}
                             </td>
 
+                            <!-- Документы -->
                             <td>
                                 {% if inspection.scan_file_id or inspection.editable_file_id %}
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex flex-column gap-2">
+
                                         {% if inspection.scan_file_id %}
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-secondary"
-                                                disabled
-                                            >
-                                                <span class="material-icons align-middle me-1">
-                                                    visibility
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="material-icons text-body-secondary">
+                                                    picture_as_pdf
                                                 </span>
-                                                Просмотр
-                                            </button>
+
+                                                <span>
+                                                    {{ inspection.scan_file_name }}
+                                                </span>
+
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary ms-auto"
+                                                    disabled
+                                                >
+                                                    <span class="material-icons align-middle me-1">
+                                                        visibility
+                                                    </span>
+                                                    Просмотр
+                                                </button>
+                                            </div>
                                         {% endif %}
 
                                         {% if inspection.editable_file_id %}
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-secondary"
-                                                disabled
-                                            >
-                                                <span class="material-icons align-middle me-1">
-                                                    download
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="material-icons text-body-secondary">
+                                                    description
                                                 </span>
-                                                Скачать
-                                            </button>
+
+                                                <span>
+                                                    {{ inspection.editable_file_name }}
+                                                </span>
+
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary ms-auto"
+                                                    disabled
+                                                >
+                                                    <span class="material-icons align-middle me-1">
+                                                        download
+                                                    </span>
+                                                    Скачать
+                                                </button>
+                                            </div>
                                         {% endif %}
+
                                     </div>
                                 {% else %}
                                     <span class="text-body-secondary">

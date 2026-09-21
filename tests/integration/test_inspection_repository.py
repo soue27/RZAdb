@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from uuid6 import uuid7
+
+from app.domain.file import File
+
 import pytest
 
 from app.application.inspections.repository import InspectionTaskRepository
@@ -169,6 +173,34 @@ async def test_inspection_repository_get_by_substation_id(
     db_session.add_all([first_task, second_task])
     await db_session.flush()
 
+    scan_file = File(
+        id=uuid7(),
+        s3_key="files/2026/08/scan.pdf",
+        original_name="scan.pdf",
+        display_name="Скан осмотра",
+        extension=".pdf",
+        size=1024,
+        mime_type="application/pdf",
+        uploaded_at=datetime.now(UTC),
+    )
+
+    editable_file = File(
+        id=uuid7(),
+        s3_key="files/2026/08/inspection.docx",
+        original_name="inspection.docx",
+        display_name="Редактируемый документ",
+        extension=".docx",
+        size=2048,
+        mime_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        uploaded_at=datetime.now(UTC),
+    )
+
+    db_session.add_all([scan_file, editable_file])
+    await db_session.flush()
+
     first_inspection = Inspection(
         id=uuid4(),
         substation_id=substation.id,
@@ -176,6 +208,8 @@ async def test_inspection_repository_get_by_substation_id(
         inspection_date=datetime(2026, 8, 1, tzinfo=UTC).date(),
         remarks="Первый осмотр.",
         created_by=manager.id,
+        scan_file_id=scan_file.id,
+        editable_file_id=editable_file.id,
     )
 
     second_inspection = Inspection(
@@ -201,3 +235,10 @@ async def test_inspection_repository_get_by_substation_id(
     assert inspections[1].id == first_inspection.id
     assert inspections[0].inspection_date.isoformat() == "2026-09-01"
     assert inspections[1].inspection_date.isoformat() == "2026-08-01"
+    assert inspections[1].scan_file is not None
+    assert inspections[1].scan_file.id == scan_file.id
+    assert inspections[1].scan_file.display_name == "Скан осмотра"
+
+    assert inspections[1].editable_file is not None
+    assert inspections[1].editable_file.id == editable_file.id
+    assert inspections[1].editable_file.display_name == "Редактируемый документ"
