@@ -33,3 +33,9 @@ def test_substation_template_renders_details():
     assert "г. Екатеринбург" in html
     assert "56.838900" in html
     assert "60.605700" in html
+    assert "Основные сведения" in html
+    assert "Присоединения" in html
+    assert "Инспекции" in html
+    assert "Инструкции" in html
+    assert "Схемы селективности" in html
+    assert "Изменить" in html
