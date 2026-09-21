@@ -12,7 +12,6 @@ from app.application.connections.repository import ConnectionRepository
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
-from app.application.substations.repository import SubstationRepository
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.users.repository import UserRepository
@@ -20,6 +19,8 @@ from app.application.objects.service import ObjectService
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
+from app.application.substations.service import SubstationService
+from app.application.substations.repository import SubstationRepository
 
 
 def get_object_storage() -> ObjectStorage:
@@ -97,4 +98,12 @@ def get_object_service(
             connection_repository=ConnectionRepository(session),
             urza_repository=URZARepository(session),
         ),
+    )
+
+
+def get_substation_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SubstationService:
+    return SubstationService(
+        repository=SubstationRepository(session),
     )

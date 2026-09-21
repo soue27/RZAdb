@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -9,11 +10,29 @@ from app.application.objects.exceptions import (
     ObjectNotFoundError,
 )
 from app.application.objects.schemas import SelectedObject
-from app.domain.enums import AccessCategory, UserRole
+from app.application.substations.schemas import SubstationDetails
+from app.domain.enums import AccessCategory, HighestVoltage, UserRole
 from app.domain.user import User
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import get_object_service
+from app.presentation.dependencies.services import (
+    get_object_service,
+    get_substation_service,
+)
+
+
+class FakeSubstationService:
+    async def get_details(self, substation_id: UUID) -> SubstationDetails:
+        return SubstationDetails(
+            id=substation_id,
+            dispatch_name="ПС Центральная",
+            highest_voltage=HighestVoltage.KV_110,
+            sap_code="SAP-001",
+            asureo_code="ASUREO-001",
+            address="г. Екатеринбург",
+            latitude=Decimal("56.838900"),
+            longitude=Decimal("60.605700"),
+        )
 
 
 def make_user() -> User:
@@ -64,6 +83,13 @@ def override_object_service(service: FakeObjectService):
     return dependency
 
 
+def override_substation_service(service: FakeSubstationService):
+    def dependency() -> FakeSubstationService:
+        return service
+
+    return dependency
+
+
 def test_get_object_requires_authentication() -> None:
     app.dependency_overrides.clear()
 
@@ -90,6 +116,9 @@ def test_get_object_returns_selected_object() -> None:
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService(result=selected_object)
     )
+    app.dependency_overrides[get_substation_service] = (
+        override_substation_service(FakeSubstationService())
+    )
 
     try:
         client = TestClient(app)
@@ -100,8 +129,10 @@ def test_get_object_returns_selected_object() -> None:
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        assert "ПС Свердловская" in response.text
-        assert "substation" in response.text
+        assert "ПС Центральная" in response.text
+        assert "110 кВ" in response.text
+        assert "SAP-001" in response.text
+        assert "ASUREO-001" in response.text
     finally:
         app.dependency_overrides.clear()
 
@@ -158,6 +189,9 @@ def test_get_object_rejects_invalid_uuid() -> None:
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService()
+    )
+    app.dependency_overrides[get_substation_service] = (
+        override_substation_service(FakeSubstationService())
     )
 
     try:

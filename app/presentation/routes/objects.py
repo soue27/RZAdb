@@ -11,6 +11,11 @@ from app.application.objects.service import ObjectService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_object_service
+from app.application.substations.service import SubstationService
+from app.presentation.dependencies.services import (
+    get_object_service,
+    get_substation_service,
+)
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter(
@@ -29,13 +34,26 @@ async def get_object(
     object_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[
+        SubstationService,
+        Depends(get_substation_service),
+    ],
 ):
     try:
+
         selected_object = await object_service.get_object(
             user_id=current_user.id,
             object_type=object_type,
             object_id=object_id,
         )
+        if object_type == "substation":
+            substation = await substation_service.get_details(object_id)
+
+            return templates.TemplateResponse(
+                request=request,
+                name="objects/substation.html",
+                context={"substation": substation},
+            )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

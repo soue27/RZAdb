@@ -1,0 +1,46 @@
+<div class="object-card">
+    <div class="object-card-header">
+        <div>
+            <div class="text-body-secondary small">
+                Подстанция
+            </div>
+
+            <h2 class="h4 mb-0">
+                {{ substation.dispatch_name }}
+            </h2>
+        </div>
+    </div>
+
+    <hr>
+
+    <dl class="row mb-0">
+        <dt class="col-sm-4">Наивысшее напряжение</dt>
+        <dd class="col-sm-8">
+            {{ substation.highest_voltage.value }} кВ
+        </dd>
+
+        <dt class="col-sm-4">SAP</dt>
+        <dd class="col-sm-8">
+            {{ substation.sap_code or "—" }}
+        </dd>
+
+        <dt class="col-sm-4">АСУЕО</dt>
+        <dd class="col-sm-8">
+            {{ substation.asureo_code or "—" }}
+        </dd>
+
+        <dt class="col-sm-4">Адрес</dt>
+        <dd class="col-sm-8">
+            {{ substation.address or "—" }}
+        </dd>
+
+        <dt class="col-sm-4">Координаты</dt>
+        <dd class="col-sm-8">
+            {% if substation.latitude is not none and substation.longitude is not none %}
+                {{ substation.latitude }}, {{ substation.longitude }}
+            {% else %}
+                —
+            {% endif %}
+        </dd>
+    </dl>
+</div>
