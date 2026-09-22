@@ -26,6 +26,12 @@ from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
 from app.application.rza_instructions.service import RZAInstructionService
+from app.application.selectivity_schemes.repository import (
+    SelectivitySchemeRepository,
+)
+from app.application.selectivity_schemes.service import (
+    SelectivitySchemeService,
+)
 
 
 def get_object_storage() -> ObjectStorage:
@@ -135,6 +141,21 @@ def get_rza_instruction_service(
 ) -> RZAInstructionService:
     return RZAInstructionService(
         repository=RZAInstructionRepository(session),
+        access_service=AccessService(
+            user_repository=UserRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            substation_repository=SubstationRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        ),
+    )
+
+
+def get_selectivity_scheme_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SelectivitySchemeService:
+    return SelectivitySchemeService(
+        repository=SelectivitySchemeRepository(session),
         access_service=AccessService(
             user_repository=UserRepository(session),
             enterprise_repository=EnterpriseRepository(session),

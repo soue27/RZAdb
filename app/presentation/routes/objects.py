@@ -21,6 +21,12 @@ from app.presentation.dependencies.services import (
     get_rza_instruction_service,
     get_substation_service,
 )
+from app.application.selectivity_schemes.service import (
+    SelectivitySchemeService,
+)
+from app.presentation.dependencies.services import (
+    get_selectivity_scheme_service,
+)
 
 router = APIRouter(
     prefix="/objects",
@@ -202,4 +208,49 @@ async def get_substation_instructions(
         request=request,
         name="objects/substation_instructions.html",
         context={"instruction": instruction},
+    )
+
+
+@router.get("/substation/{substation_id}/selectivity-schemes")
+async def get_substation_selectivity_schemes(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[
+        ObjectService,
+        Depends(get_object_service),
+    ],
+    selectivity_scheme_service: Annotated[
+        SelectivitySchemeService,
+        Depends(get_selectivity_scheme_service),
+    ],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="substation",
+            object_id=substation_id,
+        )
+    except ObjectAccessDeniedError:
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён.",
+        )
+    except ObjectNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Подстанция не найдена.",
+        )
+
+    versions = await selectivity_scheme_service.get_version_list(
+        user_id=current_user.id,
+        substation_id=substation_id,
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/substation_selectivity_schemes.html",
+        context={
+            "versions": versions,
+        },
     )

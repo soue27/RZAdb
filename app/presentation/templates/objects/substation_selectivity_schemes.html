@@ -1,0 +1,78 @@
+<div>
+    {% if versions %}
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Версия</th>
+                        <th>Дата</th>
+                        <th>Номер</th>
+                        <th>Наименование</th>
+                        <th>Что изменено</th>
+                        <th>Автор</th>
+                        <th>Документы</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for version in versions %}
+                        <tr>
+                            <td class="text-nowrap">
+                                {{ version.version_number }}
+                            </td>
+
+                            <td class="text-nowrap">
+                                {{ version.effective_date.strftime("%d.%m.%Y") }}
+                            </td>
+
+                            <td>
+                                {{ version.number }}
+                            </td>
+
+                            <td>
+                                {{ version.name }}
+                            </td>
+
+                            <td>
+                                {{ version.change_description or "—" }}
+                            </td>
+
+                            <td>
+                                {{ version.creator_name or "—" }}
+                            </td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-2">
+                                    {% if version.scan_file_name %}
+                                        <div>
+                                            <span class="material-icons align-middle text-body-secondary me-1">
+                                                picture_as_pdf
+                                            </span>
+                                            {{ version.scan_file_name }}
+                                        </div>
+                                    {% endif %}
+
+                                    {% if version.editable_file_name %}
+                                        <div>
+                                            <span class="material-icons align-middle text-body-secondary me-1">
+                                                description
+                                            </span>
+                                            {{ version.editable_file_name }}
+                                        </div>
+                                    {% endif %}
+
+                                    {% if not version.scan_file_name and not version.editable_file_name %}
+                                        <span class="text-body-secondary">—</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-body-secondary py-4 text-center">
+            Схема селективности отсутствует.
+        </div>
+    {% endif %}
+</div>
