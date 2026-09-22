@@ -9,6 +9,7 @@ from app.application.files.service import FileService
 from app.presentation.dependencies.services import get_file_service
 from app.presentation.schemas.files import FileResponse
 
+
 router = APIRouter(prefix="/files", tags=["files"])
 
 
@@ -34,10 +35,12 @@ async def upload_file(
 
     return FileResponse.model_validate(saved_file)
 
-@router.get("/{file_id}")
-async def download_file(
+
+async def _get_file_response(
+    *,
     file_id: UUID,
-    file_service: Annotated[FileService, Depends(get_file_service)],
+    file_service: FileService,
+    disposition: str,
 ) -> Response:
     try:
         file, content = await file_service.download(file_id=file_id)
@@ -52,7 +55,31 @@ async def download_file(
         media_type=file.mime_type,
         headers={
             "Content-Disposition": (
-                f'attachment; filename="{file.original_name}"'
+                f'{disposition}; filename="{file.original_name}"'
             ),
         },
+    )
+
+
+@router.get("/{file_id}/view")
+async def view_file(
+    file_id: UUID,
+    file_service: Annotated[FileService, Depends(get_file_service)],
+) -> Response:
+    return await _get_file_response(
+        file_id=file_id,
+        file_service=file_service,
+        disposition="inline",
+    )
+
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: UUID,
+    file_service: Annotated[FileService, Depends(get_file_service)],
+) -> Response:
+    return await _get_file_response(
+        file_id=file_id,
+        file_service=file_service,
+        disposition="attachment",
     )

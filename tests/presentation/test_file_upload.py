@@ -1,4 +1,3 @@
-
 from uuid import uuid4
 
 import pytest
@@ -72,6 +71,47 @@ def test_upload_file_without_display_name() -> None:
 
 
 @pytest.mark.asyncio
+async def test_view_file() -> None:
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+        content = b"test pdf content"
+
+        upload_response = await client.post(
+            "/files",
+            files={
+                "file": (
+                    "scan.pdf",
+                    content,
+                    "application/pdf",
+                ),
+            },
+            data={
+                "display_name": "ПС Тестовая — ТО — 2026-09-19",
+            },
+        )
+
+        assert upload_response.status_code == 200
+
+        file_id = upload_response.json()["id"]
+
+        view_response = await client.get(
+            f"/files/{file_id}/view",
+        )
+
+    assert view_response.status_code == 200
+    assert view_response.content == content
+    assert view_response.headers["content-type"] == "application/pdf"
+    assert (
+        view_response.headers["content-disposition"]
+        == 'inline; filename="scan.pdf"'
+    )
+
+
+@pytest.mark.asyncio
 async def test_download_file() -> None:
     transport = ASGITransport(app=app)
 
@@ -99,15 +139,33 @@ async def test_download_file() -> None:
 
         file_id = upload_response.json()["id"]
 
-        download_response = await client.get(f"/files/{file_id}")
-
-        assert download_response.status_code == 200
-        assert download_response.content == content
-        assert download_response.headers["content-type"] == "application/pdf"
-        assert (
-                download_response.headers["content-disposition"]
-                == 'attachment; filename="scan.pdf"'
+        download_response = await client.get(
+            f"/files/{file_id}/download",
         )
+
+    assert download_response.status_code == 200
+    assert download_response.content == content
+    assert download_response.headers["content-type"] == "application/pdf"
+    assert (
+        download_response.headers["content-disposition"]
+        == 'attachment; filename="scan.pdf"'
+    )
+
+
+@pytest.mark.asyncio
+async def test_view_missing_file() -> None:
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+        response = await client.get(
+            f"/files/{uuid4()}/view",
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Файл не найден."}
 
 
 @pytest.mark.asyncio
@@ -118,8 +176,9 @@ async def test_download_missing_file() -> None:
         transport=transport,
         base_url="http://test",
     ) as client:
-        response = await client.get(f"/files/{uuid4()}")
+        response = await client.get(
+            f"/files/{uuid4()}/download",
+        )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Файл не найден."}
-
