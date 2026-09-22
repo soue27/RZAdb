@@ -28,10 +28,65 @@ class FakeConnectionRepository:
     def __init__(self, connections):
         self.connections = connections
         self.received_ids = None
+        self.received_id = None
+
+    async def get_by_id(self, connection_id):
+        self.received_id = connection_id
+
+        for connection in self.connections:
+            if connection.id == connection_id:
+                return connection
+
+        return None
 
     async def get_by_substation_ids(self, substation_ids):
         self.received_ids = substation_ids
         return self.connections
+
+
+@pytest.mark.asyncio
+async def test_get_by_id_returns_connection_dto():
+    connection_id = uuid7()
+
+    connection = FakeConnection(
+        connection_id=connection_id,
+        dispatch_name="ВЛ 110 кВ Северная",
+        sap_code="SAP-001",
+        asureo_code="ASUREO-001",
+        rdu_subordination=True,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+    )
+
+    repository = FakeConnectionRepository([connection])
+    service = ConnectionService(repository)
+
+    result = await service.get_by_id(connection_id)
+
+    assert repository.received_id == connection_id
+
+    assert result is not None
+    assert result.id == connection_id
+    assert result.dispatch_name == "ВЛ 110 кВ Северная"
+    assert result.sap_code == "SAP-001"
+    assert result.asureo_code == "ASUREO-001"
+    assert result.rdu_subordination is True
+    assert (
+        result.operational_current_type
+        == OperationalCurrentType.PERMANENT
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_by_id_returns_none_for_missing_connection():
+    connection_id = uuid7()
+
+    repository = FakeConnectionRepository([])
+    service = ConnectionService(repository)
+
+    result = await service.get_by_id(connection_id)
+
+    assert result is None
+    assert repository.received_id == connection_id
 
 
 @pytest.mark.asyncio

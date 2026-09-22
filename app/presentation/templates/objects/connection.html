@@ -1,0 +1,50 @@
+<div class="object-card">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <div class="text-body-secondary small mb-1">
+                Присоединение
+            </div>
+
+            <h2 class="h4 mb-0">
+                {{ connection.dispatch_name }}
+            </h2>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-primary" disabled>
+                <span class="material-icons align-middle me-1">edit</span>
+                Изменить
+            </button>
+
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                <span class="material-icons align-middle">more_horiz</span>
+            </button>
+        </div>
+    </div>
+
+    <dl class="row mb-0">
+        <dt class="col-sm-4">SAP</dt>
+        <dd class="col-sm-8">
+            {{ connection.sap_code or "—" }}
+        </dd>
+
+        <dt class="col-sm-4">АСУЕО</dt>
+        <dd class="col-sm-8">
+            {{ connection.asureo_code or "—" }}
+        </dd>
+
+        <dt class="col-sm-4">Подчинённость РДУ</dt>
+        <dd class="col-sm-8">
+            {% if connection.rdu_subordination %}
+                Да
+            {% else %}
+                Нет
+            {% endif %}
+        </dd>
+
+        <dt class="col-sm-4">Тип оперативного тока</dt>
+        <dd class="col-sm-8">
+            {{ connection.operational_current_type.value }}
+        </dd>
+    </dl>
+</div>

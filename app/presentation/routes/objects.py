@@ -27,6 +27,7 @@ from app.application.selectivity_schemes.service import (
 from app.presentation.dependencies.services import (
     get_selectivity_scheme_service,
 )
+from app.application.connections.service import ConnectionService
 
 router = APIRouter(
     prefix="/objects",
@@ -49,6 +50,10 @@ async def get_object(
         SubstationService,
         Depends(get_substation_service),
     ],
+    connection_service: Annotated[
+        ConnectionService,
+        Depends(get_connection_service),
+    ],
 ):
     try:
         selected_object = await object_service.get_object(
@@ -65,6 +70,20 @@ async def get_object(
                 name="objects/substation.html",
                 context={
                     "substation": substation,
+                },
+            )
+
+        if object_type == "connection":
+            connection = await connection_service.get_by_id(object_id)
+
+            if connection is None:
+                raise ObjectNotFoundError
+
+            return templates.TemplateResponse(
+                request=request,
+                name="objects/connection.html",
+                context={
+                    "connection": connection,
                 },
             )
 
