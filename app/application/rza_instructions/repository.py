@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.rza_instruction import (
@@ -57,18 +58,22 @@ class RZAInstructionRepository:
         return version
 
     async def get_current_version(
-        self,
-        instruction_id: UUID,
+            self,
+            instruction_id: UUID,
     ) -> RZAInstructionVersion | None:
         query = (
             select(RZAInstructionVersion)
+            .options(
+                selectinload(RZAInstructionVersion.scan_file),
+                selectinload(RZAInstructionVersion.editable_file),
+            )
             .where(
-                RZAInstructionVersion.rza_instruction_id
-                == instruction_id,
+                RZAInstructionVersion.rza_instruction_id == instruction_id,
             )
             .order_by(
                 RZAInstructionVersion.version_number.desc(),
             )
             .limit(1)
         )
+
         return await self.session.scalar(query)

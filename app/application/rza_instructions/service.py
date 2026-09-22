@@ -9,6 +9,9 @@ from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
 )
+from app.application.rza_instructions.schemas import (
+    RZAInstructionDetails,
+)
 
 
 class RZAInstructionService:
@@ -150,3 +153,44 @@ class RZAInstructionService:
         await self.repository.add_version(version)
 
         return version
+
+    async def get_details(
+        self,
+        user_id: UUID,
+        substation_id: UUID,
+    ) -> RZAInstructionDetails | None:
+        instruction = await self.get_by_substation(
+            user_id=user_id,
+            substation_id=substation_id,
+        )
+
+        if instruction is None:
+            return None
+
+        version = await self.repository.get_current_version(
+            instruction.id,
+        )
+
+        if version is None:
+            return None
+
+        return RZAInstructionDetails(
+            instruction_id=instruction.id,
+            version_id=version.id,
+            version_number=version.version_number,
+            effective_date=version.effective_date,
+            change_description=version.change_description,
+            change_justification=version.change_justification,
+            scan_file_id=version.scan_file_id,
+            scan_file_name=(
+                version.scan_file.display_name
+                if version.scan_file is not None
+                else None
+            ),
+            editable_file_id=version.editable_file_id,
+            editable_file_name=(
+                version.editable_file.display_name
+                if version.editable_file is not None
+                else None
+            ),
+        )

@@ -12,6 +12,7 @@ from app.application.connections.repository import ConnectionRepository
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
+from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.users.repository import UserRepository
@@ -24,6 +25,7 @@ from app.application.substations.repository import SubstationRepository
 from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
+from app.application.rza_instructions.service import RZAInstructionService
 
 
 def get_object_storage() -> ObjectStorage:
@@ -125,4 +127,19 @@ def get_inspection_service(
 ) -> InspectionService:
     return InspectionService(
         repository=InspectionRepository(session),
+    )
+
+
+def get_rza_instruction_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RZAInstructionService:
+    return RZAInstructionService(
+        repository=RZAInstructionRepository(session),
+        access_service=AccessService(
+            user_repository=UserRepository(session),
+            enterprise_repository=EnterpriseRepository(session),
+            substation_repository=SubstationRepository(session),
+            connection_repository=ConnectionRepository(session),
+            urza_repository=URZARepository(session),
+        ),
     )

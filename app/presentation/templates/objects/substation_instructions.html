@@ -1,0 +1,49 @@
+<div>
+    {% if instruction %}
+        <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <div class="text-body-secondary small mb-1">
+                    Инструкция по РЗА
+                </div>
+                <h3 class="h5 mb-0">
+                    Версия {{ instruction.version_number }}
+                </h3>
+            </div>
+
+            <span class="badge text-bg-light">
+                Действует с {{ instruction.effective_date.strftime("%d.%m.%Y") }}
+            </span>
+        </div>
+
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Дата вступления</dt>
+            <dd class="col-sm-8">
+                {{ instruction.effective_date.strftime("%d.%m.%Y") }}
+            </dd>
+
+            <dt class="col-sm-4">Описание изменений</dt>
+            <dd class="col-sm-8">
+                {{ instruction.change_description or "—" }}
+            </dd>
+
+            <dt class="col-sm-4">Обоснование изменений</dt>
+            <dd class="col-sm-8">
+                {{ instruction.change_justification or "—" }}
+            </dd>
+
+            <dt class="col-sm-4">Скан</dt>
+            <dd class="col-sm-8">
+                {{ instruction.scan_file_name or "—" }}
+            </dd>
+
+            <dt class="col-sm-4">Редактируемый файл</dt>
+            <dd class="col-sm-8">
+                {{ instruction.editable_file_name or "—" }}
+            </dd>
+        </dl>
+    {% else %}
+        <div class="text-body-secondary py-4 text-center">
+            Инструкция по РЗА отсутствует.
+        </div>
+    {% endif %}
+</div>

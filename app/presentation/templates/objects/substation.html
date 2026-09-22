@@ -76,7 +76,9 @@
                 type="button"
                 class="nav-link"
                 data-rzadb-tab
-                disabled
+                hx-get="/objects/substation/{{ substation.id }}/instructions"
+                hx-target="#substation-tab-content"
+                hx-swap="innerHTML"
             >
                 Инструкции
             </button>
