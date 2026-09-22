@@ -47,6 +47,7 @@ class FakeSubstationService:
             address="г. Екатеринбург",
             latitude=Decimal("56.838900"),
             longitude=Decimal("60.605700"),
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
 

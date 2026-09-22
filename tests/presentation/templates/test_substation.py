@@ -4,8 +4,7 @@ from uuid6 import uuid7
 from fastapi.templating import Jinja2Templates
 
 from app.application.substations.schemas import SubstationDetails
-from app.domain.enums import HighestVoltage
-
+from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 templates = Jinja2Templates(directory="app/presentation/templates")
 
@@ -20,6 +19,7 @@ def test_substation_template_renders_details():
         address="г. Екатеринбург",
         latitude=Decimal("56.838900"),
         longitude=Decimal("60.605700"),
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     template = templates.get_template("objects/substation.html")

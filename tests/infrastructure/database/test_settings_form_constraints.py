@@ -33,13 +33,14 @@ async def test_urza_can_have_only_one_settings_form() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Ввод 110 кВ",
             rdu_subordination=True,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(

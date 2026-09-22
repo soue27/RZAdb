@@ -24,6 +24,7 @@ async def test_connection_persistence() -> None:
             dispatch_name="ПС Тестовая",
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
@@ -32,7 +33,6 @@ async def test_connection_persistence() -> None:
             sap_code="SAP-CONN-001",
             asureo_code="ASUREO-CONN-001",
             rdu_subordination=True,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add(connection)
@@ -44,9 +44,5 @@ async def test_connection_persistence() -> None:
         assert connection.sap_code == "SAP-CONN-001"
         assert connection.asureo_code == "ASUREO-CONN-001"
         assert connection.rdu_subordination is True
-        assert (
-            connection.operational_current_type
-            == OperationalCurrentType.PERMANENT
-        )
 
         await session.rollback()

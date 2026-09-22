@@ -15,7 +15,7 @@ from app.domain.enums import (
     EnterpriseType,
     HighestVoltage,
     TaskStatus,
-    UserRole,
+    UserRole, OperationalCurrentType,
 )
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
@@ -52,6 +52,7 @@ async def test_inspection_task_repository(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Репозиторная",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all([department, manager, substation])
@@ -149,6 +150,7 @@ async def test_inspection_repository_get_by_substation_id(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Осмотры",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all([department, manager, substation])

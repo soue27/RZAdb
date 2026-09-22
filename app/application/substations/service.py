@@ -26,4 +26,5 @@ class SubstationService:
             address=substation.address,
             latitude=substation.latitude,
             longitude=substation.longitude,
+            operational_current_type=substation.operational_current_type,
         )

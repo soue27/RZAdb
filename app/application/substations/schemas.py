@@ -3,13 +3,14 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.domain.enums import HighestVoltage
+from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
 class SubstationDetails(BaseModel):
     id: UUID
     dispatch_name: str
     highest_voltage: HighestVoltage
+    operational_current_type: OperationalCurrentType
     sap_code: str | None
     asureo_code: str | None
     address: str | None

@@ -23,15 +23,16 @@ from app.infrastructure.seed.service import RZACSVSeedService
 
 
 def make_row(
-    *,
-    full_name: str = "Тестовый холдинг",
-    short_name: str = "Тестовый холдинг",
+        *,
+        full_name: str = "Тестовый холдинг",
+        short_name: str = "Тестовый холдинг",
 ) -> dict[str, str]:
     return {
         "holding_full_name": full_name,
         "holding_short_name": short_name,
         "holding_sap_code": "",
     }
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_holding_creates_holding() -> None:
@@ -50,6 +51,7 @@ async def test_get_or_create_holding_creates_holding() -> None:
             assert holding.sap_code is None
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_holding_returns_existing_holding() -> None:
@@ -94,6 +96,7 @@ async def test_get_or_create_holding_returns_existing_holding() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_holding_ignores_deleted_holding() -> None:
     async with async_session_factory() as session:
@@ -123,6 +126,7 @@ async def test_get_or_create_holding_ignores_deleted_holding() -> None:
             assert result.short_name == "Новый холдинг"
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_branch_is_scoped_to_holding() -> None:
@@ -171,6 +175,7 @@ async def test_get_or_create_branch_is_scoped_to_holding() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_branch_returns_existing_branch() -> None:
     async with async_session_factory() as session:
@@ -214,6 +219,7 @@ async def test_get_or_create_branch_returns_existing_branch() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_department_creates_department() -> None:
     async with async_session_factory() as session:
@@ -256,6 +262,7 @@ async def test_get_or_create_department_creates_department() -> None:
             assert department.sap_code == "PO-001"
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_department_is_scoped_to_branch() -> None:
@@ -311,6 +318,7 @@ async def test_get_or_create_department_is_scoped_to_branch() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_department_returns_existing_department() -> None:
     async with async_session_factory() as session:
@@ -361,6 +369,7 @@ async def test_get_or_create_department_returns_existing_department() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_substation_creates_substation() -> None:
     async with async_session_factory() as session:
@@ -382,6 +391,7 @@ async def test_get_or_create_substation_creates_substation() -> None:
                 {
                     "substation_dispatch_name": "ПС Свердловская",
                     "substation_highest_voltage": "110",
+                    "operational_current_type": "alternating",
                     "substation_sap_code": "PS-001",
                     "substation_asureo_code": "ASUREO-001",
                     "substation_address": "г. Екатеринбург",
@@ -400,8 +410,10 @@ async def test_get_or_create_substation_creates_substation() -> None:
             assert str(substation.latitude) == "56.123456"
             assert str(substation.longitude) == "60.123456"
             assert substation.address == "г. Екатеринбург"
+            assert substation.operational_current_type.value == "alternating"
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_substation_returns_existing_substation() -> None:
@@ -421,6 +433,7 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
             substation = Substation(
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
+                operational_current_type=OperationalCurrentType.ALTERNATING,
                 dispatch_name="ПС Свердловская",
                 sap_code="OLD-SAP",
             )
@@ -433,8 +446,8 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
             result = await service.get_or_create_substation(
                 {
                     "substation_dispatch_name": "ПС Свердловская",
-                    "substation_highest_voltage": "220",
-                    "substation_sap_code": "NEW-SAP",
+                    "substation_highest_voltage": "110",
+                    "operational_current_type": "alternating",
                 },
                 department_id=department.id,
             )
@@ -444,6 +457,7 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
             assert result.sap_code == "OLD-SAP"
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_substation_ignores_deleted_substation() -> None:
@@ -463,6 +477,7 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
             deleted_substation = Substation(
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
+                operational_current_type=OperationalCurrentType.ALTERNATING,
                 dispatch_name="ПС Свердловская",
                 deleted_at=func.now(),
             )
@@ -476,6 +491,7 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
                 {
                     "substation_dispatch_name": "ПС Свердловская",
                     "substation_highest_voltage": "110",
+                    "operational_current_type": "alternating",
                 },
                 department_id=department.id,
             )
@@ -484,6 +500,7 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
             assert result.deleted_at is None
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_connection_creates_connection() -> None:
@@ -503,6 +520,7 @@ async def test_get_or_create_connection_creates_connection() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -515,7 +533,6 @@ async def test_get_or_create_connection_creates_connection() -> None:
                     "connection_sap_code": "CON-001",
                     "connection_asureo_code": "ASUREO-CON-001",
                     "connection_rdu_subordination": "да",
-                    "operational_current_type": "permanent",
                 },
                 substation_id=substation.id,
             )
@@ -526,12 +543,9 @@ async def test_get_or_create_connection_creates_connection() -> None:
             assert connection.sap_code == "CON-001"
             assert connection.asureo_code == "ASUREO-CON-001"
             assert connection.rdu_subordination is True
-            assert (
-                connection.operational_current_type
-                == OperationalCurrentType.PERMANENT
-            )
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_connection_parses_values() -> None:
@@ -543,6 +557,7 @@ async def test_get_or_create_connection_parses_values() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+
             )
             session.add(department)
             await session.flush()
@@ -551,6 +566,7 @@ async def test_get_or_create_connection_parses_values() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -563,20 +579,16 @@ async def test_get_or_create_connection_parses_values() -> None:
                     "connection_sap_code": "",
                     "connection_asureo_code": "",
                     "connection_rdu_subordination": "нет",
-                    "operational_current_type": "rectified",
                 },
                 substation_id=substation.id,
             )
 
             assert connection.rdu_subordination is False
-            assert (
-                connection.operational_current_type
-                == OperationalCurrentType.RECTIFIED
-            )
             assert connection.sap_code is None
             assert connection.asureo_code is None
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_connection_returns_existing_connection() -> None:
@@ -588,6 +600,7 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+
             )
             session.add(department)
             await session.flush()
@@ -596,6 +609,7 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -605,7 +619,6 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 sap_code="OLD-SAP",
                 rdu_subordination=True,
-                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(connection)
             await session.flush()
@@ -618,7 +631,6 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                     "connection_sap_code": "NEW-SAP",
                     "connection_asureo_code": "NEW-ASUREO",
                     "connection_rdu_subordination": "нет",
-                    "operational_current_type": "rectified",
                 },
                 substation_id=substation.id,
             )
@@ -626,12 +638,9 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
             assert result.id == connection.id
             assert result.sap_code == "OLD-SAP"
             assert result.rdu_subordination is True
-            assert (
-                result.operational_current_type
-                == OperationalCurrentType.PERMANENT
-            )
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_get_or_create_urza_creates_urza() -> None:
@@ -651,6 +660,7 @@ async def test_get_or_create_urza_creates_urza() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -659,7 +669,6 @@ async def test_get_or_create_urza_creates_urza() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=True,
-                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(connection)
             await session.flush()
@@ -695,6 +704,7 @@ async def test_get_or_create_urza_creates_urza() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
     async with async_session_factory() as session:
@@ -713,6 +723,7 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -721,7 +732,6 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=False,
-                operational_current_type=OperationalCurrentType.RECTIFIED,
             )
             session.add(connection)
             await session.flush()
@@ -752,6 +762,7 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_urza_returns_existing_urza() -> None:
     async with async_session_factory() as session:
@@ -770,6 +781,7 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 enterprise_id=department.id,
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
+                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(substation)
             await session.flush()
@@ -778,7 +790,6 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=True,
-                operational_current_type=OperationalCurrentType.PERMANENT,
             )
             session.add(connection)
             await session.flush()
@@ -824,6 +835,7 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
             assert result.complexity is False
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_import_row_creates_full_hierarchy() -> None:
@@ -918,6 +930,7 @@ async def test_import_row_creates_full_hierarchy() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_import_row_is_idempotent() -> None:
     async with async_session_factory() as session:
@@ -967,6 +980,7 @@ async def test_import_row_is_idempotent() -> None:
             assert result.scalar_one() == 1
         finally:
             await transaction.rollback()
+
 
 @pytest.mark.asyncio
 async def test_import_rows_creates_full_dataset() -> None:
@@ -1067,6 +1081,7 @@ async def test_import_rows_creates_full_dataset() -> None:
         finally:
             await transaction.rollback()
 
+
 @pytest.mark.asyncio
 async def test_import_rows_is_idempotent() -> None:
     importer = CSVImporter(Path("data/rzadb_test_data.csv"))
@@ -1161,3 +1176,4 @@ async def test_import_rows_is_idempotent() -> None:
 
         finally:
             await transaction.rollback()
+

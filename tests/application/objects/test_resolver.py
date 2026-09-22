@@ -80,7 +80,6 @@ async def test_resolves_connection() -> None:
         substation_id=uuid7(),
         dispatch_name="ВЛ 110 кВ Свердловская",
         rdu_subordination=False,
-        operational_current_type="permanent",
     )
 
     resolver = make_resolver(connection=connection)
