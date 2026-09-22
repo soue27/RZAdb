@@ -18,6 +18,7 @@ from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 from app.domain.user import User
+from app.domain.selectivity_scheme import SelectivityScheme, SelectivitySchemeVersion
 
 __all__ = [
     "OTD",
@@ -43,5 +44,7 @@ __all__ = [
     "TaskHistory",
     "URZAInstruction",
     "URZAInstructionVersion",
-    "User"
+    "User",
+    "SelectivityScheme",
+    "SelectivitySchemeVersion",
 ]
