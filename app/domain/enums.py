@@ -22,6 +22,14 @@ class OperationalCurrentType(StrEnum):
     RECTIFIED = "rectified"
     ALTERNATING = "alternating"
 
+    @property
+    def label(self) -> str:
+        return {
+            self.PERMANENT: "Постоянный ток",
+            self.RECTIFIED: "Выпрямленный ток",
+            self.ALTERNATING: "Переменный ток",
+        }[self]
+
 
 class URZAStatus(StrEnum):
     IN_OPERATION = "in_operation"

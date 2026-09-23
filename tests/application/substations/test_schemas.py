@@ -49,3 +49,9 @@ def test_substation_details_allows_optional_fields_to_be_none() -> None:
     assert substation.address is None
     assert substation.latitude is None
     assert substation.longitude is None
+
+
+def test_operational_current_type_labels() -> None:
+    assert OperationalCurrentType.PERMANENT.label == "Постоянный ток"
+    assert OperationalCurrentType.RECTIFIED.label == "Выпрямленный ток"
+    assert OperationalCurrentType.ALTERNATING.label == "Переменный ток"
