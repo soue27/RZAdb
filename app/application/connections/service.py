@@ -28,7 +28,6 @@ class ConnectionService:
             sap_code=connection.sap_code,
             asureo_code=connection.asureo_code,
             rdu_subordination=connection.rdu_subordination,
-            operational_current_type=connection.operational_current_type,
         )
 
     async def get_by_substation_id(
@@ -46,7 +45,6 @@ class ConnectionService:
                 sap_code=connection.sap_code,
                 asureo_code=connection.asureo_code,
                 rdu_subordination=connection.rdu_subordination,
-                operational_current_type=connection.operational_current_type,
             )
             for connection in connections
         ]

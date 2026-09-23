@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid6 import uuid7
 
 from app.application.substations.schemas import SubstationDetails
-from app.domain.enums import HighestVoltage
+from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
 def test_substation_details_schema() -> None:
@@ -18,6 +18,7 @@ def test_substation_details_schema() -> None:
         address="г. Екатеринбург, ул. Энергетиков, 1",
         latitude=Decimal("56.838900"),
         longitude=Decimal("60.605700"),
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     assert substation.id == substation_id
@@ -40,6 +41,7 @@ def test_substation_details_allows_optional_fields_to_be_none() -> None:
         address=None,
         latitude=None,
         longitude=None,
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     assert substation.sap_code is None
@@ -47,3 +49,9 @@ def test_substation_details_allows_optional_fields_to_be_none() -> None:
     assert substation.address is None
     assert substation.latitude is None
     assert substation.longitude is None
+
+
+def test_operational_current_type_labels() -> None:
+    assert OperationalCurrentType.PERMANENT.label == "Постоянный ток"
+    assert OperationalCurrentType.RECTIFIED.label == "Выпрямленный ток"
+    assert OperationalCurrentType.ALTERNATING.label == "Переменный ток"

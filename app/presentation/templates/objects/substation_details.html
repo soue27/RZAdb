@@ -1,22 +1,47 @@
-<dl class="row mb-0">
-    <dt class="col-sm-4">Наивысшее напряжение</dt>
-    <dd class="col-sm-8">{{ substation.highest_voltage.value }} кВ</dd>
+<dl class="rzadb-property-list">
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">Наивысшее напряжение</dt>
+        <dd class="rzadb-property-value">
+            {{ substation.highest_voltage.value }} кВ
+        </dd>
+    </div>
 
-    <dt class="col-sm-4">SAP</dt>
-    <dd class="col-sm-8">{{ substation.sap_code or "—" }}</dd>
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">Тип оперативного тока</dt>
+        <dd class="rzadb-property-value">
+            {{ substation.operational_current_type.label }}
+        </dd>
+    </div>
 
-    <dt class="col-sm-4">АСУЕО</dt>
-    <dd class="col-sm-8">{{ substation.asureo_code or "—" }}</dd>
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">SAP</dt>
+        <dd class="rzadb-property-value">
+            {{ substation.sap_code or "—" }}
+        </dd>
+    </div>
 
-    <dt class="col-sm-4">Адрес</dt>
-    <dd class="col-sm-8">{{ substation.address or "—" }}</dd>
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">АСУЕО</dt>
+        <dd class="rzadb-property-value">
+            {{ substation.asureo_code or "—" }}
+        </dd>
+    </div>
 
-    <dt class="col-sm-4">Координаты</dt>
-    <dd class="col-sm-8">
-        {% if substation.latitude is not none and substation.longitude is not none %}
-            {{ substation.latitude }}, {{ substation.longitude }}
-        {% else %}
-            —
-        {% endif %}
-    </dd>
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">Адрес</dt>
+        <dd class="rzadb-property-value">
+            {{ substation.address or "—" }}
+        </dd>
+    </div>
+
+    <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">Координаты</dt>
+        <dd class="rzadb-property-value">
+            {% if substation.latitude is not none and substation.longitude is not none %}
+                {{ substation.latitude }}, {{ substation.longitude }}
+            {% else %}
+                —
+            {% endif %}
+        </dd>
+    </div>
 </dl>

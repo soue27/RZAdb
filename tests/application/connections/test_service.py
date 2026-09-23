@@ -14,14 +14,12 @@ class FakeConnection:
         sap_code,
         asureo_code,
         rdu_subordination,
-        operational_current_type,
     ):
         self.id = connection_id
         self.dispatch_name = dispatch_name
         self.sap_code = sap_code
         self.asureo_code = asureo_code
         self.rdu_subordination = rdu_subordination
-        self.operational_current_type = operational_current_type
 
 
 class FakeConnectionRepository:
@@ -54,7 +52,6 @@ async def test_get_by_id_returns_connection_dto():
         sap_code="SAP-001",
         asureo_code="ASUREO-001",
         rdu_subordination=True,
-        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     repository = FakeConnectionRepository([connection])
@@ -70,10 +67,6 @@ async def test_get_by_id_returns_connection_dto():
     assert result.sap_code == "SAP-001"
     assert result.asureo_code == "ASUREO-001"
     assert result.rdu_subordination is True
-    assert (
-        result.operational_current_type
-        == OperationalCurrentType.PERMANENT
-    )
 
 
 @pytest.mark.asyncio
@@ -100,7 +93,6 @@ async def test_get_by_substation_id_returns_connection_dtos():
         sap_code="SAP-001",
         asureo_code="ASUREO-001",
         rdu_subordination=True,
-        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     repository = FakeConnectionRepository([connection])
@@ -116,10 +108,6 @@ async def test_get_by_substation_id_returns_connection_dtos():
     assert result[0].sap_code == "SAP-001"
     assert result[0].asureo_code == "ASUREO-001"
     assert result[0].rdu_subordination is True
-    assert (
-        result[0].operational_current_type
-        == OperationalCurrentType.PERMANENT
-    )
 
 
 @pytest.mark.asyncio

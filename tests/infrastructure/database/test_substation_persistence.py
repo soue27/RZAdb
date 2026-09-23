@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.domain.enterprise import Enterprise
-from app.domain.enums import EnterpriseType, HighestVoltage
+from app.domain.enums import EnterpriseType, HighestVoltage, OperationalCurrentType
 from app.domain.substation import Substation
 from app.infrastructure.database.engine import async_session_factory
 
@@ -26,6 +26,7 @@ async def test_substation_persistence() -> None:
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
             address="г. Екатеринбург, ул. Тестовая, 1",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add(substation)

@@ -51,6 +51,7 @@ async def test_superadmin_can_access_any_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, superadmin, substation])
@@ -96,6 +97,7 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, engineer, substation])
@@ -148,6 +150,7 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
             enterprise=another_department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([
@@ -198,6 +201,7 @@ async def test_admin_can_access_substation_of_own_department() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_220,
             dispatch_name="ПС Администратора",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, admin, substation])
@@ -244,6 +248,7 @@ async def test_manager_can_access_substation_of_own_department() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Руководителя",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, manager, substation])
@@ -279,6 +284,7 @@ async def test_unknown_user_cannot_access_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, substation])
@@ -325,6 +331,7 @@ async def test_inactive_user_cannot_access_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, user, substation])
@@ -409,6 +416,7 @@ async def test_deleted_user_cannot_access_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, user, substation])
@@ -457,6 +465,7 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Удалённая ПС",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, user, substation])
@@ -505,6 +514,7 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, user, substation])
@@ -564,6 +574,7 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Холдинга",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([holding, branch, department, specialist, substation])
@@ -624,6 +635,7 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего филиала",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([holding, branch, department, specialist, substation])
@@ -698,6 +710,7 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             enterprise=another_department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого филиала",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([
@@ -751,6 +764,7 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add_all([department, specialist, substation])
@@ -1258,13 +1272,13 @@ async def test_engineer_can_access_connection_in_own_department() -> None:
             enterprise=enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         engineer = User(
@@ -1315,24 +1329,24 @@ async def test_engineer_cannot_access_connection_in_another_department() -> None
             enterprise=own_enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Own PS",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
         another_substation = Substation(
             enterprise=another_enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Another PS",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         own_connection = Connection(
             substation=own_substation,
             dispatch_name="Own Connection",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
         another_connection = Connection(
             substation=another_substation,
             dispatch_name="Another Connection",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         engineer = User(
@@ -1401,13 +1415,13 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         specialist = User(
@@ -1479,24 +1493,25 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             enterprise=department_a,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-A",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
         substation_b = Substation(
             enterprise=department_b,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-B",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection_a = Connection(
             substation=substation_a,
             dispatch_name="Connection A",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
+
         )
         connection_b = Connection(
             substation=substation_b,
             dispatch_name="Connection B",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         specialist = User(
@@ -1551,13 +1566,13 @@ async def test_can_access_connection_returns_false_for_deleted_connection() -> N
             enterprise=enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         engineer = User(
@@ -1605,13 +1620,13 @@ async def test_can_access_connection_returns_false_for_deleted_substation() -> N
             enterprise=enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Deleted PS",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         engineer = User(
@@ -1669,13 +1684,13 @@ async def test_engineer_can_access_urza_of_own_department() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -1746,13 +1761,13 @@ async def test_engineer_cannot_access_urza_of_another_department() -> None:
             enterprise=another_department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -1820,13 +1835,13 @@ async def test_cannot_access_deleted_urza() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -1895,13 +1910,13 @@ async def test_cannot_access_urza_of_deleted_connection() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Удалённое присоединение",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -1970,13 +1985,13 @@ async def test_cannot_access_urza_of_deleted_substation() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Удалённая ПС",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -2045,13 +2060,13 @@ async def test_superadmin_can_access_urza_of_any_department() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -2125,13 +2140,13 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Холдинга",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(
@@ -2220,13 +2235,13 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого филиала",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(

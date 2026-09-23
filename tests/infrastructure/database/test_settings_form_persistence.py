@@ -35,13 +35,14 @@ async def test_settings_form_persistence() -> None:
             dispatch_name="ПС Тестовая",
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
+
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Ввод 110 кВ",
             rdu_subordination=True,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         urza = URZA(

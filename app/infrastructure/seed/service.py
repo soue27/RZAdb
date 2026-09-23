@@ -157,6 +157,9 @@ class RZACSVSeedService:
             highest_voltage=CSVRowParser.highest_voltage(
                 row["substation_highest_voltage"]
             ),
+            operational_current_type=CSVRowParser.operational_current_type(
+                row["operational_current_type"]
+            ),
             dispatch_name=dispatch_name,
             sap_code=CSVRowParser.optional_string(
                 row.get("substation_sap_code", "")
@@ -215,9 +218,7 @@ class RZACSVSeedService:
             rdu_subordination=CSVRowParser.boolean(
                 row["connection_rdu_subordination"]
             ),
-            operational_current_type=CSVRowParser.operational_current_type(
-                row["operational_current_type"]
-            ),
+
         )
 
         self.session.add(connection)

@@ -9,7 +9,7 @@ from app.domain.enums import (
     EnterpriseType,
     HighestVoltage,
     TaskStatus,
-    UserRole,
+    UserRole, OperationalCurrentType,
 )
 from app.domain.inspection import Inspection
 from app.domain.inspection_task import InspectionTask
@@ -41,6 +41,7 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     task = InspectionTask(

@@ -14,7 +14,7 @@ from app.domain.enums import (
     EnterpriseType,
     HighestVoltage,
     TaskStatus,
-    UserRole,
+    UserRole, OperationalCurrentType,
 )
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
@@ -50,6 +50,7 @@ async def test_create_inspection_task_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Сервисная",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -138,6 +139,7 @@ async def test_assign_inspection_task_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Назначение",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -239,6 +241,7 @@ async def test_accept_inspection_task_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Принятие",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -349,6 +352,7 @@ async def test_complete_inspection_task_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Завершение",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -487,6 +491,7 @@ async def test_cannot_complete_inspection_without_remarks(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Remarks",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -578,6 +583,7 @@ async def test_send_inspection_to_review_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Review",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -715,6 +721,7 @@ async def test_review_approve_inspection_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Approval",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(
@@ -856,6 +863,7 @@ async def test_review_return_inspection_with_real_postgresql(
         enterprise_id=department.id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Return",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     db_session.add_all(

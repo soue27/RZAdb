@@ -68,13 +68,13 @@ async def test_tree_service_builds_full_enterprise_tree(
         enterprise=department,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     connection = Connection(
         substation=substation,
         dispatch_name="ВЛ 110 кВ Тестовая",
         rdu_subordination=False,
-        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     urza = URZA(
@@ -212,13 +212,13 @@ async def test_tree_service_starts_from_specialist_branch(
         enterprise=department,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Инженерная",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     connection = Connection(
         substation=substation,
         dispatch_name="ВЛ 110 кВ Инженерная",
         rdu_subordination=False,
-        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     urza = URZA(
@@ -364,18 +364,21 @@ async def test_tree_service_starts_from_specialist_branch(
         enterprise=department_1,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 1",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     substation_2 = Substation(
         enterprise=department_2,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 2",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     substation_3 = Substation(
         enterprise=department_3,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 3",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     session.add_all([
@@ -517,12 +520,14 @@ async def test_tree_service_excludes_deleted_enterprises_and_substations(
         enterprise=active_department,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Активная",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     deleted_substation = Substation(
         enterprise=active_department,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Архивная",
+        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     session.add_all([

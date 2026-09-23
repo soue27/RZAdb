@@ -13,7 +13,6 @@ def test_connection_list_item_contains_all_fields():
         sap_code="SAP-001",
         asureo_code="ASUREO-001",
         rdu_subordination=True,
-        operational_current_type=OperationalCurrentType.PERMANENT,
     )
 
     assert result.id == connection_id
@@ -21,10 +20,6 @@ def test_connection_list_item_contains_all_fields():
     assert result.sap_code == "SAP-001"
     assert result.asureo_code == "ASUREO-001"
     assert result.rdu_subordination is True
-    assert (
-        result.operational_current_type
-        == OperationalCurrentType.PERMANENT
-    )
 
 
 def test_connection_list_item_allows_optional_codes():
@@ -34,7 +29,6 @@ def test_connection_list_item_allows_optional_codes():
         sap_code=None,
         asureo_code=None,
         rdu_subordination=False,
-        operational_current_type=OperationalCurrentType.RECTIFIED,
     )
 
     assert result.sap_code is None

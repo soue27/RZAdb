@@ -21,13 +21,13 @@ async def test_get_by_id_returns_connection() -> None:
             enterprise=enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
+            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
-            operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
         session.add(connection)

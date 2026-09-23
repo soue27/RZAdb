@@ -11,7 +11,6 @@ class ConnectionListItem(BaseModel):
     sap_code: str | None
     asureo_code: str | None
     rdu_subordination: bool
-    operational_current_type: OperationalCurrentType
 
 
 class ConnectionDetails(BaseModel):
@@ -20,4 +19,3 @@ class ConnectionDetails(BaseModel):
     sap_code: str | None
     asureo_code: str | None
     rdu_subordination: bool
-    operational_current_type: OperationalCurrentType

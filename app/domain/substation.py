@@ -5,7 +5,7 @@ from sqlalchemy import Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enterprise import Enterprise
-from app.domain.enums import HighestVoltage
+from app.domain.enums import HighestVoltage, OperationalCurrentType
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
@@ -31,6 +31,15 @@ class Substation(
         Enum(
             HighestVoltage,
             name="highest_voltage",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+    )
+
+    operational_current_type: Mapped[OperationalCurrentType] = mapped_column(
+        Enum(
+            OperationalCurrentType,
+            name="operational_current_type",
             values_callable=lambda enum: [item.value for item in enum],
         ),
         nullable=False,
