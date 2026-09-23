@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
 
+from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_service import InspectionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -11,6 +12,9 @@ from app.application.objects.exceptions import (
 )
 from app.application.objects.service import ObjectService
 from app.application.rza_instructions.service import RZAInstructionService
+from app.application.selectivity_schemes.service import (
+    SelectivitySchemeService,
+)
 from app.application.substations.service import SubstationService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -19,15 +23,9 @@ from app.presentation.dependencies.services import (
     get_inspection_service,
     get_object_service,
     get_rza_instruction_service,
+    get_selectivity_scheme_service,
     get_substation_service,
 )
-from app.application.selectivity_schemes.service import (
-    SelectivitySchemeService,
-)
-from app.presentation.dependencies.services import (
-    get_selectivity_scheme_service,
-)
-from app.application.connections.service import ConnectionService
 
 router = APIRouter(
     prefix="/objects",

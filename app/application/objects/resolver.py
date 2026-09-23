@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from app.application.objects.schemas import SelectedObject
 from app.application.connections.repository import ConnectionRepository
+from app.application.objects.schemas import SelectedObject
 from app.application.substations.repository import SubstationRepository
 from app.application.urzas.repository import URZARepository
 

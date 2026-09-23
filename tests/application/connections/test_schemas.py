@@ -1,7 +1,6 @@
 from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
-from app.domain.enums import OperationalCurrentType
 
 
 def test_connection_list_item_contains_all_fields():

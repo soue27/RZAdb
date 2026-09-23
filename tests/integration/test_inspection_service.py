@@ -13,8 +13,9 @@ from app.domain.enums import (
     AccessCategory,
     EnterpriseType,
     HighestVoltage,
+    OperationalCurrentType,
     TaskStatus,
-    UserRole, OperationalCurrentType,
+    UserRole,
 )
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory

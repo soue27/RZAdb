@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
 from app.application.access.service import AccessService
@@ -26,7 +27,6 @@ from app.domain.enums import (
 from app.domain.substation import Substation
 from app.domain.urza import URZA
 from app.domain.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.asyncio

@@ -5,12 +5,12 @@ from app.application.access.service import AccessService
 from app.application.rza_instructions.repository import (
     RZAInstructionRepository,
 )
+from app.application.rza_instructions.schemas import (
+    RZAInstructionDetails,
+)
 from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
-)
-from app.application.rza_instructions.schemas import (
-    RZAInstructionDetails,
 )
 
 

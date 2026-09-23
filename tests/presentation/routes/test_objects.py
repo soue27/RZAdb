@@ -1,8 +1,7 @@
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
-from datetime import date
 
-import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
@@ -19,21 +18,16 @@ from app.domain.enums import (
     OperationalCurrentType,
     UserRole,
 )
-from app.domain.user import User
 from app.domain.inspection import Inspection
-from app.domain.inspection_task import InspectionTask
+from app.domain.user import User
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
-from app.application.inspections.inspection_service import InspectionService
-from app.domain.inspection import Inspection
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
     get_object_service,
     get_substation_service,
 )
-
-
 
 
 class FakeSubstationService:

@@ -2,8 +2,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.domain.enums import OperationalCurrentType
-
 
 class ConnectionListItem(BaseModel):
     id: UUID

@@ -5,9 +5,8 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.inspections.inspection_service import InspectionService
-from app.domain.inspection import Inspection
-from app.domain.inspection_task import InspectionTask
 from app.domain.file import File
+from app.domain.inspection import Inspection
 
 
 @pytest.mark.asyncio

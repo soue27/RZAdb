@@ -1,7 +1,7 @@
 from decimal import Decimal
-from uuid6 import uuid7
 
 from fastapi.templating import Jinja2Templates
+from uuid6 import uuid7
 
 from app.application.substations.schemas import SubstationDetails
 from app.domain.enums import HighestVoltage, OperationalCurrentType

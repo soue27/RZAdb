@@ -13,10 +13,17 @@ class URZARepository:
         self.session = session
 
     async def get_by_id(
-        self,
-        urza_id: UUID,
+            self,
+            urza_id: UUID,
     ) -> URZA | None:
-        return await self.session.get(URZA, urza_id)
+        result = await self.session.scalars(
+            select(URZA).where(
+                URZA.id == urza_id,
+                URZA.deleted_at.is_(None),
+            )
+        )
+
+        return result.one_or_none()
 
     async def get_all_active(self) -> list[URZA]:
         """Возвращает все неудалённые устройства РЗА."""

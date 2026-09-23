@@ -1,6 +1,5 @@
-from uuid6 import uuid7
-
 import pytest
+from uuid6 import uuid7
 
 from app.application.objects.resolver import ObjectResolver
 from app.domain.connection import Connection

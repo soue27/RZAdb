@@ -11,6 +11,7 @@ from app.domain.program import Program
 from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
 from app.domain.rza_settings import SettingsForm
 from app.domain.schema import SchemaForm, SchemaRecord
+from app.domain.selectivity_scheme import SelectivityScheme, SelectivitySchemeVersion
 from app.domain.settings_record import SettingsRecord
 from app.domain.substation import Substation
 from app.domain.task import Task
@@ -18,7 +19,6 @@ from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 from app.domain.user import User
-from app.domain.selectivity_scheme import SelectivityScheme, SelectivitySchemeVersion
 
 __all__ = [
     "OTD",
@@ -36,6 +36,8 @@ __all__ = [
     "RZAInstructionVersion",
     "SchemaForm",
     "SchemaRecord",
+    "SelectivityScheme",
+    "SelectivitySchemeVersion",
     "SettingsForm",
     "SettingsRecord",
     "Substation",
@@ -45,6 +47,4 @@ __all__ = [
     "URZAInstruction",
     "URZAInstructionVersion",
     "User",
-    "SelectivityScheme",
-    "SelectivitySchemeVersion",
 ]

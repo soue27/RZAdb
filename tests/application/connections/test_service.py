@@ -1,9 +1,7 @@
+import pytest
 from uuid6 import uuid7
 
-import pytest
-
 from app.application.connections.service import ConnectionService
-from app.domain.enums import OperationalCurrentType
 
 
 class FakeConnection:

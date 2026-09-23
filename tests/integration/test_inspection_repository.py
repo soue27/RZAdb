@@ -1,22 +1,21 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from uuid6 import uuid7
 
-from app.domain.file import File
-
-import pytest
-
-from app.application.inspections.repository import InspectionTaskRepository
 from app.application.inspections.inspection_repository import InspectionRepository
+from app.application.inspections.repository import InspectionTaskRepository
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
     EnterpriseType,
     HighestVoltage,
+    OperationalCurrentType,
     TaskStatus,
-    UserRole, OperationalCurrentType,
+    UserRole,
 )
+from app.domain.file import File
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask

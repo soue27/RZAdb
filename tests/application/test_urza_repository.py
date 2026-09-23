@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
@@ -27,11 +27,13 @@ async def test_get_by_id_returns_urza() -> None:
         complexity=False,
     )
 
-    session.get.return_value = urza
+    scalars_result = MagicMock()
+    scalars_result.one_or_none.return_value = urza
+    session.scalars.return_value = scalars_result
 
     repository = URZARepository(session)
 
     result = await repository.get_by_id(urza.id)
 
     assert result is urza
-    session.get.assert_awaited_once_with(URZA, urza.id)
+    scalars_result.one_or_none.assert_called_once()

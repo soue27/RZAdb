@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from app.application.substations.schemas import SubstationDetails
-from app.application.substations.repository import SubstationRepository
 from app.application.objects.exceptions import ObjectNotFoundError
+from app.application.substations.repository import SubstationRepository
+from app.application.substations.schemas import SubstationDetails
 
 
 class SubstationService:

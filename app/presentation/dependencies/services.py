@@ -5,26 +5,18 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.access.service import AccessService
-from app.application.objects.resolver import ObjectResolver
 from app.application.auth.password import PasswordService
 from app.application.auth.service import AuthService
 from app.application.connections.repository import ConnectionRepository
+from app.application.connections.service import ConnectionService
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
-from app.application.rza_instructions.repository import RZAInstructionRepository
-from app.application.tree.service import TreeService
-from app.application.urzas.repository import URZARepository
-from app.application.users.repository import UserRepository
-from app.application.objects.service import ObjectService
-from app.infrastructure.database.session import get_session
-from app.infrastructure.storage.base import ObjectStorage
-from app.infrastructure.storage.local import LocalObjectStorage
-from app.application.substations.service import SubstationService
-from app.application.substations.repository import SubstationRepository
-from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
+from app.application.objects.resolver import ObjectResolver
+from app.application.objects.service import ObjectService
+from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.repository import (
     SelectivitySchemeRepository,
@@ -32,6 +24,14 @@ from app.application.selectivity_schemes.repository import (
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.application.substations.repository import SubstationRepository
+from app.application.substations.service import SubstationService
+from app.application.tree.service import TreeService
+from app.application.urzas.repository import URZARepository
+from app.application.users.repository import UserRepository
+from app.infrastructure.database.session import get_session
+from app.infrastructure.storage.base import ObjectStorage
+from app.infrastructure.storage.local import LocalObjectStorage
 
 
 def get_object_storage() -> ObjectStorage:

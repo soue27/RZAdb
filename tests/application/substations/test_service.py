@@ -1,7 +1,7 @@
 from decimal import Decimal
-from uuid6 import uuid7
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.substations.service import SubstationService

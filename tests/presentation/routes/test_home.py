@@ -1,11 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
-import pytest
-
-from app.domain.enums import AccessCategory, UserRole
-from app.domain.user import User
-from app.presentation.app import app
-from app.presentation.auth.dependencies import get_current_user
 
 from app.application.tree.schemas import (
     ConnectionTreeNode,
@@ -13,6 +8,10 @@ from app.application.tree.schemas import (
     SubstationTreeNode,
     URZATreeNode,
 )
+from app.domain.enums import AccessCategory, UserRole
+from app.domain.user import User
+from app.presentation.app import app
+from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_tree_service
 
 
@@ -137,7 +136,7 @@ def test_home_renders_separate_connection_expand_and_select_controls() -> None:
         )
 
         assert (
-            f'data-object-type="connection"'
+            'data-object-type="connection"'
             in response.text
         )
 

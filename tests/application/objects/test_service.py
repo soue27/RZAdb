@@ -3,12 +3,12 @@ from uuid import UUID
 import pytest
 from uuid6 import uuid7
 
-from app.application.objects.schemas import SelectedObject
-from app.application.objects.service import ObjectService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
+from app.application.objects.schemas import SelectedObject
+from app.application.objects.service import ObjectService
 
 
 class FakeAccessService:
