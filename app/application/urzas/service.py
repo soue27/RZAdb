@@ -2,7 +2,11 @@ from uuid import UUID
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.urzas.repository import URZARepository
-from app.application.urzas.schemas import URZADetails
+from app.application.urzas.schemas import (
+    URZAConnectionInfo,
+    URZADetails,
+    URZASubstationInfo,
+)
 
 
 class URZAService:
@@ -28,4 +32,12 @@ class URZAService:
             category=urza.category,
             room_category=urza.room_category,
             complexity=urza.complexity,
+            connection=URZAConnectionInfo(
+                id=urza.connection.id,
+                dispatch_name=urza.connection.dispatch_name,
+            ),
+            substation=URZASubstationInfo(
+                id=urza.connection.substation.id,
+                dispatch_name=urza.connection.substation.dispatch_name,
+            ),
         )

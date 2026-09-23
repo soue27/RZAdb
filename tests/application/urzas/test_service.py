@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
@@ -15,6 +15,16 @@ from app.domain.urza import URZA
 async def test_get_details_returns_urza_details() -> None:
     repository = AsyncMock()
 
+    connection = MagicMock()
+    connection.id = uuid7()
+    connection.dispatch_name = "ВЛ 110 кВ"
+
+    substation = MagicMock()
+    substation.id = uuid7()
+    substation.dispatch_name = "ПС Центральная"
+
+    connection.substation = substation
+
     urza = URZA(
         id=uuid7(),
         connection_id=uuid7(),
@@ -28,6 +38,8 @@ async def test_get_details_returns_urza_details() -> None:
         room_category=RoomCategory.I,
         complexity=False,
     )
+
+    urza.connection = connection
 
     repository.get_by_id.return_value = urza
 
@@ -46,6 +58,10 @@ async def test_get_details_returns_urza_details() -> None:
     assert result.category is URZACategory.II
     assert result.room_category is RoomCategory.I
     assert result.complexity is False
+    assert result.connection.id == connection.id
+    assert result.connection.dispatch_name == "ВЛ 110 кВ"
+    assert result.substation.id == substation.id
+    assert result.substation.dispatch_name == "ПС Центральная"
 
     repository.get_by_id.assert_awaited_once_with(urza.id)
 

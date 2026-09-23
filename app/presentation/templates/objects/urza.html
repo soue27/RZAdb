@@ -1,0 +1,258 @@
+<div class="rzadb-object-card">
+
+    <!-- Родительский путь -->
+    <div class="mb-3">
+        <div class="rzadb-object-breadcrumb">
+            {{ urza.substation.dispatch_name }}
+            <span class="mx-1">›</span>
+            {{ urza.connection.dispatch_name }}
+        </div>
+    </div>
+
+    <!-- Заголовок и действия -->
+    <div class="d-flex justify-content-between align-items-start gap-3">
+
+        <div>
+            <h2 class="mb-0">{{ urza.dispatch_name }}</h2>
+        </div>
+
+        <div class="d-flex gap-2 flex-shrink-0">
+
+            <button
+                type="button"
+                class="btn btn-outline-primary"
+            >
+                Изменить
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-outline-secondary"
+                title="Дополнительные действия"
+            >
+                <span class="material-icons">more_horiz</span>
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- Ключевые признаки -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+
+        <!-- Элементная база -->
+        <span class="badge text-bg-light border">
+            {{ urza.element_base.label }}
+        </span>
+
+        <!-- Сложная -->
+        {% if urza.complexity %}
+            <span class="badge text-bg-danger">
+                Сложная
+            </span>
+        {% endif %}
+
+        <!-- Категория -->
+        <span class="badge text-bg-light border">
+            Категория {{ urza.category.value }}
+        </span>
+
+        <!-- РДУ -->
+        {% if urza.rdu_subordination %}
+            <span class="badge text-bg-danger">
+                РДУ
+            </span>
+        {% endif %}
+
+        <!-- Статус -->
+        <span class="badge {{ urza.status.badge_class }}">
+            ● {{ urza.status.label }}
+        </span>
+
+    </div>
+
+    <!-- Основные сведения -->
+    <div class="mt-3">
+
+        <details>
+
+            <summary class="small fw-semibold text-secondary">
+                Основные сведения
+            </summary>
+
+            <div class="rzadb-property-list mt-2">
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Инвентарный номер
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.inventory_number or "—" }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Дата ввода в эксплуатацию
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.commissioning_date.strftime("%d.%m.%Y") }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Статус
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.status.label }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Элементная база
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.element_base.label }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Категория
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.category.value }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Категория помещения
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.room_category.value }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Сложность
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {% if urza.complexity %}
+                            Да
+                        {% else %}
+                            Нет
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Подчинение РДУ
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {% if urza.rdu_subordination %}
+                            Да
+                        {% else %}
+                            Нет
+                        {% endif %}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Присоединение
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.connection.dispatch_name }}
+                    </dd>
+                </div>
+
+                <div class="rzadb-property-row">
+                    <dt class="rzadb-property-label">
+                        Подстанция
+                    </dt>
+                    <dd class="rzadb-property-value">
+                        {{ urza.substation.dispatch_name }}
+                    </dd>
+                </div>
+
+            </div>
+
+        </details>
+
+    </div>
+
+    <!-- Рабочие разделы УРЗА -->
+    <div class="mt-4">
+
+        <ul class="nav nav-tabs" role="tablist">
+
+            <li class="nav-item">
+                <button
+                    class="nav-link active"
+                    type="button"
+                >
+                    ОТД
+                </button>
+            </li>
+
+            <li class="nav-item">
+                <button
+                    class="nav-link"
+                    type="button"
+                >
+                    Уставки
+                </button>
+            </li>
+
+            <li class="nav-item">
+                <button
+                    class="nav-link"
+                    type="button"
+                >
+                    Схемы
+                </button>
+            </li>
+
+            <li class="nav-item">
+                <button
+                    class="nav-link"
+                    type="button"
+                >
+                    ТО
+                </button>
+            </li>
+
+            <li class="nav-item">
+                <button
+                    class="nav-link"
+                    type="button"
+                >
+                    Программы
+                </button>
+            </li>
+
+            <li class="nav-item">
+                <button
+                    class="nav-link"
+                    type="button"
+                >
+                    Инструкция
+                </button>
+            </li>
+
+        </ul>
+
+        <div class="pt-4">
+            <div class="text-secondary text-center py-5">
+                Выберите раздел
+            </div>
+        </div>
+
+    </div>
+
+</div>

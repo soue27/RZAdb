@@ -1,8 +1,10 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.connection import Connection
 from app.domain.urza import URZA
 
 
@@ -17,7 +19,13 @@ class URZARepository:
             urza_id: UUID,
     ) -> URZA | None:
         result = await self.session.scalars(
-            select(URZA).where(
+            select(URZA)
+            .options(
+                selectinload(URZA.connection).selectinload(
+                    Connection.substation,
+                ),
+            )
+            .where(
                 URZA.id == urza_id,
                 URZA.deleted_at.is_(None),
             )

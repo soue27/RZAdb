@@ -28,6 +28,7 @@ from app.application.substations.repository import SubstationRepository
 from app.application.substations.service import SubstationService
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
+from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
@@ -125,6 +126,14 @@ def get_connection_service(
 ) -> ConnectionService:
     return ConnectionService(
         repository=ConnectionRepository(session),
+    )
+
+
+def get_urza_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> URZAService:
+    return URZAService(
+        repository=URZARepository(session),
     )
 
 

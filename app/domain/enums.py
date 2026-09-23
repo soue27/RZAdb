@@ -37,11 +37,37 @@ class URZAStatus(StrEnum):
     DECOMMISSIONED = "decommissioned"
     RESERVE = "reserve"
 
+    @property
+    def label(self) -> str:
+        return {
+            self.IN_OPERATION: "В эксплуатации",
+            self.IN_REPAIR: "В ремонте",
+            self.DECOMMISSIONED: "Выведено из эксплуатации",
+            self.RESERVE: "Резерв",
+        }[self]
+
+    @property
+    def badge_class(self) -> str:
+        return {
+            self.IN_OPERATION: "text-bg-success",
+            self.IN_REPAIR: "text-bg-warning",
+            self.DECOMMISSIONED: "text-bg-danger",
+            self.RESERVE: "text-bg-primary",
+        }[self]
+
 
 class ElementBase(StrEnum):
     ELECTROMECHANICAL = "electromechanical"
     MICROELECTRONIC = "microelectronic"
     MICROPROCESSOR = "microprocessor"
+
+    @property
+    def label(self) -> str:
+        return {
+            self.ELECTROMECHANICAL: "Электромеханическая",
+            self.MICROELECTRONIC: "Микроэлектронная",
+            self.MICROPROCESSOR: "Микропроцессорная",
+        }[self]
 
 
 class URZACategory(StrEnum):
@@ -50,11 +76,19 @@ class URZACategory(StrEnum):
     III = "III"
     IV = "IV"
 
+    @property
+    def label(self) -> str:
+        return self.value
+
 
 class RoomCategory(StrEnum):
     I = "I"
     II = "II"
     III = "III"
+
+    @property
+    def label(self) -> str:
+        return self.value
 
 
 class OTDPurpose(StrEnum):
