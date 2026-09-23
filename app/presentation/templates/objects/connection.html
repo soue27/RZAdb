@@ -22,29 +22,30 @@
         </div>
     </div>
 
-    <dl class="row mb-0">
-        <dt class="col-sm-4">SAP</dt>
-        <dd class="col-sm-8">
-            {{ connection.sap_code or "—" }}
-        </dd>
+    <dl class="rzadb-property-list">
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">SAP</dt>
+            <dd class="rzadb-property-value">
+                {{ connection.sap_code or "—" }}
+            </dd>
+        </div>
 
-        <dt class="col-sm-4">АСУЕО</dt>
-        <dd class="col-sm-8">
-            {{ connection.asureo_code or "—" }}
-        </dd>
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">АСУЕО</dt>
+            <dd class="rzadb-property-value">
+                {{ connection.asureo_code or "—" }}
+            </dd>
+        </div>
 
-        <dt class="col-sm-4">Подчинённость РДУ</dt>
-        <dd class="col-sm-8">
-            {% if connection.rdu_subordination %}
-                Да
-            {% else %}
-                Нет
-            {% endif %}
-        </dd>
-
-        <dt class="col-sm-4">Тип оперативного тока</dt>
-        <dd class="col-sm-8">
-            {{ connection.operational_current_type.value }}
-        </dd>
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">Подчинённость РДУ</dt>
+            <dd class="rzadb-property-value">
+                {% if connection.rdu_subordination %}
+                    Да
+                {% else %}
+                    Нет
+                {% endif %}
+            </dd>
+        </div>
     </dl>
 </div>
