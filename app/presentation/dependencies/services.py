@@ -30,6 +30,8 @@ from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
+from app.application.otd.repository import OTDRepository
+from app.application.otd.service import OTDService
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
@@ -172,4 +174,14 @@ def get_selectivity_scheme_service(
             connection_repository=ConnectionRepository(session),
             urza_repository=URZARepository(session),
         ),
+    )
+
+
+def get_otd_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> OTDService:
+    return OTDService(
+        repository=OTDRepository(session),
+        access_service=access_service,
     )

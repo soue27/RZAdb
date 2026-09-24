@@ -57,3 +57,13 @@ class OTDRepository:
         )
 
         return await self.session.scalar(query)
+
+    async def get_versions(self, otd_id: UUID) -> list[OTDVersion]:
+        query = (
+            select(OTDVersion)
+            .where(OTDVersion.otd_id == otd_id)
+            .order_by(OTDVersion.version_number.desc())
+        )
+        result = await self.session.scalars(query)
+        return list(result.all())
+

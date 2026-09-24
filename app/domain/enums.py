@@ -97,6 +97,15 @@ class OTDPurpose(StrEnum):
     PA = "pa"
     RA = "ra"
 
+    @property
+    def label(self) -> str:
+        return {
+            self.RZA: "РЗА",
+            self.SA: "СА",
+            self.PA: "ПА",
+            self.RA: "РА",
+        }[self]
+
 
 class AccessCategory(StrEnum):
     I = "I"

@@ -134,3 +134,48 @@ async def test_get_current_version_returns_latest_version() -> None:
     assert result is version
     session.scalar.assert_awaited_once()
 
+
+@pytest.mark.asyncio
+async def test_get_versions_returns_versions_in_descending_order() -> None:
+    session = AsyncMock()
+
+    otd_id = uuid7()
+
+    versions = [
+        OTDVersion(
+            id=uuid7(),
+            otd_id=otd_id,
+            version_number=3,
+            effective_date=date.today(),
+            urza_service_life=10,
+            urza_purpose=OTDPurpose.RZA,
+        ),
+        OTDVersion(
+            id=uuid7(),
+            otd_id=otd_id,
+            version_number=2,
+            effective_date=date.today(),
+            urza_service_life=10,
+            urza_purpose=OTDPurpose.RZA,
+        ),
+        OTDVersion(
+            id=uuid7(),
+            otd_id=otd_id,
+            version_number=1,
+            effective_date=date.today(),
+            urza_service_life=10,
+            urza_purpose=OTDPurpose.RZA,
+        ),
+    ]
+
+    scalar_result = MagicMock()
+    scalar_result.all.return_value = versions
+    session.scalars.return_value = scalar_result
+
+    repository = OTDRepository(session)
+
+    result = await repository.get_versions(otd_id)
+
+    assert result == versions
+    assert [version.version_number for version in result] == [3, 2, 1]
+    session.scalars.assert_awaited_once()

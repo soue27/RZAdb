@@ -10,7 +10,6 @@ from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
-from app.application.urzas.service import URZAService
 from app.application.objects.service import ObjectService
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import (
@@ -18,6 +17,7 @@ from app.application.selectivity_schemes.service import (
 )
 from app.application.substations.service import SubstationService
 from app.application.urzas.service import URZAService
+from app.application.otd.service import OTDService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -28,6 +28,7 @@ from app.presentation.dependencies.services import (
     get_selectivity_scheme_service,
     get_substation_service,
     get_urza_service,
+    get_otd_service,
 )
 
 router = APIRouter(
@@ -59,6 +60,10 @@ async def get_object(
         URZAService,
         Depends(get_urza_service),
     ],
+    otd_service: Annotated[
+        OTDService,
+        Depends(get_otd_service),
+    ],
 ):
     try:
         selected_object = await object_service.get_object(
@@ -78,6 +83,7 @@ async def get_object(
                 },
             )
 
+
         if object_type == "connection":
             connection = await connection_service.get_by_id(object_id)
 
@@ -94,12 +100,17 @@ async def get_object(
 
         if object_type == "urza":
             urza = await urza_service.get_details(object_id)
+            otd = await otd_service.get_details(
+                user_id=current_user.id,
+                urza_id=object_id,
+            )
 
             return templates.TemplateResponse(
                 request=request,
                 name="objects/urza.html",
                 context={
                     "urza": urza,
+                    "otd": otd,
                 },
             )
 
