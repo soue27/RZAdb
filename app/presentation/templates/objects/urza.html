@@ -226,6 +226,9 @@
                     type="button"
                     class="nav-link"
                     data-rzadb-tab
+                    hx-get="/objects/urza/{{ urza.id }}/schemas"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
                 >
                     Схемы
                 </button>

@@ -26,6 +26,8 @@ from app.application.selectivity_schemes.repository import (
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.application.schema.repository import SchemaRepository
+from app.application.schema.service import SchemaService
 from app.application.settings.repository import SettingsRepository
 from app.application.settings.service import SettingsService
 from app.application.substations.repository import SubstationRepository
@@ -195,5 +197,15 @@ def get_settings_service(
 ) -> SettingsService:
     return SettingsService(
         repository=SettingsRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_schema_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> SchemaService:
+    return SchemaService(
+        repository=SchemaRepository(session),
         access_service=access_service,
     )

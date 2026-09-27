@@ -30,6 +30,30 @@ class SchemaService:
             urza_id,
         )
 
+    async def get_details(
+            self,
+            user_id: UUID,
+            urza_id: UUID,
+    ) -> tuple[SchemaForm | None, list[SchemaRecord]]:
+        if not await self.access_service.can_access_urza(
+                user_id,
+                urza_id,
+        ):
+            return None, []
+
+        schema_form = await self.repository.get_form_by_urza_id(
+            urza_id,
+        )
+
+        if schema_form is None:
+            return None, []
+
+        records = await self.repository.get_records_by_form_id(
+            schema_form.id,
+        )
+
+        return schema_form, records
+
     async def create_form(
             self,
             user_id: UUID,

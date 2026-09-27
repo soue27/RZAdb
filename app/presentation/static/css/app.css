@@ -910,3 +910,90 @@ body {
     width: 120px;
     white-space: nowrap;
 }
+
+/* =========================================================
+   СХЕМЫ
+   ========================================================= */
+
+.rzadb-schemas-table {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+/* Заголовки */
+.rzadb-schemas-table thead th {
+    padding: 0.45rem 0.6rem;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Ячейки */
+.rzadb-schemas-table tbody td {
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Вертикальные разделители */
+.rzadb-schemas-table th + th,
+.rzadb-schemas-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+/* Подсветка строки при наведении */
+.rzadb-schemas-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* № схемы */
+.rzadb-schemas-table th:nth-child(1),
+.rzadb-schemas-table td:nth-child(1) {
+    width: 110px;
+    white-space: nowrap;
+}
+
+/* Наименование */
+.rzadb-schemas-table th:nth-child(2),
+.rzadb-schemas-table td:nth-child(2) {
+    width: 260px;
+    text-align: left;
+}
+
+/* Описание изменения */
+.rzadb-schemas-table th:nth-child(3),
+.rzadb-schemas-table td:nth-child(3) {
+    width: 340px;
+    max-width: 340px;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Обоснование изменения */
+.rzadb-schemas-table th:nth-child(4),
+.rzadb-schemas-table td:nth-child(4) {
+    width: 340px;
+    max-width: 340px;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Дата загрузки */
+.rzadb-schemas-table th:nth-child(5),
+.rzadb-schemas-table td:nth-child(5) {
+    width: 110px;
+    white-space: nowrap;
+}
+
+/* Кто добавил */
+.rzadb-schemas-table th:nth-child(6),
+.rzadb-schemas-table td:nth-child(6) {
+    width: 120px;
+    white-space: nowrap;
+}

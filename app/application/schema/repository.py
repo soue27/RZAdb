@@ -1,7 +1,9 @@
 from uuid import UUID
 
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.schema import SchemaForm, SchemaRecord
 
@@ -36,6 +38,25 @@ class SchemaRepository:
             SchemaRecord,
             record_id,
         )
+
+    async def get_records_by_form_id(
+            self,
+            schema_form_id: UUID,
+    ) -> list[SchemaRecord]:
+        query = (
+            select(SchemaRecord)
+            .options(
+                selectinload(SchemaRecord.creator),
+            )
+            .where(
+                SchemaRecord.schema_form_id == schema_form_id,
+            )
+            .order_by(
+                SchemaRecord.upload_date.desc(),
+            )
+        )
+
+        return list((await self.session.scalars(query)).all())
 
     async def add_form(
         self,
