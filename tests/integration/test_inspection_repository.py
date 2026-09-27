@@ -24,9 +24,7 @@ from app.domain.user import User
 
 
 @pytest.mark.asyncio
-async def test_inspection_task_repository(
-    db_session,
-) -> None:
+async def test_inspection_task_repository(db_session, system_user_id) -> None:
     """Проверяем основные операции репозитория на PostgreSQL."""
 
     department = Enterprise(
@@ -34,6 +32,8 @@ async def test_inspection_task_repository(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО",
         short_name="ПО Тест",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -44,6 +44,8 @@ async def test_inspection_task_repository(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -52,6 +54,8 @@ async def test_inspection_task_repository(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Репозиторная",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all([department, manager, substation])
@@ -65,6 +69,7 @@ async def test_inspection_task_repository(
         created_by=manager.id,
         status=TaskStatus.CREATED,
         deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
     )
 
     # create()
@@ -113,6 +118,7 @@ async def test_inspection_task_repository(
         inspection_date=datetime.now(UTC).date(),
         remarks="Замечаний не выявлено",
         created_by=manager.id,
+        updated_by=system_user_id,
     )
 
     created_inspection = await repository.create_inspection(inspection)
@@ -123,7 +129,7 @@ async def test_inspection_task_repository(
 
 @pytest.mark.asyncio
 async def test_inspection_repository_get_by_substation_id(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем получение результатов осмотров подстанции."""
 
@@ -132,6 +138,8 @@ async def test_inspection_repository_get_by_substation_id(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО",
         short_name="ПО Тест",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -142,6 +150,8 @@ async def test_inspection_repository_get_by_substation_id(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -150,6 +160,8 @@ async def test_inspection_repository_get_by_substation_id(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Осмотры",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all([department, manager, substation])
@@ -161,6 +173,7 @@ async def test_inspection_repository_get_by_substation_id(
         created_by=manager.id,
         status=TaskStatus.COMPLETED,
         deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
     )
 
     second_task = InspectionTask(
@@ -169,6 +182,7 @@ async def test_inspection_repository_get_by_substation_id(
         created_by=manager.id,
         status=TaskStatus.COMPLETED,
         deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
     )
 
     db_session.add_all([first_task, second_task])
@@ -183,6 +197,8 @@ async def test_inspection_repository_get_by_substation_id(
         size=1024,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     editable_file = File(
@@ -193,10 +209,11 @@ async def test_inspection_repository_get_by_substation_id(
         extension=".docx",
         size=2048,
         mime_type=(
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document"
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ),
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all([scan_file, editable_file])
@@ -211,6 +228,7 @@ async def test_inspection_repository_get_by_substation_id(
         created_by=manager.id,
         scan_file_id=scan_file.id,
         editable_file_id=editable_file.id,
+        updated_by=system_user_id,
     )
 
     second_inspection = Inspection(
@@ -220,6 +238,7 @@ async def test_inspection_repository_get_by_substation_id(
         inspection_date=datetime(2026, 9, 1, tzinfo=UTC).date(),
         remarks="Второй осмотр.",
         created_by=manager.id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all([first_inspection, second_inspection])

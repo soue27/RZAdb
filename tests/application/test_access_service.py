@@ -29,12 +29,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_superadmin_can_access_any_substation() -> None:
+async def test_superadmin_can_access_any_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое ПО",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         superadmin = User(
@@ -45,6 +47,8 @@ async def test_superadmin_can_access_any_substation() -> None:
             enterprise_id=None,
             access_category=AccessCategory.I,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -52,6 +56,8 @@ async def test_superadmin_can_access_any_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, superadmin, substation])
@@ -74,13 +80,16 @@ async def test_superadmin_can_access_any_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_can_access_substation_of_own_department() -> None:
+async def test_engineer_can_access_substation_of_own_department(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -91,6 +100,8 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -98,6 +109,8 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, engineer, substation])
@@ -122,18 +135,24 @@ async def test_engineer_can_access_substation_of_own_department() -> None:
 
 
 @pytest.mark.asyncio
-async def test_engineer_cannot_access_substation_of_another_department() -> None:
+async def test_engineer_cannot_access_substation_of_another_department(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         own_department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         another_department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Другое ПО",
             short_name="ДРУГОЕ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -144,6 +163,8 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
             enterprise=own_department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -151,14 +172,18 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            own_department,
-            another_department,
-            engineer,
-            substation,
-        ])
+        session.add_all(
+            [
+                own_department,
+                another_department,
+                engineer,
+                substation,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -178,13 +203,16 @@ async def test_engineer_cannot_access_substation_of_another_department() -> None
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_admin_can_access_substation_of_own_department() -> None:
+async def test_admin_can_access_substation_of_own_department(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Администратора",
             short_name="ПО АДМ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         admin = User(
@@ -195,6 +223,8 @@ async def test_admin_can_access_substation_of_own_department() -> None:
             enterprise=department,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -202,6 +232,8 @@ async def test_admin_can_access_substation_of_own_department() -> None:
             highest_voltage=HighestVoltage.KV_220,
             dispatch_name="ПС Администратора",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, admin, substation])
@@ -226,12 +258,14 @@ async def test_admin_can_access_substation_of_own_department() -> None:
 
 
 @pytest.mark.asyncio
-async def test_manager_can_access_substation_of_own_department() -> None:
+async def test_manager_can_access_substation_of_own_department(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Руководителя",
             short_name="ПО РУК",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         manager = User(
@@ -242,6 +276,8 @@ async def test_manager_can_access_substation_of_own_department() -> None:
             enterprise=department,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -249,6 +285,8 @@ async def test_manager_can_access_substation_of_own_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Руководителя",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, manager, substation])
@@ -271,13 +309,16 @@ async def test_manager_can_access_substation_of_own_department() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_unknown_user_cannot_access_substation() -> None:
+async def test_unknown_user_cannot_access_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -285,6 +326,8 @@ async def test_unknown_user_cannot_access_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, substation])
@@ -296,7 +339,6 @@ async def test_unknown_user_cannot_access_substation() -> None:
             enterprise_repository=EnterpriseRepository(session),
             connection_repository=ConnectionRepository(session),
             urza_repository=URZARepository(session),
-
         )
 
         result = await service.can_access_substation(
@@ -308,13 +350,16 @@ async def test_unknown_user_cannot_access_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_inactive_user_cannot_access_substation() -> None:
+async def test_inactive_user_cannot_access_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         user = User(
@@ -325,6 +370,8 @@ async def test_inactive_user_cannot_access_substation() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -332,6 +379,8 @@ async def test_inactive_user_cannot_access_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, user, substation])
@@ -354,13 +403,16 @@ async def test_inactive_user_cannot_access_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_user_cannot_access_unknown_substation() -> None:
+async def test_user_cannot_access_unknown_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         user = User(
@@ -371,6 +423,8 @@ async def test_user_cannot_access_unknown_substation() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, user])
@@ -393,13 +447,16 @@ async def test_user_cannot_access_unknown_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_deleted_user_cannot_access_substation() -> None:
+async def test_deleted_user_cannot_access_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         user = User(
@@ -410,6 +467,8 @@ async def test_deleted_user_cannot_access_substation() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -417,6 +476,8 @@ async def test_deleted_user_cannot_access_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, user, substation])
@@ -443,12 +504,14 @@ async def test_deleted_user_cannot_access_substation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deleted_substation_cannot_be_accessed() -> None:
+async def test_deleted_substation_cannot_be_accessed(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         user = User(
@@ -459,6 +522,8 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -466,6 +531,8 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Удалённая ПС",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, user, substation])
@@ -492,12 +559,14 @@ async def test_deleted_substation_cannot_be_accessed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_user_without_enterprise_cannot_access_substation() -> None:
+async def test_user_without_enterprise_cannot_access_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО Тестовое",
             short_name="ПО ТЕСТ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         user = User(
@@ -508,6 +577,8 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
             enterprise_id=None,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -515,6 +586,8 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, user, substation])
@@ -537,13 +610,16 @@ async def test_user_without_enterprise_cannot_access_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_can_access_substation_inside_holding() -> None:
+async def test_specialist_can_access_substation_inside_holding(system_user_id) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Холдинг",
             short_name="Х",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch = Enterprise(
@@ -551,6 +627,8 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             full_name="Филиал",
             short_name="Ф",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department = Enterprise(
@@ -558,6 +636,8 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             full_name="ПО",
             short_name="ПО",
             parent=branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -568,6 +648,8 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             enterprise=holding,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -575,6 +657,8 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Холдинга",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([holding, branch, department, specialist, substation])
@@ -599,12 +683,16 @@ async def test_specialist_can_access_substation_inside_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_specialist_can_access_substation_inside_own_branch() -> None:
+async def test_specialist_can_access_substation_inside_own_branch(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Холдинг",
             short_name="Х",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch = Enterprise(
@@ -612,6 +700,8 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             full_name="Свой филиал",
             short_name="СФ",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department = Enterprise(
@@ -619,6 +709,8 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             full_name="Своё ПО",
             short_name="СПО",
             parent=branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -629,6 +721,8 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             enterprise=branch,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -636,6 +730,8 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего филиала",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([holding, branch, department, specialist, substation])
@@ -660,12 +756,16 @@ async def test_specialist_can_access_substation_inside_own_branch() -> None:
 
 
 @pytest.mark.asyncio
-async def test_specialist_cannot_access_substation_of_another_branch() -> None:
+async def test_specialist_cannot_access_substation_of_another_branch(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Холдинг",
             short_name="Х",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         own_branch = Enterprise(
@@ -673,6 +773,8 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             full_name="Свой филиал",
             short_name="СФ",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         another_branch = Enterprise(
@@ -680,6 +782,8 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             full_name="Другой филиал",
             short_name="ДФ",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         own_department = Enterprise(
@@ -687,6 +791,8 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             full_name="Своё ПО",
             short_name="СПО",
             parent=own_branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         another_department = Enterprise(
@@ -694,6 +800,8 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             full_name="Другое ПО",
             short_name="ДПО",
             parent=another_branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -704,6 +812,8 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             enterprise=own_branch,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -711,17 +821,21 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого филиала",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            holding,
-            own_branch,
-            another_branch,
-            own_department,
-            another_department,
-            specialist,
-            substation,
-        ])
+        session.add_all(
+            [
+                holding,
+                own_branch,
+                another_branch,
+                own_department,
+                another_department,
+                specialist,
+                substation,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -741,13 +855,18 @@ async def test_specialist_cannot_access_substation_of_another_branch() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_with_department_scope_cannot_access_substation() -> None:
+async def test_specialist_with_department_scope_cannot_access_substation(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="ПО",
             short_name="ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -758,6 +877,8 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
             enterprise=department,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -765,6 +886,8 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, specialist, substation])
@@ -787,13 +910,16 @@ async def test_specialist_with_department_scope_cannot_access_substation() -> No
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_superadmin_can_access_any_enterprise() -> None:
+async def test_superadmin_can_access_any_enterprise(system_user_id) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         superadmin = User(
             full_name="Superadmin",
@@ -802,6 +928,8 @@ async def test_superadmin_can_access_any_enterprise() -> None:
             password_hash="hash",
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([enterprise, superadmin])
@@ -823,13 +951,16 @@ async def test_superadmin_can_access_any_enterprise() -> None:
         assert result is True
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_can_access_own_enterprise() -> None:
+async def test_engineer_can_access_own_enterprise(system_user_id) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         engineer = User(
             full_name="Engineer",
@@ -839,6 +970,8 @@ async def test_engineer_can_access_own_enterprise() -> None:
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(engineer)
@@ -860,18 +993,23 @@ async def test_engineer_can_access_own_enterprise() -> None:
         assert result is True
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_cannot_access_another_enterprise() -> None:
+async def test_engineer_cannot_access_another_enterprise(system_user_id) -> None:
     async with async_session_factory() as session:
         own_enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Own Department",
             short_name="Own Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         another_enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Another Department",
             short_name="Another Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         engineer = User(
             full_name="Engineer",
@@ -881,6 +1019,8 @@ async def test_engineer_cannot_access_another_enterprise() -> None:
             enterprise=own_enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([another_enterprise, engineer])
@@ -902,25 +1042,32 @@ async def test_engineer_cannot_access_another_enterprise() -> None:
         assert result is False
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_can_access_descendant_enterprise() -> None:
+async def test_specialist_can_access_descendant_enterprise(system_user_id) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Holding",
             short_name="Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         branch = Enterprise(
             type=EnterpriseType.BRANCH,
             full_name="Branch",
             short_name="Branch",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
             parent=branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         specialist = User(
             full_name="Specialist",
@@ -930,6 +1077,8 @@ async def test_specialist_can_access_descendant_enterprise() -> None:
             access_category=AccessCategory.IV,
             enterprise=holding,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, specialist])
@@ -951,13 +1100,18 @@ async def test_specialist_can_access_descendant_enterprise() -> None:
         assert result is True
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
+async def test_can_access_enterprise_returns_false_for_deleted_user(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         user = User(
             full_name="Deleted User",
@@ -967,6 +1121,8 @@ async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(user)
@@ -990,13 +1146,18 @@ async def test_can_access_enterprise_returns_false_for_deleted_user() -> None:
         assert result is False
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
+async def test_can_access_enterprise_returns_false_for_inactive_user(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         user = User(
             full_name="Inactive User",
@@ -1006,6 +1167,8 @@ async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(user)
@@ -1027,13 +1190,18 @@ async def test_can_access_enterprise_returns_false_for_inactive_user() -> None:
         assert result is False
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> None:
+async def test_can_access_enterprise_returns_false_for_deleted_enterprise(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Deleted Department",
             short_name="Deleted Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         user = User(
             full_name="Engineer",
@@ -1043,6 +1211,8 @@ async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> N
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(user)
@@ -1066,19 +1236,26 @@ async def test_can_access_enterprise_returns_false_for_deleted_enterprise() -> N
         assert result is False
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
+async def test_specialist_cannot_access_with_deleted_own_enterprise(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Deleted Holding",
             short_name="Deleted Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         specialist = User(
             full_name="Specialist",
@@ -1088,6 +1265,8 @@ async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
             enterprise=holding,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([department, specialist])
@@ -1111,13 +1290,18 @@ async def test_specialist_cannot_access_with_deleted_own_enterprise() -> None:
         assert result is False
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_can_access_departments_in_different_branches() -> None:
+async def test_specialist_can_access_departments_in_different_branches(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Holding",
             short_name="Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch_a = Enterprise(
@@ -1125,12 +1309,16 @@ async def test_specialist_can_access_departments_in_different_branches() -> None
             full_name="Branch A",
             short_name="Branch A",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         branch_b = Enterprise(
             type=EnterpriseType.BRANCH,
             full_name="Branch B",
             short_name="Branch B",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department_a = Enterprise(
@@ -1138,12 +1326,16 @@ async def test_specialist_can_access_departments_in_different_branches() -> None
             full_name="Department A",
             short_name="Department A",
             parent=branch_a,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         department_b = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department B",
             short_name="Department B",
             parent=branch_b,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -1154,13 +1346,17 @@ async def test_specialist_can_access_departments_in_different_branches() -> None
             enterprise=holding,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            department_a,
-            department_b,
-            specialist,
-        ])
+        session.add_all(
+            [
+                department_a,
+                department_b,
+                specialist,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -1185,13 +1381,18 @@ async def test_specialist_can_access_departments_in_different_branches() -> None
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_cannot_access_department_in_another_branch() -> None:
+async def test_specialist_cannot_access_department_in_another_branch(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Holding",
             short_name="Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch_a = Enterprise(
@@ -1199,12 +1400,16 @@ async def test_specialist_cannot_access_department_in_another_branch() -> None:
             full_name="Branch A",
             short_name="Branch A",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         branch_b = Enterprise(
             type=EnterpriseType.BRANCH,
             full_name="Branch B",
             short_name="Branch B",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department_a = Enterprise(
@@ -1212,12 +1417,16 @@ async def test_specialist_cannot_access_department_in_another_branch() -> None:
             full_name="Department A",
             short_name="Department A",
             parent=branch_a,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         department_b = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department B",
             short_name="Department B",
             parent=branch_b,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -1228,13 +1437,17 @@ async def test_specialist_cannot_access_department_in_another_branch() -> None:
             enterprise=branch_a,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            department_a,
-            department_b,
-            specialist,
-        ])
+        session.add_all(
+            [
+                department_a,
+                department_b,
+                specialist,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -1259,13 +1472,16 @@ async def test_specialist_cannot_access_department_in_another_branch() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_can_access_connection_in_own_department() -> None:
+async def test_engineer_can_access_connection_in_own_department(system_user_id) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1273,12 +1489,16 @@ async def test_engineer_can_access_connection_in_own_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1289,6 +1509,8 @@ async def test_engineer_can_access_connection_in_own_department() -> None:
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([connection, engineer])
@@ -1311,18 +1533,25 @@ async def test_engineer_can_access_connection_in_own_department() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_cannot_access_connection_in_another_department() -> None:
+async def test_engineer_cannot_access_connection_in_another_department(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         own_enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Own Department",
             short_name="Own Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         another_enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Another Department",
             short_name="Another Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         own_substation = Substation(
@@ -1330,23 +1559,31 @@ async def test_engineer_cannot_access_connection_in_another_department() -> None
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Own PS",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         another_substation = Substation(
             enterprise=another_enterprise,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Another PS",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         own_connection = Connection(
             substation=own_substation,
             dispatch_name="Own Connection",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         another_connection = Connection(
             substation=another_substation,
             dispatch_name="Another Connection",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1357,13 +1594,17 @@ async def test_engineer_cannot_access_connection_in_another_department() -> None
             enterprise=own_enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            own_connection,
-            another_connection,
-            engineer,
-        ])
+        session.add_all(
+            [
+                own_connection,
+                another_connection,
+                engineer,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -1388,13 +1629,16 @@ async def test_engineer_cannot_access_connection_in_another_department() -> None
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_can_access_connection_in_own_branch() -> None:
+async def test_specialist_can_access_connection_in_own_branch(system_user_id) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Holding",
             short_name="Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch = Enterprise(
@@ -1402,6 +1646,8 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             full_name="Branch",
             short_name="Branch",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department = Enterprise(
@@ -1409,6 +1655,8 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             full_name="Department",
             short_name="Department",
             parent=branch,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1416,12 +1664,16 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -1432,6 +1684,8 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
             enterprise=branch,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([connection, specialist])
@@ -1454,13 +1708,18 @@ async def test_specialist_can_access_connection_in_own_branch() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_cannot_access_connection_in_another_branch() -> None:
+async def test_specialist_cannot_access_connection_in_another_branch(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Holding",
             short_name="Holding",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         branch_a = Enterprise(
@@ -1468,12 +1727,16 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             full_name="Branch A",
             short_name="Branch A",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         branch_b = Enterprise(
             type=EnterpriseType.BRANCH,
             full_name="Branch B",
             short_name="Branch B",
             parent=holding,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department_a = Enterprise(
@@ -1481,12 +1744,16 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             full_name="Department A",
             short_name="Department A",
             parent=branch_a,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         department_b = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department B",
             short_name="Department B",
             parent=branch_b,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation_a = Substation(
@@ -1494,24 +1761,31 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-A",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         substation_b = Substation(
             enterprise=department_b,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-B",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection_a = Connection(
             substation=substation_a,
             dispatch_name="Connection A",
             rdu_subordination=False,
-
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
         connection_b = Connection(
             substation=substation_b,
             dispatch_name="Connection B",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -1522,13 +1796,17 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
             enterprise=branch_a,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            connection_a,
-            connection_b,
-            specialist,
-        ])
+        session.add_all(
+            [
+                connection_a,
+                connection_b,
+                specialist,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -1553,13 +1831,18 @@ async def test_specialist_cannot_access_connection_in_another_branch() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_can_access_connection_returns_false_for_deleted_connection() -> None:
+async def test_can_access_connection_returns_false_for_deleted_connection(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1567,12 +1850,16 @@ async def test_can_access_connection_returns_false_for_deleted_connection() -> N
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1583,6 +1870,8 @@ async def test_can_access_connection_returns_false_for_deleted_connection() -> N
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([connection, engineer])
@@ -1607,13 +1896,18 @@ async def test_can_access_connection_returns_false_for_deleted_connection() -> N
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_can_access_connection_returns_false_for_deleted_substation() -> None:
+async def test_can_access_connection_returns_false_for_deleted_substation(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1621,12 +1915,16 @@ async def test_can_access_connection_returns_false_for_deleted_substation() -> N
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Deleted PS",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1637,6 +1935,8 @@ async def test_can_access_connection_returns_false_for_deleted_substation() -> N
             enterprise=enterprise,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([connection, engineer])
@@ -1661,13 +1961,16 @@ async def test_can_access_connection_returns_false_for_deleted_substation() -> N
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_can_access_urza_of_own_department() -> None:
+async def test_engineer_can_access_urza_of_own_department(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1678,6 +1981,8 @@ async def test_engineer_can_access_urza_of_own_department() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1685,12 +1990,16 @@ async def test_engineer_can_access_urza_of_own_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -1704,15 +2013,19 @@ async def test_engineer_can_access_urza_of_own_department() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        session.add_all([
-            department,
-            engineer,
-            substation,
-            connection,
-            urza,
-        ])
+        session.add_all(
+            [
+                department,
+                engineer,
+                substation,
+                connection,
+                urza,
+            ]
+        )
         await session.flush()
 
         service = AccessService(
@@ -1732,19 +2045,26 @@ async def test_engineer_can_access_urza_of_own_department() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_engineer_cannot_access_urza_of_another_department() -> None:
+async def test_engineer_cannot_access_urza_of_another_department(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         own_department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         another_department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Другое ПО",
             short_name="ДРУГОЕ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1755,6 +2075,8 @@ async def test_engineer_cannot_access_urza_of_another_department() -> None:
             enterprise=own_department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1762,12 +2084,16 @@ async def test_engineer_cannot_access_urza_of_another_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -1781,6 +2107,8 @@ async def test_engineer_cannot_access_urza_of_another_department() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all(
@@ -1812,13 +2140,16 @@ async def test_engineer_cannot_access_urza_of_another_department() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_cannot_access_deleted_urza() -> None:
+async def test_cannot_access_deleted_urza(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1829,6 +2160,8 @@ async def test_cannot_access_deleted_urza() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1836,12 +2169,16 @@ async def test_cannot_access_deleted_urza() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -1855,6 +2192,8 @@ async def test_cannot_access_deleted_urza() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza.deleted_at = datetime.now(UTC)
@@ -1887,13 +2226,16 @@ async def test_cannot_access_deleted_urza() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_cannot_access_urza_of_deleted_connection() -> None:
+async def test_cannot_access_urza_of_deleted_connection(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1904,6 +2246,8 @@ async def test_cannot_access_urza_of_deleted_connection() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1911,12 +2255,16 @@ async def test_cannot_access_urza_of_deleted_connection() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Своего ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Удалённое присоединение",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -1930,6 +2278,8 @@ async def test_cannot_access_urza_of_deleted_connection() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection.deleted_at = datetime.now(UTC)
@@ -1962,13 +2312,16 @@ async def test_cannot_access_urza_of_deleted_connection() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_cannot_access_urza_of_deleted_substation() -> None:
+async def test_cannot_access_urza_of_deleted_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Своё ПО",
             short_name="СВОЁ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -1979,6 +2332,8 @@ async def test_cannot_access_urza_of_deleted_substation() -> None:
             enterprise=department,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -1986,12 +2341,16 @@ async def test_cannot_access_urza_of_deleted_substation() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="Удалённая ПС",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -2005,6 +2364,8 @@ async def test_cannot_access_urza_of_deleted_substation() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation.deleted_at = datetime.now(UTC)
@@ -2037,13 +2398,16 @@ async def test_cannot_access_urza_of_deleted_substation() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_superadmin_can_access_urza_of_any_department() -> None:
+async def test_superadmin_can_access_urza_of_any_department(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Другое ПО",
             short_name="ДРУГОЕ ПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         superadmin = User(
@@ -2054,6 +2418,8 @@ async def test_superadmin_can_access_urza_of_any_department() -> None:
             enterprise_id=None,
             access_category=AccessCategory.I,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -2061,12 +2427,16 @@ async def test_superadmin_can_access_urza_of_any_department() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого ПО",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -2080,6 +2450,8 @@ async def test_superadmin_can_access_urza_of_any_department() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all(
@@ -2110,13 +2482,16 @@ async def test_superadmin_can_access_urza_of_any_department() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_can_access_urza_in_holding_descendant() -> None:
+async def test_specialist_can_access_urza_in_holding_descendant(system_user_id) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Холдинг",
             short_name="ХОЛДИНГ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department = Enterprise(
@@ -2124,6 +2499,8 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
             parent=holding,
             full_name="ПО Холдинга",
             short_name="ПО ХОЛДИНГА",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -2134,6 +2511,8 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
             enterprise=holding,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -2141,12 +2520,16 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Холдинга",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -2160,6 +2543,8 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all(
@@ -2191,13 +2576,16 @@ async def test_specialist_can_access_urza_in_holding_descendant() -> None:
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
-async def test_specialist_cannot_access_urza_in_another_branch() -> None:
+async def test_specialist_cannot_access_urza_in_another_branch(system_user_id) -> None:
     async with async_session_factory() as session:
         holding = Enterprise(
             type=EnterpriseType.HOLDING,
             full_name="Холдинг",
             short_name="ХОЛДИНГ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         own_branch = Enterprise(
@@ -2205,6 +2593,8 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             parent=holding,
             full_name="Свой филиал",
             short_name="СВОЙ ФИЛИАЛ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         another_branch = Enterprise(
@@ -2212,6 +2602,8 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             parent=holding,
             full_name="Другой филиал",
             short_name="ДРУГОЙ ФИЛИАЛ",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         department = Enterprise(
@@ -2219,6 +2611,8 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             parent=another_branch,
             full_name="ПО другого филиала",
             short_name="ПО ДРУГОГО ФИЛИАЛА",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         specialist = User(
@@ -2229,6 +2623,8 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             enterprise=own_branch,
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -2236,12 +2632,16 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Другого филиала",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Присоединение 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -2255,6 +2655,8 @@ async def test_specialist_cannot_access_urza_in_another_branch() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all(

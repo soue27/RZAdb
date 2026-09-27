@@ -23,9 +23,9 @@ from app.infrastructure.seed.service import RZACSVSeedService
 
 
 def make_row(
-        *,
-        full_name: str = "Тестовый холдинг",
-        short_name: str = "Тестовый холдинг",
+    *,
+    full_name: str = "Тестовый холдинг",
+    short_name: str = "Тестовый холдинг",
 ) -> dict[str, str]:
     return {
         "holding_full_name": full_name,
@@ -54,7 +54,7 @@ async def test_get_or_create_holding_creates_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_holding_returns_existing_holding() -> None:
+async def test_get_or_create_holding_returns_existing_holding(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -64,6 +64,8 @@ async def test_get_or_create_holding_returns_existing_holding() -> None:
                 full_name="Существующий холдинг",
                 short_name="Существующий",
                 sap_code="SAP-001",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(holding)
@@ -98,7 +100,7 @@ async def test_get_or_create_holding_returns_existing_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_holding_ignores_deleted_holding() -> None:
+async def test_get_or_create_holding_ignores_deleted_holding(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -108,6 +110,8 @@ async def test_get_or_create_holding_ignores_deleted_holding() -> None:
                 full_name="Архивный холдинг",
                 short_name="Архивный",
                 deleted_at=func.now(),
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(deleted_holding)
@@ -129,7 +133,7 @@ async def test_get_or_create_holding_ignores_deleted_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_branch_is_scoped_to_holding() -> None:
+async def test_get_or_create_branch_is_scoped_to_holding(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -138,11 +142,15 @@ async def test_get_or_create_branch_is_scoped_to_holding() -> None:
                 type=EnterpriseType.HOLDING,
                 full_name="Первый холдинг",
                 short_name="Первый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             second_holding = Enterprise(
                 type=EnterpriseType.HOLDING,
                 full_name="Второй холдинг",
                 short_name="Второй",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add_all([first_holding, second_holding])
@@ -153,6 +161,8 @@ async def test_get_or_create_branch_is_scoped_to_holding() -> None:
                 parent_id=first_holding.id,
                 full_name="Свердловский филиал",
                 short_name="Свердловский",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(first_branch)
@@ -177,7 +187,7 @@ async def test_get_or_create_branch_is_scoped_to_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_branch_returns_existing_branch() -> None:
+async def test_get_or_create_branch_returns_existing_branch(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -186,6 +196,8 @@ async def test_get_or_create_branch_returns_existing_branch() -> None:
                 type=EnterpriseType.HOLDING,
                 full_name="Тестовый холдинг",
                 short_name="Тестовый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(holding)
@@ -197,6 +209,8 @@ async def test_get_or_create_branch_returns_existing_branch() -> None:
                 full_name="Существующий филиал",
                 short_name="Существующий",
                 sap_code="OLD-SAP",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(branch)
@@ -221,7 +235,7 @@ async def test_get_or_create_branch_returns_existing_branch() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_department_creates_department() -> None:
+async def test_get_or_create_department_creates_department(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -230,6 +244,8 @@ async def test_get_or_create_department_creates_department() -> None:
                 type=EnterpriseType.HOLDING,
                 full_name="Тестовый холдинг",
                 short_name="Тестовый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(holding)
             await session.flush()
@@ -239,6 +255,8 @@ async def test_get_or_create_department_creates_department() -> None:
                 parent_id=holding.id,
                 full_name="Тестовый филиал",
                 short_name="Тестовый филиал",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(branch)
             await session.flush()
@@ -265,7 +283,7 @@ async def test_get_or_create_department_creates_department() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_department_is_scoped_to_branch() -> None:
+async def test_get_or_create_department_is_scoped_to_branch(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -274,6 +292,8 @@ async def test_get_or_create_department_is_scoped_to_branch() -> None:
                 type=EnterpriseType.HOLDING,
                 full_name="Тестовый холдинг",
                 short_name="Тестовый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(holding)
             await session.flush()
@@ -283,12 +303,16 @@ async def test_get_or_create_department_is_scoped_to_branch() -> None:
                 parent_id=holding.id,
                 full_name="Первый филиал",
                 short_name="Первый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             second_branch = Enterprise(
                 type=EnterpriseType.BRANCH,
                 parent_id=holding.id,
                 full_name="Второй филиал",
                 short_name="Второй",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add_all([first_branch, second_branch])
             await session.flush()
@@ -298,6 +322,8 @@ async def test_get_or_create_department_is_scoped_to_branch() -> None:
                 parent_id=first_branch.id,
                 full_name="ПО Центральные сети",
                 short_name="Центральные сети",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(first_department)
             await session.flush()
@@ -320,7 +346,9 @@ async def test_get_or_create_department_is_scoped_to_branch() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_department_returns_existing_department() -> None:
+async def test_get_or_create_department_returns_existing_department(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -329,6 +357,8 @@ async def test_get_or_create_department_returns_existing_department() -> None:
                 type=EnterpriseType.HOLDING,
                 full_name="Тестовый холдинг",
                 short_name="Тестовый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(holding)
             await session.flush()
@@ -338,6 +368,8 @@ async def test_get_or_create_department_returns_existing_department() -> None:
                 parent_id=holding.id,
                 full_name="Тестовый филиал",
                 short_name="Тестовый",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(branch)
             await session.flush()
@@ -348,6 +380,8 @@ async def test_get_or_create_department_returns_existing_department() -> None:
                 full_name="ПО Центральные сети",
                 short_name="Существующее",
                 sap_code="OLD-SAP",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -371,7 +405,7 @@ async def test_get_or_create_department_returns_existing_department() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_substation_creates_substation() -> None:
+async def test_get_or_create_substation_creates_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -380,6 +414,8 @@ async def test_get_or_create_substation_creates_substation() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные сети",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(department)
@@ -416,7 +452,9 @@ async def test_get_or_create_substation_creates_substation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_substation_returns_existing_substation() -> None:
+async def test_get_or_create_substation_returns_existing_substation(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -425,6 +463,8 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(department)
@@ -436,6 +476,8 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
                 operational_current_type=OperationalCurrentType.ALTERNATING,
                 dispatch_name="ПС Свердловская",
                 sap_code="OLD-SAP",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(substation)
@@ -460,7 +502,9 @@ async def test_get_or_create_substation_returns_existing_substation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_substation_ignores_deleted_substation() -> None:
+async def test_get_or_create_substation_ignores_deleted_substation(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -469,6 +513,8 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(department)
@@ -480,6 +526,8 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
                 operational_current_type=OperationalCurrentType.ALTERNATING,
                 dispatch_name="ПС Свердловская",
                 deleted_at=func.now(),
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
 
             session.add(deleted_substation)
@@ -503,7 +551,7 @@ async def test_get_or_create_substation_ignores_deleted_substation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_connection_creates_connection() -> None:
+async def test_get_or_create_connection_creates_connection(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -512,6 +560,8 @@ async def test_get_or_create_connection_creates_connection() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -521,6 +571,8 @@ async def test_get_or_create_connection_creates_connection() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -548,7 +600,7 @@ async def test_get_or_create_connection_creates_connection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_connection_parses_values() -> None:
+async def test_get_or_create_connection_parses_values(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -557,7 +609,8 @@ async def test_get_or_create_connection_parses_values() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
-
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -567,6 +620,8 @@ async def test_get_or_create_connection_parses_values() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -591,7 +646,9 @@ async def test_get_or_create_connection_parses_values() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_connection_returns_existing_connection() -> None:
+async def test_get_or_create_connection_returns_existing_connection(
+    system_user_id,
+) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -600,7 +657,8 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
-
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -610,6 +668,8 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -619,6 +679,8 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 sap_code="OLD-SAP",
                 rdu_subordination=True,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(connection)
             await session.flush()
@@ -643,7 +705,7 @@ async def test_get_or_create_connection_returns_existing_connection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_creates_urza() -> None:
+async def test_get_or_create_urza_creates_urza(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -652,6 +714,8 @@ async def test_get_or_create_urza_creates_urza() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -661,6 +725,8 @@ async def test_get_or_create_urza_creates_urza() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -669,6 +735,8 @@ async def test_get_or_create_urza_creates_urza() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=True,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(connection)
             await session.flush()
@@ -706,7 +774,7 @@ async def test_get_or_create_urza_creates_urza() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
+async def test_get_or_create_urza_allows_empty_inventory_number(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -715,6 +783,8 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -724,6 +794,8 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -732,6 +804,8 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=False,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(connection)
             await session.flush()
@@ -764,7 +838,7 @@ async def test_get_or_create_urza_allows_empty_inventory_number() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_returns_existing_urza() -> None:
+async def test_get_or_create_urza_returns_existing_urza(system_user_id) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -773,6 +847,8 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 type=EnterpriseType.DEPARTMENT,
                 full_name="ПО Центральные сети",
                 short_name="Центральные",
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(department)
             await session.flush()
@@ -782,6 +858,8 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 highest_voltage=HighestVoltage.KV_110,
                 dispatch_name="ПС Свердловская",
                 operational_current_type=OperationalCurrentType.PERMANENT,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(substation)
             await session.flush()
@@ -790,6 +868,8 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 substation_id=substation.id,
                 dispatch_name="ВЛ 110 кВ Свердловская",
                 rdu_subordination=True,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(connection)
             await session.flush()
@@ -805,6 +885,8 @@ async def test_get_or_create_urza_returns_existing_urza() -> None:
                 category=URZACategory.II,
                 room_category=RoomCategory.I,
                 complexity=False,
+                created_by=system_user_id,
+                updated_by=system_user_id,
             )
             session.add(urza)
             await session.flush()
@@ -1176,4 +1258,3 @@ async def test_import_rows_is_idempotent() -> None:
 
         finally:
             await transaction.rollback()
-

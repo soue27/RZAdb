@@ -22,7 +22,7 @@ def test_login_page() -> None:
     assert 'name="password"' in response.text
 
 
-def test_login_success() -> None:
+def test_login_success(system_user_id) -> None:
     user = User(
         full_name="Тестовый пользователь",
         role=UserRole.ENGINEER,
@@ -30,6 +30,8 @@ def test_login_success() -> None:
         password_hash="hash",
         access_category=AccessCategory.IV,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     auth_service = AsyncMock(spec=AuthService)
@@ -64,6 +66,7 @@ def test_login_success() -> None:
     finally:
         app.dependency_overrides.clear()
 
+
 def test_login_invalid_credentials() -> None:
     auth_service = AsyncMock(spec=AuthService)
     auth_service.authenticate.side_effect = InvalidCredentialsError
@@ -94,6 +97,7 @@ def test_login_invalid_credentials() -> None:
     finally:
         app.dependency_overrides.clear()
 
+
 def test_logout() -> None:
     client = TestClient(app)
 
@@ -104,6 +108,7 @@ def test_logout() -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/auth/login"
+
 
 def test_logout_clears_session() -> None:
     client = TestClient(app)

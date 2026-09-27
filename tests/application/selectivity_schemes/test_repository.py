@@ -13,7 +13,7 @@ from app.domain.selectivity_scheme import (
 
 
 @pytest.mark.asyncio
-async def test_get_by_id():
+async def test_get_by_id(system_user_id):
     session = MagicMock()
     session.get = AsyncMock()
 
@@ -21,6 +21,8 @@ async def test_get_by_id():
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = scheme
@@ -37,7 +39,7 @@ async def test_get_by_id():
 
 
 @pytest.mark.asyncio
-async def test_get_by_substation_id():
+async def test_get_by_substation_id(system_user_id):
     session = MagicMock()
     session.scalar = AsyncMock()
 
@@ -45,6 +47,8 @@ async def test_get_by_substation_id():
     scheme = SelectivityScheme(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = scheme
@@ -79,13 +83,15 @@ async def test_get_version_by_id():
 
 
 @pytest.mark.asyncio
-async def test_add_scheme():
+async def test_add_scheme(system_user_id):
     session = MagicMock()
     session.flush = AsyncMock()
 
     scheme = SelectivityScheme(
         id=uuid7(),
         substation_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = SelectivitySchemeRepository(session)

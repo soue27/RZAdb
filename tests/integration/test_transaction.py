@@ -7,12 +7,14 @@ from app.domain.enums import EnterpriseType
 
 
 @pytest.mark.asyncio
-async def test_database_transaction_is_rolled_back(db_session) -> None:
+async def test_database_transaction_is_rolled_back(db_session, system_user_id) -> None:
     enterprise = Enterprise(
         id=uuid4(),
         type=EnterpriseType.DEPARTMENT,
         full_name="Rollback Test Department",
         short_name="Rollback Test",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add(enterprise)

@@ -1,4 +1,3 @@
-
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,12 +10,14 @@ from app.domain.otd import OTD, OTDVersion
 
 
 @pytest.mark.asyncio
-async def test_get_by_id_returns_otd() -> None:
+async def test_get_by_id_returns_otd(system_user_id) -> None:
     session = AsyncMock()
 
     otd = OTD(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = otd
@@ -28,14 +29,17 @@ async def test_get_by_id_returns_otd() -> None:
     assert result is otd
     session.get.assert_awaited_once_with(OTD, otd.id)
 
+
 @pytest.mark.asyncio
-async def test_get_by_urza_id_returns_otd() -> None:
+async def test_get_by_urza_id_returns_otd(system_user_id) -> None:
     session = AsyncMock()
 
     urza_id = uuid7()
     otd = OTD(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = otd
@@ -49,7 +53,7 @@ async def test_get_by_urza_id_returns_otd() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_version_by_id_returns_version() -> None:
+async def test_get_version_by_id_returns_version(system_user_id) -> None:
     session = AsyncMock()
 
     version = OTDVersion(
@@ -59,6 +63,8 @@ async def test_get_version_by_id_returns_version() -> None:
         effective_date=date.today(),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = version
@@ -70,14 +76,17 @@ async def test_get_version_by_id_returns_version() -> None:
     assert result is version
     session.get.assert_awaited_once_with(OTDVersion, version.id)
 
+
 @pytest.mark.asyncio
-async def test_add_otd() -> None:
+async def test_add_otd(system_user_id) -> None:
     session = MagicMock()
     session.flush = AsyncMock()
 
     otd = OTD(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = OTDRepository(session)
@@ -88,8 +97,9 @@ async def test_add_otd() -> None:
     session.add.assert_called_once_with(otd)
     session.flush.assert_awaited_once()
 
+
 @pytest.mark.asyncio
-async def test_add_otd_version() -> None:
+async def test_add_otd_version(system_user_id) -> None:
     session = MagicMock()
     session.flush = AsyncMock()
 
@@ -100,6 +110,8 @@ async def test_add_otd_version() -> None:
         effective_date=date.today(),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = OTDRepository(session)
@@ -110,8 +122,9 @@ async def test_add_otd_version() -> None:
     session.add.assert_called_once_with(version)
     session.flush.assert_awaited_once()
 
+
 @pytest.mark.asyncio
-async def test_get_current_version_returns_latest_version() -> None:
+async def test_get_current_version_returns_latest_version(system_user_id) -> None:
     session = AsyncMock()
 
     otd_id = uuid7()
@@ -123,6 +136,8 @@ async def test_get_current_version_returns_latest_version() -> None:
         effective_date=date.today(),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = version
@@ -136,7 +151,9 @@ async def test_get_current_version_returns_latest_version() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_versions_returns_versions_in_descending_order() -> None:
+async def test_get_versions_returns_versions_in_descending_order(
+    system_user_id,
+) -> None:
     session = AsyncMock()
 
     otd_id = uuid7()
@@ -149,6 +166,8 @@ async def test_get_versions_returns_versions_in_descending_order() -> None:
             effective_date=date.today(),
             urza_service_life=10,
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         ),
         OTDVersion(
             id=uuid7(),
@@ -157,6 +176,8 @@ async def test_get_versions_returns_versions_in_descending_order() -> None:
             effective_date=date.today(),
             urza_service_life=10,
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         ),
         OTDVersion(
             id=uuid7(),
@@ -165,6 +186,8 @@ async def test_get_versions_returns_versions_in_descending_order() -> None:
             effective_date=date.today(),
             urza_service_life=10,
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         ),
     ]
 

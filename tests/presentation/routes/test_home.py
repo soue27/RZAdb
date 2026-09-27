@@ -15,7 +15,7 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_tree_service
 
 
-def make_user() -> User:
+def make_user(system_user_id) -> User:
     return User(
         id=uuid7(),
         full_name="Тестовый пользователь",
@@ -24,7 +24,10 @@ def make_user() -> User:
         password_hash="hash",
         access_category=AccessCategory.IV,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
+
 
 class FakeTreeService:
     def __init__(self, tree: list[EnterpriseTreeNode]) -> None:
@@ -32,6 +35,7 @@ class FakeTreeService:
 
     async def get_tree(self, user_id):
         return self.tree
+
 
 def make_tree(root_type: str, root_name: str) -> list[EnterpriseTreeNode]:
     return [
@@ -42,6 +46,7 @@ def make_tree(root_type: str, root_name: str) -> list[EnterpriseTreeNode]:
             short_name=root_name,
         )
     ]
+
 
 def make_tree_with_substation() -> tuple[
     list[EnterpriseTreeNode],
@@ -66,6 +71,7 @@ def make_tree_with_substation() -> tuple[
     ]
 
     return tree, str(substation_id)
+
 
 def make_tree_with_connection() -> tuple[
     list[EnterpriseTreeNode],
@@ -108,8 +114,11 @@ def make_tree_with_connection() -> tuple[
         "urza": str(urza_id),
     }
 
-def test_home_renders_separate_connection_expand_and_select_controls() -> None:
-    user = make_user()
+
+def test_home_renders_separate_connection_expand_and_select_controls(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
     tree, object_ids = make_tree_with_connection()
 
     async def override_current_user() -> User:
@@ -135,15 +144,9 @@ def test_home_renders_separate_connection_expand_and_select_controls() -> None:
             in response.text
         )
 
-        assert (
-            'data-object-type="connection"'
-            in response.text
-        )
+        assert 'data-object-type="connection"' in response.text
 
-        assert (
-            f'data-object-id="{object_ids["connection"]}"'
-            in response.text
-        )
+        assert f'data-object-id="{object_ids["connection"]}"' in response.text
 
     finally:
         app.dependency_overrides.clear()
@@ -157,8 +160,8 @@ def test_home_requires_authentication() -> None:
     assert response.status_code == 401
 
 
-def test_home_authenticated() -> None:
-    user = make_user()
+def test_home_authenticated(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     async def override_current_user() -> User:
         return user
@@ -177,6 +180,7 @@ def test_home_authenticated() -> None:
     finally:
         app.dependency_overrides.clear()
 
+
 @pytest.mark.parametrize(
     ("root_type", "root_name"),
     [
@@ -186,10 +190,9 @@ def test_home_authenticated() -> None:
     ],
 )
 def test_home_renders_tree_root_types(
-    root_type: str,
-    root_name: str,
+    root_type: str, root_name: str, system_user_id
 ) -> None:
-    user = make_user()
+    user = make_user(system_user_id=system_user_id)
 
     async def override_current_user() -> User:
         return user
@@ -214,8 +217,9 @@ def test_home_renders_tree_root_types(
     finally:
         app.dependency_overrides.clear()
 
-def test_home_renders_substation_object_attributes() -> None:
-    user = make_user()
+
+def test_home_renders_substation_object_attributes(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     tree, substation_id = make_tree_with_substation()
 
@@ -242,8 +246,9 @@ def test_home_renders_substation_object_attributes() -> None:
     finally:
         app.dependency_overrides.clear()
 
-def test_home_renders_object_attributes_for_tree_chain() -> None:
-    user = make_user()
+
+def test_home_renders_object_attributes_for_tree_chain(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     tree, object_ids = make_tree_with_connection()
 
@@ -265,33 +270,20 @@ def test_home_renders_object_attributes_for_tree_chain() -> None:
 
         assert response.status_code == 200
 
-        assert (
-            'data-object-type="substation"' in response.text
-        )
-        assert (
-            f'data-object-id="{object_ids["substation"]}"'
-            in response.text
-        )
+        assert 'data-object-type="substation"' in response.text
+        assert f'data-object-id="{object_ids["substation"]}"' in response.text
 
-        assert (
-            'data-object-type="connection"' in response.text
-        )
-        assert (
-            f'data-object-id="{object_ids["connection"]}"'
-            in response.text
-        )
+        assert 'data-object-type="connection"' in response.text
+        assert f'data-object-id="{object_ids["connection"]}"' in response.text
 
         assert 'data-object-type="urza"' in response.text
-        assert (
-            f'data-object-id="{object_ids["urza"]}"'
-            in response.text
-        )
+        assert f'data-object-id="{object_ids["urza"]}"' in response.text
     finally:
         app.dependency_overrides.clear()
 
 
-def test_home_renders_htmx_attributes_for_substation() -> None:
-    user = make_user()
+def test_home_renders_htmx_attributes_for_substation(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
     tree, substation_id = make_tree_with_substation()
 
     async def override_current_user() -> User:
@@ -311,18 +303,15 @@ def test_home_renders_htmx_attributes_for_substation() -> None:
         response = client.get("/")
 
         assert response.status_code == 200
-        assert (
-            f'hx-get="/objects/substation/{substation_id}"'
-            in response.text
-        )
+        assert f'hx-get="/objects/substation/{substation_id}"' in response.text
         assert 'hx-target="#object-content"' in response.text
         assert 'hx-swap="innerHTML"' in response.text
     finally:
         app.dependency_overrides.clear()
 
 
-def test_home_renders_htmx_attributes_for_connection() -> None:
-    user = make_user()
+def test_home_renders_htmx_attributes_for_connection(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
     tree, object_ids = make_tree_with_connection()
 
     async def override_current_user() -> User:
@@ -343,8 +332,7 @@ def test_home_renders_htmx_attributes_for_connection() -> None:
 
         assert response.status_code == 200
         assert (
-            f'hx-get="/objects/connection/{object_ids["connection"]}"'
-            in response.text
+            f'hx-get="/objects/connection/{object_ids["connection"]}"' in response.text
         )
         assert 'hx-target="#object-content"' in response.text
         assert 'hx-swap="innerHTML"' in response.text
@@ -352,8 +340,8 @@ def test_home_renders_htmx_attributes_for_connection() -> None:
         app.dependency_overrides.clear()
 
 
-def test_home_renders_htmx_attributes_for_urza() -> None:
-    user = make_user()
+def test_home_renders_htmx_attributes_for_urza(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
     tree, object_ids = make_tree_with_connection()
 
     async def override_current_user() -> User:
@@ -373,10 +361,7 @@ def test_home_renders_htmx_attributes_for_urza() -> None:
         response = client.get("/")
 
         assert response.status_code == 200
-        assert (
-            f'hx-get="/objects/urza/{object_ids["urza"]}"'
-            in response.text
-        )
+        assert f'hx-get="/objects/urza/{object_ids["urza"]}"' in response.text
         assert 'hx-target="#object-content"' in response.text
         assert 'hx-swap="innerHTML"' in response.text
     finally:

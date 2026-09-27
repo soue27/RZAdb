@@ -16,7 +16,7 @@ class FakeSession:
 
 
 @pytest.mark.asyncio
-async def test_get_by_id_returns_substation() -> None:
+async def test_get_by_id_returns_substation(system_user_id) -> None:
     session = FakeSession()
     repository = SubstationRepository(session)
 
@@ -25,6 +25,8 @@ async def test_get_by_id_returns_substation() -> None:
         enterprise_id=uuid4(),
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.substations[substation.id] = substation

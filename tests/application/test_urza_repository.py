@@ -12,7 +12,7 @@ from app.domain.substation import Substation
 
 
 @pytest.mark.asyncio
-async def test_get_by_id_returns_urza() -> None:
+async def test_get_by_id_returns_urza(system_user_id) -> None:
     session = AsyncMock()
 
     urza = URZA(
@@ -27,6 +27,8 @@ async def test_get_by_id_returns_urza() -> None:
         category=URZACategory.II,
         room_category=RoomCategory.I,
         complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     scalars_result = MagicMock()

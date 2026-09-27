@@ -31,13 +31,15 @@ from app.domain.user import User
 
 @pytest.mark.asyncio
 async def test_tree_service_builds_full_enterprise_tree(
-    db_session: AsyncSession,
+    db_session: AsyncSession, system_user_id
 ) -> None:
     session = db_session
     holding = Enterprise(
         type=EnterpriseType.HOLDING,
         full_name="Тестовый Холдинг",
         short_name="Тестовый Холдинг",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     branch = Enterprise(
@@ -45,6 +47,8 @@ async def test_tree_service_builds_full_enterprise_tree(
         full_name="Тестовый филиал",
         short_name="Тестовый филиал",
         parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     department = Enterprise(
@@ -52,6 +56,8 @@ async def test_tree_service_builds_full_enterprise_tree(
         full_name="Тестовое ПО",
         short_name="ТПО",
         parent=branch,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     superadmin = User(
@@ -62,6 +68,8 @@ async def test_tree_service_builds_full_enterprise_tree(
         enterprise_id=None,
         access_category=AccessCategory.I,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -69,12 +77,16 @@ async def test_tree_service_builds_full_enterprise_tree(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     connection = Connection(
         substation=substation,
         dispatch_name="ВЛ 110 кВ Тестовая",
         rdu_subordination=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     urza = URZA(
@@ -88,17 +100,21 @@ async def test_tree_service_builds_full_enterprise_tree(
         category=URZACategory.III,
         room_category=RoomCategory.I,
         complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        holding,
-        branch,
-        department,
-        superadmin,
-        substation,
-        connection,
-        urza,
-    ])
+    session.add_all(
+        [
+            holding,
+            branch,
+            department,
+            superadmin,
+            substation,
+            connection,
+            urza,
+        ]
+    )
 
     await session.flush()
 
@@ -165,15 +181,18 @@ async def test_tree_service_builds_full_enterprise_tree(
     assert urza_node.id == urza.id
     assert urza_node.dispatch_name == "ДЗЛ-110"
 
+
 @pytest.mark.asyncio
 async def test_tree_service_starts_from_specialist_branch(
-    db_session: AsyncSession,
+    db_session: AsyncSession, system_user_id
 ) -> None:
     session = db_session
     holding = Enterprise(
         type=EnterpriseType.HOLDING,
         full_name="Холдинг инженера",
         short_name="Холдинг инженера",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     branch = Enterprise(
@@ -181,6 +200,8 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="Филиал инженера",
         short_name="Филиал инженера",
         parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     department = Enterprise(
@@ -188,13 +209,17 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="ПО инженера",
         short_name="ПО инженера",
         parent=branch,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        holding,
-        branch,
-        department,
-    ])
+    session.add_all(
+        [
+            holding,
+            branch,
+            department,
+        ]
+    )
 
     await session.flush()
 
@@ -206,6 +231,8 @@ async def test_tree_service_starts_from_specialist_branch(
         enterprise_id=department.id,
         access_category=AccessCategory.III,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -213,12 +240,16 @@ async def test_tree_service_starts_from_specialist_branch(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Инженерная",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     connection = Connection(
         substation=substation,
         dispatch_name="ВЛ 110 кВ Инженерная",
         rdu_subordination=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     urza = URZA(
@@ -232,14 +263,18 @@ async def test_tree_service_starts_from_specialist_branch(
         category=URZACategory.III,
         room_category=RoomCategory.I,
         complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        engineer,
-        substation,
-        connection,
-        urza,
-    ])
+    session.add_all(
+        [
+            engineer,
+            substation,
+            connection,
+            urza,
+        ]
+    )
 
     await session.flush()
 
@@ -293,15 +328,18 @@ async def test_tree_service_starts_from_specialist_branch(
     assert urza_node.id == urza.id
     assert urza_node.dispatch_name == "ДЗЛ-Инженерная"
 
+
 @pytest.mark.asyncio
 async def test_tree_service_starts_from_specialist_branch(
-    db_session: AsyncSession,
+    db_session: AsyncSession, system_user_id
 ) -> None:
     session = db_session
     holding = Enterprise(
         type=EnterpriseType.HOLDING,
         full_name="Холдинг специалиста",
         short_name="Холдинг специалиста",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     branch_a = Enterprise(
@@ -309,6 +347,8 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="Филиал А",
         short_name="Филиал А",
         parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     branch_b = Enterprise(
@@ -316,6 +356,8 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="Филиал Б",
         short_name="Филиал Б",
         parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     department_1 = Enterprise(
@@ -323,6 +365,8 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="ПО 1",
         short_name="ПО 1",
         parent=branch_a,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     department_2 = Enterprise(
@@ -330,6 +374,8 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="ПО 2",
         short_name="ПО 2",
         parent=branch_a,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     department_3 = Enterprise(
@@ -337,16 +383,20 @@ async def test_tree_service_starts_from_specialist_branch(
         full_name="ПО 3",
         short_name="ПО 3",
         parent=branch_b,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        holding,
-        branch_a,
-        branch_b,
-        department_1,
-        department_2,
-        department_3,
-    ])
+    session.add_all(
+        [
+            holding,
+            branch_a,
+            branch_b,
+            department_1,
+            department_2,
+            department_3,
+        ]
+    )
 
     await session.flush()
 
@@ -358,6 +408,8 @@ async def test_tree_service_starts_from_specialist_branch(
         enterprise_id=branch_a.id,
         access_category=AccessCategory.III,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation_1 = Substation(
@@ -365,6 +417,8 @@ async def test_tree_service_starts_from_specialist_branch(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 1",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation_2 = Substation(
@@ -372,6 +426,8 @@ async def test_tree_service_starts_from_specialist_branch(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 2",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation_3 = Substation(
@@ -379,14 +435,18 @@ async def test_tree_service_starts_from_specialist_branch(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС 3",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        specialist,
-        substation_1,
-        substation_2,
-        substation_3,
-    ])
+    session.add_all(
+        [
+            specialist,
+            substation_1,
+            substation_2,
+            substation_3,
+        ]
+    )
 
     await session.flush()
 
@@ -420,10 +480,7 @@ async def test_tree_service_starts_from_specialist_branch(
 
     assert len(branch_node.children) == 2
 
-    department_nodes = {
-        node.id: node
-        for node in branch_node.children
-    }
+    department_nodes = {node.id: node for node in branch_node.children}
 
     assert set(department_nodes) == {
         department_1.id,
@@ -436,80 +493,83 @@ async def test_tree_service_starts_from_specialist_branch(
     assert len(department_nodes[department_1.id].substations) == 1
     assert len(department_nodes[department_2.id].substations) == 1
 
-    assert (
-            department_nodes[department_1.id].substations[0].id
-            == substation_1.id
-    )
+    assert department_nodes[department_1.id].substations[0].id == substation_1.id
 
-    assert (
-            department_nodes[department_2.id].substations[0].id
-            == substation_2.id
-    )
+    assert department_nodes[department_2.id].substations[0].id == substation_2.id
 
-    assert all(
-        node.id != branch_b.id
-        for node in tree
-    )
+    assert all(node.id != branch_b.id for node in tree)
 
-    assert all(
-        node.id != department_3.id
-        for node in branch_node.children
-    )
+    assert all(node.id != department_3.id for node in branch_node.children)
+
 
 @pytest.mark.asyncio
 async def test_tree_service_excludes_deleted_enterprises_and_substations(
-    db_session: AsyncSession,
+    db_session: AsyncSession, system_user_id
 ) -> None:
     session = db_session
     holding = Enterprise(
-            type=EnterpriseType.HOLDING,
-            full_name="Холдинг архива",
-            short_name="Холдинг архива",
+        type=EnterpriseType.HOLDING,
+        full_name="Холдинг архива",
+        short_name="Холдинг архива",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     active_branch = Enterprise(
-            type=EnterpriseType.BRANCH,
-            full_name="Активный филиал",
-            short_name="Активный филиал",
-            parent=holding,
+        type=EnterpriseType.BRANCH,
+        full_name="Активный филиал",
+        short_name="Активный филиал",
+        parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     deleted_branch = Enterprise(
-            type=EnterpriseType.BRANCH,
-            full_name="Архивный филиал",
-            short_name="Архивный филиал",
-            parent=holding,
-        )
+        type=EnterpriseType.BRANCH,
+        full_name="Архивный филиал",
+        short_name="Архивный филиал",
+        parent=holding,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
 
     active_department = Enterprise(
-            type=EnterpriseType.DEPARTMENT,
-            full_name="Активное ПО",
-            short_name="Активное ПО",
-            parent=active_branch,
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Активное ПО",
+        short_name="Активное ПО",
+        parent=active_branch,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     deleted_department = Enterprise(
-            type=EnterpriseType.DEPARTMENT,
-            full_name="Архивное ПО",
-            short_name="Архивное ПО",
-            parent=active_branch,
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Архивное ПО",
+        short_name="Архивное ПО",
+        parent=active_branch,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     deleted_branch_department = Enterprise(
-            type=EnterpriseType.DEPARTMENT,
-            full_name="ПО архивного филиала",
-            short_name="ПО архивного филиала",
-            parent=deleted_branch,
+        type=EnterpriseType.DEPARTMENT,
+        full_name="ПО архивного филиала",
+        short_name="ПО архивного филиала",
+        parent=deleted_branch,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
+    session.add_all(
+        [
             holding,
             active_branch,
             deleted_branch,
             active_department,
             deleted_department,
             deleted_branch_department,
-    ])
+        ]
+    )
 
     await session.flush()
     deleted_branch.deleted_at = active_branch.created_at
@@ -521,6 +581,8 @@ async def test_tree_service_excludes_deleted_enterprises_and_substations(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Активная",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     deleted_substation = Substation(
@@ -528,12 +590,16 @@ async def test_tree_service_excludes_deleted_enterprises_and_substations(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Архивная",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    session.add_all([
-        active_substation,
-        deleted_substation,
-    ])
+    session.add_all(
+        [
+            active_substation,
+            deleted_substation,
+        ]
+    )
 
     await session.flush()
 
@@ -547,6 +613,8 @@ async def test_tree_service_excludes_deleted_enterprises_and_substations(
         enterprise_id=None,
         access_category=AccessCategory.I,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.add(superadmin)
@@ -599,9 +667,10 @@ async def test_tree_service_excludes_deleted_enterprises_and_substations(
     assert substation_node.id == active_substation.id
     assert substation_node.dispatch_name == "ПС Активная"
 
+
 @pytest.mark.asyncio
 async def test_tree_service_starts_from_engineer_department(
-    db_session: AsyncSession,
+    db_session: AsyncSession, system_user_id
 ):
     session = db_session
 
@@ -609,6 +678,8 @@ async def test_tree_service_starts_from_engineer_department(
         type=EnterpriseType.DEPARTMENT,
         full_name="ПО Северные сети",
         short_name="ПО Северные сети",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
     session.add(department)
     await session.flush()
@@ -620,6 +691,8 @@ async def test_tree_service_starts_from_engineer_department(
         role=UserRole.ENGINEER,
         access_category=AccessCategory.IV,
         enterprise_id=department.id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
     session.add(user)
     await session.flush()

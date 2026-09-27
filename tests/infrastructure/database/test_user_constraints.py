@@ -7,7 +7,7 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_user_email_must_be_unique() -> None:
+async def test_user_email_must_be_unique(system_user_id) -> None:
     async with async_session_factory() as session:
         first_user = User(
             full_name="Первый Пользователь",
@@ -16,6 +16,8 @@ async def test_user_email_must_be_unique() -> None:
             password_hash="hash-1",
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         second_user = User(
@@ -25,6 +27,8 @@ async def test_user_email_must_be_unique() -> None:
             password_hash="hash-2",
             access_category=AccessCategory.IV,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(first_user)

@@ -1,8 +1,8 @@
 from app.domain.program import Program
 
 
-def test_program_model() -> None:
-    program = Program()
+def test_program_model(system_user_id) -> None:
+    program = Program(created_by=system_user_id, updated_by=system_user_id)
 
     assert program.__tablename__ == "programs"
 

@@ -12,7 +12,7 @@ from app.domain.urza import URZA
 
 
 @pytest.mark.asyncio
-async def test_get_details_returns_urza_details() -> None:
+async def test_get_details_returns_urza_details(system_user_id) -> None:
     repository = AsyncMock()
 
     connection = MagicMock()
@@ -37,6 +37,8 @@ async def test_get_details_returns_urza_details() -> None:
         category=URZACategory.II,
         room_category=RoomCategory.I,
         complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     urza.connection = connection

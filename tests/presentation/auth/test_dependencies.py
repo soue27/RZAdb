@@ -26,11 +26,7 @@ def make_request(session_data: dict) -> Request:
     return request
 
 
-def make_user(
-    *,
-    active: bool = True,
-    deleted_at=None,
-) -> User:
+def make_user(*, active: bool = True, deleted_at=None, system_user_id) -> User:
     return User(
         id=uuid7(),
         full_name="Тестовый пользователь",
@@ -40,6 +36,8 @@ def make_user(
         access_category=AccessCategory.IV,
         active=active,
         deleted_at=deleted_at,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
 
@@ -79,10 +77,13 @@ async def test_get_current_user_when_user_not_found() -> None:
 
     session = AsyncMock()
 
-    with patch(
-        "app.presentation.auth.dependencies.UserRepository",
-        return_value=repository,
-    ), pytest.raises(HTTPException) as exc_info:
+    with (
+        patch(
+            "app.presentation.auth.dependencies.UserRepository",
+            return_value=repository,
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
         await get_current_user(request, session)
 
     assert exc_info.value.status_code == 401
@@ -90,8 +91,8 @@ async def test_get_current_user_when_user_not_found() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_when_user_inactive() -> None:
-    user = make_user(active=False)
+async def test_get_current_user_when_user_inactive(system_user_id) -> None:
+    user = make_user(active=False, system_user_id=system_user_id)
 
     request = make_request({"user_id": str(user.id)})
 
@@ -100,10 +101,13 @@ async def test_get_current_user_when_user_inactive() -> None:
 
     session = AsyncMock()
 
-    with patch(
-        "app.presentation.auth.dependencies.UserRepository",
-        return_value=repository,
-    ), pytest.raises(HTTPException) as exc_info:
+    with (
+        patch(
+            "app.presentation.auth.dependencies.UserRepository",
+            return_value=repository,
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
         await get_current_user(request, session)
 
     assert exc_info.value.status_code == 401
@@ -111,8 +115,8 @@ async def test_get_current_user_when_user_inactive() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_success() -> None:
-    user = make_user()
+async def test_get_current_user_success(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     request = make_request({"user_id": str(user.id)})
 

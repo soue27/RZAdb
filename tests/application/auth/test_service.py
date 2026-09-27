@@ -17,7 +17,7 @@ def password_service() -> PasswordService:
 
 
 @pytest.fixture
-def user(password_service: PasswordService) -> User:
+def user(password_service: PasswordService, system_user_id) -> User:
     return User(
         full_name="Тестовый инженер",
         role=UserRole.ENGINEER,
@@ -26,6 +26,8 @@ def user(password_service: PasswordService) -> User:
         enterprise_id=None,
         access_category=AccessCategory.III,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
 

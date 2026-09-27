@@ -19,12 +19,16 @@ from app.domain.user import User
 
 
 @pytest.mark.asyncio
-async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
+async def test_inspection_models_can_be_saved_to_postgresql(
+    db_session, system_user_id
+) -> None:
     department = Enterprise(
         id=uuid4(),
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое производственное отделение",
         short_name="Тестовое ПО",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -35,6 +39,8 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -43,6 +49,8 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     task = InspectionTask(
@@ -51,6 +59,7 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         created_by=manager.id,
         status=TaskStatus.CREATED,
         deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -71,6 +80,7 @@ async def test_inspection_models_can_be_saved_to_postgresql(db_session) -> None:
         inspection_date=date.today(),
         remarks="Замечаний не выявлено",
         created_by=manager.id,
+        updated_by=system_user_id,
     )
 
     db_session.add(inspection)

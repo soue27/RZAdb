@@ -9,12 +9,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_get_by_id_returns_connection() -> None:
+async def test_get_by_id_returns_connection(system_user_id) -> None:
     async with async_session_factory() as session:
         enterprise = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Department",
             short_name="Department",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -22,12 +24,16 @@ async def test_get_by_id_returns_connection() -> None:
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="PS-110",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Connection 1",
             rdu_subordination=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(connection)

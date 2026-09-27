@@ -10,12 +10,14 @@ from app.domain.settings_record import SettingsRecord
 
 
 @pytest.mark.asyncio
-async def test_get_form_by_id_returns_settings_form() -> None:
+async def test_get_form_by_id_returns_settings_form(system_user_id) -> None:
     session = AsyncMock()
 
     settings_form = SettingsForm(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = settings_form
@@ -32,7 +34,7 @@ async def test_get_form_by_id_returns_settings_form() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_form_by_urza_id_returns_settings_form() -> None:
+async def test_get_form_by_urza_id_returns_settings_form(system_user_id) -> None:
     session = AsyncMock()
 
     urza_id = uuid7()
@@ -40,6 +42,8 @@ async def test_get_form_by_urza_id_returns_settings_form() -> None:
     settings_form = SettingsForm(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = settings_form
@@ -53,7 +57,7 @@ async def test_get_form_by_urza_id_returns_settings_form() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_record_by_id_returns_settings_record() -> None:
+async def test_get_record_by_id_returns_settings_record(system_user_id) -> None:
     session = AsyncMock()
 
     record_id = uuid7()
@@ -66,8 +70,9 @@ async def test_get_record_by_id_returns_settings_record() -> None:
         initial_setting="1.0 A",
         new_setting="1.2 A",
         change_reason="Корректировка уставки",
-        created_by=uuid7(),
+        created_by=system_user_id,
         signed_form_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     session.get.return_value = settings_record
@@ -84,13 +89,15 @@ async def test_get_record_by_id_returns_settings_record() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_form() -> None:
+async def test_add_form(system_user_id) -> None:
     session = MagicMock()
     session.flush = AsyncMock()
 
     settings_form = SettingsForm(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = SettingsRepository(session)
@@ -101,8 +108,9 @@ async def test_add_form() -> None:
     session.add.assert_called_once_with(settings_form)
     session.flush.assert_awaited_once()
 
+
 @pytest.mark.asyncio
-async def test_add_record() -> None:
+async def test_add_record(system_user_id) -> None:
     session = MagicMock()
     session.flush = AsyncMock()
 
@@ -114,8 +122,9 @@ async def test_add_record() -> None:
         initial_setting="1.0 A",
         new_setting="1.2 A",
         change_reason="Корректировка уставки",
-        created_by=uuid7(),
+        created_by=system_user_id,
         signed_form_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     repository = SettingsRepository(session)

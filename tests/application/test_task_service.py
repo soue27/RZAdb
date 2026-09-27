@@ -50,55 +50,35 @@ class FakeTaskRepository:
     async def get_otd_version_by_task_id(self, task_id):
         """Возвращает версию ОТД, связанную с указанной задачей."""
         return next(
-            (
-                version
-                for version in self.otd_versions
-                if version.task_id == task_id
-            ),
+            (version for version in self.otd_versions if version.task_id == task_id),
             None,
         )
 
     async def get_settings_record_by_task_id(self, task_id):
         """Возвращает запись уставок, связанную с указанной задачей."""
         return next(
-            (
-                record
-                for record in self.settings_records
-                if record.task_id == task_id
-            ),
+            (record for record in self.settings_records if record.task_id == task_id),
             None,
         )
 
     async def get_schema_record_by_task_id(self, task_id):
         """Возвращает запись схем, связанную с указанной задачей."""
         return next(
-            (
-                record
-                for record in self.schema_records
-                if record.task_id == task_id
-            ),
+            (record for record in self.schema_records if record.task_id == task_id),
             None,
         )
 
     async def get_program_by_task_id(self, task_id):
         """Возвращает программу, связанную с указанной задачей."""
         return next(
-            (
-                program
-                for program in self.programs
-                if program.task_id == task_id
-            ),
+            (program for program in self.programs if program.task_id == task_id),
             None,
         )
 
     async def get_to_record_by_task_id(self, task_id):
         """Возвращает запись ТО, связанную с указанной задачей."""
         return next(
-            (
-                record
-                for record in self.to_records
-                if record.task_id == task_id
-            ),
+            (record for record in self.to_records if record.task_id == task_id),
             None,
         )
 
@@ -115,13 +95,12 @@ def service(repository: FakeTaskRepository) -> TaskService:
 
 @pytest.mark.asyncio
 async def test_create_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     now = datetime(2026, 9, 13, 10, 0)
 
     urza_id = uuid4()
-    created_by = uuid4()
+    created_by = system_user_id
 
     task = await service.create_task(
         urza_id=urza_id,
@@ -152,37 +131,35 @@ async def test_create_task(
 
 @pytest.mark.asyncio
 async def test_create_maintenance_task_requires_maintenance_type(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     with pytest.raises(ValueError, match="maintenance_type"):
         await service.create_task(
             urza_id=uuid4(),
             work_type=TaskWorkType.MAINTENANCE,
-            created_by=uuid4(),
+            created_by=system_user_id,
         )
 
 
 @pytest.mark.asyncio
 async def test_non_maintenance_task_cannot_have_maintenance_type(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     with pytest.raises(ValueError, match="maintenance_type"):
         await service.create_task(
             urza_id=uuid4(),
             work_type=TaskWorkType.OTD,
-            created_by=uuid4(),
+            created_by=system_user_id,
             maintenance_type=MaintenanceType.V,
         )
 
 
 @pytest.mark.asyncio
-async def test_create_maintenance_task(
-    service: TaskService,
-) -> None:
+async def test_create_maintenance_task(service: TaskService, system_user_id) -> None:
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.MAINTENANCE,
-        created_by=uuid4(),
+        created_by=system_user_id,
         maintenance_type=MaintenanceType.K1,
     )
 
@@ -192,8 +169,7 @@ async def test_create_maintenance_task(
 
 @pytest.mark.asyncio
 async def test_assign_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     assigned_at = datetime(2026, 9, 14, 15, 30)
@@ -201,7 +177,7 @@ async def test_assign_task(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=created_at,
     )
 
@@ -235,14 +211,15 @@ async def test_assign_task(
     assert history.actor_id == actor_id
     assert history.created_at == assigned_at
 
+
 @pytest.mark.asyncio
 async def test_assign_task_rejects_invalid_status(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=datetime(2026, 9, 13, 10, 0),
     )
 
@@ -264,8 +241,7 @@ async def test_assign_task_rejects_invalid_status(
 
 @pytest.mark.asyncio
 async def test_accept_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     assigned_at = datetime(2026, 9, 13, 12, 0)
@@ -276,7 +252,7 @@ async def test_accept_task(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=created_at,
     )
 
@@ -320,14 +296,14 @@ async def test_accept_task(
 
 @pytest.mark.asyncio
 async def test_accept_task_only_by_assigned_engineer(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=datetime(2026, 9, 13, 10, 0),
     )
 
@@ -347,14 +323,14 @@ async def test_accept_task_only_by_assigned_engineer(
 
 @pytest.mark.asyncio
 async def test_accept_task_rejects_invalid_status(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=datetime(2026, 9, 13, 10, 0),
     )
 
@@ -379,8 +355,7 @@ async def test_accept_task_rejects_invalid_status(
 
 @pytest.mark.asyncio
 async def test_reject_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     assigned_at = datetime(2026, 9, 13, 12, 0)
@@ -391,7 +366,7 @@ async def test_reject_task(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=created_at,
     )
 
@@ -429,14 +404,14 @@ async def test_reject_task(
 
 @pytest.mark.asyncio
 async def test_reject_task_requires_reason(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -455,14 +430,14 @@ async def test_reject_task_requires_reason(
 
 @pytest.mark.asyncio
 async def test_reject_task_only_by_assigned_engineer(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -481,8 +456,7 @@ async def test_reject_task_only_by_assigned_engineer(
 
 @pytest.mark.asyncio
 async def test_reassign_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     first_assigned_at = datetime(2026, 9, 13, 12, 0)
@@ -495,7 +469,7 @@ async def test_reassign_task(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=created_at,
     )
 
@@ -539,12 +513,12 @@ async def test_reassign_task(
 
 @pytest.mark.asyncio
 async def test_reassign_task_only_in_assigned_status(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     with pytest.raises(ValueError, match="назначенную задачу"):
@@ -554,16 +528,17 @@ async def test_reassign_task_only_in_assigned_status(
             actor_id=uuid4(),
         )
 
+
 @pytest.mark.asyncio
 async def test_reassign_task_requires_new_assignee(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -579,10 +554,10 @@ async def test_reassign_task_requires_new_assignee(
             actor_id=uuid4(),
         )
 
+
 @pytest.mark.asyncio
 async def test_complete_task(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     assigned_at = datetime(2026, 9, 13, 12, 0)
@@ -593,7 +568,7 @@ async def test_complete_task(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
         now=created_at,
     )
 
@@ -617,6 +592,8 @@ async def test_complete_task(
         urza_service_life=10,
         urza_purpose="rza",
         task_id=task.id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.otd_versions.append(otd_version)
@@ -644,7 +621,7 @@ async def test_complete_task(
 
 @pytest.mark.asyncio
 async def test_complete_task_only_by_assigned_engineer(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     """Проверяет, что завершить задачу может только её исполнитель."""
     engineer_id = uuid4()
@@ -652,7 +629,7 @@ async def test_complete_task_only_by_assigned_engineer(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -675,13 +652,13 @@ async def test_complete_task_only_by_assigned_engineer(
 
 @pytest.mark.asyncio
 async def test_complete_task_rejects_invalid_status(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     """Проверяет, что завершение разрешено только для задачи в работе."""
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     engineer_id = uuid4()
@@ -698,9 +675,10 @@ async def test_complete_task_rejects_invalid_status(
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
 async def test_complete_otd_task_requires_otd_version(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     """Проверяет, что ОТД-задачу нельзя завершить без результата ОТД."""
     engineer_id = uuid4()
@@ -708,7 +686,7 @@ async def test_complete_otd_task_requires_otd_version(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -728,10 +706,10 @@ async def test_complete_otd_task_requires_otd_version(
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
 async def test_complete_otd_task_with_otd_version(
-    service: TaskService,
-    repository: FakeTaskRepository,
+    service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
     """Проверяет завершение ОТД-задачи при наличии результата ОТД."""
     engineer_id = uuid4()
@@ -740,7 +718,7 @@ async def test_complete_otd_task_with_otd_version(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -762,6 +740,8 @@ async def test_complete_otd_task_with_otd_version(
         urza_service_life=10,
         urza_purpose="rza",
         task_id=task.id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.otd_versions.append(otd_version)
@@ -775,9 +755,10 @@ async def test_complete_otd_task_with_otd_version(
     assert task.status == TaskStatus.COMPLETED
     assert task.completed_at == completed_at
 
+
 @pytest.mark.asyncio
 async def test_complete_settings_task_requires_settings_record(
-    service: TaskService,
+    service: TaskService, system_user_id
 ) -> None:
     """Проверяет, что задачу по уставкам нельзя завершить без результата."""
     engineer_id = uuid4()
@@ -785,7 +766,7 @@ async def test_complete_settings_task_requires_settings_record(
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.SETTINGS,
-        created_by=uuid4(),
+        created_by=system_user_id,
     )
 
     await service.assign_task(
@@ -805,8 +786,9 @@ async def test_complete_settings_task_requires_settings_record(
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_settings_task_with_result() -> None:
+async def test_complete_settings_task_with_result(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -816,6 +798,7 @@ async def test_complete_settings_task_with_result() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -831,6 +814,7 @@ async def test_complete_settings_task_with_result() -> None:
         created_by=engineer_id,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.settings_records.append(settings_record)
 
@@ -847,8 +831,9 @@ async def test_complete_settings_task_with_result() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
-async def test_complete_schemes_task_requires_schema_record() -> None:
+async def test_complete_schemes_task_requires_schema_record(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -858,6 +843,7 @@ async def test_complete_schemes_task_requires_schema_record() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -874,8 +860,9 @@ async def test_complete_schemes_task_requires_schema_record() -> None:
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_schemes_task_with_scan_and_signed_form() -> None:
+async def test_complete_schemes_task_with_scan_and_signed_form(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -885,6 +872,7 @@ async def test_complete_schemes_task_with_scan_and_signed_form() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -902,6 +890,7 @@ async def test_complete_schemes_task_with_scan_and_signed_form() -> None:
         editable_file_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.schema_records.append(schema_record)
 
@@ -920,7 +909,7 @@ async def test_complete_schemes_task_with_scan_and_signed_form() -> None:
 
 
 @pytest.mark.asyncio
-async def test_complete_schemes_task_requires_signed_form() -> None:
+async def test_complete_schemes_task_requires_signed_form(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -930,6 +919,7 @@ async def test_complete_schemes_task_requires_signed_form() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -947,6 +937,7 @@ async def test_complete_schemes_task_requires_signed_form() -> None:
         editable_file_id=None,
         signed_form_file_id=None,
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.schema_records.append(schema_record)
 
@@ -961,8 +952,11 @@ async def test_complete_schemes_task_requires_signed_form() -> None:
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_schemes_task_requires_scan_or_editable_file() -> None:
+async def test_complete_schemes_task_requires_scan_or_editable_file(
+    system_user_id,
+) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -972,6 +966,7 @@ async def test_complete_schemes_task_requires_scan_or_editable_file() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -989,6 +984,7 @@ async def test_complete_schemes_task_requires_scan_or_editable_file() -> None:
         editable_file_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.schema_records.append(schema_record)
 
@@ -1003,8 +999,11 @@ async def test_complete_schemes_task_requires_scan_or_editable_file() -> None:
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_schemes_task_with_editable_and_signed_form() -> None:
+async def test_complete_schemes_task_with_editable_and_signed_form(
+    system_user_id,
+) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1014,6 +1013,7 @@ async def test_complete_schemes_task_with_editable_and_signed_form() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1031,6 +1031,7 @@ async def test_complete_schemes_task_with_editable_and_signed_form() -> None:
         editable_file_id=uuid4(),
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.schema_records.append(schema_record)
 
@@ -1047,8 +1048,9 @@ async def test_complete_schemes_task_with_editable_and_signed_form() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
-async def test_complete_program_task_requires_program() -> None:
+async def test_complete_program_task_requires_program(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1058,6 +1060,7 @@ async def test_complete_program_task_requires_program() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1074,8 +1077,9 @@ async def test_complete_program_task_requires_program() -> None:
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_program_task_with_scan() -> None:
+async def test_complete_program_task_with_scan(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1085,6 +1089,7 @@ async def test_complete_program_task_with_scan() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1097,6 +1102,8 @@ async def test_complete_program_task_with_scan() -> None:
         scan_file_id=uuid4(),
         editable_file_id=None,
         task_id=task.id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
     repository.programs.append(program)
 
@@ -1113,8 +1120,9 @@ async def test_complete_program_task_with_scan() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
-async def test_complete_maintenance_task_requires_to_record() -> None:
+async def test_complete_maintenance_task_requires_to_record(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1125,6 +1133,7 @@ async def test_complete_maintenance_task_requires_to_record() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1143,7 +1152,7 @@ async def test_complete_maintenance_task_requires_to_record() -> None:
 
 
 @pytest.mark.asyncio
-async def test_complete_maintenance_task_requires_protocol() -> None:
+async def test_complete_maintenance_task_requires_protocol(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1154,6 +1163,7 @@ async def test_complete_maintenance_task_requires_protocol() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1168,6 +1178,7 @@ async def test_complete_maintenance_task_requires_protocol() -> None:
         editable_protocol_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.to_records.append(to_record)
 
@@ -1182,8 +1193,11 @@ async def test_complete_maintenance_task_requires_protocol() -> None:
             actor_id=engineer_id,
         )
 
+
 @pytest.mark.asyncio
-async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
+async def test_complete_maintenance_task_without_protocol_for_tk(
+    system_user_id,
+) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1194,6 +1208,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1208,6 +1223,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
         editable_protocol_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.to_records.append(to_record)
 
@@ -1224,6 +1240,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "maintenance_type",
@@ -1233,7 +1250,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk() -> None:
     ],
 )
 async def test_complete_maintenance_task_without_protocol_for_non_protocol_types(
-    maintenance_type: MaintenanceType,
+    maintenance_type: MaintenanceType, system_user_id
 ) -> None:
     engineer_id = uuid4()
 
@@ -1245,6 +1262,7 @@ async def test_complete_maintenance_task_without_protocol_for_non_protocol_types
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1259,6 +1277,7 @@ async def test_complete_maintenance_task_without_protocol_for_non_protocol_types
         editable_protocol_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.to_records.append(to_record)
 
@@ -1275,8 +1294,9 @@ async def test_complete_maintenance_task_without_protocol_for_non_protocol_types
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
-async def test_complete_maintenance_task_with_protocol() -> None:
+async def test_complete_maintenance_task_with_protocol(system_user_id) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1287,6 +1307,7 @@ async def test_complete_maintenance_task_with_protocol() -> None:
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1301,6 +1322,7 @@ async def test_complete_maintenance_task_with_protocol() -> None:
         editable_protocol_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.to_records.append(to_record)
 
@@ -1317,8 +1339,11 @@ async def test_complete_maintenance_task_with_protocol() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert result.completed_at == completed_at
 
+
 @pytest.mark.asyncio
-async def test_complete_maintenance_task_requires_matching_maintenance_type() -> None:
+async def test_complete_maintenance_task_requires_matching_maintenance_type(
+    system_user_id,
+) -> None:
     engineer_id = uuid4()
 
     task = Task(
@@ -1329,6 +1354,7 @@ async def test_complete_maintenance_task_requires_matching_maintenance_type() ->
         created_by=engineer_id,
         assigned_to=engineer_id,
         status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
     )
 
     repository = FakeTaskRepository()
@@ -1344,14 +1370,15 @@ async def test_complete_maintenance_task_requires_matching_maintenance_type() ->
         editable_protocol_id=None,
         signed_form_file_id=uuid4(),
         task_id=task.id,
+        updated_by=system_user_id,
     )
     repository.to_records.append(to_record)
 
     service = TaskService(repository)
 
     with pytest.raises(
-            ValueError,
-            match="Вид ТО в результате не соответствует виду ТО в задаче",
+        ValueError,
+        match="Вид ТО в результате не соответствует виду ТО в задаче",
     ):
         await service.complete_task(
             task=task,

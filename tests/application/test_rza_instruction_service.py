@@ -33,9 +33,7 @@ def service(repository, access_service):
 
 @pytest.mark.asyncio
 async def test_get_by_substation_returns_instruction(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -43,6 +41,8 @@ async def test_get_by_substation_returns_instruction(
     instruction = RZAInstruction(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -138,9 +138,7 @@ async def test_create_instruction_with_first_version(
 
 @pytest.mark.asyncio
 async def test_create_instruction_rejects_duplicate(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -148,6 +146,8 @@ async def test_create_instruction_rejects_duplicate(
     existing = RZAInstruction(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -196,11 +196,7 @@ async def test_create_instruction_denies_access(
 
 
 @pytest.mark.asyncio
-async def test_get_current_version(
-    service,
-    repository,
-    access_service,
-):
+async def test_get_current_version(service, repository, access_service, system_user_id):
     user_id = uuid7()
     substation_id = uuid7()
     instruction_id = uuid7()
@@ -208,6 +204,8 @@ async def test_get_current_version(
     instruction = RZAInstruction(
         id=instruction_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = MagicMock(spec=RZAInstructionVersion)
@@ -257,9 +255,7 @@ async def test_get_current_version_without_instruction(
 
 @pytest.mark.asyncio
 async def test_create_version_increments_version_number(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     instruction_id = uuid7()
@@ -269,6 +265,8 @@ async def test_create_version_increments_version_number(
     instruction = RZAInstruction(
         id=instruction_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     current_version = RZAInstructionVersion(
@@ -278,6 +276,7 @@ async def test_create_version_increments_version_number(
         effective_date=date(2026, 1, 1),
         created_by=user_id,
         scan_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -308,9 +307,7 @@ async def test_create_version_increments_version_number(
 
 @pytest.mark.asyncio
 async def test_create_version_without_existing_version_creates_version_one(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     instruction_id = uuid7()
@@ -319,6 +316,8 @@ async def test_create_version_without_existing_version_creates_version_one(
     instruction = RZAInstruction(
         id=instruction_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -371,9 +370,7 @@ async def test_create_version_rejects_unknown_instruction(
 
 @pytest.mark.asyncio
 async def test_create_version_denies_access(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     instruction_id = uuid7()
@@ -382,6 +379,8 @@ async def test_create_version_denies_access(
     instruction = RZAInstruction(
         id=instruction_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.get_by_id = AsyncMock(

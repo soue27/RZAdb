@@ -7,7 +7,7 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_get_by_email() -> None:
+async def test_get_by_email(system_user_id) -> None:
     async with async_session_factory() as session:
         user = User(
             full_name="Тестовый пользователь",
@@ -17,6 +17,8 @@ async def test_get_by_email() -> None:
             enterprise_id=None,
             access_category=AccessCategory.III,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(user)

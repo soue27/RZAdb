@@ -54,12 +54,14 @@ def make_resolver(
 
 
 @pytest.mark.asyncio
-async def test_resolves_substation() -> None:
+async def test_resolves_substation(system_user_id) -> None:
     substation = Substation(
         id=uuid7(),
         enterprise_id=uuid7(),
         dispatch_name="ПС Свердловская",
         highest_voltage="110",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     resolver = make_resolver(substation=substation)
@@ -73,12 +75,14 @@ async def test_resolves_substation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolves_connection() -> None:
+async def test_resolves_connection(system_user_id) -> None:
     connection = Connection(
         id=uuid7(),
         substation_id=uuid7(),
         dispatch_name="ВЛ 110 кВ Свердловская",
         rdu_subordination=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     resolver = make_resolver(connection=connection)
@@ -92,7 +96,7 @@ async def test_resolves_connection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolves_urza() -> None:
+async def test_resolves_urza(system_user_id) -> None:
     urza = URZA(
         id=uuid7(),
         connection_id=uuid7(),
@@ -104,6 +108,8 @@ async def test_resolves_urza() -> None:
         category="II",
         room_category="I",
         complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     resolver = make_resolver(urza=urza)

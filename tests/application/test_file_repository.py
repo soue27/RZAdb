@@ -8,7 +8,7 @@ from app.domain.file import File
 from app.infrastructure.database.engine import async_session_factory
 
 
-def create_file() -> File:
+def create_file(system_user_id) -> File:
     return File(
         s3_key=f"files/test/{uuid4()}.pdf",
         original_name="document.pdf",
@@ -17,15 +17,17 @@ def create_file() -> File:
         size=1024,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
 
 @pytest.mark.asyncio
-async def test_add_file() -> None:
+async def test_add_file(system_user_id) -> None:
     async with async_session_factory() as session:
         repository = FileRepository(session)
 
-        file = create_file()
+        file = create_file(system_user_id)
 
         result = await repository.add(file)
 
@@ -35,11 +37,11 @@ async def test_add_file() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_by_id() -> None:
+async def test_get_by_id(system_user_id) -> None:
     async with async_session_factory() as session:
         repository = FileRepository(session)
 
-        file = create_file()
+        file = create_file(system_user_id)
         await repository.add(file)
 
         result = await repository.get_by_id(file.id)
@@ -60,11 +62,11 @@ async def test_get_by_id_returns_none_for_missing_file() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_by_s3_key() -> None:
+async def test_get_by_s3_key(system_user_id) -> None:
     async with async_session_factory() as session:
         repository = FileRepository(session)
 
-        file = create_file()
+        file = create_file(system_user_id)
         await repository.add(file)
 
         result = await repository.get_by_s3_key(file.s3_key)

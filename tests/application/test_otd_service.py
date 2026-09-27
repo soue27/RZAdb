@@ -10,7 +10,7 @@ from app.domain.otd import OTD, OTDVersion
 
 
 @pytest.mark.asyncio
-async def test_get_by_urza_returns_otd_when_access_allowed() -> None:
+async def test_get_by_urza_returns_otd_when_access_allowed(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -20,6 +20,8 @@ async def test_get_by_urza_returns_otd_when_access_allowed() -> None:
     otd = OTD(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -76,6 +78,7 @@ async def test_get_by_urza_returns_none_when_access_denied() -> None:
 
     repository.get_by_urza_id.assert_not_awaited()
 
+
 @pytest.mark.asyncio
 async def test_create_creates_otd_and_first_version() -> None:
     repository = AsyncMock()
@@ -115,6 +118,7 @@ async def test_create_creates_otd_and_first_version() -> None:
     assert created_version.urza_service_life == 10
     assert created_version.urza_purpose == OTDPurpose.RZA
 
+
 @pytest.mark.asyncio
 async def test_create_raises_permission_error_when_access_denied() -> None:
     repository = AsyncMock()
@@ -143,8 +147,11 @@ async def test_create_raises_permission_error_when_access_denied() -> None:
     repository.add.assert_not_awaited()
     repository.add_version.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_create_raises_value_error_when_otd_already_exists() -> None:
+async def test_create_raises_value_error_when_otd_already_exists(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -154,6 +161,8 @@ async def test_create_raises_value_error_when_otd_already_exists() -> None:
     existing_otd = OTD(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -179,8 +188,9 @@ async def test_create_raises_value_error_when_otd_already_exists() -> None:
     repository.add.assert_not_awaited()
     repository.add_version.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_get_current_version_returns_version() -> None:
+async def test_get_current_version_returns_version(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -190,6 +200,8 @@ async def test_get_current_version_returns_version() -> None:
     otd = OTD(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = OTDVersion(
@@ -199,6 +211,8 @@ async def test_get_current_version_returns_version() -> None:
         effective_date=date.today(),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -219,6 +233,7 @@ async def test_get_current_version_returns_version() -> None:
 
     repository.get_by_urza_id.assert_awaited_once_with(urza_id)
     repository.get_current_version.assert_awaited_once_with(otd.id)
+
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_none_when_otd_not_found() -> None:
@@ -245,8 +260,9 @@ async def test_get_current_version_returns_none_when_otd_not_found() -> None:
 
     repository.get_current_version.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_create_version_increments_version_number() -> None:
+async def test_create_version_increments_version_number(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -257,6 +273,8 @@ async def test_create_version_increments_version_number() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     current_version = OTDVersion(
@@ -266,6 +284,8 @@ async def test_create_version_increments_version_number() -> None:
         effective_date=date(2026, 1, 1),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -292,6 +312,7 @@ async def test_create_version_increments_version_number() -> None:
     assert result.urza_purpose == OTDPurpose.RZA
 
     repository.add_version.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_create_version_raises_value_error_when_otd_not_found() -> None:
@@ -321,8 +342,11 @@ async def test_create_version_raises_value_error_when_otd_not_found() -> None:
     repository.get_current_version.assert_not_awaited()
     repository.add_version.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_create_version_raises_permission_error_when_access_denied() -> None:
+async def test_create_version_raises_permission_error_when_access_denied(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -333,6 +357,8 @@ async def test_create_version_raises_permission_error_when_access_denied() -> No
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.get_by_id.return_value = otd
@@ -362,7 +388,7 @@ async def test_create_version_raises_permission_error_when_access_denied() -> No
 
 
 @pytest.mark.asyncio
-async def test_get_versions_returns_versions() -> None:
+async def test_get_versions_returns_versions(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -373,6 +399,8 @@ async def test_get_versions_returns_versions() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     versions = [
@@ -383,6 +411,8 @@ async def test_get_versions_returns_versions() -> None:
             effective_date=date(2026, 9, 16),
             urza_service_life=12,
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         ),
         OTDVersion(
             id=uuid7(),
@@ -391,6 +421,8 @@ async def test_get_versions_returns_versions() -> None:
             effective_date=date(2025, 1, 1),
             urza_service_life=10,
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         ),
     ]
 
@@ -449,7 +481,7 @@ async def test_get_versions_returns_empty_list_when_access_denied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_details_returns_current_version_and_history() -> None:
+async def test_get_details_returns_current_version_and_history(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -460,6 +492,8 @@ async def test_get_details_returns_current_version_and_history() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version_2 = OTDVersion(
@@ -472,6 +506,8 @@ async def test_get_details_returns_current_version_and_history() -> None:
         terminal_type="МП терминал",
         urza_service_life=12,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version_1 = OTDVersion(
@@ -484,6 +520,8 @@ async def test_get_details_returns_current_version_and_history() -> None:
         terminal_type="МП терминал",
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -523,7 +561,7 @@ async def test_get_details_returns_current_version_and_history() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_details_returns_selected_version() -> None:
+async def test_get_details_returns_selected_version(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -534,6 +572,8 @@ async def test_get_details_returns_selected_version() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version_2 = OTDVersion(
@@ -544,6 +584,8 @@ async def test_get_details_returns_selected_version() -> None:
         created_at=datetime(2026, 8, 20, 10, 0),
         urza_service_life=12,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version_1 = OTDVersion(
@@ -554,6 +596,8 @@ async def test_get_details_returns_selected_version() -> None:
         created_at=datetime(2025, 3, 15, 10, 0),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -585,7 +629,9 @@ async def test_get_details_returns_selected_version() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_details_returns_none_when_selected_version_not_found() -> None:
+async def test_get_details_returns_none_when_selected_version_not_found(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -597,6 +643,8 @@ async def test_get_details_returns_none_when_selected_version_not_found() -> Non
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = OTDVersion(
@@ -607,6 +655,8 @@ async def test_get_details_returns_none_when_selected_version_not_found() -> Non
         created_at=datetime(2025, 3, 15, 10, 0),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -631,7 +681,9 @@ async def test_get_details_returns_none_when_selected_version_not_found() -> Non
 
 
 @pytest.mark.asyncio
-async def test_get_details_does_not_select_version_from_another_otd() -> None:
+async def test_get_details_does_not_select_version_from_another_otd(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -643,6 +695,8 @@ async def test_get_details_does_not_select_version_from_another_otd() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = OTDVersion(
@@ -653,6 +707,8 @@ async def test_get_details_does_not_select_version_from_another_otd() -> None:
         created_at=datetime(2025, 3, 15, 10, 0),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -707,7 +763,9 @@ async def test_get_details_returns_none_when_access_denied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_version_details_returns_version_when_access_allowed() -> None:
+async def test_get_version_details_returns_version_when_access_allowed(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -719,6 +777,8 @@ async def test_get_version_details_returns_version_when_access_allowed() -> None
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = OTDVersion(
@@ -731,6 +791,8 @@ async def test_get_version_details_returns_version_when_access_allowed() -> None
         terminal_type="МП терминал",
         urza_service_life=12,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.get_version_by_id.return_value = version
@@ -790,7 +852,9 @@ async def test_get_version_details_returns_none_when_version_not_found() -> None
 
 
 @pytest.mark.asyncio
-async def test_get_version_details_returns_none_when_access_denied() -> None:
+async def test_get_version_details_returns_none_when_access_denied(
+    system_user_id,
+) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -802,6 +866,8 @@ async def test_get_version_details_returns_none_when_access_denied() -> None:
     otd = OTD(
         id=otd_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = OTDVersion(
@@ -812,6 +878,8 @@ async def test_get_version_details_returns_none_when_access_denied() -> None:
         created_at=datetime(2025, 3, 15, 10, 0),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository.get_version_by_id.return_value = version

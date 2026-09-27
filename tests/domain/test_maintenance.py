@@ -1,8 +1,8 @@
 from app.domain.maintenance import TORecord
 
 
-def test_to_record_model() -> None:
-    record = TORecord()
+def test_to_record_model(system_user_id) -> None:
+    record = TORecord(created_by=system_user_id, updated_by=system_user_id)
 
     assert record.__tablename__ == "to_records"
 

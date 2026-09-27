@@ -25,7 +25,7 @@ from app.domain.user import User
 
 @pytest.mark.asyncio
 async def test_create_inspection_task_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем создание задачи осмотра через сервис и PostgreSQL."""
 
@@ -34,6 +34,8 @@ async def test_create_inspection_task_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое производственное отделение",
         short_name="Тестовое ПО",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -44,6 +46,8 @@ async def test_create_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -52,6 +56,8 @@ async def test_create_inspection_task_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Сервисная",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -102,9 +108,10 @@ async def test_create_inspection_task_with_real_postgresql(
     assert saved_task.created_by == manager.id
     assert saved_task.status == TaskStatus.CREATED
 
+
 @pytest.mark.asyncio
 async def test_assign_inspection_task_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем назначение задачи исполнителю через PostgreSQL."""
 
@@ -113,6 +120,8 @@ async def test_assign_inspection_task_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО для назначения",
         short_name="ПО Назначение",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -123,6 +132,8 @@ async def test_assign_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -133,6 +144,8 @@ async def test_assign_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -141,6 +154,8 @@ async def test_assign_inspection_task_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Назначение",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -189,9 +204,7 @@ async def test_assign_inspection_task_with_real_postgresql(
     assert result.deadline_at == created_at + timedelta(days=7)
 
     history = await db_session.execute(
-        select(InspectionHistory).where(
-            InspectionHistory.inspection_task_id == task.id
-        )
+        select(InspectionHistory).where(InspectionHistory.inspection_task_id == task.id)
     )
     history_records = history.scalars().all()
 
@@ -204,9 +217,10 @@ async def test_assign_inspection_task_with_real_postgresql(
     assert history_record.new_status == TaskStatus.ASSIGNED
     assert history_record.actor_id == manager.id
 
+
 @pytest.mark.asyncio
 async def test_accept_inspection_task_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем принятие задачи исполнителем через PostgreSQL."""
 
@@ -215,6 +229,8 @@ async def test_accept_inspection_task_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО для принятия",
         short_name="ПО Принятие",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -225,6 +241,8 @@ async def test_accept_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -235,6 +253,8 @@ async def test_accept_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -243,6 +263,8 @@ async def test_accept_inspection_task_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Принятие",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -315,9 +337,10 @@ async def test_accept_inspection_task_with_real_postgresql(
     assert accepted_history.new_status == TaskStatus.IN_PROGRESS
     assert accepted_history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
 async def test_complete_inspection_task_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем завершение осмотра и создание результата в PostgreSQL."""
 
@@ -326,6 +349,8 @@ async def test_complete_inspection_task_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО для завершения",
         short_name="ПО Завершение",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -336,6 +361,8 @@ async def test_complete_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -346,6 +373,8 @@ async def test_complete_inspection_task_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -354,6 +383,8 @@ async def test_complete_inspection_task_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Завершение",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -417,9 +448,7 @@ async def test_complete_inspection_task_with_real_postgresql(
     assert result.deadline_at == created_at + timedelta(days=7)
 
     inspection_result = await db_session.execute(
-        select(Inspection).where(
-            Inspection.inspection_task_id == task.id
-        )
+        select(Inspection).where(Inspection.inspection_task_id == task.id)
     )
     inspections = inspection_result.scalars().all()
 
@@ -438,9 +467,7 @@ async def test_complete_inspection_task_with_real_postgresql(
 
     history_result = await db_session.execute(
         select(InspectionHistory)
-        .where(
-            InspectionHistory.inspection_task_id == task.id
-        )
+        .where(InspectionHistory.inspection_task_id == task.id)
         .order_by(InspectionHistory.created_at)
     )
     history_records = history_result.scalars().all()
@@ -454,9 +481,10 @@ async def test_complete_inspection_task_with_real_postgresql(
     assert completed_history.new_status == TaskStatus.COMPLETED
     assert completed_history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
 async def test_cannot_complete_inspection_without_remarks(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем обязательность замечаний при завершении осмотра."""
 
@@ -465,6 +493,8 @@ async def test_cannot_complete_inspection_without_remarks(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО — обязательные замечания",
         short_name="ПО Remarks",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -475,6 +505,8 @@ async def test_cannot_complete_inspection_without_remarks(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -485,6 +517,8 @@ async def test_cannot_complete_inspection_without_remarks(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -493,11 +527,11 @@ async def test_cannot_complete_inspection_without_remarks(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Remarks",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
-    db_session.add_all(
-        [department, manager, engineer, substation]
-    )
+    db_session.add_all([department, manager, engineer, substation])
     await db_session.flush()
 
     task_repository = InspectionTaskRepository(db_session)
@@ -546,9 +580,10 @@ async def test_cannot_complete_inspection_without_remarks(
     assert saved_task.status == TaskStatus.IN_PROGRESS
     assert saved_task.completed_at is None
 
+
 @pytest.mark.asyncio
 async def test_send_inspection_to_review_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем передачу завершённого осмотра на проверку."""
 
@@ -557,6 +592,8 @@ async def test_send_inspection_to_review_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО — проверка",
         short_name="ПО Review",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     manager = User(
@@ -567,6 +604,8 @@ async def test_send_inspection_to_review_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -577,6 +616,8 @@ async def test_send_inspection_to_review_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -585,6 +626,8 @@ async def test_send_inspection_to_review_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Review",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -658,9 +701,7 @@ async def test_send_inspection_to_review_with_real_postgresql(
 
     history_result = await db_session.execute(
         select(InspectionHistory)
-        .where(
-            InspectionHistory.inspection_task_id == task.id
-        )
+        .where(InspectionHistory.inspection_task_id == task.id)
         .order_by(InspectionHistory.created_at)
     )
     history_records = history_result.scalars().all()
@@ -674,9 +715,10 @@ async def test_send_inspection_to_review_with_real_postgresql(
     assert review_history.new_status == TaskStatus.UNDER_REVIEW
     assert review_history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
 async def test_review_approve_inspection_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем одобрение результата осмотра Manager-ом."""
 
@@ -685,6 +727,8 @@ async def test_review_approve_inspection_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО — одобрение",
         short_name="ПО Approval",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     creator = User(
@@ -695,6 +739,8 @@ async def test_review_approve_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -705,6 +751,8 @@ async def test_review_approve_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     reviewer = User(
@@ -715,6 +763,8 @@ async def test_review_approve_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -723,6 +773,8 @@ async def test_review_approve_inspection_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Approval",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -799,9 +851,7 @@ async def test_review_approve_inspection_with_real_postgresql(
 
     history_result = await db_session.execute(
         select(InspectionHistory)
-        .where(
-            InspectionHistory.inspection_task_id == task.id
-        )
+        .where(InspectionHistory.inspection_task_id == task.id)
         .order_by(InspectionHistory.created_at)
     )
     history_records = history_result.scalars().all()
@@ -816,9 +866,10 @@ async def test_review_approve_inspection_with_real_postgresql(
     assert review_history.actor_id == reviewer.id
     assert review_history.comment is None
 
+
 @pytest.mark.asyncio
 async def test_review_return_inspection_with_real_postgresql(
-    db_session,
+    db_session, system_user_id
 ) -> None:
     """Проверяем возврат результата осмотра исполнителю."""
 
@@ -827,6 +878,8 @@ async def test_review_return_inspection_with_real_postgresql(
         type=EnterpriseType.DEPARTMENT,
         full_name="Тестовое ПО — возврат",
         short_name="ПО Return",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     creator = User(
@@ -837,6 +890,8 @@ async def test_review_return_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     engineer = User(
@@ -847,6 +902,8 @@ async def test_review_return_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     reviewer = User(
@@ -857,6 +914,8 @@ async def test_review_return_inspection_with_real_postgresql(
         password_hash="test-hash",
         enterprise_id=department.id,
         access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     substation = Substation(
@@ -865,6 +924,8 @@ async def test_review_return_inspection_with_real_postgresql(
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Return",
         operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     db_session.add_all(
@@ -951,9 +1012,7 @@ async def test_review_return_inspection_with_real_postgresql(
 
     history_result = await db_session.execute(
         select(InspectionHistory)
-        .where(
-            InspectionHistory.inspection_task_id == task.id
-        )
+        .where(InspectionHistory.inspection_task_id == task.id)
         .order_by(InspectionHistory.created_at)
     )
     history_records = history_result.scalars().all()

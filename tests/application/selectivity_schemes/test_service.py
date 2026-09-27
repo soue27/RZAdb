@@ -35,9 +35,7 @@ def service(repository, access_service):
 
 @pytest.mark.asyncio
 async def test_get_by_substation_returns_scheme(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -45,6 +43,8 @@ async def test_get_by_substation_returns_scheme(
     scheme = SelectivityScheme(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -139,17 +139,12 @@ async def test_create_scheme_with_first_version(
     assert created_version.scan_file_id == scan_file_id
     assert created_version.editable_file_id == editable_file_id
     assert created_version.change_description == "Первичное создание"
-    assert (
-        created_version.change_justification
-        == "Ввод подстанции в эксплуатацию"
-    )
+    assert created_version.change_justification == "Ввод подстанции в эксплуатацию"
 
 
 @pytest.mark.asyncio
 async def test_create_scheme_rejects_duplicate(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -157,6 +152,8 @@ async def test_create_scheme_rejects_duplicate(
     existing = SelectivityScheme(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -209,11 +206,7 @@ async def test_create_scheme_denies_access(
 
 
 @pytest.mark.asyncio
-async def test_get_current_version(
-    service,
-    repository,
-    access_service,
-):
+async def test_get_current_version(service, repository, access_service, system_user_id):
     user_id = uuid7()
     substation_id = uuid7()
     scheme_id = uuid7()
@@ -221,6 +214,8 @@ async def test_get_current_version(
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = MagicMock(spec=SelectivitySchemeVersion)
@@ -270,9 +265,7 @@ async def test_get_current_version_without_scheme(
 
 @pytest.mark.asyncio
 async def test_create_version_increments_version_number(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     scheme_id = uuid7()
@@ -281,6 +274,8 @@ async def test_create_version_increments_version_number(
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     current_version = SelectivitySchemeVersion(
@@ -290,8 +285,9 @@ async def test_create_version_increments_version_number(
         number="С-110-01",
         name="Схема селективности ПС-1",
         effective_date=date(2026, 8, 1),
-        created_by=uuid7(),
+        created_by=system_user_id,
         scan_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     access_service.can_access_substation.return_value = True
@@ -318,10 +314,7 @@ async def test_create_version_increments_version_number(
     assert result.selectivity_scheme_id == scheme_id
     assert result.version_number == 4
     assert result.number == "С-110-02"
-    assert (
-        result.name
-        == "Схема селективности ПС-1 после реконструкции"
-    )
+    assert result.name == "Схема селективности ПС-1 после реконструкции"
     assert result.created_by == user_id
 
     repository.add_version.assert_awaited_once_with(result)
@@ -360,9 +353,7 @@ async def test_create_version_without_scheme(
 
 @pytest.mark.asyncio
 async def test_get_versions_returns_history(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -371,6 +362,8 @@ async def test_get_versions_returns_history(
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     versions = [
@@ -423,9 +416,7 @@ async def test_get_versions_without_scheme(
 
 @pytest.mark.asyncio
 async def test_get_details_returns_dto(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -437,6 +428,8 @@ async def test_get_details_returns_dto(
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version = SelectivitySchemeVersion(
@@ -451,6 +444,7 @@ async def test_get_details_returns_dto(
         created_by=user_id,
         scan_file_id=scan_file_id,
         editable_file_id=editable_file_id,
+        updated_by=system_user_id,
     )
 
     creator = MagicMock()
@@ -498,9 +492,7 @@ async def test_get_details_returns_dto(
 
 @pytest.mark.asyncio
 async def test_get_version_list_returns_dtos(
-    service,
-    repository,
-    access_service,
+    service, repository, access_service, system_user_id
 ):
     user_id = uuid7()
     substation_id = uuid7()
@@ -509,6 +501,8 @@ async def test_get_version_list_returns_dtos(
     scheme = SelectivityScheme(
         id=scheme_id,
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     version_2 = SelectivitySchemeVersion(
@@ -523,6 +517,7 @@ async def test_get_version_list_returns_dtos(
         created_by=user_id,
         scan_file_id=uuid7(),
         editable_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     version_1 = SelectivitySchemeVersion(
@@ -536,6 +531,7 @@ async def test_get_version_list_returns_dtos(
         change_justification="Ввод подстанции в эксплуатацию",
         created_by=user_id,
         scan_file_id=uuid7(),
+        updated_by=system_user_id,
     )
 
     creator = MagicMock()

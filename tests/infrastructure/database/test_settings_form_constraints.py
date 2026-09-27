@@ -21,26 +21,31 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_urza_can_have_only_one_settings_form() -> None:
+async def test_urza_can_have_only_one_settings_form(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
             enterprise=department,
             highest_voltage=HighestVoltage.KV_110,
             dispatch_name="ПС Тестовая",
-
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Ввод 110 кВ",
             rdu_subordination=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -53,10 +58,16 @@ async def test_urza_can_have_only_one_settings_form() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        first_form = SettingsForm(urza=urza)
-        second_form = SettingsForm(urza=urza)
+        first_form = SettingsForm(
+            urza=urza, created_by=system_user_id, updated_by=system_user_id
+        )
+        second_form = SettingsForm(
+            urza=urza, created_by=system_user_id, updated_by=system_user_id
+        )
 
         session.add(first_form)
         await session.flush()

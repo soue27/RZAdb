@@ -2,11 +2,13 @@ from app.domain.enterprise import Enterprise
 from app.domain.enums import EnterpriseType
 
 
-def test_enterprise_model() -> None:
+def test_enterprise_model(system_user_id) -> None:
     enterprise = Enterprise(
         type=EnterpriseType.HOLDING,
         full_name="Тестовый холдинг",
         short_name="Тест",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     assert enterprise.type == EnterpriseType.HOLDING

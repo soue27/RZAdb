@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-from uuid6 import uuid7
 
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
@@ -45,9 +44,11 @@ async def test_file_service_uploads_content_to_local_storage(
 
         await session.rollback()
 
+
 @pytest.mark.asyncio
 async def test_file_service_archive_keeps_content_in_storage(
     tmp_path: Path,
+    system_user_id,
 ) -> None:
     storage = LocalObjectStorage(tmp_path)
 
@@ -69,7 +70,7 @@ async def test_file_service_archive_keeps_content_in_storage(
             mime_type="application/pdf",
         )
 
-        user_id = uuid7()
+        user_id = system_user_id
 
         await service.archive(
             file_id=file.id,

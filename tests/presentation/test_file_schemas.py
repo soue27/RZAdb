@@ -6,7 +6,7 @@ from app.domain.file import File
 from app.presentation.schemas.files import FileResponse
 
 
-def test_file_response_from_file() -> None:
+def test_file_response_from_file(system_user_id) -> None:
     file_id = uuid7()
 
     file = File(
@@ -18,6 +18,8 @@ def test_file_response_from_file() -> None:
         size=1024,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     response = FileResponse.model_validate(file)
@@ -31,7 +33,7 @@ def test_file_response_from_file() -> None:
     assert response.uploaded_at == file.uploaded_at
 
 
-def test_file_response_does_not_expose_s3_key() -> None:
+def test_file_response_does_not_expose_s3_key(system_user_id) -> None:
     file = File(
         id=uuid7(),
         s3_key="files/2026/09/secret.pdf",
@@ -41,11 +43,14 @@ def test_file_response_does_not_expose_s3_key() -> None:
         size=512,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     response = FileResponse.model_validate(file)
 
     assert not hasattr(response, "s3_key")
+
 
 from app.presentation.schemas.files import FileUploadForm
 

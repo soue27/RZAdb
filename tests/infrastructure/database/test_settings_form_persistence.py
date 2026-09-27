@@ -21,12 +21,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_settings_form_persistence() -> None:
+async def test_settings_form_persistence(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -35,14 +37,17 @@ async def test_settings_form_persistence() -> None:
             dispatch_name="ПС Тестовая",
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
-
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Ввод 110 кВ",
             rdu_subordination=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -55,9 +60,13 @@ async def test_settings_form_persistence() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        settings_form = SettingsForm(urza=urza)
+        settings_form = SettingsForm(
+            urza=urza, created_by=system_user_id, updated_by=system_user_id
+        )
 
         session.add(settings_form)
         await session.flush()

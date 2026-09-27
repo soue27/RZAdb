@@ -23,12 +23,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_otd_version_persistence() -> None:
+async def test_otd_version_persistence(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -37,14 +39,17 @@ async def test_otd_version_persistence() -> None:
             dispatch_name="ПС Тестовая",
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
-
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
             substation=substation,
             dispatch_name="Ввод 110 кВ",
             rdu_subordination=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         urza = URZA(
@@ -57,9 +62,11 @@ async def test_otd_version_persistence() -> None:
             category=URZACategory.II,
             room_category=RoomCategory.I,
             complexity=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
-        otd = OTD(urza=urza)
+        otd = OTD(urza=urza, created_by=system_user_id, updated_by=system_user_id)
 
         version_1 = OTDVersion(
             otd=otd,
@@ -77,6 +84,8 @@ async def test_otd_version_persistence() -> None:
             vt_ratio="110000/100",
             urza_scheme_designation="ДЗЛ-110",
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         version_2 = OTDVersion(
@@ -95,6 +104,8 @@ async def test_otd_version_persistence() -> None:
             vt_ratio="110000/100",
             urza_scheme_designation="ДЗЛ-110",
             urza_purpose=OTDPurpose.RZA,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([version_1, version_2])

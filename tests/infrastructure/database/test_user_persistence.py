@@ -1,4 +1,3 @@
-
 import pytest
 
 from app.domain.enterprise import Enterprise
@@ -12,13 +11,15 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_user_persistence() -> None:
+async def test_user_persistence(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
             sap_code="SAP-DEP-001",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         superadmin = User(
@@ -29,6 +30,8 @@ async def test_user_persistence() -> None:
             enterprise_id=None,
             access_category=AccessCategory.I,
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         engineer = User(
@@ -40,6 +43,8 @@ async def test_user_persistence() -> None:
             access_category=AccessCategory.III,
             sap_code="SAP-USER-001",
             active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add_all([superadmin, engineer])

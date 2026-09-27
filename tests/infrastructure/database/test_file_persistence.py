@@ -9,7 +9,7 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_file_can_be_persisted() -> None:
+async def test_file_can_be_persisted(system_user_id) -> None:
     uploaded_at = datetime.now(UTC)
     s3_key = f"files/test/{uuid4()}.pdf"
 
@@ -22,6 +22,8 @@ async def test_file_can_be_persisted() -> None:
             size=1024,
             mime_type="application/pdf",
             uploaded_at=uploaded_at,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(file)
@@ -29,17 +31,12 @@ async def test_file_can_be_persisted() -> None:
 
         file_id = file.id
 
-        result = await session.execute(
-            select(File).where(File.id == file_id)
-        )
+        result = await session.execute(select(File).where(File.id == file_id))
         saved_file = result.scalar_one()
 
         assert saved_file.s3_key == s3_key
         assert saved_file.original_name == "scan_001.pdf"
-        assert (
-            saved_file.display_name
-            == "ПС Тестовая_Ввод 110 кВ_ТО_2026-09-12.pdf"
-        )
+        assert saved_file.display_name == "ПС Тестовая_Ввод 110 кВ_ТО_2026-09-12.pdf"
         assert saved_file.extension == ".pdf"
         assert saved_file.size == 1024
         assert saved_file.mime_type == "application/pdf"

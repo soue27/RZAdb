@@ -9,7 +9,7 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_s3_key_must_be_unique() -> None:
+async def test_s3_key_must_be_unique(system_user_id) -> None:
     s3_key = f"files/test/{uuid4()}.pdf"
 
     async with async_session_factory() as session:
@@ -21,6 +21,8 @@ async def test_s3_key_must_be_unique() -> None:
             size=1024,
             mime_type="application/pdf",
             uploaded_at=datetime.now(UTC),
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         second_file = File(
@@ -31,6 +33,8 @@ async def test_s3_key_must_be_unique() -> None:
             size=2048,
             mime_type="application/pdf",
             uploaded_at=datetime.now(UTC),
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(first_file)

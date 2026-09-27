@@ -9,12 +9,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_substation_persistence() -> None:
+async def test_substation_persistence(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -27,6 +29,8 @@ async def test_substation_persistence() -> None:
             longitude=Decimal("60.123456"),
             address="г. Екатеринбург, ул. Тестовая, 1",
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(substation)

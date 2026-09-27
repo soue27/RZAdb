@@ -1,4 +1,3 @@
-
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
@@ -37,12 +36,14 @@ class FakeInspectionTaskRepository:
         self.inspections.append(inspection)
         return inspection
 
+
 class FakeUserRepository:
     def __init__(self) -> None:
         self.users = {}
 
     async def get_by_id(self, user_id):
         return self.users.get(user_id)
+
 
 @pytest.fixture
 def service_dependencies():
@@ -59,7 +60,8 @@ def service_dependencies():
 
     return service, repository, user_repository, substation_repository
 
-def make_user(role: UserRole) -> User:
+
+def make_user(role: UserRole, system_user_id) -> User:
     """Создаёт минимального пользователя с явным ID для unit-тестов."""
     return User(
         id=uuid4(),
@@ -69,7 +71,10 @@ def make_user(role: UserRole) -> User:
         password_hash="test-hash",
         access_category=AccessCategory.IV,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
+
 
 class FakeSubstationRepository:
     def __init__(self) -> None:
@@ -80,17 +85,17 @@ class FakeSubstationRepository:
 
 
 @pytest.mark.asyncio
-async def test_create_inspection_task() -> None:
+async def test_create_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
     user_repository.users[manager.id] = manager
 
     now = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
@@ -110,17 +115,17 @@ async def test_create_inspection_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_only_manager_can_create_inspection_task() -> None:
+async def test_only_manager_can_create_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    engineer = make_user(UserRole.ENGINEER)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
     user_repository.users[engineer.id] = engineer
 
     with pytest.raises(ValueError, match="только Manager"):
@@ -131,18 +136,18 @@ async def test_only_manager_can_create_inspection_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_assign_inspection_task() -> None:
+async def test_assign_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -180,18 +185,18 @@ async def test_assign_inspection_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_only_manager_can_assign_inspection_task() -> None:
+async def test_only_manager_can_assign_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -210,18 +215,18 @@ async def test_only_manager_can_assign_inspection_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cannot_assign_non_engineer_or_manager() -> None:
+async def test_cannot_assign_non_engineer_or_manager(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    admin = make_user(UserRole.ADMIN)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    admin = make_user(UserRole.ADMIN, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[admin.id] = admin
@@ -240,18 +245,18 @@ async def test_cannot_assign_non_engineer_or_manager() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cannot_assign_already_assigned_task() -> None:
+async def test_cannot_assign_already_assigned_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -274,19 +279,20 @@ async def test_cannot_assign_already_assigned_task() -> None:
             assignee_id=engineer.id,
         )
 
+
 @pytest.mark.asyncio
-async def test_assigned_engineer_can_accept_inspection_task() -> None:
+async def test_assigned_engineer_can_accept_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -326,20 +332,23 @@ async def test_assigned_engineer_can_accept_inspection_task() -> None:
     assert history.new_status == TaskStatus.IN_PROGRESS
     assert history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
-async def test_only_assigned_executor_can_accept_inspection_task() -> None:
+async def test_only_assigned_executor_can_accept_inspection_task(
+    system_user_id,
+) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
-    another_engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
+    another_engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -365,19 +374,20 @@ async def test_only_assigned_executor_can_accept_inspection_task() -> None:
             actor_id=another_engineer.id,
         )
 
+
 @pytest.mark.asyncio
-async def test_assigned_engineer_can_complete_inspection_task() -> None:
+async def test_assigned_engineer_can_complete_inspection_task(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -435,19 +445,20 @@ async def test_assigned_engineer_can_complete_inspection_task() -> None:
     assert history.new_status == TaskStatus.COMPLETED
     assert history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
-async def test_inspection_cannot_be_completed_without_remarks() -> None:
+async def test_inspection_cannot_be_completed_without_remarks(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -476,20 +487,21 @@ async def test_inspection_cannot_be_completed_without_remarks() -> None:
             remarks="   ",
         )
 
+
 @pytest.mark.asyncio
-async def test_only_assigned_executor_can_complete_inspection() -> None:
+async def test_only_assigned_executor_can_complete_inspection(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
-    another_engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
+    another_engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -522,19 +534,20 @@ async def test_only_assigned_executor_can_complete_inspection() -> None:
             remarks="Замечаний нет.",
         )
 
+
 @pytest.mark.asyncio
-async def test_assigned_engineer_can_send_inspection_to_review() -> None:
+async def test_assigned_engineer_can_send_inspection_to_review(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -588,20 +601,23 @@ async def test_assigned_engineer_can_send_inspection_to_review() -> None:
     assert history.new_status == TaskStatus.UNDER_REVIEW
     assert history.actor_id == engineer.id
 
+
 @pytest.mark.asyncio
-async def test_only_assigned_executor_can_send_inspection_to_review() -> None:
+async def test_only_assigned_executor_can_send_inspection_to_review(
+    system_user_id,
+) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
-    another_engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
+    another_engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -639,19 +655,20 @@ async def test_only_assigned_executor_can_send_inspection_to_review() -> None:
             actor_id=another_engineer.id,
         )
 
+
 @pytest.mark.asyncio
-async def test_cannot_send_in_progress_inspection_to_review() -> None:
+async def test_cannot_send_in_progress_inspection_to_review(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
     service = InspectionTaskService(
-    repository,
-    user_repository,
-    substation_repository,
-)
+        repository,
+        user_repository,
+        substation_repository,
+    )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     user_repository.users[manager.id] = manager
     user_repository.users[engineer.id] = engineer
@@ -678,8 +695,9 @@ async def test_cannot_send_in_progress_inspection_to_review() -> None:
             actor_id=engineer.id,
         )
 
+
 @pytest.mark.asyncio
-async def test_manager_can_approve_inspection() -> None:
+async def test_manager_can_approve_inspection(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
@@ -691,8 +709,8 @@ async def test_manager_can_approve_inspection() -> None:
         substation_repository,
     )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     substation_id = uuid4()
     department_id = uuid4()
@@ -704,6 +722,8 @@ async def test_manager_can_approve_inspection() -> None:
         enterprise_id=department_id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     user_repository.users[manager.id] = manager
@@ -762,8 +782,9 @@ async def test_manager_can_approve_inspection() -> None:
     assert history.new_status == TaskStatus.CLOSED
     assert history.actor_id == manager.id
 
+
 @pytest.mark.asyncio
-async def test_manager_can_return_inspection_for_revision() -> None:
+async def test_manager_can_return_inspection_for_revision(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
@@ -774,8 +795,8 @@ async def test_manager_can_return_inspection_for_revision() -> None:
         substation_repository,
     )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     substation_id = uuid4()
     department_id = uuid4()
@@ -787,6 +808,8 @@ async def test_manager_can_return_inspection_for_revision() -> None:
         enterprise_id=department_id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     user_repository.users[manager.id] = manager
@@ -851,8 +874,9 @@ async def test_manager_can_return_inspection_for_revision() -> None:
     assert history.actor_id == manager.id
     assert history.comment == reason
 
+
 @pytest.mark.asyncio
-async def test_cannot_return_inspection_without_reason() -> None:
+async def test_cannot_return_inspection_without_reason(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
@@ -863,8 +887,8 @@ async def test_cannot_return_inspection_without_reason() -> None:
         substation_repository,
     )
 
-    manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     substation_id = uuid4()
     department_id = uuid4()
@@ -876,6 +900,8 @@ async def test_cannot_return_inspection_without_reason() -> None:
         enterprise_id=department_id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     user_repository.users[manager.id] = manager
@@ -917,8 +943,11 @@ async def test_cannot_return_inspection_without_reason() -> None:
             approve=False,
         )
 
+
 @pytest.mark.asyncio
-async def test_manager_from_another_department_cannot_review_inspection() -> None:
+async def test_manager_from_another_department_cannot_review_inspection(
+    system_user_id,
+) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
@@ -929,9 +958,9 @@ async def test_manager_from_another_department_cannot_review_inspection() -> Non
         substation_repository,
     )
 
-    manager = make_user(UserRole.MANAGER)
-    another_manager = make_user(UserRole.MANAGER)
-    engineer = make_user(UserRole.ENGINEER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    another_manager = make_user(UserRole.MANAGER, system_user_id)
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
 
     substation_id = uuid4()
 
@@ -946,6 +975,8 @@ async def test_manager_from_another_department_cannot_review_inspection() -> Non
         enterprise_id=department_id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     user_repository.users[manager.id] = manager
@@ -991,8 +1022,9 @@ async def test_manager_from_another_department_cannot_review_inspection() -> Non
             approve=True,
         )
 
+
 @pytest.mark.asyncio
-async def test_manager_cannot_review_own_inspection() -> None:
+async def test_manager_cannot_review_own_inspection(system_user_id) -> None:
     repository = FakeInspectionTaskRepository()
     user_repository = FakeUserRepository()
     substation_repository = FakeSubstationRepository()
@@ -1003,8 +1035,8 @@ async def test_manager_cannot_review_own_inspection() -> None:
         substation_repository,
     )
 
-    manager = make_user(UserRole.MANAGER)
-    another_manager = make_user(UserRole.MANAGER)
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    another_manager = make_user(UserRole.MANAGER, system_user_id)
 
     substation_id = uuid4()
     department_id = uuid4()
@@ -1017,6 +1049,8 @@ async def test_manager_cannot_review_own_inspection() -> None:
         enterprise_id=department_id,
         highest_voltage=HighestVoltage.KV_110,
         dispatch_name="ПС Тестовая",
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     user_repository.users[manager.id] = manager
@@ -1070,4 +1104,3 @@ async def test_manager_cannot_review_own_inspection() -> None:
     )
 
     assert result.status == TaskStatus.CLOSED
-

@@ -10,7 +10,7 @@ from app.domain.inspection import Inspection
 
 
 @pytest.mark.asyncio
-async def test_get_by_substation_id() -> None:
+async def test_get_by_substation_id(system_user_id) -> None:
     substation_id = uuid7()
 
     scan_file = File(
@@ -22,6 +22,8 @@ async def test_get_by_substation_id() -> None:
         size=1024,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     first_inspection = Inspection(
@@ -30,8 +32,9 @@ async def test_get_by_substation_id() -> None:
         inspection_task_id=uuid7(),
         inspection_date=date(2026, 8, 1),
         remarks="Первый осмотр",
-        created_by=uuid7(),
+        created_by=system_user_id,
         scan_file=scan_file,
+        updated_by=system_user_id,
     )
 
     second_inspection = Inspection(
@@ -40,7 +43,8 @@ async def test_get_by_substation_id() -> None:
         inspection_task_id=uuid7(),
         inspection_date=date(2026, 9, 1),
         remarks="Второй осмотр",
-        created_by=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = AsyncMock()

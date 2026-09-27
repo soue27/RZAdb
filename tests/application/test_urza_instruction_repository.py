@@ -13,7 +13,7 @@ from app.domain.urza_instruction import (
 
 
 @pytest.mark.asyncio
-async def test_get_by_id():
+async def test_get_by_id(system_user_id):
     session = MagicMock()
     session.get = AsyncMock()
 
@@ -21,6 +21,8 @@ async def test_get_by_id():
     instruction = URZAInstruction(
         id=instruction_id,
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = instruction
@@ -37,7 +39,7 @@ async def test_get_by_id():
 
 
 @pytest.mark.asyncio
-async def test_get_by_urza_id():
+async def test_get_by_urza_id(system_user_id):
     session = MagicMock()
     session.scalar = AsyncMock()
 
@@ -45,6 +47,8 @@ async def test_get_by_urza_id():
     instruction = URZAInstruction(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = instruction
@@ -79,13 +83,15 @@ async def test_get_version_by_id():
 
 
 @pytest.mark.asyncio
-async def test_add_instruction():
+async def test_add_instruction(system_user_id):
     session = MagicMock()
     session.flush = AsyncMock()
 
     instruction = URZAInstruction(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = URZAInstructionRepository(session)

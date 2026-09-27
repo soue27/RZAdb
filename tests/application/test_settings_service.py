@@ -9,7 +9,7 @@ from app.domain.rza_settings import SettingsForm
 
 
 @pytest.mark.asyncio
-async def test_get_by_urza_returns_form_when_access_allowed() -> None:
+async def test_get_by_urza_returns_form_when_access_allowed(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -19,6 +19,8 @@ async def test_get_by_urza_returns_form_when_access_allowed() -> None:
     settings_form = SettingsForm(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -44,6 +46,7 @@ async def test_get_by_urza_returns_form_when_access_allowed() -> None:
     repository.get_form_by_urza_id.assert_awaited_once_with(
         urza_id,
     )
+
 
 @pytest.mark.asyncio
 async def test_get_by_urza_returns_none_when_access_denied() -> None:
@@ -73,6 +76,7 @@ async def test_get_by_urza_returns_none_when_access_denied() -> None:
     )
 
     repository.get_form_by_urza_id.assert_not_awaited()
+
 
 @pytest.mark.asyncio
 async def test_create_form_success() -> None:
@@ -108,6 +112,7 @@ async def test_create_form_success() -> None:
 
     repository.add_form.assert_awaited_once_with(result)
 
+
 @pytest.mark.asyncio
 async def test_create_form_raises_when_access_denied() -> None:
     repository = AsyncMock()
@@ -137,7 +142,7 @@ async def test_create_form_raises_when_access_denied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_form_raises_when_form_already_exists() -> None:
+async def test_create_form_raises_when_form_already_exists(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -147,6 +152,8 @@ async def test_create_form_raises_when_form_already_exists() -> None:
     existing_form = SettingsForm(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -171,8 +178,9 @@ async def test_create_form_raises_when_form_already_exists() -> None:
     )
     repository.add_form.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_create_record_success() -> None:
+async def test_create_record_success(system_user_id) -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
@@ -185,6 +193,8 @@ async def test_create_record_success() -> None:
     settings_form = SettingsForm(
         id=settings_form_id,
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     access_service.can_access_urza.return_value = True
@@ -227,6 +237,7 @@ async def test_create_record_success() -> None:
     )
 
     repository.add_record.assert_awaited_once_with(result)
+
 
 @pytest.mark.asyncio
 async def test_create_record_raises_when_access_denied() -> None:

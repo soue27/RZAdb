@@ -10,12 +10,14 @@ from app.infrastructure.database.engine import async_session_factory
 
 
 @pytest.mark.asyncio
-async def test_connection_persistence() -> None:
+async def test_connection_persistence(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
             full_name="Тестовое производственное отделение",
             short_name="ТПО",
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         substation = Substation(
@@ -25,6 +27,8 @@ async def test_connection_persistence() -> None:
             latitude=Decimal("56.123456"),
             longitude=Decimal("60.123456"),
             operational_current_type=OperationalCurrentType.PERMANENT,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         connection = Connection(
@@ -33,6 +37,8 @@ async def test_connection_persistence() -> None:
             sap_code="SAP-CONN-001",
             asureo_code="ASUREO-CONN-001",
             rdu_subordination=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
         )
 
         session.add(connection)

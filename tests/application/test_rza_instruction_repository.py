@@ -13,7 +13,7 @@ from app.domain.rza_instruction import (
 
 
 @pytest.mark.asyncio
-async def test_get_by_id():
+async def test_get_by_id(system_user_id):
     session = MagicMock()
     session.get = AsyncMock()
 
@@ -21,6 +21,8 @@ async def test_get_by_id():
     instruction = RZAInstruction(
         id=instruction_id,
         substation_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = instruction
@@ -35,8 +37,9 @@ async def test_get_by_id():
         instruction_id,
     )
 
+
 @pytest.mark.asyncio
-async def test_get_by_substation_id():
+async def test_get_by_substation_id(system_user_id):
     session = MagicMock()
     session.scalar = AsyncMock()
 
@@ -44,6 +47,8 @@ async def test_get_by_substation_id():
     instruction = RZAInstruction(
         id=uuid7(),
         substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = instruction
@@ -54,6 +59,7 @@ async def test_get_by_substation_id():
 
     assert result is instruction
     session.scalar.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_get_version_by_id():
@@ -75,14 +81,17 @@ async def test_get_version_by_id():
         version_id,
     )
 
+
 @pytest.mark.asyncio
-async def test_add_instruction():
+async def test_add_instruction(system_user_id):
     session = MagicMock()
     session.flush = AsyncMock()
 
     instruction = RZAInstruction(
         id=uuid7(),
         substation_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = RZAInstructionRepository(session)
@@ -92,6 +101,7 @@ async def test_add_instruction():
     assert result is instruction
     session.add.assert_called_once_with(instruction)
     session.flush.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_add_version():
@@ -107,6 +117,7 @@ async def test_add_version():
     assert result is version
     session.add.assert_called_once_with(version)
     session.flush.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_get_current_version():

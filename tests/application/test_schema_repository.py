@@ -8,12 +8,14 @@ from app.domain.schema import SchemaForm, SchemaRecord
 
 
 @pytest.mark.asyncio
-async def test_get_form_by_id_returns_schema_form() -> None:
+async def test_get_form_by_id_returns_schema_form(system_user_id) -> None:
     session = AsyncMock()
 
     schema_form = SchemaForm(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.get.return_value = schema_form
@@ -30,7 +32,7 @@ async def test_get_form_by_id_returns_schema_form() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_form_by_urza_id_returns_schema_form() -> None:
+async def test_get_form_by_urza_id_returns_schema_form(system_user_id) -> None:
     session = AsyncMock()
 
     urza_id = uuid7()
@@ -38,6 +40,8 @@ async def test_get_form_by_urza_id_returns_schema_form() -> None:
     schema_form = SchemaForm(
         id=uuid7(),
         urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     session.scalar.return_value = schema_form
@@ -69,14 +73,17 @@ async def test_get_record_by_id_returns_schema_record() -> None:
         record_id,
     )
 
+
 @pytest.mark.asyncio
-async def test_add_form() -> None:
+async def test_add_form(system_user_id) -> None:
     session = MagicMock()
     session.flush = AsyncMock()
 
     schema_form = SchemaForm(
         id=uuid7(),
         urza_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     repository = SchemaRepository(session)
@@ -86,6 +93,7 @@ async def test_add_form() -> None:
     assert result is schema_form
     session.add.assert_called_once_with(schema_form)
     session.flush.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_add_record() -> None:

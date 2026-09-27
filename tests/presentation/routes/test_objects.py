@@ -73,7 +73,7 @@ class FakeInspectionService:
         return self.inspections
 
 
-def make_user() -> User:
+def make_user(system_user_id) -> User:
     return User(
         id=uuid7(),
         full_name="Тестовый пользователь",
@@ -82,6 +82,8 @@ def make_user() -> User:
         password_hash="hash",
         access_category=AccessCategory.IV,
         active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
 
@@ -154,8 +156,8 @@ def test_get_object_requires_authentication() -> None:
     app.dependency_overrides.clear()
 
 
-def test_get_object_returns_selected_object() -> None:
-    user = make_user()
+def test_get_object_returns_selected_object(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
     object_id = uuid7()
 
     selected_object = SelectedObject(
@@ -168,11 +170,11 @@ def test_get_object_returns_selected_object() -> None:
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService(result=selected_object)
     )
-    app.dependency_overrides[get_substation_service] = (
-        override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_substation_service] = override_substation_service(
+        FakeSubstationService()
     )
-    app.dependency_overrides[get_connection_service] = (
-        override_connection_service(FakeConnectionService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(
+        FakeConnectionService()
     )
 
     try:
@@ -192,8 +194,8 @@ def test_get_object_returns_selected_object() -> None:
         app.dependency_overrides.clear()
 
 
-def test_get_object_returns_404_when_object_not_found() -> None:
-    user = make_user()
+def test_get_object_returns_404_when_object_not_found(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
@@ -215,8 +217,8 @@ def test_get_object_returns_404_when_object_not_found() -> None:
         app.dependency_overrides.clear()
 
 
-def test_get_object_returns_403_when_access_denied() -> None:
-    user = make_user()
+def test_get_object_returns_403_when_access_denied(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
@@ -238,18 +240,18 @@ def test_get_object_returns_403_when_access_denied() -> None:
         app.dependency_overrides.clear()
 
 
-def test_get_object_rejects_invalid_uuid() -> None:
-    user = make_user()
+def test_get_object_rejects_invalid_uuid(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
 
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService()
     )
-    app.dependency_overrides[get_substation_service] = (
-        override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_substation_service] = override_substation_service(
+        FakeSubstationService()
     )
-    app.dependency_overrides[get_connection_service] = (
-        override_connection_service(FakeConnectionService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(
+        FakeConnectionService()
     )
 
     try:
@@ -264,8 +266,8 @@ def test_get_object_rejects_invalid_uuid() -> None:
         app.dependency_overrides.clear()
 
 
-def test_get_substation_inspections_returns_inspections() -> None:
-    user = make_user()
+def test_get_substation_inspections_returns_inspections(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
     substation_id = uuid7()
 
     inspections = [
@@ -276,6 +278,7 @@ def test_get_substation_inspections_returns_inspections() -> None:
             inspection_date=date(2026, 9, 1),
             remarks="Замечаний нет.",
             created_by=user.id,
+            updated_by=system_user_id,
         ),
         Inspection(
             id=uuid7(),
@@ -284,6 +287,7 @@ def test_get_substation_inspections_returns_inspections() -> None:
             inspection_date=date(2026, 8, 1),
             remarks="Обнаружено замечание.",
             created_by=user.id,
+            updated_by=system_user_id,
         ),
     ]
 
@@ -297,10 +301,8 @@ def test_get_substation_inspections_returns_inspections() -> None:
             ),
         )
     )
-    app.dependency_overrides[get_inspection_service] = (
-        override_inspection_service(
-            FakeInspectionService(inspections),
-        )
+    app.dependency_overrides[get_inspection_service] = override_inspection_service(
+        FakeInspectionService(inspections),
     )
 
     try:

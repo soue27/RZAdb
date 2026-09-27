@@ -144,12 +144,9 @@ async def test_upload_sets_file_size_from_content(
 
     assert result.size == 9
 
+
 @pytest.mark.asyncio
-async def test_download_file(
-    service,
-    repository,
-    storage,
-):
+async def test_download_file(service, repository, storage, system_user_id):
     file = File(
         s3_key="files/2026/09/test.pdf",
         original_name="test.pdf",
@@ -158,6 +155,8 @@ async def test_download_file(
         size=4,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
 
     file_id = uuid7()
@@ -214,12 +213,9 @@ async def test_download_file_not_found(
 
     storage.download.assert_not_awaited()
 
+
 @pytest.mark.asyncio
-async def test_archive_file(
-    service,
-    repository,
-    storage,
-):
+async def test_archive_file(service, repository, storage, system_user_id):
     file_id = uuid7()
     user_id = uuid7()
 
@@ -231,6 +227,8 @@ async def test_archive_file(
         size=4,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
     file.id = file_id
 
@@ -272,7 +270,7 @@ async def test_archive_missing_file(
     repository.save = AsyncMock()
 
     with pytest.raises(
-            FileNotFoundError,
+        FileNotFoundError,
     ):
         await service.archive(
             file_id=file_id,
@@ -285,9 +283,7 @@ async def test_archive_missing_file(
 
 @pytest.mark.asyncio
 async def test_archive_already_archived_file(
-    service,
-    repository,
-    storage,
+    service, repository, storage, system_user_id
 ):
     file_id = uuid7()
     user_id = uuid7()
@@ -300,10 +296,12 @@ async def test_archive_already_archived_file(
         size=4,
         mime_type="application/pdf",
         uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
     file.id = file_id
     file.deleted_at = datetime.now(UTC)
-    file.deleted_by = uuid7()
+    file.deleted_by = system_user_id
 
     repository.get_by_id = AsyncMock(
         return_value=file,
@@ -311,8 +309,8 @@ async def test_archive_already_archived_file(
     repository.save = AsyncMock()
 
     with pytest.raises(
-            ValueError,
-            match="уже находится в архиве",
+        ValueError,
+        match="уже находится в архиве",
     ):
         await service.archive(
             file_id=file_id,
