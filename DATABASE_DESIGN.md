@@ -1,16 +1,18 @@
-# DATABASE_DESIGN.md — RZAdb / База Данных РЗА
+# DATABASE_DESIGN.md — RZAdb
 
 ## 1. Назначение
 
-RZAdb — база и веб-приложение для учёта оборудования РЗА, подстанций, присоединений, УРЗА, технической документации, формуляров, уставок, схем, ТО, программ, инструкций, осмотров и задач.
+RZAdb — внутренняя система учёта оборудования РЗА, подстанций, присоединений, устройств РЗА и связанной технической документации.
 
-Документ фиксирует согласованные доменные и архитектурные решения.
+Этот документ фиксирует согласованные доменные и архитектурные решения по базе данных.
 
-**Новые сущности, поля, связи и бизнес-правила не добавлять без отдельного доменного решения.**
+Главное правило:
+
+> Не добавлять новые сущности, поля, связи, ограничения или бизнес-правила без отдельного доменного решения.
 
 ---
 
-## 2. Иерархия
+## 2. Иерархия предметной области
 
 ```text
 Holding
@@ -21,55 +23,90 @@ Holding
                 └── URZA
 ```
 
-`Enterprise` представляет Holding, Branch или Production Department и использует `parent_id`.
+Подстанция может содержать множество присоединений.
+
+Присоединение может содержать множество устройств РЗА.
 
 ---
 
-## 3. Enterprise
+## 3. Enterprise hierarchy
 
-Таблица `enterprises` концептуально содержит:
-
-```text
-id
-type
-parent_id
-full_name
-short_name
-sap_code
-audit fields
-```
-
-Типы:
+Верхний уровень:
 
 ```text
-HOLDING
-BRANCH
-DEPARTMENT
+Holding
+Branch
+Production Department
 ```
+
+Подстанция, присоединение и URZA находятся ниже.
+
+Доступ пользователей должен учитывать принадлежность объекта соответствующему enterprise-контексту.
 
 ---
 
-## 4. Substation
+## 4. Роли
 
-Таблица `substations`:
+Используются:
 
 ```text
-id
-enterprise_id
-highest_voltage
-operational_current_type
-dispatch_name
-sap_code
-asureo_code
-latitude
-longitude
-address
-audit fields
+SUPERADMIN
+ADMIN
+SPECIALIST
+MANAGER
+ENGINEER
 ```
 
-`enterprise_id` → Production Department.
+`AccessService` является централизованной точкой authorization.
 
-Высшее напряжение:
+Проверки:
+
+```text
+can_access_enterprise()
+can_access_substation()
+can_access_connection()
+can_access_urza()
+get_accessible_enterprise_roots()
+```
+
+Authorization не должен дублироваться в UI.
+
+---
+
+## 5. Подстанция
+
+Подстанция является контейнером для:
+
+```text
+Connections
+URZA
+```
+
+Диспетчерское имя подстанции уникально в соответствующей доменной области.
+
+SAP и ASUREO не считаются глобально уникальными без отдельного доменного решения.
+
+---
+
+## 6. Присоединение
+
+Присоединение принадлежит подстанции.
+
+Присоединение может содержать множество URZA.
+
+Диспетчерское имя должно быть уникальным в соответствующей доменной области.
+
+---
+
+## 7. URZA
+
+URZA принадлежит присоединению.
+
+Имя URZA уникально внутри присоединения.
+
+### Напряжение
+
+Допустимые значения:
 
 ```text
 500
@@ -81,55 +118,7 @@ audit fields
 0.4
 ```
 
----
-
-## 5. Connection
-
-Таблица `connections`:
-
-```text
-id
-substation_id
-dispatch_name
-sap_code
-asureo_code
-rdu_subordination
-operational_current_type
-audit fields
-```
-
-Оперативный ток:
-
-```text
-PERMANENT
-RECTIFIED
-ALTERNATING
-```
-
-Не добавлять дополнительные поля без доменного решения.
-
----
-
-## 6. URZA
-
-Таблица `urzas`:
-
-```text
-id
-connection_id
-dispatch_name
-rdu_subordination
-inventory_number
-commissioning_date
-status
-element_base
-category
-room_category
-complexity
-audit fields
-```
-
-Статусы:
+### Статусы
 
 ```text
 IN_OPERATION
@@ -138,7 +127,7 @@ DECOMMISSIONED
 RESERVE
 ```
 
-База:
+### Элементная база
 
 ```text
 ELECTROMECHANICAL
@@ -146,7 +135,9 @@ MICROELECTRONIC
 MICROPROCESSOR
 ```
 
-Категория УРЗА:
+### Категория URZA
+
+Используются категории:
 
 ```text
 I
@@ -155,273 +146,21 @@ III
 IV
 ```
 
-Категория помещения:
+URZA II может обслуживаться персоналом категорий:
 
 ```text
-I
 II
 III
-```
-
-`inventory_number` nullable.
-
-УРЗА II обслуживается персоналом категорий II, III, IV.
-
----
-
-## 7. Users
-
-Минимальная концептуальная структура:
-
-```text
-id
-full_name
-email
-password_hash
-role
-enterprise_id
-access_category
-active
-audit fields
-```
-
-Роли:
-
-```text
-SUPERADMIN
-ADMIN
-SPECIALIST
-MANAGER
-ENGINEER
-```
-
-Привязка:
-
-```text
-SUPERADMIN → без enterprise binding
-SPECIALIST → Holding/Branch
-ADMIN/MANAGER/ENGINEER → Department
+IV
 ```
 
 ---
 
-## 8. AccessService
+## 8. Формуляр
 
-Доступ централизован:
+Формуляр — логическая группировка документов и данных URZA.
 
-```text
-can_access_enterprise()
-can_access_substation()
-can_access_connection()
-can_access_urza()
-get_accessible_enterprise_roots()
-```
-
-Корни дерева:
-
-```text
-SUPERADMIN → Holding roots
-SPECIALIST → bound Holding/Branch
-ADMIN/MANAGER/ENGINEER → bound Department
-```
-
-Пользователь не видит уровни выше своей границы.
-
----
-
-## 9. Soft delete
-
-Основные сущности используют:
-
-```text
-deleted_at
-deleted_by
-```
-
-Обычные active queries исключают:
-
-```sql
-deleted_at IS NOT NULL
-```
-
-Архивирование не означает физическое удаление.
-
----
-
-## 10. Универсальный аудит
-
-Принято направление к единому набору audit-полей для моделей:
-
-```text
-created_at
-created_by
-updated_at
-updated_by
-deleted_at
-deleted_by
-```
-
-Смысл:
-
-| Поле | Назначение |
-|---|---|
-| `created_at` | время создания |
-| `created_by` | пользователь, создавший запись |
-| `updated_at` | время последнего изменения |
-| `updated_by` | пользователь, последним изменивший запись |
-| `deleted_at` | время soft delete/архивирования |
-| `deleted_by` | пользователь, выполнивший soft delete |
-
-### Архитектурный принцип
-
-Audit-поля должны предоставляться централизованно базовыми mixins и не дублироваться вручную в каждой модели.
-
-Целевой подход:
-
-```text
-UUIDMixin
-TimestampMixin
-SoftDeleteMixin
-```
-
-где audit-поля распределены между базовыми mixins.
-
-Точная реализация FK, nullable/NOT NULL и способ автоматического заполнения `created_by`/`updated_by` ещё требуют реализации после отдельного анализа.
-
-### Важное ограничение
-
-Нельзя придумывать автора старых записей.
-
-Если существующие записи не содержат исторического автора, миграция должна иметь явно согласованную стратегию:
-
-```text
-unknown / NULL / system actor / другое решение
-```
-
-Выбор стратегии — доменное решение пользователя.
-
----
-
-## 11. Audit критических операций
-
-Аудит обязателен для:
-
-- прав доступа;
-- критических данных РЗА;
-- версий документов;
-- архивирования/восстановления;
-- загрузки/замены документов;
-- изменения статусов задач.
-
-Аудит не зависит от UI.
-
----
-
-## 12. TreeService
-
-DTO:
-
-```text
-EnterpriseTreeNode
-├── id
-├── type
-├── full_name
-├── short_name
-├── children[]
-└── substations[]
-
-SubstationTreeNode
-├── id
-├── dispatch_name
-└── connections[]
-
-ConnectionTreeNode
-├── id
-├── dispatch_name
-└── urzas[]
-
-URZATreeNode
-├── id
-└── dispatch_name
-```
-
-Алгоритм:
-
-```text
-AccessService
-→ active Enterprise
-→ Substation
-→ Connection
-→ URZA
-→ DTO
-```
-
-Сортировка:
-
-- Enterprise → `full_name`;
-- Substation/Connection/URZA → `dispatch_name`.
-
-Текущая реализация может фильтровать потомков в памяти. Для MVP допустимо; при росте данных оптимизировать.
-
----
-
-## 13. Repository API
-
-```text
-EnterpriseRepository:
-  get_by_id()
-  get_all_active()
-  is_ancestor_or_same()
-
-SubstationRepository:
-  get_by_id()
-  get_all_active()
-  get_by_enterprise_ids()
-
-ConnectionRepository:
-  get_by_id()
-  get_all_active()
-  get_by_substation_ids()
-
-URZARepository:
-  get_by_id()
-  get_all_active()
-  get_by_connection_ids()
-```
-
-Repository отвечает за доступ к данным, а не за UI или бизнес-правила.
-
----
-
-## 14. Versioning
-
-Версионируемые документы не перезаписывать:
-
-```text
-current version
-      ↓
-new version
-      ↓
-old version remains in history
-```
-
-Для ОТД:
-
-```text
-OTD
-├── current version
-└── historical versions
-```
-
-Старая версия остаётся доступной.
-
----
-
-## 15. Формуляр
-
-Формуляр — логическая группировка.
-
-Под URZA на одном логическом уровне находятся:
+На одном логическом уровне под URZA находятся:
 
 ```text
 ОТД
@@ -431,11 +170,23 @@ OTD
 Программы
 ```
 
+Инструкция URZA также является отдельным документным разделом URZA.
+
 ---
 
-## 16. ОТД
+## 9. ОТД
 
-`OTDPurpose`:
+ОТД имеет текущую версию и исторические версии.
+
+```text
+OTD
+├── current version
+└── historical versions
+```
+
+Старые версии не удаляются.
+
+### Назначение ОТД
 
 ```text
 RZA
@@ -446,41 +197,123 @@ RA
 
 Для ОТД подпись не обязательна.
 
-ОТД имеет:
+### Versioning
+
+Создание новой версии:
 
 ```text
 current version
-historical versions
+      ↓
+new version
+      ↓
+old version remains in history
 ```
 
-Текущая UI-реализация позволяет выбирать историческую версию через HTMX без полной перезагрузки страницы.
+Одна бизнес-операция создания новой версии должна быть атомарной.
+
+В UI исторические версии доступны через HTMX.
 
 ---
 
-## 17. ТО
+## 10. Уставки
 
-Типы:
+`SettingsForm` относится к одному URZA.
 
 ```text
-В
-К
-К1
-Н
-Т
-ТК
-О
-ОСМ
-ВП
-ПП
+URZA
+└── SettingsForm
+    └── SettingsRecord[]
 ```
 
-Подписанная форма/скан обязательна.
+`SettingsRecord` фиксирует:
+
+```text
+change_date
+parameter_name
+initial_setting
+new_setting
+change_reason
+signed_form_file
+ task
+creator
+```
+
+История изменений не должна уничтожаться физически.
+
+---
+
+## 11. Схемы
+
+`SchemaForm` относится к одному URZA.
+
+```text
+URZA
+└── SchemaForm
+    └── SchemaRecord[]
+```
+
+Запись схемы содержит:
+
+```text
+schema_number
+schema_name
+change_description
+change_justification
+upload_date
+scan_file
+editable_file
+signed_form_file
+task
+creator
+```
+
+Файлы имеют явные FK на `files.id`.
+
+---
+
+## 12. ТО
+
+ТО относится непосредственно к URZA.
+
+```text
+URZA
+└── TORecord[]
+```
+
+### Типы ТО
+
+```text
+В   — Профилактическое восстановление
+К   — Профилактический контроль
+К1  — Первый профилактический контроль
+Н   — Наладка
+Т   — Тестовый контроль
+ТК  — Технический контроль
+О   — Опробование
+ОСМ — Технический осмотр
+ВП  — Внеочередная проверка
+ПП  — Послеаварийная проверка
+```
+
+Для `ТК`, `О`, `ОСМ` протокол не требуется согласно исходному workflow.
+
+Подписанная форма/скан для обычной записи ТО обязательна.
 
 Плановая дата ТО хранится для последующего микросервиса.
 
+### Исторические ТО
+
+Текущая модель не перерабатывается без отдельного доменного решения.
+
+Исходный workflow предусматривает отдельный процесс ввода исторических ТО.
+
+Вопрос исторических ТО является отложенным.
+
 ---
 
-## 18. Программы
+## 13. Программы
+
+Программа относится непосредственно к URZA.
 
 Типы:
 
@@ -490,13 +323,114 @@ DECOMMISSIONING
 WORK
 ```
 
-Сканы хранятся в object storage и доступны для просмотра/скачивания.
+Запись программы содержит:
+
+```text
+program_type
+program_number
+scan_file
+editable_file
+task
+creator
+```
+
+Скан программы является обязательным.
+
+Файлы хранятся через object storage, а в БД хранится ссылка/метаданные файла.
 
 ---
 
-## 19. Tasks
+## 14. Инструкция URZA
 
-Типы работ:
+Инструкция URZA является отдельной сущностью уровня URZA.
+
+```text
+URZA
+└── URZAInstruction
+    └── URZAInstructionVersion[]
+```
+
+`URZAInstruction` — логическая группа.
+
+`URZAInstructionVersion` — конкретная версия документа.
+
+Для URZA существует одна группа инструкции:
+
+```text
+URZAInstruction.urza_id UNIQUE
+```
+
+### Версия инструкции
+
+Содержит:
+
+```text
+version_number
+effective_date
+change_description
+change_justification
+scan_file
+editable_file
+creator
+```
+
+Скан инструкции обязателен.
+
+Редактируемый файл необязателен.
+
+Исторические версии не удаляются.
+
+Создание новой версии:
+
+```text
+current version
+      ↓
+new version
+      ↓
+old version remains available
+```
+
+В UI история версий доступна через HTMX.
+
+При первом открытии истории она свернута.
+
+После выбора версии через историю она остаётся раскрытой.
+
+---
+
+## 15. Инструкция РЗА уровня подстанции
+
+Инструкция РЗА подстанции — другая сущность и не должна объединяться с `URZAInstruction`.
+
+```text
+Substation
+└── RZAInstruction
+    └── RZAInstructionVersion[]
+```
+
+Она относится к уровню Substation.
+
+Не использовать `URZAInstruction` для инструкции РЗА подстанции.
+
+---
+
+## 16. Схемы селективности
+
+Схемы селективности относятся к уровню Substation.
+
+```text
+Substation
+└── SelectivityScheme
+    └── SelectivitySchemeVersion[]
+```
+
+Это отдельная сущность от `SchemaForm` / `SchemaRecord`, относящихся к URZA.
+
+---
+
+## 17. Tasks
+
+Типы задач:
 
 ```text
 OTD
@@ -518,7 +452,7 @@ CLOSED
 REJECTED
 ```
 
-Активные в UI:
+Активные рабочие состояния:
 
 ```text
 ASSIGNED
@@ -526,173 +460,371 @@ IN_PROGRESS
 UNDER_REVIEW
 ```
 
-Инспекции/осмотры ПС — отдельный процесс, не обычная Task.
+Инспекции/осмотры ПС — отдельный процесс и не должны автоматически становиться обычными Tasks.
 
 ---
 
-## 20. Inspections / Осмотры
+## 18. Inspections / Осмотры
 
-**Структура БД не меняется ради изменения названия в UI.**
+В domain/database сохраняется существующая сущность `Inspection`.
 
-Существующие domain/application/database сущности `Inspection` и связанные с ними процессы сохраняются.
+Название `Inspection` в коде и БД не меняется только ради UI.
 
-В пользовательском интерфейсе используется русское отображение:
+В интерфейсе отображается:
 
 ```text
 Осмотры
 ```
 
-Не создавать отдельную сущность `Inspection` только из-за UI-названия.
+Inspection — отдельный процесс.
 
 ---
 
-## 21. Files
+## 19. Files
 
-Бинарные файлы не хранить в PostgreSQL.
+Бинарные данные не хранить в PostgreSQL.
 
-Использовать:
+Целевая архитектура:
+
+```text
+Domain entity
+    ↓
+File metadata
+    ↓
+ObjectStorage
+```
+
+Целевой storage:
 
 ```text
 S3-compatible object storage
 ```
 
-Не использовать универсальную полиморфную связь:
+Локальное хранилище может использоваться в development.
+
+Не использовать универсальную полиморфную модель:
 
 ```text
 File(owner_type, owner_id)
 ```
 
-Использовать явные связи файлов с доменными сущностями.
+Использовать явные FK:
+
+```text
+scan_file_id
+editable_file_id
+signed_form_file_id
+...
+```
+
+### Общий механизм доступа
+
+```text
+User
+ ↓
+AccessService
+ ↓
+domain object access
+ ↓
+File
+ ↓
+ObjectStorage
+ ↓
+Просмотр / Скачать
+```
+
+Не создавать отдельную несогласованную реализацию доступа к файлам для каждой сущности.
+
+PDF viewer не требуется.
 
 ---
 
-## 22. Индексы и ограничения
+## 20. Архивирование
 
-Индексы создавать исходя из реальных запросов:
+Документы и объекты не удаляются физически без отдельного доменного решения.
 
-- foreign keys;
-- `deleted_at` в active queries;
-- search fields;
-- поля уникальности;
-- часто используемые фильтры.
+Используется soft delete / archive state.
 
-SAP/ASUREO не делать глобально уникальными без отдельного доменного решения.
+Архивные объекты не должны попадать в обычные active queries и sidebar.
 
 ---
 
-## 23. Уникальность
+## 21. Audit contract
 
-Доменные ограничения:
+Универсальный audit-refactor завершён.
 
-- SAP/ASUREO не глобально уникальны без отдельного решения;
-- диспетчерское имя подстанции уникально в соответствующей области;
-- имя УРЗА уникально внутри присоединения;
-- остальные ограничения добавлять только при наличии доменного основания.
+Стандартный набор:
+
+```text
+created_at
+created_by
+updated_at
+updated_by
+deleted_at
+deleted_by
+```
+
+Смысл:
+
+```text
+created_at  — когда создано
+created_by  — кто создал
+
+updated_at  — когда последний раз изменено
+updated_by  — кто последний изменил
+
+deleted_at  — когда архивировано
+ deleted_by  — кто архивировал
+```
+
+Audit-поля должны быть реализованы централизованно через базовые mixins.
+
+Audit не должен зависеть от UI.
+
+Текущий Alembic head после audit-refactor:
+
+```text
+a74c1d8f2b90
+```
 
 ---
 
-## 24. Транзакции
+## 22. Транзакции
 
-Одна бизнес-операция атомарна.
+Одна бизнес-операция должна быть атомарной.
 
 Пример создания новой версии:
 
 ```text
 BEGIN
-  old → historical
-  new → current
-  metadata update
+
+create new version
+update required metadata
+preserve old version
+
 COMMIT
 ```
 
+Не оставлять частично выполненную бизнес-операцию.
+
+Repository не выполняет `commit()` без архитектурной причины.
+
 ---
 
-## 25. Миграции
+## 23. Миграции
 
-Alembic находится в:
+Alembic:
 
 ```text
 migrations/
 ```
 
-После изменения модели:
+Стандартный процесс:
 
 ```text
-изменить model
+изменение модели
 → создать migration
 → проверить migration
 → применить migration
-→ запустить тесты
+→ тесты
 ```
 
-Для универсального audit-refactor:
+Для значимых database changes:
 
 ```text
-inspect current schema
-→ согласовать audit contract
-→ изменить mixins/models
-→ создать migration
-→ определить стратегию старых данных
-→ применить migration
-→ тесты
+inspect
+→ plan
+→ domain decision
+→ implementation
+→ migration
+→ tests
 ```
 
 Не создавать migration до согласования структуры изменения.
 
 ---
 
-## 26. Текущий статус
+## 24. Индексы и ограничения
 
-На текущем этапе реализованы и проверены:
+Индексы создаются исходя из реальных запросов.
 
-- authentication;
-- signed cookie session;
-- AccessService;
-- EnterpriseRepository;
-- SubstationRepository;
-- ConnectionRepository;
-- URZARepository;
-- TreeService;
-- Tree DTO;
-- границы SUPERADMIN/SPECIALIST/ENGINEER;
-- soft-delete filtering;
-- sidebar UI;
-- карточка URZA;
-- карточка ОТД;
-- версии ОТД;
-- история версий ОТД;
-- переключение версии ОТД через HTMX;
-- сохранение состояния раскрытия истории при переключении версии.
+Основные кандидаты:
 
-Текущая рабочая ветка:
+- foreign keys;
+- `deleted_at` в active queries;
+- поля поиска;
+- поля уникальности;
+- часто используемые фильтры.
+
+Не добавлять индексы «на всякий случай».
+
+SAP/ASUREO не делать глобально уникальными без отдельного доменного решения.
+
+---
+
+## 25. Текущий статус
+
+Завершено:
 
 ```text
-refactor/universal-audit
+Authentication
+AccessService
+Enterprise
+Substation
+Connection
+URZA
+Tree
+Sidebar
+URZA card
+OTD
+OTD versioning
+OTD history
+Settings
+Schemes
+Maintenance
+Programs
+URZA Instruction
+URZA Instruction versioning
+Universal audit
 ```
 
-Следующий этап:
+Все шесть вкладок URZA реализованы:
 
 ```text
-исследование текущего audit-состояния
-→ проектирование универсального audit contract
-→ доменное решение
-→ implementation
-→ migration
-→ tests
+ОТД
+Уставки
+Схемы
+ТО
+Программы
+Инструкция
 ```
 
 ---
 
-## 27. Основной принцип
+## 26. Контрольный аудит — следующий этап
 
-База данных отражает согласованную предметную область.
+Перед следующим крупным функциональным изменением необходимо провести аудит фактического состояния проекта:
 
-Не добавлять поля «на всякий случай».
+```text
+current code
+→ models
+→ repositories
+→ services
+→ DTO
+→ routes
+→ dependencies
+→ templates
+→ tests
+→ migrations
+→ storage
+→ DATABASE_DESIGN
+→ AGENTS
+→ TODO
+```
 
-Не менять структуру БД ради косметического UI-изменения.
+Результат:
 
-Не дублировать сущности.
+```text
+DONE
+PARTIAL
+TODO
+NEEDS DOMAIN DECISION
+TECHNICAL DEBT
+```
 
-Не удалять исторические версии документов.
+После аудита обновляется roadmap.
 
-Не смешивать инфраструктурные детали с доменными правилами.
+Если для полного аудита недостаточно информации из текущего контекста, coding agent может собрать фактическую информацию из репозитория. Его отчёт следует использовать как источник фактического состояния, а не предполагать наличие кода.
+
+---
+
+## 27. Предварительный roadmap
+
+Порядок подлежит пересмотру после аудита:
+
+```text
+1. Контрольный аудит
+2. Обновление roadmap / TODO
+
+3. Общий механизм файлов
+   ├── File access
+   ├── Просмотр
+   ├── Скачать
+   └── ObjectStorage abstraction
+
+4. Подключение файлов ко всем URZA-вкладкам
+
+5. Полноценный CRUD документов URZA
+   ├── ОТД
+   ├── Уставки
+   ├── Схемы
+   ├── ТО
+   ├── Программы
+   └── Инструкция
+
+6. Tasks workflow
+
+7. Substation
+   ├── Основные сведения
+   ├── Присоединения
+   ├── Осмотры
+   ├── Инструкции
+   └── Схемы селективности
+
+8. Inspection workflow
+
+9. Production S3
+
+10. Backup
+
+11. Cold S3 / archive
+
+12. Notifications / automation
+```
+
+Порядок может быть изменён после контрольного аудита.
+
+---
+
+## 28. Отложенные вопросы
+
+### Исторические ТО
+
+Не изменять `historical_data` без отдельного решения.
+
+Исходный workflow требует отдельного процесса ввода исторических данных.
+
+### Files
+
+Сначала общий file contract, затем подключение к сущностям.
+
+### S3
+
+Production S3 подключать после стабилизации file abstraction.
+
+### Backup / cold storage
+
+Проектировать после стабилизации storage contract.
+
+---
+
+## 29. Основной принцип
+
+База данных должна отражать согласованную предметную область.
+
+Не:
+
+- добавлять поля «на всякий случай»;
+- создавать дублирующие сущности;
+- менять БД ради косметического UI;
+- физически удалять исторические версии;
+- смешивать domain rules и infrastructure details.
+
+При неоднозначности:
+
+```text
+исследование
+→ вопрос пользователю
+→ доменное решение
+→ реализация
+```
