@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.templating import Jinja2Templates
 
 from app.application.connections.service import ConnectionService
@@ -64,6 +64,7 @@ async def get_object(
         OTDService,
         Depends(get_otd_service),
     ],
+    otd_version: UUID | None = Query(default=None),
 ):
     try:
         selected_object = await object_service.get_object(
@@ -100,9 +101,11 @@ async def get_object(
 
         if object_type == "urza":
             urza = await urza_service.get_details(object_id)
+
             otd = await otd_service.get_details(
                 user_id=current_user.id,
                 urza_id=object_id,
+                version_id=otd_version,
             )
 
             return templates.TemplateResponse(

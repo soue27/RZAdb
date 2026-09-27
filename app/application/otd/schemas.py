@@ -31,4 +31,5 @@ class OTDVersionDetails(BaseModel):
 class OTDDetails(BaseModel):
     id: UUID
     current_version: OTDVersionDetails | None
+    selected_version: OTDVersionDetails | None
     versions: list[OTDVersionDetails]

@@ -825,3 +825,10 @@ body {
     font-size: 0.9rem;
     color: var(--rzadb-secondary);
 }
+
+.rzadb-otd-version-outdated {
+    margin-top: 3px;
+    font-size: 0.9rem;
+    color: #dc3545;
+    font-weight: 600;
+}

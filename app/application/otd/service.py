@@ -119,6 +119,29 @@ class OTDService:
 
         return otd
 
+    async def get_version_details(
+            self,
+            user_id: UUID,
+            version_id: UUID,
+    ) -> OTDVersionDetails | None:
+        version = await self.repository.get_version_by_id(version_id)
+
+        if version is None:
+            return None
+
+        otd = await self.repository.get_by_id(version.otd_id)
+
+        if otd is None:
+            return None
+
+        if not await self.access_service.can_access_urza(
+                user_id,
+                otd.urza_id,
+        ):
+            return None
+
+        return self._to_version_details(version)
+
     async def create_version(
             self,
             user_id: UUID,
@@ -164,11 +187,16 @@ class OTDService:
             self,
             user_id: UUID,
             urza_id: UUID,
+            version_id: UUID | None = None,
     ) -> OTDDetails | None:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
+        if not await self.access_service.can_access_urza(
+                user_id,
+                urza_id,
+        ):
             return None
 
         otd = await self.repository.get_by_urza_id(urza_id)
+
         if otd is None:
             return None
 
@@ -179,8 +207,30 @@ class OTDService:
             for version in versions
         ]
 
+        current_version = (
+            version_details[0]
+            if version_details
+            else None
+        )
+
+        selected_version = current_version
+
+        if version_id is not None:
+            selected_version = next(
+                (
+                    version
+                    for version in version_details
+                    if version.id == version_id
+                ),
+                None,
+            )
+
+            if selected_version is None:
+                return None
+
         return OTDDetails(
             id=otd.id,
-            current_version=version_details[0] if version_details else None,
+            current_version=current_version,
+            selected_version=selected_version,
             versions=version_details,
         )

@@ -517,6 +517,163 @@ async def test_get_details_returns_current_version_and_history() -> None:
 
     repository.get_by_urza_id.assert_awaited_once_with(urza_id)
     repository.get_versions.assert_awaited_once_with(otd_id)
+    assert result.selected_version is not None
+    assert result.selected_version.id == version_2.id
+    assert result.selected_version.version_number == 2
+
+
+@pytest.mark.asyncio
+async def test_get_details_returns_selected_version() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    otd_id = uuid7()
+
+    otd = OTD(
+        id=otd_id,
+        urza_id=urza_id,
+    )
+
+    version_2 = OTDVersion(
+        id=uuid7(),
+        otd_id=otd_id,
+        version_number=2,
+        effective_date=date(2026, 1, 1),
+        created_at=datetime(2026, 8, 20, 10, 0),
+        urza_service_life=12,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    version_1 = OTDVersion(
+        id=uuid7(),
+        otd_id=otd_id,
+        version_number=1,
+        effective_date=date(2025, 1, 1),
+        created_at=datetime(2025, 3, 15, 10, 0),
+        urza_service_life=10,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_urza_id.return_value = otd
+    repository.get_versions.return_value = [version_2, version_1]
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_details(
+        user_id=user_id,
+        urza_id=urza_id,
+        version_id=version_1.id,
+    )
+
+    assert result is not None
+    assert result.current_version is not None
+    assert result.current_version.id == version_2.id
+
+    assert result.selected_version is not None
+    assert result.selected_version.id == version_1.id
+    assert result.selected_version.version_number == 1
+    assert result.selected_version.urza_service_life == 10
+
+    assert result.versions[0].id == version_2.id
+    assert result.versions[1].id == version_1.id
+
+
+@pytest.mark.asyncio
+async def test_get_details_returns_none_when_selected_version_not_found() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    otd_id = uuid7()
+    unknown_version_id = uuid7()
+
+    otd = OTD(
+        id=otd_id,
+        urza_id=urza_id,
+    )
+
+    version = OTDVersion(
+        id=uuid7(),
+        otd_id=otd_id,
+        version_number=1,
+        effective_date=date(2025, 1, 1),
+        created_at=datetime(2025, 3, 15, 10, 0),
+        urza_service_life=10,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_urza_id.return_value = otd
+    repository.get_versions.return_value = [version]
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_details(
+        user_id=user_id,
+        urza_id=urza_id,
+        version_id=unknown_version_id,
+    )
+
+    assert result is None
+
+    repository.get_by_urza_id.assert_awaited_once_with(urza_id)
+    repository.get_versions.assert_awaited_once_with(otd_id)
+
+
+@pytest.mark.asyncio
+async def test_get_details_does_not_select_version_from_another_otd() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    otd_id = uuid7()
+    unknown_version_id = uuid7()
+
+    otd = OTD(
+        id=otd_id,
+        urza_id=urza_id,
+    )
+
+    version = OTDVersion(
+        id=uuid7(),
+        otd_id=otd_id,
+        version_number=1,
+        effective_date=date(2025, 1, 1),
+        created_at=datetime(2025, 3, 15, 10, 0),
+        urza_service_life=10,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_urza_id.return_value = otd
+    repository.get_versions.return_value = [version]
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_details(
+        user_id=user_id,
+        urza_id=urza_id,
+        version_id=unknown_version_id,
+    )
+
+    assert result is None
+
+    repository.get_by_urza_id.assert_awaited_once_with(urza_id)
+    repository.get_versions.assert_awaited_once_with(otd_id)
 
 
 @pytest.mark.asyncio
@@ -547,3 +704,135 @@ async def test_get_details_returns_none_when_access_denied() -> None:
     )
     repository.get_by_urza_id.assert_not_awaited()
     repository.get_versions.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_version_details_returns_version_when_access_allowed() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    otd_id = uuid7()
+    version_id = uuid7()
+
+    otd = OTD(
+        id=otd_id,
+        urza_id=urza_id,
+    )
+
+    version = OTDVersion(
+        id=version_id,
+        otd_id=otd_id,
+        version_number=2,
+        effective_date=date(2026, 1, 1),
+        created_at=datetime(2026, 8, 20, 10, 0),
+        panel_cabinet_type="Шкаф РЗА",
+        terminal_type="МП терминал",
+        urza_service_life=12,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    repository.get_version_by_id.return_value = version
+    repository.get_by_id.return_value = otd
+    access_service.can_access_urza.return_value = True
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_version_details(
+        user_id=user_id,
+        version_id=version_id,
+    )
+
+    assert result is not None
+    assert result.id == version_id
+    assert result.version_number == 2
+    assert result.created_at == version.created_at
+    assert result.urza_service_life == 12
+    assert result.urza_purpose == OTDPurpose.RZA
+
+    repository.get_version_by_id.assert_awaited_once_with(version_id)
+    repository.get_by_id.assert_awaited_once_with(otd_id)
+    access_service.can_access_urza.assert_awaited_once_with(
+        user_id,
+        urza_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_version_details_returns_none_when_version_not_found() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    version_id = uuid7()
+
+    repository.get_version_by_id.return_value = None
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_version_details(
+        user_id=user_id,
+        version_id=version_id,
+    )
+
+    assert result is None
+
+    repository.get_version_by_id.assert_awaited_once_with(version_id)
+    repository.get_by_id.assert_not_awaited()
+    access_service.can_access_urza.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_version_details_returns_none_when_access_denied() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    otd_id = uuid7()
+    version_id = uuid7()
+
+    otd = OTD(
+        id=otd_id,
+        urza_id=urza_id,
+    )
+
+    version = OTDVersion(
+        id=version_id,
+        otd_id=otd_id,
+        version_number=1,
+        effective_date=date(2025, 1, 1),
+        created_at=datetime(2025, 3, 15, 10, 0),
+        urza_service_life=10,
+        urza_purpose=OTDPurpose.RZA,
+    )
+
+    repository.get_version_by_id.return_value = version
+    repository.get_by_id.return_value = otd
+    access_service.can_access_urza.return_value = False
+
+    service = OTDService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    result = await service.get_version_details(
+        user_id=user_id,
+        version_id=version_id,
+    )
+
+    assert result is None
+
+    repository.get_version_by_id.assert_awaited_once_with(version_id)
+    repository.get_by_id.assert_awaited_once_with(otd_id)
+    access_service.can_access_urza.assert_awaited_once_with(
+        user_id,
+        urza_id,
+    )
