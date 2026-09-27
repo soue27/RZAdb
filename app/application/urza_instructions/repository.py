@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.urza_instruction import (
     URZAInstruction,
@@ -57,11 +58,14 @@ class URZAInstructionRepository:
         return version
 
     async def get_current_version(
-        self,
-        instruction_id: UUID,
+            self,
+            instruction_id: UUID,
     ) -> URZAInstructionVersion | None:
         query = (
             select(URZAInstructionVersion)
+            .options(
+                selectinload(URZAInstructionVersion.creator),
+            )
             .where(
                 URZAInstructionVersion.urza_instruction_id
                 == instruction_id,
@@ -72,3 +76,27 @@ class URZAInstructionRepository:
             .limit(1)
         )
         return await self.session.scalar(query)
+
+    async def get_versions(
+            self,
+            instruction_id: UUID,
+    ) -> list[URZAInstructionVersion]:
+        query = (
+            select(URZAInstructionVersion)
+            .options(
+                selectinload(URZAInstructionVersion.creator),
+                selectinload(URZAInstructionVersion.scan_file),
+                selectinload(URZAInstructionVersion.editable_file),
+            )
+            .where(
+                URZAInstructionVersion.urza_instruction_id
+                == instruction_id,
+            )
+            .order_by(
+                URZAInstructionVersion.version_number.desc(),
+            )
+        )
+
+        result = await self.session.scalars(query)
+
+        return list(result.all())

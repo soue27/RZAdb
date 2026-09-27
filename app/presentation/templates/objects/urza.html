@@ -265,6 +265,9 @@
                     type="button"
                     class="nav-link"
                     data-rzadb-tab
+                    hx-get="/objects/urza/{{ urza.id }}/instruction"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
                 >
                     Инструкция
                 </button>

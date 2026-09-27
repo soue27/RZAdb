@@ -1,0 +1,182 @@
+<div id="urza-tab-content">
+
+    {% if instruction and versions %}
+
+        {% set current_version = versions[0] %}
+        {% set displayed_version = selected_version or current_version %}
+        {% set is_current_version = displayed_version.id == current_version.id %}
+
+        <!-- Заголовок версии -->
+        <div class="mb-3">
+
+            <div class="rzadb-otd-version-title">
+                Версия {{ displayed_version.version_number }}
+            </div>
+
+            {% if is_current_version %}
+
+                <div class="rzadb-otd-version-date">
+                    Действует с
+                    {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
+                </div>
+
+            {% else %}
+
+                <div class="rzadb-otd-version-outdated">
+                    Версия устаревшая
+                </div>
+
+                <div class="rzadb-otd-version-date">
+                    Действовала с
+                    {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
+                    по
+                    {% for version in versions %}
+                        {% if version.id == displayed_version.id and not loop.first %}
+                            {{ versions[loop.index0 - 1].effective_date.strftime("%d.%m.%Y") }}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+            {% endif %}
+
+        </div>
+
+        <!-- Данные выбранной версии -->
+        <div class="rzadb-property-list">
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Дата вступления в действие
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Описание изменений
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.change_description or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Обоснование изменений
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.change_justification or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Изменения внесены
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.creator.full_name or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Скан инструкции
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.scan_file.original_name }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Редактируемый файл
+                </dt>
+                <dd class="rzadb-property-value">
+                    {% if displayed_version.editable_file %}
+                        {{ displayed_version.editable_file.original_name }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </dd>
+            </div>
+
+        </div>
+
+        <!-- История версий -->
+        {% if versions|length > 1 %}
+
+            <details
+                class="mt-4 rzadb-otd-history"
+                {% if selected_version %}
+                    open
+                {% endif %}
+            >
+
+                <summary class="small fw-semibold text-secondary">
+                    История версий
+                </summary>
+
+                <div class="list-group mt-3">
+
+                    {% for version in versions %}
+
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+
+                            <div>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-link p-0 text-start text-decoration-none"
+                                    hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
+                                    hx-target="#urza-tab-content"
+                                    hx-swap="outerHTML"
+                                    hx-push-url="true"
+                                >
+
+                                    <div class="fw-semibold">
+                                        Версия {{ version.version_number }}
+                                    </div>
+
+                                    <div class="small text-secondary">
+                                        Действует с
+                                        {{ version.effective_date.strftime("%d.%m.%Y") }}
+                                    </div>
+
+                                    <div class="small text-secondary">
+                                        Внес:
+                                        {{ version.creator.full_name or "—" }}
+                                    </div>
+
+                                </button>
+
+                            </div>
+
+                            {% if version.id == current_version.id %}
+
+                                <span class="badge text-bg-success">
+                                    Текущая
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    {% endfor %}
+
+                </div>
+
+            </details>
+
+        {% endif %}
+
+    {% else %}
+
+        <div class="text-secondary text-center py-5">
+            Инструкция для данного УРЗА ещё не создана.
+        </div>
+
+    {% endif %}
+
+</div>

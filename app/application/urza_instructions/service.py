@@ -106,6 +106,55 @@ class URZAInstructionService:
             instruction.id,
         )
 
+    async def get_versions(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+    ) -> list[URZAInstructionVersion]:
+        if not await self.access_service.can_access_urza(
+            user_id,
+            urza_id,
+        ):
+            raise PermissionError("Доступ к URZA запрещён")
+
+        instruction = await self.repository.get_by_urza_id(
+            urza_id,
+        )
+
+        if instruction is None:
+            return []
+
+        return await self.repository.get_versions(
+            instruction.id,
+        )
+
+    async def get_version_by_id(
+        self,
+        user_id: UUID,
+        version_id: UUID,
+    ) -> URZAInstructionVersion | None:
+        version = await self.repository.get_version_by_id(
+            version_id,
+        )
+
+        if version is None:
+            return None
+
+        instruction = await self.repository.get_by_id(
+            version.urza_instruction_id,
+        )
+
+        if instruction is None:
+            return None
+
+        if not await self.access_service.can_access_urza(
+            user_id,
+            instruction.urza_id,
+        ):
+            raise PermissionError("Доступ к URZA запрещён")
+
+        return version
+
     async def create_version(
         self,
         user_id: UUID,

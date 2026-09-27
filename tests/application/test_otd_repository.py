@@ -67,14 +67,14 @@ async def test_get_version_by_id_returns_version(system_user_id) -> None:
         updated_by=system_user_id,
     )
 
-    session.get.return_value = version
+    session.scalar.return_value = version
 
     repository = OTDRepository(session)
 
     result = await repository.get_version_by_id(version.id)
 
     assert result is version
-    session.get.assert_awaited_once_with(OTDVersion, version.id)
+    session.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -124,7 +124,9 @@ async def test_add_otd_version(system_user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_current_version_returns_latest_version(system_user_id) -> None:
+async def test_get_current_version_returns_latest_version(
+    system_user_id,
+) -> None:
     session = AsyncMock()
 
     otd_id = uuid7()

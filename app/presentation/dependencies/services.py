@@ -39,6 +39,10 @@ from app.application.substations.service import SubstationService
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
+from app.application.urza_instructions.service import URZAInstructionService
+from app.application.urza_instructions.repository import (
+    URZAInstructionRepository,
+)
 from app.application.users.repository import UserRepository
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
@@ -231,5 +235,15 @@ def get_program_service(
 ) -> ProgramService:
     return ProgramService(
         repository=ProgramRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_urza_instruction_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> URZAInstructionService:
+    return URZAInstructionService(
+        repository=URZAInstructionRepository(session),
         access_service=access_service,
     )
