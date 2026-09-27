@@ -664,6 +664,8 @@ SAP/ASUREO не делать глобально уникальными без о
 
 ## 25. Текущий статус
 
+### DONE
+
 Завершено:
 
 ```text
@@ -688,7 +690,11 @@ URZA Instruction versioning
 Universal audit
 ```
 
-Все шесть вкладок URZA реализованы:
+### URZA-вкладки
+
+Все шесть вкладок URZA реализованы на текущем этапе как карточки/таблицы и соответствующие application/read routes. Полноценный CRUD, единый file access и полный HTTP/UI workflow для документов ещё не завершены.
+
+
 
 ```text
 ОТД
@@ -701,60 +707,98 @@ Universal audit
 
 ---
 
-## 26. Контрольный аудит — следующий этап
+## 26. Контрольный аудит — выполнен 27.09.2026
 
-Перед следующим крупным функциональным изменением необходимо провести аудит фактического состояния проекта:
+Контрольный аудит фактического состояния проекта выполнен. Его результат следует считать текущей базой для дальнейшей работы.
+
+### Проверено
 
 ```text
-current code
-→ models
-→ repositories
-→ services
-→ DTO
-→ routes
-→ dependencies
-→ templates
-→ tests
-→ migrations
-→ storage
-→ DATABASE_DESIGN
-→ AGENTS
-→ TODO
+models
+repositories
+services
+DTO
+routes / DI
+templates
+tests
+migrations
+storage
+DATABASE_DESIGN
+AGENTS
+TODO / roadmap
 ```
 
-Результат:
+### Фактический результат
 
 ```text
 DONE
+- authentication / AccessService
+- hierarchy / tree / sidebar / cards
+- все 6 URZA-вкладок в текущей read/UI части
+- OTD versioning + history
+- URZA Instruction versioning + history
+- universal audit-refactor
+
 PARTIAL
+- document CRUD
+- file integration
+- Substation functionality
+- Tasks workflow
+- Inspection workflow
+
 TODO
+- secure common file access
+- HTTP/UI write workflow for documents
+- Tasks HTTP/UI
+- Inspection HTTP/UI
+- production S3
+- backup / restore
+- cold storage
+
 NEEDS DOMAIN DECISION
-TECHNICAL DEBT
+- exact uniqueness scope for dispatch_name
+- rules for archived records in ordinary lists/history
 ```
 
-После аудита обновляется roadmap.
-
-Если для полного аудита недостаточно информации из текущего контекста, coding agent может собрать фактическую информацию из репозитория. Его отчёт следует использовать как источник фактического состояния, а не предполагать наличие кода.
-
----
-
-## 27. Предварительный roadmap
-
-Порядок подлежит пересмотру после аудита:
+### Проверки
 
 ```text
-1. Контрольный аудит
-2. Обновление roadmap / TODO
+pytest: 450 passed, 2 warnings
+Alembic head: a74c1d8f2b90
+Alembic drift: not detected
+Ruff: 66 known issues, not blocking the logical stage
+```
 
-3. Общий механизм файлов
-   ├── File access
+### Критические замечания
+
+File view/download routes требуют обязательной авторизации и проверки доступа к объекту через общий access contract. Нельзя считать наличие `FileService` достаточным: endpoint обязан проверять пользователя и принадлежность файла доступному доменному объекту.
+
+Наличие application-service методов для Tasks/Inspection не означает наличие готового HTTP/UI workflow.
+
+Документные repositories должны единообразно исключать архивные записи из active queries.
+
+`migrations/env.py` не должен выводить database URL в лог.
+
+Циклическую зависимость FK `users ↔ enterprises` следует отдельно оценить при следующем DB-аудите/изменении схемы.
+
+## 27. Актуальный roadmap
+
+```text
+1. Два доменных решения
+   ├── область уникальности dispatch_name
+   └── правила отображения архивных записей
+
+2. Общий безопасный механизм файлов
+   ├── authentication
+   ├── object-level access
+   ├── FileService / repository contract
    ├── Просмотр
    ├── Скачать
-   └── ObjectStorage abstraction
+   └── archive
 
-4. Подключение файлов ко всем URZA-вкладкам
+3. Подключение файлов ко всем URZA-вкладкам
 
-5. Полноценный CRUD документов URZA
+4. Полноценный CRUD документов URZA
    ├── ОТД
    ├── Уставки
    ├── Схемы
@@ -762,51 +806,48 @@ TECHNICAL DEBT
    ├── Программы
    └── Инструкция
 
-6. Tasks workflow
+5. Tasks workflow через HTTP/UI
 
-7. Substation
-   ├── Основные сведения
-   ├── Присоединения
-   ├── Осмотры
-   ├── Инструкции
-   └── Схемы селективности
+6. Inspection workflow через HTTP/UI
 
-8. Inspection workflow
+7. Остальная Substation-функциональность
 
-9. Production S3
+8. Production S3
 
-10. Backup
+9. Backup / restore
 
-11. Cold S3 / archive
+10. Cold S3 / архивирование
 
-12. Notifications / automation
+11. Notifications / automation
+
+12. Финальный контрольный аудит
 ```
 
-Порядок может быть изменён после контрольного аудита.
-
----
-
-## 28. Отложенные вопросы
+## 28. Отложенные и зафиксированные вопросы
 
 ### Исторические ТО
 
-Не изменять `historical_data` без отдельного решения.
-
-Исходный workflow требует отдельного процесса ввода исторических данных.
+Не изменять `historical_data` без отдельного доменного решения. Исходный workflow требует отдельного процесса ввода исторических данных.
 
 ### Files
 
-Сначала общий file contract, затем подключение к сущностям.
+Сначала общий file contract и безопасность доступа, затем подключение к сущностям.
 
 ### S3
 
-Production S3 подключать после стабилизации file abstraction.
+Production S3 подключать после стабилизации общего storage contract.
 
 ### Backup / cold storage
 
 Проектировать после стабилизации storage contract.
 
----
+### Dispatch names
+
+Не создавать новые unique constraints, пока пользователь не подтвердит точные области уникальности для диспетчерских имён.
+
+### Archived records
+
+До реализации единого archive behavior определить, какие архивные записи видны в обычных вкладках, истории и отдельных архивных представлениях.
 
 ## 29. Основной принцип
 
