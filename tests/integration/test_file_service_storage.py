@@ -11,6 +11,7 @@ from app.infrastructure.storage.local import LocalObjectStorage
 @pytest.mark.asyncio
 async def test_file_service_uploads_content_to_local_storage(
     tmp_path: Path,
+    system_user_id,
 ) -> None:
     storage = LocalObjectStorage(tmp_path)
 
@@ -25,6 +26,7 @@ async def test_file_service_uploads_content_to_local_storage(
         content = b"RZAdb test file content"
 
         file = await service.upload(
+            actor_id=system_user_id,
             content=content,
             original_name="test.pdf",
             display_name="Тестовый файл.pdf",
@@ -63,6 +65,7 @@ async def test_file_service_archive_keeps_content_in_storage(
         content = b"RZAdb archive test"
 
         file = await service.upload(
+            actor_id=system_user_id,
             content=content,
             original_name="archive.pdf",
             display_name="Архивный файл.pdf",

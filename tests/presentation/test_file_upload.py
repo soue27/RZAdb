@@ -1,14 +1,38 @@
-from uuid import uuid4
+from collections.abc import Iterator
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+from app.domain.enums import AccessCategory, UserRole
+from app.domain.user import User
 from app.presentation.app import app
+from app.presentation.auth.dependencies import get_current_user
 
 
-def test_upload_file() -> None:
-    client = TestClient(app)
+@pytest.fixture
+def authenticated_client(system_user_id: UUID) -> Iterator[TestClient]:
+    current_user = User(
+        id=system_user_id,
+        full_name="SYSTEM",
+        role=UserRole.SUPERADMIN,
+        email="system@rzadb.local",
+        password_hash="test-hash",
+        access_category=AccessCategory.IV,
+        active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_upload_file(authenticated_client: TestClient) -> None:
+    client = authenticated_client
 
     content = b"test pdf content"
 
@@ -40,8 +64,8 @@ def test_upload_file() -> None:
     assert "s3_key" not in data
 
 
-def test_upload_file_without_file() -> None:
-    client = TestClient(app)
+def test_upload_file_without_file(authenticated_client: TestClient) -> None:
+    client = authenticated_client
 
     response = client.post(
         "/files",
@@ -53,8 +77,8 @@ def test_upload_file_without_file() -> None:
     assert response.status_code == 422
 
 
-def test_upload_file_without_display_name() -> None:
-    client = TestClient(app)
+def test_upload_file_without_display_name(authenticated_client: TestClient) -> None:
+    client = authenticated_client
 
     response = client.post(
         "/files",
@@ -71,7 +95,7 @@ def test_upload_file_without_display_name() -> None:
 
 
 @pytest.mark.asyncio
-async def test_view_file() -> None:
+async def test_view_file(authenticated_client: TestClient) -> None:
     transport = ASGITransport(app=app)
 
     async with AsyncClient(
@@ -112,7 +136,7 @@ async def test_view_file() -> None:
 
 
 @pytest.mark.asyncio
-async def test_download_file() -> None:
+async def test_download_file(authenticated_client: TestClient) -> None:
     transport = ASGITransport(app=app)
 
     async with AsyncClient(
@@ -153,7 +177,7 @@ async def test_download_file() -> None:
 
 
 @pytest.mark.asyncio
-async def test_view_missing_file() -> None:
+async def test_view_missing_file(authenticated_client: TestClient) -> None:
     transport = ASGITransport(app=app)
 
     async with AsyncClient(
@@ -169,7 +193,7 @@ async def test_view_missing_file() -> None:
 
 
 @pytest.mark.asyncio
-async def test_download_missing_file() -> None:
+async def test_download_missing_file(authenticated_client: TestClient) -> None:
     transport = ASGITransport(app=app)
 
     async with AsyncClient(

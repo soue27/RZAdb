@@ -21,6 +21,7 @@ class FileService:
     async def upload(
         self,
         *,
+        actor_id: UUID,
         content: bytes,
         original_name: str,
         display_name: str,
@@ -53,6 +54,8 @@ class FileService:
             size=len(content),
             mime_type=mime_type,
             uploaded_at=uploaded_at,
+            created_by=actor_id,
+            updated_by=actor_id,
         )
 
         await self.repository.add(file)

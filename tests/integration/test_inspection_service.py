@@ -83,13 +83,14 @@ async def test_create_inspection_task_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
     assert task.id is not None
     assert task.substation_id == substation.id
     assert task.created_by == manager.id
+    assert task.updated_by == manager.id
     assert task.status == TaskStatus.CREATED
 
     assert task.deadline_at == now + timedelta(days=7)
@@ -183,7 +184,7 @@ async def test_assign_inspection_task_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=created_at,
     )
 
@@ -293,7 +294,7 @@ async def test_accept_inspection_task_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=created_at,
     )
 
@@ -414,7 +415,7 @@ async def test_complete_inspection_task_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=created_at,
     )
 
@@ -548,7 +549,7 @@ async def test_cannot_complete_inspection_without_remarks(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -658,7 +659,7 @@ async def test_send_inspection_to_review_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=created_at,
     )
 
@@ -806,7 +807,7 @@ async def test_review_approve_inspection_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=creator.id,
+        actor_id=creator.id,
         now=created_at,
     )
 
@@ -957,7 +958,7 @@ async def test_review_return_inspection_with_real_postgresql(
 
     task = await service.create(
         substation_id=substation.id,
-        created_by=creator.id,
+        actor_id=creator.id,
         now=created_at,
     )
 

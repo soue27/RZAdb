@@ -102,7 +102,7 @@ async def test_create_inspection_task(system_user_id) -> None:
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -111,6 +111,8 @@ async def test_create_inspection_task(system_user_id) -> None:
     assert task.assigned_at is None
     assert task.acceptance_deadline_at is None
     assert task.deadline_at == now + timedelta(days=7)
+    assert task.created_by == manager.id
+    assert task.updated_by == manager.id
     assert repository.created_task is task
 
 
@@ -131,7 +133,7 @@ async def test_only_manager_can_create_inspection_task(system_user_id) -> None:
     with pytest.raises(ValueError, match="только Manager"):
         await service.create(
             substation_id=uuid4(),
-            created_by=engineer.id,
+            actor_id=engineer.id,
         )
 
 
@@ -156,7 +158,7 @@ async def test_assign_inspection_task(system_user_id) -> None:
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -203,7 +205,7 @@ async def test_only_manager_can_assign_inspection_task(system_user_id) -> None:
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     with pytest.raises(ValueError, match="только Manager"):
@@ -233,7 +235,7 @@ async def test_cannot_assign_non_engineer_or_manager(system_user_id) -> None:
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     with pytest.raises(ValueError, match="Engineer или Manager"):
@@ -263,7 +265,7 @@ async def test_cannot_assign_already_assigned_task(system_user_id) -> None:
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -301,7 +303,7 @@ async def test_assigned_engineer_can_accept_inspection_task(system_user_id) -> N
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -356,7 +358,7 @@ async def test_only_assigned_executor_can_accept_inspection_task(
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -396,7 +398,7 @@ async def test_assigned_engineer_can_complete_inspection_task(system_user_id) ->
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -465,7 +467,7 @@ async def test_inspection_cannot_be_completed_without_remarks(system_user_id) ->
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -509,7 +511,7 @@ async def test_only_assigned_executor_can_complete_inspection(system_user_id) ->
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -556,7 +558,7 @@ async def test_assigned_engineer_can_send_inspection_to_review(system_user_id) -
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -625,7 +627,7 @@ async def test_only_assigned_executor_can_send_inspection_to_review(
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -675,7 +677,7 @@ async def test_cannot_send_in_progress_inspection_to_review(system_user_id) -> N
 
     task = await service.create(
         substation_id=uuid4(),
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -734,7 +736,7 @@ async def test_manager_can_approve_inspection(system_user_id) -> None:
 
     task = await service.create(
         substation_id=substation_id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -820,7 +822,7 @@ async def test_manager_can_return_inspection_for_revision(system_user_id) -> Non
 
     task = await service.create(
         substation_id=substation_id,
-        created_by=manager.id,
+        actor_id=manager.id,
         now=now,
     )
 
@@ -910,7 +912,7 @@ async def test_cannot_return_inspection_without_reason(system_user_id) -> None:
 
     task = await service.create(
         substation_id=substation_id,
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -986,7 +988,7 @@ async def test_manager_from_another_department_cannot_review_inspection(
 
     task = await service.create(
         substation_id=substation_id,
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     await service.assign(
@@ -1059,7 +1061,7 @@ async def test_manager_cannot_review_own_inspection(system_user_id) -> None:
 
     task = await service.create(
         substation_id=substation_id,
-        created_by=manager.id,
+        actor_id=manager.id,
     )
 
     # Manager назначает задачу самому себе.

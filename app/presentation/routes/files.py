@@ -6,6 +6,8 @@ from fastapi import File as FastAPIFile
 from fastapi.responses import Response
 
 from app.application.files.service import FileService
+from app.domain.user import User
+from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_file_service
 from app.presentation.schemas.files import FileResponse
 
@@ -17,6 +19,7 @@ async def upload_file(
     file: Annotated[UploadFile, FastAPIFile()],
     display_name: Annotated[str, Form()],
     file_service: Annotated[FileService, Depends(get_file_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> FileResponse:
     content = await file.read()
 
@@ -25,6 +28,7 @@ async def upload_file(
         extension = "." + file.filename.rsplit(".", 1)[1]
 
     saved_file = await file_service.upload(
+        actor_id=current_user.id,
         content=content,
         original_name=file.filename or "file",
         display_name=display_name,

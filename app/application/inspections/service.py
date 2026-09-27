@@ -28,12 +28,12 @@ class InspectionTaskService:
         self,
         *,
         substation_id: UUID,
-        created_by: UUID,
+        actor_id: UUID,
         now: datetime | None = None,
     ) -> InspectionTask:
         """Создаёт новую задачу осмотра без назначения исполнителя."""
 
-        creator = await self.user_repository.get_by_id(created_by)
+        creator = await self.user_repository.get_by_id(actor_id)
 
         if creator is None:
             raise ValueError("Создатель задачи не найден.")
@@ -48,7 +48,8 @@ class InspectionTaskService:
 
         task = InspectionTask(
             substation_id=substation_id,
-            created_by=created_by,
+            created_by=actor_id,
+            updated_by=actor_id,
             assigned_to=None,
             status=TaskStatus.CREATED,
             deadline_at=current_time + timedelta(days=7),
@@ -238,6 +239,7 @@ class InspectionTaskService:
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
             created_by=actor_id,
+            updated_by=actor_id,
         )
 
         await self.repository.create_inspection(inspection)

@@ -35,10 +35,12 @@ async def test_upload_file(
     service,
     repository,
     storage,
+    system_user_id,
 ):
     content = b"test file content"
 
     result = await service.upload(
+        actor_id=system_user_id,
         content=content,
         original_name="scan.pdf",
         display_name="Скан протокола.pdf",
@@ -52,6 +54,8 @@ async def test_upload_file(
     assert result.extension == ".pdf"
     assert result.mime_type == "application/pdf"
     assert result.size == len(content)
+    assert result.created_by == system_user_id
+    assert result.updated_by == system_user_id
 
     assert result.s3_key.startswith("files/")
     assert result.s3_key.endswith(".pdf")
@@ -69,10 +73,12 @@ async def test_upload_normalizes_extension(
     service,
     repository,
     storage,
+    system_user_id,
 ):
     content = b"test"
 
     result = await service.upload(
+        actor_id=system_user_id,
         content=content,
         original_name="scan.PDF",
         display_name="Скан.pdf",
@@ -89,10 +95,12 @@ async def test_upload_accepts_extension_without_dot(
     service,
     repository,
     storage,
+    system_user_id,
 ):
     content = b"test"
 
     result = await service.upload(
+        actor_id=system_user_id,
         content=content,
         original_name="scan.pdf",
         display_name="Скан.pdf",
@@ -109,10 +117,12 @@ async def test_upload_stores_exact_content(
     service,
     repository,
     storage,
+    system_user_id,
 ):
     content = b"\x00\x01\x02\x03test"
 
     result = await service.upload(
+        actor_id=system_user_id,
         content=content,
         original_name="data.bin",
         display_name="Данные",
@@ -131,10 +141,12 @@ async def test_upload_sets_file_size_from_content(
     service,
     repository,
     storage,
+    system_user_id,
 ):
     content = b"123456789"
 
     result = await service.upload(
+        actor_id=system_user_id,
         content=content,
         original_name="test.txt",
         display_name="Тест",
