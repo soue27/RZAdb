@@ -832,3 +832,81 @@ body {
     color: #dc3545;
     font-weight: 600;
 }
+
+.rzadb-settings-table {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+/* Заголовки */
+.rzadb-settings-table thead th {
+    padding: 0.45rem 0.6rem;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Ячейки */
+.rzadb-settings-table tbody td {
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Вертикальные разделители */
+.rzadb-settings-table th + th,
+.rzadb-settings-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+/* Подсветка строки при наведении */
+.rzadb-settings-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* Дата */
+.rzadb-settings-table th:nth-child(1),
+.rzadb-settings-table td:nth-child(1) {
+    width: 100px;
+    white-space: nowrap;
+}
+
+/* Параметр */
+.rzadb-settings-table th:nth-child(2),
+.rzadb-settings-table td:nth-child(2) {
+    width: 200px;
+}
+
+/* Было */
+.rzadb-settings-table th:nth-child(3),
+.rzadb-settings-table td:nth-child(3) {
+    width: 90px;
+    white-space: nowrap;
+}
+
+/* Стало */
+.rzadb-settings-table th:nth-child(4),
+.rzadb-settings-table td:nth-child(4) {
+    width: 90px;
+    white-space: nowrap;
+}
+
+/* Причина изменения */
+.rzadb-settings-table th:nth-child(5),
+.rzadb-settings-table td:nth-child(5) {
+    width: 320px;
+    max-width: 320px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Кто изменил */
+.rzadb-settings-table th:nth-child(6),
+.rzadb-settings-table td:nth-child(6) {
+    width: 120px;
+    white-space: nowrap;
+}

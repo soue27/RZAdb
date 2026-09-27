@@ -16,6 +16,8 @@ from app.application.inspections.inspection_repository import InspectionReposito
 from app.application.inspections.inspection_service import InspectionService
 from app.application.objects.resolver import ObjectResolver
 from app.application.objects.service import ObjectService
+from app.application.otd.repository import OTDRepository
+from app.application.otd.service import OTDService
 from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.repository import (
@@ -24,14 +26,14 @@ from app.application.selectivity_schemes.repository import (
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.application.settings.repository import SettingsRepository
+from app.application.settings.service import SettingsService
 from app.application.substations.repository import SubstationRepository
 from app.application.substations.service import SubstationService
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
-from app.application.otd.repository import OTDRepository
-from app.application.otd.service import OTDService
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
@@ -183,5 +185,15 @@ def get_otd_service(
 ) -> OTDService:
     return OTDService(
         repository=OTDRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_settings_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> SettingsService:
+    return SettingsService(
+        repository=SettingsRepository(session),
         access_service=access_service,
     )

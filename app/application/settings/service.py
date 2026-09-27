@@ -29,6 +29,30 @@ class SettingsService:
 
         return await self.repository.get_form_by_urza_id(urza_id)
 
+    async def get_details(
+            self,
+            user_id: UUID,
+            urza_id: UUID,
+    ) -> tuple[SettingsForm | None, list[SettingsRecord]]:
+        if not await self.access_service.can_access_urza(
+                user_id,
+                urza_id,
+        ):
+            return None, []
+
+        settings_form = await self.repository.get_form_by_urza_id(
+            urza_id,
+        )
+
+        if settings_form is None:
+            return None, []
+
+        records = await self.repository.get_records_by_form_id(
+            settings_form.id,
+        )
+
+        return settings_form, records
+
     async def create_form(
             self,
             user_id: UUID,

@@ -187,308 +187,328 @@
     </div>
 
     <!-- Рабочие разделы УРЗА -->
-<div class="mt-4">
+    <div class="mt-4">
 
-    <ul class="nav nav-tabs" role="tablist">
+        <ul
+            class="nav nav-tabs rzadb-tabs mb-4"
+            data-rzadb-tabs
+        >
 
-        <li class="nav-item">
-            <button
-                class="nav-link active"
-                type="button"
-            >
-                ОТД
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link active"
+                    data-rzadb-tab
+                    hx-get="/objects/urza/{{ urza.id }}"
+                    hx-select="#urza-tab-content"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
+                >
+                    ОТД
+                </button>
+            </li>
 
-        <li class="nav-item">
-            <button
-                class="nav-link"
-                type="button"
-            >
-                Уставки
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link"
+                    data-rzadb-tab
+                    hx-get="/objects/urza/{{ urza.id }}/settings"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
+                >
+                    Уставки
+                </button>
+            </li>
 
-        <li class="nav-item">
-            <button
-                class="nav-link"
-                type="button"
-            >
-                Схемы
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link"
+                    data-rzadb-tab
+                >
+                    Схемы
+                </button>
+            </li>
 
-        <li class="nav-item">
-            <button
-                class="nav-link"
-                type="button"
-            >
-                ТО
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link"
+                    data-rzadb-tab
+                >
+                    ТО
+                </button>
+            </li>
 
-        <li class="nav-item">
-            <button
-                class="nav-link"
-                type="button"
-            >
-                Программы
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link"
+                    data-rzadb-tab
+                >
+                    Программы
+                </button>
+            </li>
 
-        <li class="nav-item">
-            <button
-                class="nav-link"
-                type="button"
-            >
-                Инструкция
-            </button>
-        </li>
+            <li class="nav-item">
+                <button
+                    type="button"
+                    class="nav-link"
+                    data-rzadb-tab
+                >
+                    Инструкция
+                </button>
+            </li>
 
-    </ul>
+        </ul>
 
-    <div class="pt-4">
+        <!-- =========================================================
+             TAB CONTENT
+             ========================================================= -->
+        <div id="urza-tab-content">
 
-        {% if otd and otd.current_version %}
+            {% if otd and otd.current_version %}
 
-            {% set displayed_version = otd.selected_version or otd.current_version %}
-            {% set is_current_version = displayed_version.id == otd.current_version.id %}
+                {% set displayed_version = otd.selected_version or otd.current_version %}
+                {% set is_current_version = displayed_version.id == otd.current_version.id %}
 
-            <!-- Заголовок версии -->
-            <div class="mb-3">
+                <!-- Заголовок версии -->
+                <div class="mb-3">
 
-                <div class="rzadb-otd-version-title">
-                    Версия {{ displayed_version.version_number }}
-                </div>
-
-                {% if is_current_version %}
-
-                    <div class="rzadb-otd-version-date">
-                        Действует с
-                        {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
+                    <div class="rzadb-otd-version-title">
+                        Версия {{ displayed_version.version_number }}
                     </div>
 
-                {% else %}
+                    {% if is_current_version %}
 
-                    <div class="rzadb-otd-version-outdated">
-                        Версия устаревшая
+                        <div class="rzadb-otd-version-date">
+                            Действует с
+                            {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
+                        </div>
+
+                    {% else %}
+
+                        <div class="rzadb-otd-version-outdated">
+                            Версия устаревшая
+                        </div>
+
+                        <div class="rzadb-otd-version-date">
+                            Действовала с
+                            {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
+                            по
+                            {% for version in otd.versions %}
+                                {% if version.id == displayed_version.id and not loop.first %}
+                                    {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+                <!-- Данные выбранной версии -->
+                <div class="rzadb-property-list">
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Тип панели / шкафа
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.panel_cabinet_type or "—" }}
+                        </dd>
                     </div>
 
-                    <div class="rzadb-otd-version-date">
-                        Действовала с
-                        {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
-                        по
-                        {% for version in otd.versions %}
-                            {% if version.id == displayed_version.id and not loop.first %}
-                                {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
-                            {% endif %}
-                        {% endfor %}
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Заводской номер панели / шкафа
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.panel_cabinet_serial or "—" }}
+                        </dd>
                     </div>
 
-                {% endif %}
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Год изготовления панели / шкафа
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.panel_cabinet_manufacture_year or "—" }}
+                        </dd>
+                    </div>
 
-            </div>
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Тип терминала
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.terminal_type or "—" }}
+                        </dd>
+                    </div>
 
-            <!-- Данные выбранной версии -->
-            <div class="rzadb-property-list">
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Заводской номер терминала
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.terminal_serial or "—" }}
+                        </dd>
+                    </div>
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Тип панели / шкафа
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.panel_cabinet_type or "—" }}
-                    </dd>
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Год изготовления терминала
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.terminal_manufacture_year or "—" }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Версия ПО
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.software_version or "—" }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Срок службы УРЗА
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.urza_service_life }} лет
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Коэффициент ТТ
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.ct_ratio or "—" }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Коэффициент ТН
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.vt_ratio or "—" }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Обозначение на схеме
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.urza_scheme_designation or "—" }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Назначение УРЗА
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.urza_purpose.label }}
+                        </dd>
+                    </div>
+
+                    <div class="rzadb-property-row">
+                        <dt class="rzadb-property-label">
+                            Изменения внесены
+                        </dt>
+                        <dd class="rzadb-property-value">
+                            {{ displayed_version.created_by_full_name or "—" }}
+                        </dd>
+                    </div>
+
                 </div>
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Заводской номер панели / шкафа
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.panel_cabinet_serial or "—" }}
-                    </dd>
-                </div>
+                <!-- История версий -->
+                {% if otd.versions|length > 1 %}
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Год изготовления панели / шкафа
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.panel_cabinet_manufacture_year or "—" }}
-                    </dd>
-                </div>
+                    <details class="mt-4 rzadb-otd-history">
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Тип терминала
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.terminal_type or "—" }}
-                    </dd>
-                </div>
+                        <summary class="small fw-semibold text-secondary">
+                            История версий
+                        </summary>
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Заводской номер терминала
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.terminal_serial or "—" }}
-                    </dd>
-                </div>
+                        <div class="list-group mt-3">
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Год изготовления терминала
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.terminal_manufacture_year or "—" }}
-                    </dd>
-                </div>
+                            {% for version in otd.versions %}
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Версия ПО
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.software_version or "—" }}
-                    </dd>
-                </div>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Срок службы УРЗА
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.urza_service_life }} лет
-                    </dd>
-                </div>
+                                    <div>
 
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Коэффициент ТТ
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.ct_ratio or "—" }}
-                    </dd>
-                </div>
-
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Коэффициент ТН
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.vt_ratio or "—" }}
-                    </dd>
-                </div>
-
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Обозначение на схеме
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.urza_scheme_designation or "—" }}
-                    </dd>
-                </div>
-
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Назначение УРЗА
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.urza_purpose.label }}
-                    </dd>
-                </div>
-                <div class="rzadb-property-row">
-                    <dt class="rzadb-property-label">
-                        Изменения внесены
-                    </dt>
-                    <dd class="rzadb-property-value">
-                        {{ displayed_version.created_by_full_name or "—" }}
-                    </dd>
-                </div>
-
-
-            </div>
-
-            <!-- История версий -->
-            {% if otd.versions|length > 1 %}
-
-                <details class="mt-4 rzadb-otd-history">
-
-                    <summary class="small fw-semibold text-secondary">
-                        История версий
-                    </summary>
-
-                    <div class="list-group mt-3">
-
-                        {% for version in otd.versions %}
-
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-
-                                <div>
-
-                                    <button
-                                        type="button"
-                                        class="btn btn-link p-0 text-start text-decoration-none"
-                                        hx-get="/objects/urza/{{ urza.id }}?otd_version={{ version.id }}"
-                                        hx-target="#object-content"
-                                        hx-swap="innerHTML"
-                                        hx-push-url="true"
->
-                                        <div class="fw-semibold">
-                                            Версия {{ version.version_number }}
-                                        </div>
-
-                                        {% if version.id == otd.current_version.id %}
-
-                                            <div class="small text-secondary">
-                                                Действует с
-                                                {{ version.created_at.strftime("%d.%m.%Y") }}
+                                        <button
+                                            type="button"
+                                            class="btn btn-link p-0 text-start text-decoration-none"
+                                            hx-get="/objects/urza/{{ urza.id }}?otd_version={{ version.id }}"
+                                            hx-target="#object-content"
+                                            hx-swap="innerHTML"
+                                            hx-push-url="true"
+                                        >
+                                            <div class="fw-semibold">
+                                                Версия {{ version.version_number }}
                                             </div>
 
-                                        {% else %}
+                                            {% if version.id == otd.current_version.id %}
 
-                                            <div class="small text-secondary">
-                                                Действовала с
-                                                {{ version.created_at.strftime("%d.%m.%Y") }}
-                                                по
-                                                {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
-                                            </div>
+                                                <div class="small text-secondary">
+                                                    Действует с
+                                                    {{ version.created_at.strftime("%d.%m.%Y") }}
+                                                </div>
 
-                                        {% endif %}
-                                    </button>
+                                            {% else %}
+
+                                                <div class="small text-secondary">
+                                                    Действовала с
+                                                    {{ version.created_at.strftime("%d.%m.%Y") }}
+                                                    по
+                                                    {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
+                                                </div>
+
+                                            {% endif %}
+
+                                        </button>
+
+                                    </div>
+
+                                    {% if version.id == otd.current_version.id %}
+
+                                        <span class="badge text-bg-success">
+                                            Текущая
+                                        </span>
+
+                                    {% endif %}
 
                                 </div>
 
-                                {% if version.id == otd.current_version.id %}
+                            {% endfor %}
 
-                                    <span class="badge text-bg-success">
-                                        Текущая
-                                    </span>
+                        </div>
 
-                                {% endif %}
+                    </details>
 
-                            </div>
+                {% endif %}
 
-                        {% endfor %}
+            {% else %}
 
-                    </div>
-
-                </details>
+                <div class="text-secondary text-center py-5">
+                    ОТД для данного УРЗА ещё не создано.
+                </div>
 
             {% endif %}
 
-        {% else %}
-
-            <div class="text-secondary text-center py-5">
-                ОТД для данного УРЗА ещё не создано.
-            </div>
-
-        {% endif %}
+        </div>
 
     </div>
-
-</div>
 
 </div>

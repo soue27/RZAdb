@@ -1,0 +1,76 @@
+<div id="urza-tab-content">
+
+    {% if settings_form %}
+
+        <div class="mb-3">
+            <div class="rzadb-otd-version-title">
+                Формуляр регистрации изменений уставок
+            </div>
+        </div>
+
+        {% if settings_records %}
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle rzadb-settings-table">
+
+                    <thead>
+                        <tr>
+                            <th class="text-center">Дата</th>
+                            <th>Параметр</th>
+                            <th class="text-center">Было</th>
+                            <th class="text-center">Стало</th>
+                            <th>Причина изменения</th>
+                            <th class="text-center">Кто изменил</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for record in settings_records %}
+                            <tr>
+                                <td>
+                                    {{ record.change_date.strftime("%d.%m.%Y") }}
+                                </td>
+
+                                <td>
+                                    {{ record.parameter_name }}
+                                </td>
+
+                                <td>
+                                    {{ record.initial_setting }}
+                                </td>
+
+                                <td>
+                                    {{ record.new_setting }}
+                                </td>
+
+                                <td>
+                                    {{ record.change_reason }}
+                                </td>
+
+                                <td>
+                                    {{ record.creator.full_name if record.creator else "—" }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+
+        {% else %}
+
+            <div class="text-secondary text-center py-5">
+                Изменений уставок ещё не зарегистрировано.
+            </div>
+
+        {% endif %}
+
+    {% else %}
+
+        <div class="text-secondary text-center py-5">
+            Формуляр уставок для данного УРЗА ещё не создан.
+        </div>
+
+    {% endif %}
+
+</div>

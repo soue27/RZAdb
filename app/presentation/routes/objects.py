@@ -11,24 +11,26 @@ from app.application.objects.exceptions import (
     ObjectNotFoundError,
 )
 from app.application.objects.service import ObjectService
+from app.application.otd.service import OTDService
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.application.settings.service import SettingsService
 from app.application.substations.service import SubstationService
 from app.application.urzas.service import URZAService
-from app.application.otd.service import OTDService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
     get_object_service,
+    get_otd_service,
     get_rza_instruction_service,
     get_selectivity_scheme_service,
+    get_settings_service,
     get_substation_service,
     get_urza_service,
-    get_otd_service,
 )
 
 router = APIRouter(
@@ -63,6 +65,10 @@ async def get_object(
     otd_service: Annotated[
         OTDService,
         Depends(get_otd_service),
+    ],
+    settings_service: Annotated[
+        SettingsService,
+        Depends(get_settings_service),
     ],
     otd_version: UUID | None = Query(default=None),
 ):
@@ -108,12 +114,19 @@ async def get_object(
                 version_id=otd_version,
             )
 
+            settings_form, settings_records = await settings_service.get_details(
+                user_id=current_user.id,
+                urza_id=object_id,
+            )
+
             return templates.TemplateResponse(
                 request=request,
                 name="objects/urza.html",
                 context={
                     "urza": urza,
                     "otd": otd,
+                    "settings_form": settings_form,
+                    "settings_records": settings_records,
                 },
             )
 
@@ -134,6 +147,48 @@ async def get_object(
         name="objects/selected_object.html",
         context={
             "object": selected_object,
+        },
+    )
+
+@router.get("/urza/{urza_id}/settings")
+async def get_urza_settings(
+    request: Request,
+    urza_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    settings_service: Annotated[
+        SettingsService,
+        Depends(get_settings_service),
+    ],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+
+    settings_form, settings_records = await settings_service.get_details(
+        user_id=current_user.id,
+        urza_id=urza_id,
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/urza_settings.html",
+        context={
+            "settings_form": settings_form,
+            "settings_records": settings_records,
         },
     )
 

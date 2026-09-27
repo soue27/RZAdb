@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.rza_settings import SettingsForm
 from app.domain.settings_record import SettingsRecord
@@ -27,10 +28,29 @@ class SettingsRepository:
         return await self.session.scalar(query)
 
     async def get_record_by_id(
-        self,
-        record_id: UUID,
+            self,
+            record_id: UUID,
     ) -> SettingsRecord | None:
         return await self.session.get(SettingsRecord, record_id)
+
+    async def get_records_by_form_id(
+            self,
+            settings_form_id: UUID,
+    ) -> list[SettingsRecord]:
+        query = (
+            select(SettingsRecord)
+            .options(
+                selectinload(SettingsRecord.creator),
+            )
+            .where(
+                SettingsRecord.settings_form_id == settings_form_id,
+            )
+            .order_by(
+                SettingsRecord.change_date.desc(),
+            )
+        )
+
+        return list((await self.session.scalars(query)).all())
 
     async def add_form(
             self,
