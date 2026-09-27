@@ -83,4 +83,12 @@ class User(
         default=True,
     )
 
-    enterprise: Mapped[Enterprise | None] = relationship()
+    created_by_user: Mapped["User"] = relationship(
+        foreign_keys=lambda: [User.created_by],
+    )
+    updated_by_user: Mapped["User"] = relationship(
+        foreign_keys=lambda: [User.updated_by],
+    )
+    enterprise: Mapped[Enterprise | None] = relationship(
+        foreign_keys=lambda: [User.enterprise_id],
+    )

@@ -1,17 +1,21 @@
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Text, func
+from sqlalchemy import Date, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
 from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
-class URZAInstruction(UUIDMixin, Base):
+class URZAInstruction(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "urza_instructions"
 
     urza_id: Mapped[UUID] = mapped_column(
@@ -23,7 +27,12 @@ class URZAInstruction(UUIDMixin, Base):
     urza: Mapped[URZA] = relationship()
 
 
-class URZAInstructionVersion(UUIDMixin, Base):
+class URZAInstructionVersion(
+    UUIDMixin,
+    TimestampMixin,
+    SoftDeleteMixin,
+    Base,
+):
     __tablename__ = "urza_instruction_versions"
 
     urza_instruction_id: Mapped[UUID] = mapped_column(
@@ -50,17 +59,6 @@ class URZAInstructionVersion(UUIDMixin, Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     scan_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
         nullable=False,
@@ -72,7 +70,9 @@ class URZAInstructionVersion(UUIDMixin, Base):
     )
 
     urza_instruction: Mapped[URZAInstruction] = relationship()
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [URZAInstructionVersion.created_by],
+    )
     scan_file: Mapped[File] = relationship(
         foreign_keys=[scan_file_id],
     )

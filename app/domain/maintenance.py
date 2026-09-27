@@ -56,11 +56,6 @@ class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         default="Не требуется",
     )
 
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     scan_protocol_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("files.id"),
         nullable=True,
@@ -82,7 +77,9 @@ class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
     urza: Mapped[URZA] = relationship()
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [TORecord.created_by],
+    )
     scan_protocol: Mapped[File | None] = relationship(
         foreign_keys=[scan_protocol_id],
     )

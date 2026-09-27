@@ -9,13 +9,17 @@ from app.domain.file import File
 from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import TimestampMixin, UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 if TYPE_CHECKING:
     from app.domain.inspection_task import InspectionTask
 
 
-class Inspection(UUIDMixin, TimestampMixin, Base):
+class Inspection(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Результат проведённого осмотра подстанции."""
 
     __tablename__ = "inspections"
@@ -45,16 +49,13 @@ class Inspection(UUIDMixin, TimestampMixin, Base):
         ForeignKey("files.id"),
         nullable=True,
     )
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     substation: Mapped[Substation] = relationship()
     inspection_task: Mapped["InspectionTask"] = relationship(
         back_populates="inspection",
     )
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [Inspection.created_by],
+    )
 
     scan_file: Mapped[File | None] = relationship(
         foreign_keys=[scan_file_id],

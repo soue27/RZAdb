@@ -9,10 +9,14 @@ from app.domain.task import Task
 from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
-class SchemaForm(UUIDMixin, Base):
+class SchemaForm(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "schema_forms"
 
     urza_id: Mapped[UUID] = mapped_column(
@@ -24,7 +28,7 @@ class SchemaForm(UUIDMixin, Base):
     urza: Mapped[URZA] = relationship()
 
 
-class SchemaRecord(UUIDMixin, Base):
+class SchemaRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "schema_records"
 
     schema_form_id: Mapped[UUID] = mapped_column(
@@ -57,11 +61,6 @@ class SchemaRecord(UUIDMixin, Base):
         nullable=False,
     )
 
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     scan_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
         nullable=True,
@@ -83,7 +82,9 @@ class SchemaRecord(UUIDMixin, Base):
     )
 
     schema_form: Mapped[SchemaForm] = relationship()
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [SchemaRecord.created_by],
+    )
     scan_file: Mapped[File | None] = relationship(
         foreign_keys=[scan_file_id],
     )

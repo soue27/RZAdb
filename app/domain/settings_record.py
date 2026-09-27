@@ -1,7 +1,7 @@
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
@@ -9,10 +9,14 @@ from app.domain.rza_settings import SettingsForm
 from app.domain.task import Task
 from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
-class SettingsRecord(UUIDMixin, Base):
+class SettingsRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "settings_records"
 
     settings_form_id: Mapped[UUID] = mapped_column(
@@ -45,17 +49,6 @@ class SettingsRecord(UUIDMixin, Base):
         nullable=False,
     )
 
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
     signed_form_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
         nullable=False,
@@ -67,6 +60,8 @@ class SettingsRecord(UUIDMixin, Base):
     )
 
     settings_form: Mapped[SettingsForm] = relationship()
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [SettingsRecord.created_by],
+    )
     signed_form_file: Mapped[File] = relationship()
     task: Mapped[Task | None] = relationship()

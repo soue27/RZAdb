@@ -1,17 +1,21 @@
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
 from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import UUIDMixin
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
 
 
-class SelectivityScheme(UUIDMixin, Base):
+class SelectivityScheme(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "selectivity_schemes"
 
     substation_id: Mapped[UUID] = mapped_column(
@@ -23,7 +27,12 @@ class SelectivityScheme(UUIDMixin, Base):
     substation: Mapped[Substation] = relationship()
 
 
-class SelectivitySchemeVersion(UUIDMixin, Base):
+class SelectivitySchemeVersion(
+    UUIDMixin,
+    TimestampMixin,
+    SoftDeleteMixin,
+    Base,
+):
     __tablename__ = "selectivity_scheme_versions"
 
     selectivity_scheme_id: Mapped[UUID] = mapped_column(
@@ -60,17 +69,6 @@ class SelectivitySchemeVersion(UUIDMixin, Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     scan_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
         nullable=False,
@@ -82,7 +80,9 @@ class SelectivitySchemeVersion(UUIDMixin, Base):
     )
 
     selectivity_scheme: Mapped[SelectivityScheme] = relationship()
-    creator: Mapped[User] = relationship()
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [SelectivitySchemeVersion.created_by],
+    )
     scan_file: Mapped[File] = relationship(
         foreign_keys=[scan_file_id],
     )

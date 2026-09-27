@@ -46,12 +46,6 @@ class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
 
-    # Создатель задачи — обязательный участник жизненного цикла задачи.
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
-
     # При создании задача ещё может быть неназначенной.
     assigned_to: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id"),
@@ -96,7 +90,7 @@ class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     urza: Mapped[URZA] = relationship()
 
     created_by_user: Mapped[User] = relationship(
-        foreign_keys=[created_by],
+        foreign_keys=lambda: [Task.created_by],
     )
 
     assigned_to_user: Mapped[User | None] = relationship(

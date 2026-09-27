@@ -25,10 +25,6 @@ class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         ForeignKey("substations.id"),
         nullable=False,
     )
-    created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"),
-        nullable=False,
-    )
     assigned_to: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id"),
         nullable=True,
@@ -65,7 +61,7 @@ class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     substation: Mapped[Substation] = relationship()
     created_by_user: Mapped[User] = relationship(
-        foreign_keys=[created_by],
+        foreign_keys=lambda: [InspectionTask.created_by],
     )
     assigned_to_user: Mapped[User | None] = relationship(
         foreign_keys=[assigned_to],
