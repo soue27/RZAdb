@@ -17,8 +17,13 @@ from app.infrastructure.seed.parser import CSVRowParser
 class RZACSVSeedService:
     """Импортирует тестовые данные РЗА из подготовленных CSV-строк."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+            self,
+            session: AsyncSession,
+            actor_id: UUID,
+    ) -> None:
         self.session = session
+        self.actor_id = actor_id
 
     async def get_or_create_holding(
         self,
@@ -46,6 +51,8 @@ class RZACSVSeedService:
             full_name=full_name,
             short_name=row["holding_short_name"].strip(),
             sap_code=self._optional_string(row.get("holding_sap_code")),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
         )
 
         self.session.add(holding)
@@ -83,6 +90,8 @@ class RZACSVSeedService:
             full_name=full_name,
             short_name=row["branch_short_name"].strip(),
             sap_code=self._optional_string(row.get("branch_sap_code")),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
         )
 
         self.session.add(branch)
@@ -122,6 +131,8 @@ class RZACSVSeedService:
             sap_code=self._optional_string(
                 row.get("department_sap_code")
             ),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
         )
 
         self.session.add(department)
@@ -176,6 +187,8 @@ class RZACSVSeedService:
             address=CSVRowParser.optional_string(
                 row.get("substation_address", "")
             ),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
         )
 
         self.session.add(substation)
@@ -218,6 +231,8 @@ class RZACSVSeedService:
             rdu_subordination=CSVRowParser.boolean(
                 row["connection_rdu_subordination"]
             ),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
 
         )
 
@@ -268,6 +283,8 @@ class RZACSVSeedService:
                 row["urza_room_category"]
             ),
             complexity=CSVRowParser.boolean(row["urza_complexity"]),
+            created_by=self.actor_id,
+            updated_by=self.actor_id,
         )
 
         self.session.add(urza)

@@ -2,6 +2,9 @@ import argparse
 import asyncio
 from pathlib import Path
 
+from sqlalchemy import select
+
+from app.domain.user import User
 from app.infrastructure.database.engine import async_session_factory
 from app.infrastructure.seed.csv_importer import CSVImporter
 from app.infrastructure.seed.service import RZACSVSeedService
@@ -15,12 +18,19 @@ async def import_csv(path: Path) -> int:
 
     async with async_session_factory() as session:
         try:
-            service = RZACSVSeedService(session)
+            result = await session.execute(
+                select(User.id).where(User.email == "system@rzadb.local")
+            )
+            system_user_id = result.scalar_one()
+
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             count = await service.import_rows(rows)
 
             await session.commit()
-
             return count
 
         except Exception:

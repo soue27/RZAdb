@@ -1,5 +1,6 @@
 from datetime import date
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from sqlalchemy import func, select
@@ -35,12 +36,15 @@ def make_row(
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_holding_creates_holding() -> None:
+async def test_get_or_create_holding_creates_holding(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
         try:
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             holding = await service.get_or_create_holding(make_row())
 
@@ -54,7 +58,7 @@ async def test_get_or_create_holding_creates_holding() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_holding_returns_existing_holding(system_user_id) -> None:
+async def test_get_or_create_holding_returns_existing_holding(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -71,7 +75,10 @@ async def test_get_or_create_holding_returns_existing_holding(system_user_id) ->
             session.add(holding)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_holding(
                 make_row(
@@ -100,7 +107,7 @@ async def test_get_or_create_holding_returns_existing_holding(system_user_id) ->
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_holding_ignores_deleted_holding(system_user_id) -> None:
+async def test_get_or_create_holding_ignores_deleted_holding(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -117,7 +124,10 @@ async def test_get_or_create_holding_ignores_deleted_holding(system_user_id) -> 
             session.add(deleted_holding)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_holding(
                 make_row(
@@ -133,7 +143,7 @@ async def test_get_or_create_holding_ignores_deleted_holding(system_user_id) -> 
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_branch_is_scoped_to_holding(system_user_id) -> None:
+async def test_get_or_create_branch_is_scoped_to_holding(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -168,7 +178,10 @@ async def test_get_or_create_branch_is_scoped_to_holding(system_user_id) -> None
             session.add(first_branch)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             second_branch = await service.get_or_create_branch(
                 {
@@ -187,7 +200,7 @@ async def test_get_or_create_branch_is_scoped_to_holding(system_user_id) -> None
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_branch_returns_existing_branch(system_user_id) -> None:
+async def test_get_or_create_branch_returns_existing_branch(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -216,7 +229,10 @@ async def test_get_or_create_branch_returns_existing_branch(system_user_id) -> N
             session.add(branch)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_branch(
                 {
@@ -235,7 +251,7 @@ async def test_get_or_create_branch_returns_existing_branch(system_user_id) -> N
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_department_creates_department(system_user_id) -> None:
+async def test_get_or_create_department_creates_department(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -261,7 +277,10 @@ async def test_get_or_create_department_creates_department(system_user_id) -> No
             session.add(branch)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             department = await service.get_or_create_department(
                 {
@@ -283,7 +302,7 @@ async def test_get_or_create_department_creates_department(system_user_id) -> No
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_department_is_scoped_to_branch(system_user_id) -> None:
+async def test_get_or_create_department_is_scoped_to_branch(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -328,7 +347,10 @@ async def test_get_or_create_department_is_scoped_to_branch(system_user_id) -> N
             session.add(first_department)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             second_department = await service.get_or_create_department(
                 {
@@ -347,7 +369,7 @@ async def test_get_or_create_department_is_scoped_to_branch(system_user_id) -> N
 
 @pytest.mark.asyncio
 async def test_get_or_create_department_returns_existing_department(
-    system_user_id,
+    system_user_id: UUID,
 ) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
@@ -386,7 +408,10 @@ async def test_get_or_create_department_returns_existing_department(
             session.add(department)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_department(
                 {
@@ -405,7 +430,7 @@ async def test_get_or_create_department_returns_existing_department(
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_substation_creates_substation(system_user_id) -> None:
+async def test_get_or_create_substation_creates_substation(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -421,7 +446,10 @@ async def test_get_or_create_substation_creates_substation(system_user_id) -> No
             session.add(department)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             substation = await service.get_or_create_substation(
                 {
@@ -453,7 +481,7 @@ async def test_get_or_create_substation_creates_substation(system_user_id) -> No
 
 @pytest.mark.asyncio
 async def test_get_or_create_substation_returns_existing_substation(
-    system_user_id,
+    system_user_id: UUID,
 ) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
@@ -483,7 +511,10 @@ async def test_get_or_create_substation_returns_existing_substation(
             session.add(substation)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_substation(
                 {
@@ -503,7 +534,7 @@ async def test_get_or_create_substation_returns_existing_substation(
 
 @pytest.mark.asyncio
 async def test_get_or_create_substation_ignores_deleted_substation(
-    system_user_id,
+    system_user_id: UUID,
 ) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
@@ -533,7 +564,10 @@ async def test_get_or_create_substation_ignores_deleted_substation(
             session.add(deleted_substation)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_substation(
                 {
@@ -551,7 +585,7 @@ async def test_get_or_create_substation_ignores_deleted_substation(
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_connection_creates_connection(system_user_id) -> None:
+async def test_get_or_create_connection_creates_connection(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -577,7 +611,10 @@ async def test_get_or_create_connection_creates_connection(system_user_id) -> No
             session.add(substation)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             connection = await service.get_or_create_connection(
                 {
@@ -600,7 +637,7 @@ async def test_get_or_create_connection_creates_connection(system_user_id) -> No
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_connection_parses_values(system_user_id) -> None:
+async def test_get_or_create_connection_parses_values(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -626,7 +663,10 @@ async def test_get_or_create_connection_parses_values(system_user_id) -> None:
             session.add(substation)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             connection = await service.get_or_create_connection(
                 {
@@ -647,7 +687,7 @@ async def test_get_or_create_connection_parses_values(system_user_id) -> None:
 
 @pytest.mark.asyncio
 async def test_get_or_create_connection_returns_existing_connection(
-    system_user_id,
+    system_user_id: UUID,
 ) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
@@ -685,7 +725,10 @@ async def test_get_or_create_connection_returns_existing_connection(
             session.add(connection)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_connection(
                 {
@@ -705,7 +748,7 @@ async def test_get_or_create_connection_returns_existing_connection(
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_creates_urza(system_user_id) -> None:
+async def test_get_or_create_urza_creates_urza(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -741,7 +784,10 @@ async def test_get_or_create_urza_creates_urza(system_user_id) -> None:
             session.add(connection)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             urza = await service.get_or_create_urza(
                 {
@@ -774,7 +820,7 @@ async def test_get_or_create_urza_creates_urza(system_user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_allows_empty_inventory_number(system_user_id) -> None:
+async def test_get_or_create_urza_allows_empty_inventory_number(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -810,7 +856,10 @@ async def test_get_or_create_urza_allows_empty_inventory_number(system_user_id) 
             session.add(connection)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             urza = await service.get_or_create_urza(
                 {
@@ -838,7 +887,7 @@ async def test_get_or_create_urza_allows_empty_inventory_number(system_user_id) 
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_urza_returns_existing_urza(system_user_id) -> None:
+async def test_get_or_create_urza_returns_existing_urza(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
@@ -891,7 +940,10 @@ async def test_get_or_create_urza_returns_existing_urza(system_user_id) -> None:
             session.add(urza)
             await session.flush()
 
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             result = await service.get_or_create_urza(
                 {
@@ -920,12 +972,15 @@ async def test_get_or_create_urza_returns_existing_urza(system_user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_row_creates_full_hierarchy() -> None:
+async def test_import_row_creates_full_hierarchy(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
         try:
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             row = {
                 "holding_full_name": "Россети Урал",
@@ -1014,12 +1069,15 @@ async def test_import_row_creates_full_hierarchy() -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_row_is_idempotent() -> None:
+async def test_import_row_is_idempotent(system_user_id: UUID) -> None:
     async with async_session_factory() as session:
         transaction = await session.begin()
 
         try:
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             row = {
                 "holding_full_name": "Тестовый холдинг",
@@ -1065,7 +1123,7 @@ async def test_import_row_is_idempotent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_rows_creates_full_dataset() -> None:
+async def test_import_rows_creates_full_dataset(system_user_id: UUID) -> None:
     importer = CSVImporter(Path("data/rzadb_test_data.csv"))
     rows = importer.read_rows()
 
@@ -1073,7 +1131,10 @@ async def test_import_rows_creates_full_dataset() -> None:
         transaction = await session.begin()
 
         try:
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             count = await service.import_rows(rows)
 
@@ -1165,7 +1226,7 @@ async def test_import_rows_creates_full_dataset() -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_rows_is_idempotent() -> None:
+async def test_import_rows_is_idempotent(system_user_id: UUID) -> None:
     importer = CSVImporter(Path("data/rzadb_test_data.csv"))
     rows = importer.read_rows()
 
@@ -1173,7 +1234,10 @@ async def test_import_rows_is_idempotent() -> None:
         transaction = await session.begin()
 
         try:
-            service = RZACSVSeedService(session)
+            service = RZACSVSeedService(
+                session,
+                actor_id=system_user_id,
+            )
 
             first_count = await service.import_rows(rows)
             second_count = await service.import_rows(rows)
