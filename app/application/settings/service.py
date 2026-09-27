@@ -51,6 +51,8 @@ class SettingsService:
 
         settings_form = SettingsForm(
             urza_id=urza_id,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add_form(settings_form)
@@ -92,6 +94,7 @@ class SettingsService:
             new_setting=new_setting,
             change_reason=change_reason,
             created_by=user_id,
+            updated_by=user_id,
             signed_form_file_id=signed_form_file_id,
             task_id=task_id,
         )
@@ -99,4 +102,3 @@ class SettingsService:
         await self.repository.add_record(record)
 
         return record
-

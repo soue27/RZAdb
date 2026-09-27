@@ -124,6 +124,8 @@ async def test_create_scheme_with_first_version(
     created_scheme = repository.add_scheme.await_args.args[0]
 
     assert created_scheme.substation_id == substation_id
+    assert created_scheme.created_by == user_id
+    assert created_scheme.updated_by == user_id
 
     repository.add_version.assert_awaited_once()
 
@@ -136,6 +138,7 @@ async def test_create_scheme_with_first_version(
     assert created_version.name == "Схема селективности ПС-1"
     assert created_version.effective_date == date(2026, 9, 17)
     assert created_version.created_by == user_id
+    assert created_version.updated_by == user_id
     assert created_version.scan_file_id == scan_file_id
     assert created_version.editable_file_id == editable_file_id
     assert created_version.change_description == "Первичное создание"
@@ -316,6 +319,7 @@ async def test_create_version_increments_version_number(
     assert result.number == "С-110-02"
     assert result.name == "Схема селективности ПС-1 после реконструкции"
     assert result.created_by == user_id
+    assert result.updated_by == user_id
 
     repository.add_version.assert_awaited_once_with(result)
 

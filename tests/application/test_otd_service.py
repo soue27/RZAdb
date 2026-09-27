@@ -112,11 +112,15 @@ async def test_create_creates_otd_and_first_version() -> None:
     created_version = repository.add_version.await_args.args[0]
 
     assert created_otd is result
+    assert created_otd.created_by == user_id
+    assert created_otd.updated_by == user_id
     assert created_version.otd_id == result.id
     assert created_version.version_number == 1
     assert created_version.effective_date == date(2026, 9, 16)
     assert created_version.urza_service_life == 10
     assert created_version.urza_purpose == OTDPurpose.RZA
+    assert created_version.created_by == user_id
+    assert created_version.updated_by == user_id
 
 
 @pytest.mark.asyncio
@@ -310,6 +314,8 @@ async def test_create_version_increments_version_number(system_user_id) -> None:
     assert result.effective_date == date(2026, 9, 16)
     assert result.urza_service_life == 12
     assert result.urza_purpose == OTDPurpose.RZA
+    assert result.created_by == user_id
+    assert result.updated_by == user_id
 
     repository.add_version.assert_awaited_once()
 

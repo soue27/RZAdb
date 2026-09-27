@@ -52,6 +52,8 @@ class SchemaService:
 
         schema_form = SchemaForm(
             urza_id=urza_id,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add_form(schema_form)
@@ -95,6 +97,7 @@ class SchemaService:
             change_justification=change_justification,
             upload_date=upload_date,
             created_by=user_id,
+            updated_by=user_id,
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
             signed_form_file_id=signed_form_file_id,

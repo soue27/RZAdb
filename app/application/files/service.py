@@ -87,6 +87,7 @@ class FileService:
 
         file.deleted_at = datetime.now(UTC)
         file.deleted_by = user_id
+        file.updated_by = user_id
 
         await self.repository.save(file)
 

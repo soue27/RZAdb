@@ -220,6 +220,9 @@ async def test_create_program(
         task_id=task_id,
     )
 
+    assert result.created_by == user_id
+    assert result.updated_by == user_id
+
     assert isinstance(result, Program)
     assert result.urza_id == urza_id
     assert result.program_type == ProgramType.WORK

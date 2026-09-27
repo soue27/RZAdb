@@ -85,6 +85,8 @@ class ProgramService:
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
             task_id=task_id,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add(program)

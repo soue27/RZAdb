@@ -100,6 +100,8 @@ async def test_create_form_success() -> None:
     )
 
     assert result.urza_id == urza_id
+    assert result.created_by == user_id
+    assert result.updated_by == user_id
 
     access_service.can_access_urza.assert_awaited_once_with(
         user_id,
@@ -224,6 +226,7 @@ async def test_create_record_success(system_user_id) -> None:
     assert result.new_setting == "1.2 A"
     assert result.change_reason == "Корректировка уставки"
     assert result.created_by == user_id
+    assert result.updated_by == user_id
     assert result.signed_form_file_id == signed_form_file_id
     assert result.task_id == task_id
 

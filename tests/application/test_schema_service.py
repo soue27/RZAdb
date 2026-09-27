@@ -100,6 +100,8 @@ async def test_create_form_success() -> None:
     )
 
     assert result.urza_id == urza_id
+    assert result.created_by == user_id
+    assert result.updated_by == user_id
 
     access_service.can_access_urza.assert_awaited_once_with(
         user_id,
@@ -228,6 +230,7 @@ async def test_create_record_success(system_user_id) -> None:
     assert result.change_justification == "Изменение схемы подключения"
     assert result.upload_date == date(2026, 9, 17)
     assert result.created_by == user_id
+    assert result.updated_by == user_id
     assert result.scan_file_id == scan_file_id
     assert result.editable_file_id == editable_file_id
     assert result.signed_form_file_id == signed_form_file_id

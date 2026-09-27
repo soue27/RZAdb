@@ -257,6 +257,7 @@ async def test_archive_file(service, repository, storage, system_user_id):
     assert result is file
     assert result.deleted_at is not None
     assert result.deleted_by == user_id
+    assert result.updated_by == user_id
 
     repository.get_by_id.assert_awaited_once_with(
         file_id,

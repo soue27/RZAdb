@@ -112,6 +112,7 @@ async def test_create_task(
     assert task.urza_id == urza_id
     assert task.work_type == TaskWorkType.OTD
     assert task.created_by == created_by
+    assert task.updated_by == created_by
     assert task.status == TaskStatus.CREATED
     assert task.created_at == now
     assert task.deadline_at == datetime(2026, 9, 20, 10, 0)
@@ -193,6 +194,7 @@ async def test_assign_task(
     )
 
     assert task.status == TaskStatus.ASSIGNED
+    assert task.updated_by == actor_id
     assert task.assigned_to == assigned_to
     assert task.assigned_at == assigned_at
     assert task.acceptance_deadline_at == datetime(2026, 9, 15, 15, 30)
@@ -346,6 +348,8 @@ async def test_accept_task_rejects_invalid_status(
         actor_id=engineer_id,
     )
 
+    assert task.updated_by == engineer_id
+
     with pytest.raises(ValueError, match="Недопустимый переход"):
         await service.accept_task(
             task=task,
@@ -387,6 +391,7 @@ async def test_reject_task(
     )
 
     assert task.status == TaskStatus.REJECTED
+    assert task.updated_by == engineer_id
     assert task.deadline_at == original_deadline
 
     assert len(repository.history) == 3

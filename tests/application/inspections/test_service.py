@@ -274,6 +274,8 @@ async def test_cannot_assign_already_assigned_task(system_user_id) -> None:
         assignee_id=engineer.id,
     )
 
+    assert task.updated_by == manager.id
+
     with pytest.raises(ValueError, match="Недопустимый переход"):
         await service.assign(
             task.id,
@@ -415,6 +417,8 @@ async def test_assigned_engineer_can_complete_inspection_task(system_user_id) ->
         now=now,
     )
 
+    assert task.updated_by == engineer.id
+
     completed_task = await service.complete(
         task.id,
         actor_id=engineer.id,
@@ -425,6 +429,7 @@ async def test_assigned_engineer_can_complete_inspection_task(system_user_id) ->
 
     assert completed_task.status == TaskStatus.COMPLETED
     assert completed_task.completed_at == now
+    assert completed_task.updated_by == engineer.id
 
     assert len(repository.inspections) == 1
 
@@ -437,6 +442,7 @@ async def test_assigned_engineer_can_complete_inspection_task(system_user_id) ->
     assert inspection.scan_file_id is None
     assert inspection.editable_file_id is None
     assert inspection.created_by == engineer.id
+    assert inspection.updated_by == engineer.id
 
     assert len(repository.history) == 3
 

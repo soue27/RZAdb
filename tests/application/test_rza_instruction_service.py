@@ -120,6 +120,8 @@ async def test_create_instruction_with_first_version(
     created_instruction = repository.add_instruction.await_args.args[0]
 
     assert created_instruction.substation_id == substation_id
+    assert created_instruction.created_by == user_id
+    assert created_instruction.updated_by == user_id
 
     repository.add_version.assert_awaited_once()
 
@@ -130,6 +132,7 @@ async def test_create_instruction_with_first_version(
     assert created_version.version_number == 1
     assert created_version.effective_date == date(2026, 9, 17)
     assert created_version.created_by == user_id
+    assert created_version.updated_by == user_id
     assert created_version.scan_file_id == scan_file_id
     assert created_version.editable_file_id == editable_file_id
     assert created_version.change_description == "Первичное создание"
@@ -300,6 +303,7 @@ async def test_create_version_increments_version_number(
     assert result.version_number == 4
     assert result.effective_date == date(2026, 9, 17)
     assert result.created_by == user_id
+    assert result.updated_by == user_id
     assert result.scan_file_id == scan_file_id
 
     repository.add_version.assert_awaited_once_with(result)
@@ -337,6 +341,8 @@ async def test_create_version_without_existing_version_creates_version_one(
     )
 
     assert result.version_number == 1
+    assert result.created_by == user_id
+    assert result.updated_by == user_id
     repository.add_version.assert_awaited_once_with(result)
 
 

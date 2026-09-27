@@ -46,6 +46,7 @@ class TaskService:
             maintenance_type=maintenance_type,
             description=description,
             created_by=created_by,
+            updated_by=created_by,
             status=TaskStatus.CREATED,
             deadline_at=created_at + timedelta(days=7),
         )
@@ -88,6 +89,7 @@ class TaskService:
         task.assigned_at = assignment_time
         task.acceptance_deadline_at = assignment_time + timedelta(days=1)
         task.status = TaskStatus.ASSIGNED
+        task.updated_by = actor_id
 
         await self.task_repository.save(task)
 
@@ -128,6 +130,7 @@ class TaskService:
 
         old_status = task.status
         task.status = TaskStatus.IN_PROGRESS
+        task.updated_by = actor_id
 
         await self.task_repository.save(task)
 
@@ -275,6 +278,7 @@ class TaskService:
 
         old_status = task.status
         task.status = TaskStatus.COMPLETED
+        task.updated_by = actor_id
         task.completed_at = completion_time
 
         await self.task_repository.save(task)
@@ -319,6 +323,7 @@ class TaskService:
 
         old_status = task.status
         task.status = TaskStatus.REJECTED
+        task.updated_by = actor_id
 
         await self.task_repository.save(task)
 
@@ -362,6 +367,7 @@ class TaskService:
 
         task.assigned_to = assigned_to
         task.assigned_at = assignment_time
+        task.updated_by = actor_id
 
         # Основной deadline намеренно не меняем:
         # он считается от создания задачи и не зависит от переназначения.

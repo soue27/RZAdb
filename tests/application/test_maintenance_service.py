@@ -322,6 +322,7 @@ async def test_create_saves_protocol_and_task(
     assert result.signed_form_file_id == signed_form_file_id
     assert result.task_id == task_id
     assert result.created_by == user_id
+    assert result.updated_by == user_id
 
     repository.add.assert_awaited_once_with(result)
 

@@ -103,6 +103,8 @@ class OTDService:
 
         otd = OTD(
             urza_id=urza_id,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add(otd)
@@ -113,6 +115,8 @@ class OTDService:
             effective_date=effective_date,
             urza_service_life=urza_service_life,
             urza_purpose=urza_purpose,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add_version(version)
@@ -176,6 +180,8 @@ class OTDService:
             effective_date=effective_date,
             urza_service_life=urza_service_life,
             urza_purpose=urza_purpose,
+            created_by=user_id,
+            updated_by=user_id,
             **kwargs,
         )
 

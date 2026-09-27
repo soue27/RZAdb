@@ -62,6 +62,8 @@ class URZAInstructionService:
 
         instruction = URZAInstruction(
             urza_id=urza_id,
+            created_by=user_id,
+            updated_by=user_id,
         )
 
         await self.repository.add_instruction(instruction)
@@ -73,6 +75,7 @@ class URZAInstructionService:
             change_description=change_description,
             change_justification=change_justification,
             created_by=user_id,
+            updated_by=user_id,
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
         )
@@ -143,6 +146,7 @@ class URZAInstructionService:
             change_description=change_description,
             change_justification=change_justification,
             created_by=user_id,
+            updated_by=user_id,
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
         )

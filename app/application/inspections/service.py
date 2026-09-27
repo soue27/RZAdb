@@ -107,6 +107,7 @@ class InspectionTaskService:
         current_time = now or datetime.now().astimezone()
 
         task.assigned_to = assignee_id
+        task.updated_by = actor_id
         task.status = TaskStatus.ASSIGNED
         task.assigned_at = current_time
         task.acceptance_deadline_at = current_time + timedelta(days=1)
@@ -168,6 +169,7 @@ class InspectionTaskService:
 
         old_status = task.status
         task.status = TaskStatus.IN_PROGRESS
+        task.updated_by = actor_id
 
         await self.repository.save(task)
 
@@ -246,6 +248,7 @@ class InspectionTaskService:
 
         old_status = task.status
         task.status = TaskStatus.COMPLETED
+        task.updated_by = actor_id
         task.completed_at = current_time
 
         await self.repository.save(task)
@@ -305,6 +308,7 @@ class InspectionTaskService:
 
         old_status = task.status
         task.status = TaskStatus.UNDER_REVIEW
+        task.updated_by = actor_id
 
         await self.repository.save(task)
 
@@ -382,6 +386,7 @@ class InspectionTaskService:
 
         old_status = task.status
         task.status = new_status
+        task.updated_by = actor_id
 
         if approve:
             task.closed_at = current_time

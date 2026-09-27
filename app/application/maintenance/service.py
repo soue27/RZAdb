@@ -84,6 +84,7 @@ class TORecordService:
             detected_deviations=detected_deviations,
             measures_taken=measures_taken,
             created_by=user_id,
+            updated_by=user_id,
             scan_protocol_id=scan_protocol_id,
             editable_protocol_id=editable_protocol_id,
             signed_form_file_id=signed_form_file_id,
