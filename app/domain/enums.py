@@ -157,3 +157,11 @@ class ProgramType(StrEnum):
     COMMISSIONING = "commissioning"
     DECOMMISSIONING = "decommissioning"
     WORK = "work"
+
+    @property
+    def label(self) -> str:
+        return {
+            self.COMMISSIONING: "Ввод в работу",
+            self.DECOMMISSIONING: "Вывод из работы",
+            self.WORK: "Рабочая программа",
+        }[self]

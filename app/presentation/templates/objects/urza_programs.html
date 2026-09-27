@@ -1,0 +1,35 @@
+<div id="urza-tab-content">
+    <div class="table-responsive">
+        <table class="table rzadb-programs-table">
+            <thead>
+                <tr>
+                    <th>Тип программы</th>
+                    <th>№ программы</th>
+                    <th>Дата добавления</th>
+                    <th>Скан</th>
+                    <th>Редактируемый файл</th>
+                    <th>Кто добавил</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for program in programs %}
+                    <tr>
+                        <td>{{ program.program_type.label }}</td>
+                        <td>{{ program.program_number }}</td>
+                        <td>{{ program.created_at.strftime("%d.%m.%Y") }}</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>{{ program.creator.full_name }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            Программ нет
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

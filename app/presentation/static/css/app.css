@@ -1072,3 +1072,70 @@ body {
     width: 140px;
     white-space: nowrap;
 }
+
+.rzadb-programs-table {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+.rzadb-programs-table thead th {
+    padding: 0.45rem 0.6rem;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.rzadb-programs-table tbody td {
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+.rzadb-programs-table th + th,
+.rzadb-programs-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+.rzadb-programs-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+.rzadb-programs-table th:nth-child(1),
+.rzadb-programs-table td:nth-child(1) {
+    width: 200px;
+    white-space: nowrap;
+}
+
+.rzadb-programs-table th:nth-child(2),
+.rzadb-programs-table td:nth-child(2) {
+    width: 180px;
+    white-space: nowrap;
+}
+
+.rzadb-programs-table th:nth-child(3),
+.rzadb-programs-table td:nth-child(3) {
+    width: 130px;
+    white-space: nowrap;
+}
+
+.rzadb-programs-table th:nth-child(4),
+.rzadb-programs-table td:nth-child(4) {
+    width: 150px;
+    white-space: nowrap;
+}
+
+.rzadb-programs-table th:nth-child(5),
+.rzadb-programs-table td:nth-child(5) {
+    width: 200px;
+    white-space: nowrap;
+}
+
+.rzadb-programs-table th:nth-child(6),
+.rzadb-programs-table td:nth-child(6) {
+    width: 180px;
+    white-space: nowrap;
+}

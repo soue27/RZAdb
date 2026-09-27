@@ -7,6 +7,7 @@ from app.domain.enums import ProgramType
 from app.domain.file import File
 from app.domain.task import Task
 from app.domain.urza import URZA
+from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
@@ -53,6 +54,10 @@ class Program(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
     urza: Mapped[URZA] = relationship()
+
+    creator: Mapped[User] = relationship(
+        foreign_keys=lambda: [Program.created_by],
+    )
 
     scan_file: Mapped[File] = relationship(
         foreign_keys=[scan_file_id],

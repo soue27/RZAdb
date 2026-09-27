@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.program import Program
 
@@ -20,11 +21,14 @@ class ProgramRepository:
         )
 
     async def get_by_urza_id(
-        self,
-        urza_id: UUID,
+            self,
+            urza_id: UUID,
     ) -> list[Program]:
         query = (
             select(Program)
+            .options(
+                selectinload(Program.creator),
+            )
             .where(
                 Program.urza_id == urza_id,
             )

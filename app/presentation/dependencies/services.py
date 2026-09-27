@@ -20,6 +20,8 @@ from app.application.objects.resolver import ObjectResolver
 from app.application.objects.service import ObjectService
 from app.application.otd.repository import OTDRepository
 from app.application.otd.service import OTDService
+from app.application.programs.repository import ProgramRepository
+from app.application.programs.service import ProgramService
 from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.repository import (
@@ -219,5 +221,15 @@ def get_schema_service(
 ) -> SchemaService:
     return SchemaService(
         repository=SchemaRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_program_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> ProgramService:
+    return ProgramService(
+        repository=ProgramRepository(session),
         access_service=access_service,
     )
