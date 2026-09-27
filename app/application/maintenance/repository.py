@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.maintenance import TORecord
 
@@ -25,6 +26,9 @@ class TORecordRepository:
     ) -> list[TORecord]:
         query = (
             select(TORecord)
+            .options(
+                selectinload(TORecord.creator),
+            )
             .where(
                 TORecord.urza_id == urza_id,
             )

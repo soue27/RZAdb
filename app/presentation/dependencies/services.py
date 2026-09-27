@@ -14,6 +14,8 @@ from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
+from app.application.maintenance.repository import TORecordRepository
+from app.application.maintenance.service import TORecordService
 from app.application.objects.resolver import ObjectResolver
 from app.application.objects.service import ObjectService
 from app.application.otd.repository import OTDRepository
@@ -197,6 +199,16 @@ def get_settings_service(
 ) -> SettingsService:
     return SettingsService(
         repository=SettingsRepository(session),
+        access_service=access_service,
+    )
+
+
+def get_maintenance_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> TORecordService:
+    return TORecordService(
+        repository=TORecordRepository(session),
         access_service=access_service,
     )
 

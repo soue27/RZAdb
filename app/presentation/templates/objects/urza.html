@@ -239,6 +239,9 @@
                     type="button"
                     class="nav-link"
                     data-rzadb-tab
+                    hx-get="/objects/urza/{{ urza.id }}/maintenance"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
                 >
                     ТО
                 </button>

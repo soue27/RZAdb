@@ -997,3 +997,78 @@ body {
     width: 120px;
     white-space: nowrap;
 }
+
+.rzadb-maintenance-table {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+.rzadb-maintenance-table thead th {
+    padding: 0.45rem 0.6rem;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.rzadb-maintenance-table tbody td {
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+.rzadb-maintenance-table th + th,
+.rzadb-maintenance-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+.rzadb-maintenance-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* Дата ТО */
+.rzadb-maintenance-table th:nth-child(1),
+.rzadb-maintenance-table td:nth-child(1) {
+    width: 100px;
+    white-space: nowrap;
+}
+
+/* Вид ТО */
+.rzadb-maintenance-table th:nth-child(2),
+.rzadb-maintenance-table td:nth-child(2) {
+    width: 80px;
+    white-space: nowrap;
+}
+
+/* Выявленные отклонения */
+.rzadb-maintenance-table th:nth-child(3),
+.rzadb-maintenance-table td:nth-child(3) {
+    width: 300px;
+    text-align: left;
+}
+
+/* Принятые меры */
+.rzadb-maintenance-table th:nth-child(4),
+.rzadb-maintenance-table td:nth-child(4) {
+    width: 360px;
+    text-align: left;
+}
+
+/* Исторические данные */
+.rzadb-maintenance-table th:nth-child(5),
+.rzadb-maintenance-table td:nth-child(5) {
+    width: 150px;
+    max-width: 150px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Кто выполнил */
+.rzadb-maintenance-table th:nth-child(6),
+.rzadb-maintenance-table td:nth-child(6) {
+    width: 140px;
+    white-space: nowrap;
+}
