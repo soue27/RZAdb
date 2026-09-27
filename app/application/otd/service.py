@@ -3,9 +3,9 @@ from uuid import UUID
 
 from app.application.access.service import AccessService
 from app.application.otd.repository import OTDRepository
+from app.application.otd.schemas import OTDDetails, OTDVersionDetails
 from app.domain.enums import OTDPurpose
 from app.domain.otd import OTD, OTDVersion
-from app.application.otd.schemas import OTDDetails, OTDVersionDetails
 
 
 class OTDService:
@@ -35,6 +35,7 @@ class OTDService:
             urza_scheme_designation=version.urza_scheme_designation,
             urza_purpose=version.urza_purpose,
             created_at=version.created_at,
+            created_by_full_name=version.created_by_user.full_name,
         )
 
     async def get_by_urza(

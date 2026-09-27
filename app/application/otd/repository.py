@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.otd import OTD, OTDVersion
 
@@ -24,10 +25,16 @@ class OTDRepository:
         return await self.session.scalar(query)
 
     async def get_version_by_id(
-        self,
-        version_id: UUID,
+            self,
+            version_id: UUID,
     ) -> OTDVersion | None:
-        return await self.session.get(OTDVersion, version_id)
+        query = (
+            select(OTDVersion)
+            .options(selectinload(OTDVersion.created_by_user))
+            .where(OTDVersion.id == version_id)
+        )
+
+        return await self.session.scalar(query)
 
     async def add(
             self,
@@ -51,9 +58,11 @@ class OTDRepository:
     ) -> OTDVersion | None:
         query = (
             select(OTDVersion)
-            .where(OTDVersion.otd_id == otd_id)
+            .options(selectinload(OTDVersion.created_by_user))
+            .where(
+                OTDVersion.otd_id == otd_id,
+            )
             .order_by(OTDVersion.version_number.desc())
-            .limit(1)
         )
 
         return await self.session.scalar(query)
@@ -61,7 +70,10 @@ class OTDRepository:
     async def get_versions(self, otd_id: UUID) -> list[OTDVersion]:
         query = (
             select(OTDVersion)
-            .where(OTDVersion.otd_id == otd_id)
+            .options(selectinload(OTDVersion.created_by_user))
+            .where(
+                OTDVersion.otd_id == otd_id,
+            )
             .order_by(OTDVersion.version_number.desc())
         )
         result = await self.session.scalars(query)

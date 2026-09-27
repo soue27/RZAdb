@@ -10,6 +10,7 @@ class OTDVersionDetails(BaseModel):
     id: UUID
     version_number: int
     created_at: datetime
+    created_by_full_name: str | None
     effective_date: date
     panel_cabinet_type: str | None
     panel_cabinet_serial: str | None
