@@ -11,15 +11,12 @@ class OTDVersionDetails(BaseModel):
     version_number: int
     created_at: datetime
     effective_date: date
-
     panel_cabinet_type: str | None
     panel_cabinet_serial: str | None
     panel_cabinet_manufacture_year: int | None
-
     terminal_type: str | None
     terminal_serial: str | None
     terminal_manufacture_year: int | None
-
     urza_service_life: int
     software_version: str | None
     ct_ratio: str | None
