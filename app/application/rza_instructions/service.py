@@ -7,6 +7,7 @@ from app.application.rza_instructions.repository import (
 )
 from app.application.rza_instructions.schemas import (
     RZAInstructionDetails,
+    RZAInstructionVersionDetails,
 )
 from app.domain.rza_instruction import (
     RZAInstruction,
@@ -22,6 +23,36 @@ class RZAInstructionService:
     ) -> None:
         self.repository = repository
         self.access_service = access_service
+
+    def _to_version_details(
+            self,
+            version: RZAInstructionVersion,
+    ) -> RZAInstructionVersionDetails:
+        return RZAInstructionVersionDetails(
+            id=version.id,
+            version_number=version.version_number,
+            effective_date=version.effective_date,
+            change_description=version.change_description,
+            change_justification=version.change_justification,
+            created_at=version.created_at,
+            created_by_full_name=(
+                version.creator.full_name
+                if version.creator is not None
+                else None
+            ),
+            scan_file_id=version.scan_file_id,
+            scan_file_name=(
+                version.scan_file.display_name
+                if version.scan_file is not None
+                else None
+            ),
+            editable_file_id=version.editable_file_id,
+            editable_file_name=(
+                version.editable_file.display_name
+                if version.editable_file is not None
+                else None
+            ),
+        )
 
     async def get_by_substation(
         self,
@@ -108,6 +139,33 @@ class RZAInstructionService:
         return await self.repository.get_current_version(
             instruction.id,
         )
+
+    async def get_versions(
+            self,
+            user_id: UUID,
+            substation_id: UUID,
+    ) -> list[RZAInstructionVersionDetails]:
+        if not await self.access_service.can_access_substation(
+                user_id,
+                substation_id,
+        ):
+            raise PermissionError("Доступ к подстанции запрещён")
+
+        instruction = await self.repository.get_by_substation_id(
+            substation_id,
+        )
+
+        if instruction is None:
+            return []
+
+        versions = await self.repository.get_versions(
+            instruction.id,
+        )
+
+        return [
+            self._to_version_details(version)
+            for version in versions
+        ]
 
     async def create_version(
         self,

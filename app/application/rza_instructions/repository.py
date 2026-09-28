@@ -77,3 +77,25 @@ class RZAInstructionRepository:
         )
 
         return await self.session.scalar(query)
+
+    async def get_versions(
+            self,
+            instruction_id: UUID,
+    ) -> list[RZAInstructionVersion]:
+        query = (
+            select(RZAInstructionVersion)
+            .options(
+                selectinload(RZAInstructionVersion.creator),
+                selectinload(RZAInstructionVersion.scan_file),
+                selectinload(RZAInstructionVersion.editable_file),
+            )
+            .where(
+                RZAInstructionVersion.rza_instruction_id == instruction_id,
+            )
+            .order_by(
+                RZAInstructionVersion.version_number.desc(),
+            )
+        )
+
+        result = await self.session.scalars(query)
+        return list(result.all())

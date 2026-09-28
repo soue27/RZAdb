@@ -135,3 +135,33 @@ async def test_get_current_version():
 
     assert result is version
     session.scalar.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_versions():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+
+    instruction_id = uuid7()
+
+    version_2 = MagicMock(spec=RZAInstructionVersion)
+    version_1 = MagicMock(spec=RZAInstructionVersion)
+
+    scalars_result = MagicMock()
+    scalars_result.all.return_value = [
+        version_2,
+        version_1,
+    ]
+    session.scalars.return_value = scalars_result
+
+    repository = RZAInstructionRepository(session)
+
+    result = await repository.get_versions(instruction_id)
+
+    assert result == [
+        version_2,
+        version_1,
+    ]
+
+    session.scalars.assert_awaited_once()
+    scalars_result.all.assert_called_once()

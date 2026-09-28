@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -254,6 +254,140 @@ async def test_get_current_version_without_instruction(
 
     assert result is None
     repository.get_current_version.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_versions_returns_version_details(
+    service,
+    repository,
+    access_service,
+    system_user_id,
+):
+    user_id = uuid7()
+    substation_id = uuid7()
+    instruction_id = uuid7()
+
+    instruction = RZAInstruction(
+        id=instruction_id,
+        substation_id=substation_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    version_2 = MagicMock(spec=RZAInstructionVersion)
+    version_2.id = uuid7()
+    version_2.version_number = 2
+    version_2.effective_date = date(2026, 9, 20)
+    version_2.change_description = "Изменение 2"
+    version_2.change_justification = "Основание 2"
+    version_2.created_by = user_id
+    version_2.created_at = datetime(2026, 9, 20, 12, 0, 0)
+    version_2.creator = MagicMock()
+    version_2.creator.full_name = "Иванов Иван Иванович"
+    version_2.scan_file_id = uuid7()
+    version_2.scan_file = MagicMock()
+    version_2.scan_file.display_name = "instruction_v2.pdf"
+    version_2.editable_file_id = uuid7()
+    version_2.editable_file = MagicMock()
+    version_2.editable_file.display_name = "instruction_v2.docx"
+
+    version_1 = MagicMock(spec=RZAInstructionVersion)
+    version_1.id = uuid7()
+    version_1.version_number = 1
+    version_1.effective_date = date(2026, 1, 1)
+    version_1.change_description = "Первичная версия"
+    version_1.change_justification = "Создание инструкции"
+    version_1.created_by = user_id
+    version_1.created_at = datetime(2026, 1, 1, 10, 0, 0)
+    version_1.creator = MagicMock()
+    version_1.creator.full_name = "Петров Пётр Петрович"
+    version_1.scan_file_id = uuid7()
+    version_1.scan_file = MagicMock()
+    version_1.scan_file.display_name = "instruction_v1.pdf"
+    version_1.editable_file_id = None
+    version_1.editable_file = None
+
+    access_service.can_access_substation.return_value = True
+    repository.get_by_substation_id = AsyncMock(
+        return_value=instruction,
+    )
+    repository.get_versions = AsyncMock(
+        return_value=[version_2, version_1],
+    )
+
+    result = await service.get_versions(
+        user_id=user_id,
+        substation_id=substation_id,
+    )
+
+    assert len(result) == 2
+    assert result[0].created_at == datetime(2026, 9, 20, 12, 0, 0)
+    assert result[1].created_at == datetime(2026, 1, 1, 10, 0, 0)
+    assert result[0].version_number == 2
+    assert result[0].created_by_full_name == "Иванов Иван Иванович"
+    assert result[0].scan_file_name == "instruction_v2.pdf"
+    assert result[0].editable_file_name == "instruction_v2.docx"
+
+    assert result[1].version_number == 1
+    assert result[1].created_by_full_name == "Петров Пётр Петрович"
+    assert result[1].scan_file_name == "instruction_v1.pdf"
+    assert result[1].editable_file_name is None
+
+    repository.get_versions.assert_awaited_once_with(
+        instruction_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_versions_without_instruction_returns_empty_list(
+    service,
+    repository,
+    access_service,
+):
+    user_id = uuid7()
+    substation_id = uuid7()
+
+    access_service.can_access_substation.return_value = True
+    repository.get_by_substation_id = AsyncMock(
+        return_value=None,
+    )
+    repository.get_versions = AsyncMock()
+
+    result = await service.get_versions(
+        user_id=user_id,
+        substation_id=substation_id,
+    )
+
+    assert result == []
+
+    repository.get_versions.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_versions_denies_access(
+    service,
+    repository,
+    access_service,
+):
+    user_id = uuid7()
+    substation_id = uuid7()
+
+    access_service.can_access_substation.return_value = False
+    repository.get_by_substation_id = AsyncMock()
+    repository.get_versions = AsyncMock()
+
+    with pytest.raises(
+        PermissionError,
+        match="Доступ к подстанции запрещён",
+    ):
+        await service.get_versions(
+            user_id=user_id,
+            substation_id=substation_id,
+        )
+
+    repository.get_by_substation_id.assert_not_awaited()
+    repository.get_versions.assert_not_awaited()
+
 
 
 @pytest.mark.asyncio
