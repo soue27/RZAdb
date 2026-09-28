@@ -10,6 +10,9 @@ from app.application.auth.service import AuthService
 from app.application.connections.repository import ConnectionRepository
 from app.application.connections.service import ConnectionService
 from app.application.enterprises.repository import EnterpriseRepository
+from app.application.files.access_service import FileAccessService
+from app.application.files.owner_repository import FileOwnerRepository
+from app.application.files.owner_resolver import FileOwnerResolver
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
 from app.application.inspections.inspection_repository import InspectionRepository
@@ -87,6 +90,17 @@ def get_access_service(
         enterprise_repository=EnterpriseRepository(session),
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
+    )
+
+
+def get_file_access_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> FileAccessService:
+    return FileAccessService(
+        file_repository=FileRepository(session),
+        owner_resolver=FileOwnerResolver(FileOwnerRepository(session)),
+        access_service=access_service,
     )
 
 

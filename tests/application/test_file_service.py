@@ -158,11 +158,16 @@ async def test_upload_sets_file_size_from_content(
 
 
 @pytest.mark.asyncio
-async def test_download_file(service, repository, storage, system_user_id):
+async def test_read_file_returns_binary_and_uses_file_key(
+    service,
+    repository,
+    storage,
+    system_user_id,
+):
     file = File(
-        s3_key="files/2026/09/test.pdf",
-        original_name="test.pdf",
-        display_name="Тестовый файл.pdf",
+        s3_key="files/2026/09/read-test.pdf",
+        original_name="read-test.pdf",
+        display_name="Файл для чтения",
         extension=".pdf",
         size=4,
         mime_type="application/pdf",
@@ -170,60 +175,39 @@ async def test_download_file(service, repository, storage, system_user_id):
         created_by=system_user_id,
         updated_by=system_user_id,
     )
+    content = b"data"
+    storage.download = AsyncMock(return_value=content)
+    repository.get_by_id = AsyncMock()
 
-    file_id = uuid7()
-    file.id = file_id
+    result = await service.read(file)
 
-    content = b"test"
-
-    repository.get_by_id = AsyncMock(
-        return_value=file,
-    )
-    storage.download = AsyncMock(
-        return_value=content,
-    )
-
-    saved_file, result = await service.download(
-        file_id=file_id,
-    )
-
-    assert saved_file is file
     assert result == content
-
-    repository.get_by_id.assert_awaited_once_with(
-        file_id,
-    )
-
-    storage.download.assert_awaited_once_with(
-        key=file.s3_key,
-    )
+    storage.download.assert_awaited_once_with(key=file.s3_key)
+    repository.get_by_id.assert_not_awaited()
+    assert not hasattr(service, "access_service")
 
 
 @pytest.mark.asyncio
-async def test_download_file_not_found(
-    service,
-    repository,
-    storage,
-):
-    file_id = uuid7()
-
-    repository.get_by_id = AsyncMock(
-        return_value=None,
+async def test_read_file_propagates_storage_error(service, storage, system_user_id):
+    file = File(
+        s3_key="files/2026/09/missing.pdf",
+        original_name="missing.pdf",
+        display_name="Отсутствующий файл",
+        extension=".pdf",
+        size=0,
+        mime_type="application/pdf",
+        uploaded_at=datetime.now(UTC),
+        created_by=system_user_id,
+        updated_by=system_user_id,
     )
-    storage.download = AsyncMock()
+    storage_error = FileNotFoundError(file.s3_key)
+    storage.download = AsyncMock(side_effect=storage_error)
 
-    with pytest.raises(
-        FileNotFoundError,
-    ):
-        await service.download(
-            file_id=file_id,
-        )
+    with pytest.raises(FileNotFoundError) as exc_info:
+        await service.read(file)
 
-    repository.get_by_id.assert_awaited_once_with(
-        file_id,
-    )
-
-    storage.download.assert_not_awaited()
+    assert exc_info.value is storage_error
+    storage.download.assert_awaited_once_with(key=file.s3_key)
 
 
 @pytest.mark.asyncio
