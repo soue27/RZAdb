@@ -104,6 +104,26 @@ body {
     text-decoration: underline;
 }
 
+.rzadb-file-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rzadb-file-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.13rem;
+    padding: 0.15rem 0.33rem;
+    font-size: 0.47rem;
+}
+
+.rzadb-file-actions .material-icons {
+    font-size: 11px;
+    line-height: 1;
+}
+
 
 /* ---------------------------------------------------------
    Application surface

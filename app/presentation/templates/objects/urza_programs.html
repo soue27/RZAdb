@@ -1,3 +1,5 @@
+{% from "objects/_file_actions.html" import file_actions %}
+
 <div id="urza-tab-content">
     <div class="table-responsive">
         <table class="table rzadb-programs-table">
@@ -18,8 +20,10 @@
                         <td>{{ program.program_type.label }}</td>
                         <td>{{ program.program_number }}</td>
                         <td>{{ program.created_at.strftime("%d.%m.%Y") }}</td>
-                        <td>—</td>
-                        <td>—</td>
+                        <td>{{ file_actions(program.scan_file_id) if program.scan_file_id }}</td>
+                        <td>
+                            {{ file_actions(program.editable_file_id) if program.editable_file_id else "—" }}
+                        </td>
                         <td>{{ program.creator.full_name }}</td>
                     </tr>
                 {% else %}

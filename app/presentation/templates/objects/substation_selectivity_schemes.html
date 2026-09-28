@@ -1,3 +1,5 @@
+{% from "objects/_file_actions.html" import file_actions %}
+
 <div>
     {% if versions %}
         <div class="table-responsive">
@@ -42,25 +44,27 @@
 
                             <td>
                                 <div class="d-flex flex-column gap-2">
-                                    {% if version.scan_file_name %}
+                                    {% if version.scan_file_id %}
                                         <div>
                                             <span class="material-icons align-middle text-body-secondary me-1">
                                                 picture_as_pdf
                                             </span>
-                                            {{ version.scan_file_name }}
+                                            {{ version.scan_file_name or "Скан" }}
+                                            {{ file_actions(version.scan_file_id) }}
                                         </div>
                                     {% endif %}
 
-                                    {% if version.editable_file_name %}
+                                    {% if version.editable_file_id %}
                                         <div>
                                             <span class="material-icons align-middle text-body-secondary me-1">
                                                 description
                                             </span>
-                                            {{ version.editable_file_name }}
+                                            {{ version.editable_file_name or "Редактируемый файл" }}
+                                            {{ file_actions(version.editable_file_id) }}
                                         </div>
                                     {% endif %}
 
-                                    {% if not version.scan_file_name and not version.editable_file_name %}
+                                    {% if not version.scan_file_id and not version.editable_file_id %}
                                         <span class="text-body-secondary">—</span>
                                     {% endif %}
                                 </div>

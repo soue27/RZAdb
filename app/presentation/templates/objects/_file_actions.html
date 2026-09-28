@@ -1,0 +1,12 @@
+{% macro file_actions(file_id) -%}
+    <div class="rzadb-file-actions">
+        <a class="btn btn-primary" href="/files/{{ file_id }}/view">
+            <span class="material-icons" aria-hidden="true">visibility</span>
+            <span>Просмотр</span>
+        </a>
+        <a class="btn btn-success" href="/files/{{ file_id }}/download">
+            <span class="material-icons" aria-hidden="true">download</span>
+            <span>Скачать</span>
+        </a>
+    </div>
+{%- endmacro %}

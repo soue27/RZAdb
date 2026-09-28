@@ -1,3 +1,5 @@
+{% from "objects/_file_actions.html" import file_actions %}
+
 <div>
     {% if instruction %}
         <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
@@ -34,11 +36,15 @@
             <dt class="col-sm-4">Скан</dt>
             <dd class="col-sm-8">
                 {{ instruction.scan_file_name or "—" }}
+                {{ file_actions(instruction.scan_file_id) }}
             </dd>
 
             <dt class="col-sm-4">Редактируемый файл</dt>
             <dd class="col-sm-8">
                 {{ instruction.editable_file_name or "—" }}
+                {% if instruction.editable_file_id %}
+                    {{ file_actions(instruction.editable_file_id) }}
+                {% endif %}
             </dd>
         </dl>
     {% else %}

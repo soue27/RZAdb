@@ -1,3 +1,5 @@
+{% from "objects/_file_actions.html" import file_actions %}
+
 <div id="urza-tab-content">
 
     {% if maintenance_records %}
@@ -19,6 +21,7 @@
                         <th>Принятые меры</th>
                         <th>Исторические данные</th>
                         <th class="text-center">Кто выполнил</th>
+                        <th>Документы ТО</th>
                     </tr>
                 </thead>
 
@@ -47,6 +50,29 @@
 
                             <td>
                                 {{ record.creator.full_name if record.creator else "—" }}
+                            </td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-2">
+                                    {% if record.scan_protocol_id %}
+                                        <div>
+                                            <div class="small text-secondary">Скан протокола</div>
+                                            {{ file_actions(record.scan_protocol_id) }}
+                                        </div>
+                                    {% endif %}
+                                    {% if record.editable_protocol_id %}
+                                        <div>
+                                            <div class="small text-secondary">Редактируемый протокол</div>
+                                            {{ file_actions(record.editable_protocol_id) }}
+                                        </div>
+                                    {% endif %}
+                                    {% if record.signed_form_file_id %}
+                                        <div>
+                                            <div class="small text-secondary">Подписанная форма</div>
+                                            {{ file_actions(record.signed_form_file_id) }}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}

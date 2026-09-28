@@ -1,3 +1,5 @@
+{% from "objects/_file_actions.html" import file_actions %}
+
 <div id="urza-tab-content">
 
     {% if instruction and versions %}
@@ -86,6 +88,7 @@
                 </dt>
                 <dd class="rzadb-property-value">
                     {{ displayed_version.scan_file.original_name }}
+                    {{ file_actions(displayed_version.scan_file_id) }}
                 </dd>
             </div>
 
@@ -96,6 +99,7 @@
                 <dd class="rzadb-property-value">
                     {% if displayed_version.editable_file %}
                         {{ displayed_version.editable_file.original_name }}
+                        {{ file_actions(displayed_version.editable_file_id) }}
                     {% else %}
                         —
                     {% endif %}
