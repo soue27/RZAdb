@@ -33,6 +33,22 @@ class URZARepository:
 
         return result.one_or_none()
 
+    async def get_by_id_including_deleted(
+            self,
+            urza_id: UUID,
+    ) -> URZA | None:
+        result = await self.session.scalars(
+            select(URZA)
+            .options(
+                selectinload(URZA.connection).selectinload(
+                    Connection.substation,
+                ),
+            )
+            .where(URZA.id == urza_id)
+        )
+
+        return result.one_or_none()
+
     async def get_all_active(self) -> list[URZA]:
         """Возвращает все неудалённые устройства РЗА."""
 

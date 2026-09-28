@@ -504,7 +504,7 @@ async def test_deleted_user_cannot_access_substation(system_user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_deleted_substation_cannot_be_accessed(system_user_id) -> None:
+async def test_deleted_substation_can_be_accessed(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
@@ -553,7 +553,7 @@ async def test_deleted_substation_cannot_be_accessed(system_user_id) -> None:
             substation_id=substation.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 
@@ -1192,7 +1192,7 @@ async def test_can_access_enterprise_returns_false_for_inactive_user(
 
 
 @pytest.mark.asyncio
-async def test_can_access_enterprise_returns_false_for_deleted_enterprise(
+async def test_can_access_enterprise_returns_true_for_deleted_enterprise(
     system_user_id,
 ) -> None:
     async with async_session_factory() as session:
@@ -1233,7 +1233,7 @@ async def test_can_access_enterprise_returns_false_for_deleted_enterprise(
             enterprise_id=enterprise.id,
         )
 
-        assert result is False
+        assert result is True
         await session.rollback()
 
 
@@ -1833,7 +1833,7 @@ async def test_specialist_cannot_access_connection_in_another_branch(
 
 
 @pytest.mark.asyncio
-async def test_can_access_connection_returns_false_for_deleted_connection(
+async def test_can_access_connection_returns_true_for_deleted_connection(
     system_user_id,
 ) -> None:
     async with async_session_factory() as session:
@@ -1892,13 +1892,13 @@ async def test_can_access_connection_returns_false_for_deleted_connection(
             connection_id=connection.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 
 
 @pytest.mark.asyncio
-async def test_can_access_connection_returns_false_for_deleted_substation(
+async def test_can_access_connection_returns_true_for_deleted_substation(
     system_user_id,
 ) -> None:
     async with async_session_factory() as session:
@@ -1957,7 +1957,7 @@ async def test_can_access_connection_returns_false_for_deleted_substation(
             connection_id=connection.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 
@@ -2142,7 +2142,7 @@ async def test_engineer_cannot_access_urza_of_another_department(
 
 
 @pytest.mark.asyncio
-async def test_cannot_access_deleted_urza(system_user_id) -> None:
+async def test_can_access_deleted_urza(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
@@ -2222,13 +2222,13 @@ async def test_cannot_access_deleted_urza(system_user_id) -> None:
             urza_id=urza.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 
 
 @pytest.mark.asyncio
-async def test_cannot_access_urza_of_deleted_connection(system_user_id) -> None:
+async def test_can_access_urza_of_deleted_connection(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
@@ -2308,13 +2308,13 @@ async def test_cannot_access_urza_of_deleted_connection(system_user_id) -> None:
             urza_id=urza.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 
 
 @pytest.mark.asyncio
-async def test_cannot_access_urza_of_deleted_substation(system_user_id) -> None:
+async def test_can_access_urza_of_deleted_substation(system_user_id) -> None:
     async with async_session_factory() as session:
         department = Enterprise(
             type=EnterpriseType.DEPARTMENT,
@@ -2394,7 +2394,7 @@ async def test_cannot_access_urza_of_deleted_substation(system_user_id) -> None:
             urza_id=urza.id,
         )
 
-        assert result is False
+        assert result is True
 
         await session.rollback()
 

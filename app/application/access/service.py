@@ -95,7 +95,7 @@ class AccessService:
             return False
 
         enterprise = await self.enterprise_repository.get_by_id(enterprise_id)
-        if enterprise is None or enterprise.deleted_at is not None:
+        if enterprise is None:
             return False
 
         if user.role is UserRole.SUPERADMIN:
@@ -144,9 +144,6 @@ class AccessService:
         if substation is None:
             return False
 
-        if substation.deleted_at is not None:
-            return False
-
         return await self.can_access_enterprise(
             user_id=user_id,
             enterprise_id=substation.enterprise_id,
@@ -164,17 +161,11 @@ class AccessService:
         if connection is None:
             return False
 
-        if connection.deleted_at is not None:
-            return False
-
         substation = await self.substation_repository.get_by_id(
             connection.substation_id,
         )
 
         if substation is None:
-            return False
-
-        if substation.deleted_at is not None:
             return False
 
         return await self.can_access_enterprise(
@@ -189,12 +180,9 @@ class AccessService:
     ) -> bool:
         """Проверяет доступ пользователя к устройству РЗА."""
 
-        urza = await self.urza_repository.get_by_id(urza_id)
+        urza = await self.urza_repository.get_by_id_including_deleted(urza_id)
 
         if urza is None:
-            return False
-
-        if urza.deleted_at is not None:
             return False
 
         connection = await self.connection_repository.get_by_id(
@@ -204,17 +192,11 @@ class AccessService:
         if connection is None:
             return False
 
-        if connection.deleted_at is not None:
-            return False
-
         substation = await self.substation_repository.get_by_id(
             connection.substation_id,
         )
 
         if substation is None:
-            return False
-
-        if substation.deleted_at is not None:
             return False
 
         return await self.can_access_enterprise(
