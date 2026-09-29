@@ -1159,3 +1159,55 @@ body {
     width: 180px;
     white-space: nowrap;
 }
+
+
+/* Заголовки */
+.rzadb-inspections-table thead th {
+    padding: 0.45rem 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Ячейки */
+.rzadb-inspections-table tbody td {
+    padding: 0.4rem 0.6rem;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Вертикальные разделители */
+.rzadb-inspections-table th + th,
+.rzadb-inspections-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+/* Подсветка строки при наведении */
+.rzadb-inspections-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* Дата */
+.rzadb-inspections-table th:nth-child(1),
+.rzadb-inspections-table td:nth-child(1) {
+    width: 110px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Замечания */
+.rzadb-inspections-table th:nth-child(2),
+.rzadb-inspections-table td:nth-child(2) {
+    width: 700px;
+    max-width: 700px;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Документы */
+.rzadb-inspections-table th:nth-child(3),
+.rzadb-inspections-table td:nth-child(3) {
+    width: auto;
+    text-align: left;
+}

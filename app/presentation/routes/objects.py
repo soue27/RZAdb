@@ -235,6 +235,7 @@ async def get_substation_inspections(
         substation_id,
     )
 
+
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_inspections.html",
