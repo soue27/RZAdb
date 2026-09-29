@@ -111,18 +111,22 @@
 
             <div class="tree-row">
 
-                <button
-                    type="button"
-                    class="tree-expand-button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#tree-substation-{{ substation.id }}"
-                    aria-expanded="false"
-                    aria-label="Развернуть {{ substation.dispatch_name }}"
-                >
-                    <span class="material-icons tree-chevron">
-                        chevron_right
-                    </span>
-                </button>
+                {% if substation.connections %}
+                    <button
+                        type="button"
+                        class="tree-expand-button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-substation-{{ substation.id }}"
+                        aria-expanded="false"
+                        aria-label="Развернуть {{ substation.dispatch_name }}"
+                    >
+                        <span class="material-icons tree-chevron">
+                            chevron_right
+                        </span>
+                    </button>
+                {% else %}
+                    <span class="tree-expand-spacer"></span>
+                {% endif %}
 
                 <button
                     type="button"
@@ -144,14 +148,16 @@
 
             </div>
 
-            <div
-                id="tree-substation-{{ substation.id }}"
-                class="collapse tree-children"
-            >
-                {% for connection in substation.connections %}
-                    {{ connection_node(connection) }}
-                {% endfor %}
-            </div>
+            {% if substation.connections %}
+                <div
+                    id="tree-substation-{{ substation.id }}"
+                    class="collapse tree-children"
+                >
+                    {% for connection in substation.connections %}
+                        {{ connection_node(connection) }}
+                    {% endfor %}
+                </div>
+            {% endif %}
 
         </div>
     {% endmacro %}
@@ -162,18 +168,22 @@
 
             <div class="tree-row">
 
-                <button
-                    type="button"
-                    class="tree-expand-button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#tree-connection-{{ connection.id }}"
-                    aria-expanded="false"
-                    aria-label="Развернуть {{ connection.dispatch_name }}"
-                >
-                    <span class="material-icons tree-chevron">
-                        chevron_right
-                    </span>
-                </button>
+                {% if connection.urzas %}
+                    <button
+                        type="button"
+                        class="tree-expand-button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-connection-{{ connection.id }}"
+                        aria-expanded="false"
+                        aria-label="Развернуть {{ connection.dispatch_name }}"
+                    >
+                        <span class="material-icons tree-chevron">
+                            chevron_right
+                        </span>
+                    </button>
+                {% else %}
+                    <span class="tree-expand-spacer"></span>
+                {% endif %}
 
                 <button
                     type="button"
@@ -195,34 +205,34 @@
 
             </div>
 
-            <div
-                id="tree-connection-{{ connection.id }}"
-                class="collapse tree-children"
-            >
+            {% if connection.urzas %}
+                <div
+                    id="tree-connection-{{ connection.id }}"
+                    class="collapse tree-children"
+                >
+                    {% for urza in connection.urzas %}
+                        <button
+                            type="button"
+                            class="tree-item"
+                            data-object-type="urza"
+                            data-object-id="{{ urza.id }}"
+                            hx-get="/objects/urza/{{ urza.id }}"
+                            hx-target="#object-content"
+                            hx-swap="innerHTML"
+                        >
+                            <span class="tree-icon-spacer"></span>
 
-                {% for urza in connection.urzas %}
-                    <button
-                        type="button"
-                        class="tree-item"
-                        data-object-type="urza"
-                        data-object-id="{{ urza.id }}"
-                        hx-get="/objects/urza/{{ urza.id }}"
-                        hx-target="#object-content"
-                        hx-swap="innerHTML"
-                    >
-                        <span class="tree-icon-spacer"></span>
+                            <span class="material-icons tree-icon">
+                                memory
+                            </span>
 
-                        <span class="material-icons tree-icon">
-                            memory
-                        </span>
-
-                        <span class="tree-label">
-                            {{ urza.dispatch_name }}
-                        </span>
-                    </button>
-                {% endfor %}
-
-            </div>
+                            <span class="tree-label">
+                                {{ urza.dispatch_name }}
+                            </span>
+                        </button>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
         </div>
     {% endmacro %}
