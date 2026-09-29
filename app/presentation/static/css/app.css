@@ -1211,3 +1211,83 @@ body {
     width: auto;
     text-align: left;
 }
+
+/* Заголовки */
+.rzadb-selectivity-schemes-table thead th {
+    padding: 0.45rem 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Ячейки */
+.rzadb-selectivity-schemes-table tbody td {
+    padding: 0.4rem 0.6rem;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Вертикальные разделители */
+.rzadb-selectivity-schemes-table th + th,
+.rzadb-selectivity-schemes-table td + td {
+    border-left: 1px solid #dee2e6;
+}
+
+/* Подсветка строки при наведении */
+.rzadb-selectivity-schemes-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+/* Версия */
+.rzadb-selectivity-schemes-table th:nth-child(1),
+.rzadb-selectivity-schemes-table td:nth-child(1) {
+    width: 70px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Дата */
+.rzadb-selectivity-schemes-table th:nth-child(2),
+.rzadb-selectivity-schemes-table td:nth-child(2) {
+    width: 110px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Номер */
+.rzadb-selectivity-schemes-table th:nth-child(3),
+.rzadb-selectivity-schemes-table td:nth-child(3) {
+    width: 130px;
+    white-space: nowrap;
+}
+
+/* Наименование */
+.rzadb-selectivity-schemes-table th:nth-child(4),
+.rzadb-selectivity-schemes-table td:nth-child(4) {
+    width: 220px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Что изменено */
+.rzadb-selectivity-schemes-table th:nth-child(5),
+.rzadb-selectivity-schemes-table td:nth-child(5) {
+    width: 300px;
+    max-width: 300px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* Автор */
+.rzadb-selectivity-schemes-table th:nth-child(6),
+.rzadb-selectivity-schemes-table td:nth-child(6) {
+    width: 150px;
+    white-space: nowrap;
+}
+
+/* Документы */
+.rzadb-selectivity-schemes-table th:nth-child(7),
+.rzadb-selectivity-schemes-table td:nth-child(7) {
+    width: auto;
+    white-space: normal;
+}
