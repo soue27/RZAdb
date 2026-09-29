@@ -1,55 +1,179 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
-<div>
-    {% if instruction %}
-        <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-            <div>
-                <div class="text-body-secondary small mb-1">
-                    Инструкция по РЗА
-                </div>
-                <h3 class="h5 mb-0">
-                    Версия {{ instruction.version_number }}
-                </h3>
+{% if selected_version %}
+
+    <!-- Заголовок версии -->
+    <div class="mb-3">
+        <div class="rzadb-otd-version-title">
+            Версия {{ selected_version.version_number }}
+        </div>
+
+        {% if selected_version.id == versions[0].id %}
+
+            <div class="rzadb-otd-version-date">
+                Действует с
+                {{ selected_version.effective_date.strftime("%d.%m.%Y") }}
             </div>
 
-            <span class="badge text-bg-light">
-                Действует с {{ instruction.effective_date.strftime("%d.%m.%Y") }}
-            </span>
+        {% else %}
+
+            <div class="rzadb-otd-version-outdated">
+                Версия устаревшая
+            </div>
+
+            <div class="rzadb-otd-version-date">
+                Действовала с
+                {{ selected_version.effective_date.strftime("%d.%m.%Y") }}
+                по
+                {% for version in versions %}
+                    {% if version.id == selected_version.id and not loop.first %}
+                        {{ versions[loop.index0 - 1].effective_date.strftime("%d.%m.%Y") }}
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+        {% endif %}
+    </div>
+
+
+    <!-- Данные выбранной версии -->
+    <div class="rzadb-property-list">
+
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Дата вступления
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.effective_date.strftime("%d.%m.%Y") }}
+            </dd>
         </div>
 
-        <dl class="row mb-0">
-            <dt class="col-sm-4">Дата вступления</dt>
-            <dd class="col-sm-8">
-                {{ instruction.effective_date.strftime("%d.%m.%Y") }}
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Описание изменений
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.change_description or "—" }}
             </dd>
+        </div>
 
-            <dt class="col-sm-4">Описание изменений</dt>
-            <dd class="col-sm-8">
-                {{ instruction.change_description or "—" }}
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Обоснование изменений
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.change_justification or "—" }}
             </dd>
+        </div>
 
-            <dt class="col-sm-4">Обоснование изменений</dt>
-            <dd class="col-sm-8">
-                {{ instruction.change_justification or "—" }}
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Изменения внесены
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.created_by_full_name or "—" }}
             </dd>
+        </div>
 
-            <dt class="col-sm-4">Скан</dt>
-            <dd class="col-sm-8">
-                {{ instruction.scan_file_name or "—" }}
-                {{ file_actions(instruction.scan_file_id) }}
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Скан
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.scan_file_name or "—" }}
+                {{ file_actions(selected_version.scan_file_id) }}
             </dd>
+        </div>
 
-            <dt class="col-sm-4">Редактируемый файл</dt>
-            <dd class="col-sm-8">
-                {{ instruction.editable_file_name or "—" }}
-                {% if instruction.editable_file_id %}
-                    {{ file_actions(instruction.editable_file_id) }}
+        <div class="rzadb-property-row">
+            <dt class="rzadb-property-label">
+                Редактируемый файл
+            </dt>
+            <dd class="rzadb-property-value">
+                {{ selected_version.editable_file_name or "—" }}
+
+                {% if selected_version.editable_file_id %}
+                    {{ file_actions(selected_version.editable_file_id) }}
                 {% endif %}
             </dd>
-        </dl>
-    {% else %}
-        <div class="text-body-secondary py-4 text-center">
-            Инструкция по РЗА отсутствует.
         </div>
+
+    </div>
+
+
+    <!-- История версий -->
+    {% if versions|length > 1 %}
+
+        <details class="mt-4 rzadb-otd-history">
+
+            <summary class="small fw-semibold text-secondary">
+                История версий
+            </summary>
+
+            <div class="list-group mt-3">
+
+                {% for version in versions %}
+
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+
+                        <div>
+
+                            <button
+                                type="button"
+                                class="btn btn-link p-0 text-start text-decoration-none"
+                                hx-get="/objects/substation/{{ substation_id }}/instructions?instruction_version={{ version.id }}"
+                                hx-target="#substation-tab-content"
+                                hx-swap="innerHTML"
+                                hx-push-url="true"
+                            >
+                                <div class="fw-semibold">
+                                    Версия {{ version.version_number }}
+                                </div>
+
+                                {% if loop.first %}
+
+                                    <div class="small text-secondary">
+                                        Действует с
+                                        {{ version.effective_date.strftime("%d.%m.%Y") }}
+                                    </div>
+
+                                {% else %}
+
+                                    <div class="small text-secondary">
+                                        Действовала с
+                                        {{ version.effective_date.strftime("%d.%m.%Y") }}
+                                        по
+                                        {{ versions[loop.index0 - 1].effective_date.strftime("%d.%m.%Y") }}
+                                    </div>
+
+                                {% endif %}
+
+                            </button>
+
+                        </div>
+
+                        {% if loop.first %}
+
+                            <span class="badge text-bg-success">
+                                Текущая
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        </details>
+
     {% endif %}
-</div>
+
+{% else %}
+
+    <div class="text-secondary text-center py-5">
+        Инструкция по РЗА ещё не создана.
+    </div>
+
+{% endif %}

@@ -483,6 +483,7 @@ async def get_substation_instructions(
         RZAInstructionService,
         Depends(get_rza_instruction_service),
     ],
+    instruction_version: UUID | None = Query(default=None),
 ):
     try:
         await object_service.get_object(
@@ -506,10 +507,35 @@ async def get_substation_instructions(
         substation_id=substation_id,
     )
 
+    versions = await rza_instruction_service.get_versions(
+        user_id=current_user.id,
+        substation_id=substation_id,
+    )
+
+    selected_version = None
+
+    if instruction_version is not None:
+        selected_version = next(
+            (
+                version
+                for version in versions
+                if version.id == instruction_version
+            ),
+            None,
+        )
+
+    if selected_version is None and versions:
+        selected_version = versions[0]
+
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_instructions.html",
-        context={"instruction": instruction},
+        context={
+            "instruction": instruction,
+            "versions": versions,
+            "selected_version": selected_version,
+            "substation_id": substation_id,
+        },
     )
 
 

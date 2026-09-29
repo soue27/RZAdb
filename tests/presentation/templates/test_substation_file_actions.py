@@ -65,41 +65,61 @@ def test_inspection_template_links_each_present_file_role() -> None:
 
 def test_instruction_template_links_current_version_files() -> None:
     scan_id, editable_id = uuid4(), uuid4()
+
     current_instruction = SimpleNamespace(
         version_number=3,
         effective_date=date(2026, 1, 1),
         change_description="Изменение",
         change_justification="Обоснование",
+        created_by_full_name="Автор инструкции",
         scan_file_id=scan_id,
         scan_file_name="instruction.pdf",
         editable_file_id=editable_id,
         editable_file_name="instruction.docx",
     )
 
+    versions = [current_instruction]
+
     html = templates.get_template(
         "objects/substation_instructions.html",
-    ).render(instruction=current_instruction)
+    ).render(
+        instruction=current_instruction,
+        versions=versions,
+        selected_version=current_instruction,
+    )
 
     assert "Версия 3" in html
+    assert "Автор инструкции" in html
     assert_file_actions(html, scan_id)
     assert_file_actions(html, editable_id)
     assert "instruction.pdf" in html
     assert "instruction.docx" in html
+    assert "История версий" in html
 
     current_instruction.editable_file_id = None
     current_instruction.editable_file_name = None
+
     html_without_editable = templates.get_template(
         "objects/substation_instructions.html",
-    ).render(instruction=current_instruction)
+    ).render(
+        instruction=current_instruction,
+        versions=versions,
+        selected_version=current_instruction,
+    )
+
     assert_file_actions(html_without_editable, scan_id)
     assert html_without_editable.count('class="rzadb-file-actions"') == 1
     assert "/files/None/" not in html_without_editable
 
     empty_html = templates.get_template(
         "objects/substation_instructions.html",
-    ).render(instruction=None)
-    assert_no_file_actions(empty_html)
+    ).render(
+        instruction=None,
+        versions=[],
+        selected_version=None,
+    )
 
+    assert_no_file_actions(empty_html)
 
 def test_selectivity_template_uses_file_ids_per_version() -> None:
     first_scan_id, first_editable_id, second_scan_id = (

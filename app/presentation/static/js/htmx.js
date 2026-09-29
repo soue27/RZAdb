@@ -1,23 +1,28 @@
+const HISTORY_TARGETS = new Set([
+    "object-content",
+    "substation-tab-content",
+]);
+
 document.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.detail.target;
 
-    if (!target || target.id !== "object-content") {
+    if (!target || !HISTORY_TARGETS.has(target.id)) {
         return;
     }
 
     const history = target.querySelector("details.rzadb-otd-history");
 
-    target.dataset.otdHistoryOpen = history?.open ? "true" : "false";
+    target.dataset.historyOpen = history?.open ? "true" : "false";
 });
 
 document.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail.target;
 
-    if (!target || target.id !== "object-content") {
+    if (!target || !HISTORY_TARGETS.has(target.id)) {
         return;
     }
 
-    if (target.dataset.otdHistoryOpen !== "true") {
+    if (target.dataset.historyOpen !== "true") {
         return;
     }
 
@@ -27,5 +32,5 @@ document.addEventListener("htmx:afterSwap", (event) => {
         history.open = true;
     }
 
-    delete target.dataset.otdHistoryOpen;
+    delete target.dataset.historyOpen;
 });
