@@ -1,6 +1,7 @@
 import logging
 from typing import Annotated
 from uuid import UUID
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi import File as FastAPIFile
@@ -88,12 +89,16 @@ async def _get_file_response(
             detail="Файл не найден.",
         ) from exc
 
+    encoded_filename = quote(file.original_name)
+
     return Response(
         content=content,
         media_type=file.mime_type,
         headers={
             "Content-Disposition": (
-                f'{disposition}; filename="{file.original_name}"'
+                f"{disposition}; "
+                f'filename="{file.original_name.encode("ascii", "ignore").decode("ascii")}"; '
+                f"filename*=UTF-8''{encoded_filename}"
             ),
         },
     )

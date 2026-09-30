@@ -1,6 +1,24 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
 <div id="urza-tab-content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="rzadb-otd-version-title">
+            Программы
+        </div>
+
+        <button
+            type="button"
+            class="btn btn-primary"
+            hx-get="/objects/urza/{{ urza_id }}/programs/new"
+            hx-target="#urza-tab-content"
+            hx-swap="outerHTML"
+        >
+            <span class="material-icons align-middle me-1">add</span>
+            Добавить программу
+        </button>
+    </div>
+
     <div class="table-responsive">
         <table class="table rzadb-programs-table">
             <thead>
@@ -36,4 +54,5 @@
             </tbody>
         </table>
     </div>
+
 </div>

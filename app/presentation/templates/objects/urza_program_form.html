@@ -1,0 +1,92 @@
+<div id="urza-tab-content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="rzadb-otd-version-title">
+            Добавление программы
+        </div>
+
+        <button
+            type="button"
+            class="btn btn-outline-secondary"
+            hx-get="/objects/urza/{{ urza_id }}/programs"
+            hx-target="#urza-tab-content"
+            hx-swap="outerHTML"
+        >
+            Отмена
+        </button>
+    </div>
+
+    <form
+        method="post"
+        enctype="multipart/form-data"
+        hx-post="/objects/urza/{{ urza_id }}/programs"
+        hx-target="#urza-tab-content"
+    >
+        <div class="mb-3">
+            <label class="form-label" for="program-type">
+                Тип программы
+            </label>
+
+            <select
+                id="program-type"
+                name="program_type"
+                class="form-select"
+            >
+                {% for program_type in program_types %}
+                    <option value="{{ program_type.value }}">
+                        {{ program_type.label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="program-number">
+                № программы
+            </label>
+
+            <input
+                id="program-number"
+                name="program_number"
+                type="text"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="scan-file">
+                Скан программы
+            </label>
+
+            <input
+                id="scan-file"
+                name="scan_file"
+                type="file"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="editable-file">
+                Редактируемый файл
+            </label>
+
+            <input
+                id="editable-file"
+                name="editable_file"
+                type="file"
+                class="form-control"
+            >
+        </div>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Сохранить программу
+        </button>
+    </form>
+
+</div>
