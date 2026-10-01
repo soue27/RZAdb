@@ -44,6 +44,7 @@ class SettingsRepository:
             )
             .where(
                 SettingsRecord.settings_form_id == settings_form_id,
+                SettingsRecord.deleted_at.is_(None),
             )
             .order_by(
                 SettingsRecord.change_date.desc(),
@@ -67,3 +68,6 @@ class SettingsRepository:
         self.session.add(record)
         await self.session.flush()
         return record
+
+    async def flush(self) -> None:
+        await self.session.flush()

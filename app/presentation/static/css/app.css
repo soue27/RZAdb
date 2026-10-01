@@ -104,14 +104,8 @@ body {
     text-decoration: underline;
 }
 
-.rzadb-file-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.rzadb-file-actions .btn {
+.rzadb-file-actions .btn,
+.rzadb-settings-actions .btn {
     display: inline-flex;
     align-items: center;
     gap: 0.13rem;
@@ -119,9 +113,25 @@ body {
     font-size: 0.47rem;
 }
 
-.rzadb-file-actions .material-icons {
+.rzadb-file-actions .material-icons,
+.rzadb-settings-actions .material-icons {
     font-size: 11px;
     line-height: 1;
+}
+
+.rzadb-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.rzadb-file-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 

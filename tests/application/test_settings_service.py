@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
 from uuid6 import uuid7
 
 from app.application.settings.service import SettingsService
+from app.domain.settings_record import SettingsRecord
 from app.domain.rza_settings import SettingsForm
 
 
@@ -323,3 +324,192 @@ async def test_create_record_creates_form_when_form_not_exists() -> None:
     assert record.created_by == user_id
     assert record.updated_by == user_id
     assert record.signed_form_file_id == signed_form_file_id
+
+
+@pytest.mark.asyncio
+async def test_delete_record_raises_when_access_denied() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    record_id = uuid7()
+
+    access_service.can_access_urza.return_value = False
+
+    service = SettingsService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    with pytest.raises(
+        PermissionError,
+        match="Доступ к URZA запрещён",
+    ):
+        await service.delete_record(
+            user_id=user_id,
+            urza_id=urza_id,
+            record_id=record_id,
+        )
+
+    repository.get_record_by_id.assert_not_awaited()
+    repository.get_form_by_urza_id.assert_not_awaited()
+    repository.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_record_raises_when_record_not_exists() -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    record_id = uuid7()
+
+    access_service.can_access_urza.return_value = True
+    repository.get_record_by_id.return_value = None
+
+    service = SettingsService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Запись уставок не найдена",
+    ):
+        await service.delete_record(
+            user_id=user_id,
+            urza_id=urza_id,
+            record_id=record_id,
+        )
+
+    repository.get_record_by_id.assert_awaited_once_with(
+        record_id,
+    )
+    repository.get_form_by_urza_id.assert_not_awaited()
+    repository.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_record_raises_when_record_belongs_to_another_urza(
+    system_user_id,
+) -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    another_urza_id = uuid7()
+    record_id = uuid7()
+    settings_form_id = uuid7()
+
+    settings_form = SettingsForm(
+        id=settings_form_id,
+        urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    record = SettingsRecord(
+        id=record_id,
+        settings_form_id=uuid7(),
+        change_date=date(2026, 9, 17),
+        parameter_name="Ток срабатывания",
+        initial_setting="1.0 A",
+        new_setting="1.2 A",
+        change_reason="Корректировка уставки",
+        signed_form_file_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_record_by_id.return_value = record
+    repository.get_form_by_urza_id.return_value = settings_form
+
+    service = SettingsService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Запись уставок не принадлежит данному URZA",
+    ):
+        await service.delete_record(
+            user_id=user_id,
+            urza_id=urza_id,
+            record_id=record_id,
+        )
+
+    repository.get_record_by_id.assert_awaited_once_with(
+        record_id,
+    )
+    repository.get_form_by_urza_id.assert_awaited_once_with(
+        urza_id,
+    )
+    repository.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_record_success(system_user_id) -> None:
+    repository = AsyncMock()
+    access_service = AsyncMock()
+
+    user_id = uuid7()
+    urza_id = uuid7()
+    record_id = uuid7()
+    settings_form_id = uuid7()
+
+    settings_form = SettingsForm(
+        id=settings_form_id,
+        urza_id=urza_id,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    record = SettingsRecord(
+        id=record_id,
+        settings_form_id=settings_form_id,
+        change_date=date(2026, 9, 17),
+        parameter_name="Ток срабатывания",
+        initial_setting="1.0 A",
+        new_setting="1.2 A",
+        change_reason="Корректировка уставки",
+        signed_form_file_id=uuid7(),
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_record_by_id.return_value = record
+    repository.get_form_by_urza_id.return_value = settings_form
+
+    service = SettingsService(
+        repository=repository,
+        access_service=access_service,
+    )
+
+    before = datetime.now(timezone.utc)
+
+    await service.delete_record(
+        user_id=user_id,
+        urza_id=urza_id,
+        record_id=record_id,
+    )
+
+    after = datetime.now(timezone.utc)
+
+    assert record.deleted_at is not None
+    assert before <= record.deleted_at <= after
+    assert record.deleted_by == user_id
+    assert record.updated_by == user_id
+
+    repository.get_record_by_id.assert_awaited_once_with(
+        record_id,
+    )
+    repository.get_form_by_urza_id.assert_awaited_once_with(
+        urza_id,
+    )
+    repository.flush.assert_awaited_once()

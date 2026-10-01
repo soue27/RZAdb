@@ -1,5 +1,5 @@
-from datetime import date
 from uuid import UUID
+from datetime import date, datetime, timezone
 
 from app.application.access.service import AccessService
 from app.application.settings.repository import SettingsRepository
@@ -130,3 +130,38 @@ class SettingsService:
         await self.repository.add_record(record)
 
         return record
+
+    async def delete_record(
+            self,
+            user_id: UUID,
+            urza_id: UUID,
+            record_id: UUID,
+    ) -> None:
+        if not await self.access_service.can_access_urza(
+                user_id,
+                urza_id,
+        ):
+            raise PermissionError("Доступ к URZA запрещён")
+
+        record = await self.repository.get_record_by_id(record_id)
+
+        if record is None:
+            raise ValueError("Запись уставок не найдена")
+
+        settings_form = await self.repository.get_form_by_urza_id(
+            urza_id,
+        )
+
+        if settings_form is None:
+            raise ValueError("Формуляр уставок не найден")
+
+        if record.settings_form_id != settings_form.id:
+            raise ValueError(
+                "Запись уставок не принадлежит данному URZA"
+            )
+
+        record.deleted_at = datetime.now(timezone.utc)
+        record.deleted_by = user_id
+        record.updated_by = user_id
+
+        await self.repository.flush()

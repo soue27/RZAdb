@@ -35,6 +35,7 @@
                         <th>Причина изменения</th>
                         <th class="text-center">Кто внес</th>
                         <th>Подписанная форма</th>
+                        <th class="text-center">Действия</th>
                     </tr>
                 </thead>
 
@@ -68,6 +69,29 @@
                             <td>
                                 {% if record.signed_form_file_id %}
                                     {{ file_actions(record.signed_form_file_id) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td class="text-center">
+                                {% if current_user.role.value in ["superadmin", "admin", "manager"] %}
+                                    <div class="rzadb-settings-actions">
+                                        <form
+                                            method="post"
+                                            hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >
+                                            <button
+                                                type="submit"
+                                                class="btn btn-danger"
+                                            >
+                                                <span class="material-icons">delete</span>
+                                                Удалить
+                                            </button>
+                                        </form>
+                                    </div>
                                 {% else %}
                                     —
                                 {% endif %}

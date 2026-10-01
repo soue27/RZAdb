@@ -173,6 +173,82 @@ async def create_urza_settings_record(
     )
 
 
+@router.post("/urza/{urza_id}/settings/{record_id}/delete")
+async def delete_urza_settings_record(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[
+        ObjectService,
+        Depends(get_object_service),
+    ],
+    settings_service: Annotated[
+        SettingsService,
+        Depends(get_settings_service),
+    ],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+
+    if current_user.role.value not in {
+        "superadmin",
+        "admin",
+        "manager",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для удаления записи.",
+        )
+
+    try:
+        await settings_service.delete_record(
+            user_id=current_user.id,
+            urza_id=urza_id,
+            record_id=record_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    settings_form, settings_records = await settings_service.get_details(
+        user_id=current_user.id,
+        urza_id=urza_id,
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/urza_settings.html",
+        context={
+            "settings_form": settings_form,
+            "settings_records": settings_records,
+            "current_user": current_user,
+            "urza_id": urza_id,
+        },
+    )
+
+
 @router.get("/urza/{urza_id}/settings/new")
 async def get_new_urza_settings_form(
     request: Request,
