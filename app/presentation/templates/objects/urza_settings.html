@@ -2,84 +2,87 @@
 
 <div id="urza-tab-content">
 
-    {% if settings_form %}
-
-        <div class="mb-3">
-            <div class="rzadb-otd-version-title">
-                Формуляр регистрации изменений уставок
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="rzadb-otd-version-title">
+            Формуляр регистрации изменений уставок
         </div>
 
-        {% if settings_records %}
-
-            <div class="table-responsive">
-                <table class="table table-sm align-middle rzadb-settings-table">
-
-                    <thead>
-                        <tr>
-                            <th class="text-center">Дата</th>
-                            <th>Параметр</th>
-                            <th class="text-center">Было</th>
-                            <th class="text-center">Стало</th>
-                            <th>Причина изменения</th>
-                            <th class="text-center">Кто изменил</th>
-                            <th>Подписанная форма</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for record in settings_records %}
-                            <tr>
-                                <td>
-                                    {{ record.change_date.strftime("%d.%m.%Y") }}
-                                </td>
-
-                                <td>
-                                    {{ record.parameter_name }}
-                                </td>
-
-                                <td>
-                                    {{ record.initial_setting }}
-                                </td>
-
-                                <td>
-                                    {{ record.new_setting }}
-                                </td>
-
-                                <td>
-                                    {{ record.change_reason }}
-                                </td>
-
-                                <td>
-                                    {{ record.creator.full_name if record.creator else "—" }}
-                                </td>
-
-                                <td>
-                                    {% if record.signed_form_file_id %}
-                                        {{ file_actions(record.signed_form_file_id) }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-
-                </table>
-            </div>
-
-        {% else %}
-
-            <div class="text-secondary text-center py-5">
-                Изменений уставок ещё не зарегистрировано.
-            </div>
-
+        {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
+            <button
+                type="button"
+                class="btn btn-primary"
+                hx-get="/objects/urza/{{ urza_id }}/settings/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <span class="material-icons align-middle me-1">add</span>
+                Добавить запись
+            </button>
         {% endif %}
+    </div>
+
+    {% if settings_records %}
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle rzadb-settings-table">
+
+                <thead>
+                    <tr>
+                        <th class="text-center">Дата</th>
+                        <th>Параметр</th>
+                        <th class="text-center">Было</th>
+                        <th class="text-center">Стало</th>
+                        <th>Причина изменения</th>
+                        <th class="text-center">Кто внес</th>
+                        <th>Подписанная форма</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for record in settings_records %}
+                        <tr>
+                            <td>
+                                {{ record.change_date.strftime("%d.%m.%Y") }}
+                            </td>
+
+                            <td>
+                                {{ record.parameter_name }}
+                            </td>
+
+                            <td>
+                                {{ record.initial_setting }}
+                            </td>
+
+                            <td>
+                                {{ record.new_setting }}
+                            </td>
+
+                            <td>
+                                {{ record.change_reason }}
+                            </td>
+
+                            <td>
+                                {{ record.creator.full_name if record.creator else "—" }}
+                            </td>
+
+                            <td>
+                                {% if record.signed_form_file_id %}
+                                    {{ file_actions(record.signed_form_file_id) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
 
     {% else %}
 
         <div class="text-secondary text-center py-5">
-            Формуляр уставок для данного УРЗА ещё не создан.
+            Изменений уставок ещё не зарегистрировано.
         </div>
 
     {% endif %}

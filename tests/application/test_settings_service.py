@@ -277,12 +277,13 @@ async def test_create_record_raises_when_access_denied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_record_raises_when_form_not_exists() -> None:
+async def test_create_record_creates_form_when_form_not_exists() -> None:
     repository = AsyncMock()
     access_service = AsyncMock()
 
     user_id = uuid7()
     urza_id = uuid7()
+    signed_form_file_id = uuid7()
 
     access_service.can_access_urza.return_value = True
     repository.get_form_by_urza_id.return_value = None
@@ -292,22 +293,33 @@ async def test_create_record_raises_when_form_not_exists() -> None:
         access_service=access_service,
     )
 
-    with pytest.raises(
-        ValueError,
-        match="Форма уставок для данного URZA не существует",
-    ):
-        await service.create_record(
-            user_id=user_id,
-            urza_id=urza_id,
-            change_date=date(2026, 9, 17),
-            parameter_name="Ток срабатывания",
-            initial_setting="1.0 A",
-            new_setting="1.2 A",
-            change_reason="Корректировка уставки",
-            signed_form_file_id=uuid7(),
-        )
+    record = await service.create_record(
+        user_id=user_id,
+        urza_id=urza_id,
+        change_date=date(2026, 9, 17),
+        parameter_name="Ток срабатывания",
+        initial_setting="1.0 A",
+        new_setting="1.2 A",
+        change_reason="Корректировка уставки",
+        signed_form_file_id=signed_form_file_id,
+    )
 
     repository.get_form_by_urza_id.assert_awaited_once_with(
         urza_id,
     )
-    repository.add_record.assert_not_awaited()
+
+    repository.add_form.assert_awaited_once()
+
+    created_form = repository.add_form.await_args.args[0]
+
+    assert isinstance(created_form, SettingsForm)
+    assert created_form.urza_id == urza_id
+    assert created_form.created_by == user_id
+    assert created_form.updated_by == user_id
+
+    repository.add_record.assert_awaited_once_with(record)
+
+    assert record.settings_form_id == created_form.id
+    assert record.created_by == user_id
+    assert record.updated_by == user_id
+    assert record.signed_form_file_id == signed_form_file_id

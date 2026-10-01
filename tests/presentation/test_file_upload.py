@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 from unittest.mock import AsyncMock, MagicMock
+from urllib.parse import quote
 
 import pytest
 import pytest_asyncio
@@ -242,7 +243,9 @@ async def test_file_endpoints_authorize_before_read_and_preserve_response(
     assert response.content == b"test pdf content"
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"] == (
-        f'{disposition}; filename="{state["file"].original_name}"'
+        f'{disposition}; '
+        f'filename="{state["file"].original_name}"; '
+        f"filename*=UTF-8''{quote(state['file'].original_name)}"
     )
     getattr(state["access_service"], access_method).assert_awaited_once_with(
         user_id=state["user"].id,

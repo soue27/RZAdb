@@ -925,10 +925,13 @@ body {
 }
 
 /* Кто изменил */
+/* Кто внес */
 .rzadb-settings-table th:nth-child(6),
 .rzadb-settings-table td:nth-child(6) {
     width: 120px;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 /* =========================================================

@@ -1,0 +1,117 @@
+<div id="urza-tab-content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="rzadb-otd-version-title">
+            Добавление изменения уставок
+        </div>
+
+        <button
+            type="button"
+            class="btn btn-outline-secondary"
+            hx-get="/objects/urza/{{ urza_id }}/settings"
+            hx-target="#urza-tab-content"
+            hx-swap="outerHTML"
+        >
+            Отмена
+        </button>
+    </div>
+
+    <form
+        method="post"
+        enctype="multipart/form-data"
+        hx-post="/objects/urza/{{ urza_id }}/settings"
+        hx-target="#urza-tab-content"
+    >
+        <div class="mb-3">
+            <label class="form-label" for="change-date">
+                Дата изменения
+            </label>
+
+            <input
+                id="change-date"
+                name="change_date"
+                type="date"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="parameter-name">
+                Параметр
+            </label>
+
+            <input
+                id="parameter-name"
+                name="parameter_name"
+                type="text"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="initial-setting">
+                Было
+            </label>
+
+            <input
+                id="initial-setting"
+                name="initial_setting"
+                type="text"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="new-setting">
+                Стало
+            </label>
+
+            <input
+                id="new-setting"
+                name="new_setting"
+                type="text"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="change-reason">
+                Причина изменения
+            </label>
+
+            <textarea
+                id="change-reason"
+                name="change_reason"
+                class="form-control"
+                rows="3"
+                required
+            ></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="signed-form-file">
+                Подписанная форма
+            </label>
+
+            <input
+                id="signed-form-file"
+                name="signed_form_file"
+                type="file"
+                class="form-control"
+                required
+            >
+        </div>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Сохранить запись
+        </button>
+    </form>
+
+</div>

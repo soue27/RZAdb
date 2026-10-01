@@ -106,9 +106,13 @@ class SettingsService:
         )
 
         if settings_form is None:
-            raise ValueError(
-                "Форма уставок для данного URZA не существует"
+            settings_form = SettingsForm(
+                urza_id=urza_id,
+                created_by=user_id,
+                updated_by=user_id,
             )
+            await self.repository.add_form(settings_form)
+
 
         record = SettingsRecord(
             settings_form_id=settings_form.id,

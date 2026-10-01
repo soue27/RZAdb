@@ -29,9 +29,14 @@ def test_settings_template_links_signed_form_file() -> None:
         signed_form_file_id=file_id,
     )
 
+    current_user = SimpleNamespace(
+        role=SimpleNamespace(value="engineer"),
+    )
+
     html = templates.get_template("objects/urza_settings.html").render(
         settings_form=object(),
         settings_records=[record],
+        current_user=current_user,
     )
 
     assert "Подписанная форма" in html
@@ -40,7 +45,9 @@ def test_settings_template_links_signed_form_file() -> None:
     empty_html = templates.get_template("objects/urza_settings.html").render(
         settings_form=None,
         settings_records=[],
+        current_user=current_user,
     )
+
     assert_no_file_actions(empty_html)
 
 
