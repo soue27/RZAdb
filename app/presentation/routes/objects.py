@@ -30,7 +30,6 @@ from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.application.schema.service import SchemaService
 from app.application.programs.service import ProgramService
-from app.application.urza_instructions.service import URZAInstructionService
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
@@ -43,7 +42,6 @@ from app.presentation.dependencies.services import (
     get_schema_service,
     get_maintenance_service,
     get_program_service,
-    get_urza_instruction_service,
     get_file_service,
     get_settings_service,
 )
@@ -252,69 +250,6 @@ async def get_urza_maintenance(
         name="objects/urza_maintenance.html",
         context={
             "maintenance_records": maintenance_records,
-        },
-    )
-
-
-@router.get("/urza/{urza_id}/instruction")
-async def get_urza_instruction(
-    request: Request,
-    urza_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    object_service: Annotated[ObjectService, Depends(get_object_service)],
-    urza_instruction_service: Annotated[
-        URZAInstructionService,
-        Depends(get_urza_instruction_service),
-    ],
-    instruction_version: UUID | None = Query(default=None),
-):
-    try:
-        await object_service.get_object(
-            user_id=current_user.id,
-            object_type="urza",
-            object_id=urza_id,
-        )
-    except ObjectAccessDeniedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ запрещён",
-        ) from exc
-    except ObjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="URZA не найдено",
-        ) from exc
-
-    instruction = await urza_instruction_service.get_by_urza(
-        user_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    versions = []
-    selected_version = None
-
-    if instruction is not None:
-        versions = await urza_instruction_service.get_versions(
-            user_id=current_user.id,
-            urza_id=urza_id,
-        )
-
-        if instruction_version is not None:
-            selected_version = await urza_instruction_service.get_version_by_id(
-                user_id=current_user.id,
-                version_id=instruction_version,
-            )
-
-        if selected_version is None and versions:
-            selected_version = versions[0]
-
-    return templates.TemplateResponse(
-        request=request,
-        name="objects/urza_instruction.html",
-        context={
-            "instruction": instruction,
-            "versions": versions,
-            "selected_version": selected_version,
         },
     )
 

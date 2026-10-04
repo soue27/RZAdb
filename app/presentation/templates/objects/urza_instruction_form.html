@@ -1,0 +1,11 @@
+<div id="urza-tab-content" class="card"><div class="card-body">
+    <h2 class="h5">{% if new_version %}Новая версия инструкции{% else %}Создание инструкции{% endif %}</h2>
+    <form method="post" enctype="multipart/form-data" action="{% if new_version %}/objects/urza/{{ urza_id }}/instruction/{{ instruction_id }}/versions{% else %}/objects/urza/{{ urza_id }}/instruction{% endif %}" hx-post="{% if new_version %}/objects/urza/{{ urza_id }}/instruction/{{ instruction_id }}/versions{% else %}/objects/urza/{{ urza_id }}/instruction{% endif %}" hx-target="#urza-tab-content" hx-swap="outerHTML">
+        <div class="mb-3"><label class="form-label" for="effective_date">Дата вступления в действие</label><input class="form-control" type="date" id="effective_date" name="effective_date" required></div>
+        <div class="mb-3"><label class="form-label" for="scan_file">Подписанный скан</label><input class="form-control" type="file" id="scan_file" name="scan_file" required></div>
+        <div class="mb-3"><label class="form-label" for="editable_file">Редактируемый файл (необязательно)</label><input class="form-control" type="file" id="editable_file" name="editable_file"></div>
+        <div class="mb-3"><label class="form-label" for="change_description">Описание изменений</label><textarea class="form-control" id="change_description" name="change_description"></textarea></div>
+        <div class="mb-3"><label class="form-label" for="change_justification">Обоснование изменений</label><textarea class="form-control" id="change_justification" name="change_justification"></textarea></div>
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+    </form>
+</div></div>

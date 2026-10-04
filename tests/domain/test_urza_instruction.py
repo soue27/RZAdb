@@ -1,3 +1,5 @@
+from sqlalchemy import UniqueConstraint
+
 from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,
@@ -23,3 +25,13 @@ def test_urza_instruction_version_model(system_user_id) -> None:
     assert version.created_by == system_user_id
     assert version.scan_file_id is None
     assert version.editable_file_id is None
+
+
+def test_instruction_version_number_is_unique_per_instruction() -> None:
+    constraints = URZAInstructionVersion.__table__.constraints
+    assert any(
+        isinstance(constraint, UniqueConstraint)
+        and set(constraint.columns.keys())
+        == {"urza_instruction_id", "version_number"}
+        for constraint in constraints
+    )

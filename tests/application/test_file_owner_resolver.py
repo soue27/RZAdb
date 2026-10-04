@@ -9,11 +9,13 @@ from app.application.files.exceptions import AmbiguousFileOwnershipError
 from app.application.files.owner_repository import FileOwnerRepository
 from app.application.files.owner_resolver import FileOwnerResolver
 from app.application.files.owners import FileAccessTargetType, FileOwnerType
+from app.domain import urza
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     ElementBase,
     EnterpriseType,
+    DocumentStatus,
     HighestVoltage,
     MaintenanceType,
     OperationalCurrentType,
@@ -43,6 +45,7 @@ from app.domain.urza_instruction import (
     URZAInstructionVersion,
 )
 from app.infrastructure.database.engine import async_session_factory
+from app.presentation.routes import files
 
 
 def _new_file(system_user_id: UUID, *, deleted: bool = False) -> File:
@@ -179,6 +182,7 @@ async def owner_data(system_user_id):
             urza=urza,
             program_type=ProgramType.WORK,
             program_number="P-1",
+            status=DocumentStatus.APPROVED,
             scan_file=files["program_scan"],
             editable_file=files["program_editable"],
             created_by=system_user_id,
@@ -193,6 +197,7 @@ async def owner_data(system_user_id):
         urza_instruction_version = URZAInstructionVersion(
             urza_instruction=urza_instruction,
             version_number=1,
+            status=DocumentStatus.APPROVED,
             effective_date=date(2026, 1, 1),
             scan_file=files["urza_instruction_scan"],
             editable_file=files["urza_instruction_editable"],
@@ -383,6 +388,7 @@ async def test_same_owner_can_reference_file_in_multiple_roles(
         urza_id=expected["program_scan"][2],
         program_type=ProgramType.WORK,
         program_number="P-duplicate-role",
+        status=DocumentStatus.APPROVED,
         scan_file=shared_file,
         editable_file=shared_file,
         created_by=system_user_id,
@@ -401,26 +407,23 @@ async def test_same_owner_can_reference_file_in_multiple_roles(
 
 
 @pytest.mark.asyncio
-async def test_different_owner_objects_are_ambiguous(
+async def test_different_owner_types_are_ambiguous(
     owner_data,
     system_user_id,
 ) -> None:
-    session, files, _ = owner_data
+    session, files, expected = owner_data
     shared_file = _new_file(system_user_id)
-    original_program_owner = await FileOwnerRepository(
-        session,
-    ).get_owners_by_file_id(files["program_scan"].id)
-    second_program = Program(
-        urza_id=original_program_owner[0].access_target_id,
-        program_type=ProgramType.WORK,
-        program_number="P-second-owner",
-        scan_file=shared_file,
+
+    to_record = TORecord(
+        urza_id=expected["program_scan"][2],
+        maintenance_date=date(2026, 1, 2),
+        maintenance_type=MaintenanceType.K,
+        signed_form_file=shared_file,
         created_by=system_user_id,
         updated_by=system_user_id,
     )
-    first_program = await session.get(Program, original_program_owner[0].owner_id)
-    first_program.editable_file = shared_file
-    session.add_all([shared_file, second_program])
+
+    session.add_all([shared_file, to_record])
     await session.flush()
 
     with pytest.raises(AmbiguousFileOwnershipError):
@@ -434,16 +437,19 @@ async def test_different_owner_types_are_ambiguous(
     owner_data,
     system_user_id,
 ) -> None:
-    session, files, expected = owner_data
+    session, _, expected = owner_data
     shared_file = _new_file(system_user_id)
+
     program = Program(
         urza_id=expected["program_scan"][2],
         program_type=ProgramType.WORK,
-        program_number="P-cross-type",
+        program_number="P-different-type",
+        status=DocumentStatus.APPROVED,
         scan_file=shared_file,
         created_by=system_user_id,
         updated_by=system_user_id,
     )
+
     to_record = TORecord(
         urza_id=expected["program_scan"][2],
         maintenance_date=date(2026, 1, 2),
@@ -452,6 +458,7 @@ async def test_different_owner_types_are_ambiguous(
         created_by=system_user_id,
         updated_by=system_user_id,
     )
+
     session.add_all([shared_file, program, to_record])
     await session.flush()
 

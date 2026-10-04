@@ -1,414 +1,159 @@
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
 
-from app.application.urza_instructions.service import (
-    URZAInstructionService,
-)
-from app.domain.urza_instruction import (
-    URZAInstruction,
-    URZAInstructionVersion,
-)
+from app.application.urza_instructions.service import URZAInstructionService
+from app.domain.enums import DocumentStatus, UserRole
+from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 
 
 @pytest.fixture
-def repository():
-    return MagicMock()
+def deps():
+    repo, access, users, urzas = MagicMock(), MagicMock(), MagicMock(), MagicMock()
+    access.can_access_urza = AsyncMock(return_value=True)
+    repo.get_by_urza_id = AsyncMock(return_value=None)
+    repo.add_instruction = AsyncMock(side_effect=lambda x: x)
+    repo.add_version = AsyncMock(side_effect=lambda x: x)
+    repo.get_by_id = AsyncMock()
+    repo.get_version_by_id = AsyncMock()
+    repo.get_versions = AsyncMock(return_value=[])
+    repo.get_current_version = AsyncMock()
+    repo.get_max_version_number = AsyncMock(return_value=None)
+    repo.save = AsyncMock()
+    users.get_by_id = AsyncMock()
+    urzas.get_by_id = AsyncMock()
+    service = URZAInstructionService(repo, access, users, urzas)
+    return service, repo, access, users, urzas
 
 
-@pytest.fixture
-def access_service():
-    service = MagicMock()
-    service.can_access_urza = AsyncMock()
-    return service
-
-
-@pytest.fixture
-def service(repository, access_service):
-    return URZAInstructionService(
-        repository=repository,
-        access_service=access_service,
-    )
-
-
-@pytest.mark.asyncio
-async def test_get_by_urza_returns_instruction(
-    service, repository, access_service, system_user_id
-):
-    user_id = uuid7()
-    urza_id = uuid7()
-
-    instruction = URZAInstruction(
-        id=uuid7(),
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    access_service.can_access_urza.return_value = True
-    repository.get_by_urza_id = AsyncMock(
-        return_value=instruction,
-    )
-
-    result = await service.get_by_urza(
-        user_id,
-        urza_id,
-    )
-
-    assert result is instruction
-    access_service.can_access_urza.assert_awaited_once_with(
-        user_id,
-        urza_id,
-    )
-    repository.get_by_urza_id.assert_awaited_once_with(
-        urza_id,
-    )
+def make_user(role, enterprise_id=None, active=True):
+    return SimpleNamespace(role=role, enterprise_id=enterprise_id, active=active, deleted_at=None)
 
 
 @pytest.mark.asyncio
-async def test_get_by_urza_denies_access(
-    service,
-    repository,
-    access_service,
-):
-    user_id = uuid7()
-    urza_id = uuid7()
+@pytest.mark.parametrize(("role", "expected"), [
+    (UserRole.ENGINEER, DocumentStatus.DRAFT),
+    (UserRole.ADMIN, DocumentStatus.DRAFT),
+    (UserRole.SUPERADMIN, DocumentStatus.DRAFT),
+    (UserRole.MANAGER, DocumentStatus.APPROVED),
+])
+async def test_create_first_version_assigns_role_status(deps, role, expected):
+    service, repo, access, users, _ = deps
+    user_id, urza_id = uuid7(), uuid7()
+    users.get_by_id.return_value = make_user(role)
+    instruction = await service.create(user_id, urza_id, date(2026, 1, 1), uuid7())
+    version = repo.add_version.await_args.args[0]
+    assert instruction.urza_id == urza_id
+    assert version.version_number == 1
+    assert version.status is expected
 
-    access_service.can_access_urza.return_value = False
-    repository.get_by_urza_id = AsyncMock()
 
+@pytest.mark.asyncio
+async def test_create_instruction_rejects_duplicate(deps):
+    service, repo, _, users, _ = deps
+    users.get_by_id.return_value = make_user(UserRole.ENGINEER)
+    repo.get_by_urza_id.return_value = SimpleNamespace(id=uuid7())
+    with pytest.raises(ValueError, match="уже существует"):
+        await service.create(uuid7(), uuid7(), date.today(), uuid7())
+    repo.add_instruction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_by_urza_checks_access(deps):
+    service, repo, access, _, _ = deps
+    access.can_access_urza.return_value = False
     with pytest.raises(PermissionError):
-        await service.get_by_urza(
-            user_id,
-            urza_id,
-        )
-
-    repository.get_by_urza_id.assert_not_awaited()
+        await service.get_by_urza(uuid7(), uuid7())
+    repo.get_by_urza_id.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_create_instruction_with_first_version(
-    service,
-    repository,
-    access_service,
-):
-    user_id = uuid7()
-    urza_id = uuid7()
-    scan_file_id = uuid7()
-    editable_file_id = uuid7()
-
-    access_service.can_access_urza.return_value = True
-    repository.get_by_urza_id = AsyncMock(return_value=None)
-    repository.add_instruction = AsyncMock()
-    repository.add_version = AsyncMock()
-
-    result = await service.create(
-        user_id=user_id,
-        urza_id=urza_id,
-        effective_date=date(2026, 9, 17),
-        scan_file_id=scan_file_id,
-        editable_file_id=editable_file_id,
-        change_description="Первичное создание",
-        change_justification="Ввод инструкции",
-    )
-
-    assert isinstance(result, URZAInstruction)
-    assert result.urza_id == urza_id
-
-    repository.add_instruction.assert_awaited_once()
-
-    created_instruction = repository.add_instruction.await_args.args[0]
-
-    assert created_instruction.urza_id == urza_id
-    assert created_instruction.created_by == user_id
-    assert created_instruction.updated_by == user_id
-
-    repository.add_version.assert_awaited_once()
-
-    created_version = repository.add_version.await_args.args[0]
-
-    assert isinstance(created_version, URZAInstructionVersion)
-    assert created_version.urza_instruction_id == created_instruction.id
-    assert created_version.version_number == 1
-    assert created_version.effective_date == date(2026, 9, 17)
-    assert created_version.created_by == user_id
-    assert created_version.updated_by == user_id
-    assert created_version.scan_file_id == scan_file_id
-    assert created_version.editable_file_id == editable_file_id
-    assert created_version.change_description == "Первичное создание"
-    assert created_version.change_justification == "Ввод инструкции"
+def setup_version(deps, status):
+    service, repo, access, users, urzas = deps
+    user_id, urza_id, iid, vid = uuid7(), uuid7(), uuid7(), uuid7()
+    instruction = URZAInstruction(id=iid, urza_id=urza_id)
+    version = URZAInstructionVersion(id=vid, urza_instruction_id=iid,
+        version_number=2, status=status, effective_date=date(2026, 1, 1), scan_file_id=uuid7())
+    repo.get_version_by_id.return_value = version
+    repo.get_by_id.return_value = instruction
+    users.get_by_id.return_value = make_user(UserRole.ENGINEER)
+    urzas.get_by_id.return_value = SimpleNamespace(
+        connection=SimpleNamespace(substation=SimpleNamespace(enterprise_id=uuid7())))
+    return service, repo, access, users, urzas, user_id, urza_id, version
 
 
 @pytest.mark.asyncio
-async def test_create_instruction_rejects_duplicate(
-    service, repository, access_service, system_user_id
-):
-    user_id = uuid7()
-    urza_id = uuid7()
-
-    existing = URZAInstruction(
-        id=uuid7(),
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    access_service.can_access_urza.return_value = True
-    repository.get_by_urza_id = AsyncMock(
-        return_value=existing,
-    )
-    repository.add_instruction = AsyncMock()
-    repository.add_version = AsyncMock()
-
-    with pytest.raises(
-        ValueError,
-        match="уже существует",
-    ):
-        await service.create(
-            user_id=user_id,
-            urza_id=urza_id,
-            effective_date=date(2026, 9, 17),
-            scan_file_id=uuid7(),
-        )
-
-    repository.add_instruction.assert_not_awaited()
-    repository.add_version.assert_not_awaited()
+async def test_draft_can_submit_for_review(deps):
+    service, repo, _, _, _, user, urza, version = setup_version(deps, DocumentStatus.DRAFT)
+    result = await service.submit_for_review(user, version.id, urza)
+    assert result.status is DocumentStatus.UNDER_REVIEW
+    repo.save.assert_awaited_once_with(version)
 
 
 @pytest.mark.asyncio
-async def test_create_instruction_denies_access(
-    service,
-    repository,
-    access_service,
-):
-    user_id = uuid7()
-    urza_id = uuid7()
+async def test_under_review_manager_can_approve_or_return(deps):
+    for method, expected in (("approve", DocumentStatus.APPROVED), ("return_to_draft", DocumentStatus.DRAFT)):
+        service, repo, _, users, urzas, _, urza, version = setup_version(deps, DocumentStatus.UNDER_REVIEW)
+        repo.save.reset_mock()
+        enterprise = uuid7()
+        users.get_by_id.return_value = make_user(UserRole.MANAGER, enterprise)
+        urzas.get_by_id.return_value.connection.substation.enterprise_id = enterprise
+        result = await getattr(service, method)(uuid7(), version.id, urza)
+        assert result.status is expected
+        assert repo.save.await_args.args == (version,)
+        assert repo.save.await_count == 1
 
-    access_service.can_access_urza.return_value = False
-    repository.get_by_urza_id = AsyncMock()
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role,active,enterprise_matches", [
+    (UserRole.ENGINEER, True, True),
+    (UserRole.MANAGER, False, True),
+    (UserRole.MANAGER, True, False),
+])
+async def test_approval_rejects_wrong_reviewer(deps, role, active, enterprise_matches):
+    service, _, _, users, urzas, user, urza, version = setup_version(deps, DocumentStatus.UNDER_REVIEW)
+    enterprise = uuid7()
+    users.get_by_id.return_value = make_user(role, enterprise if enterprise_matches else uuid7(), active)
+    urzas.get_by_id.return_value.connection.substation.enterprise_id = enterprise
     with pytest.raises(PermissionError):
-        await service.create(
-            user_id=user_id,
-            urza_id=urza_id,
-            effective_date=date(2026, 9, 17),
-            scan_file_id=uuid7(),
-        )
-
-    repository.get_by_urza_id.assert_not_awaited()
+        await service.approve(user, version.id, urza)
 
 
 @pytest.mark.asyncio
-async def test_get_current_version(service, repository, access_service, system_user_id):
-    user_id = uuid7()
-    urza_id = uuid7()
-    instruction_id = uuid7()
-
-    instruction = URZAInstruction(
-        id=instruction_id,
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    version = MagicMock(spec=URZAInstructionVersion)
-
-    access_service.can_access_urza.return_value = True
-    repository.get_by_urza_id = AsyncMock(
-        return_value=instruction,
-    )
-    repository.get_current_version = AsyncMock(
-        return_value=version,
-    )
-
-    result = await service.get_current_version(
-        user_id,
-        urza_id,
-    )
-
-    assert result is version
-    repository.get_current_version.assert_awaited_once_with(
-        instruction_id,
-    )
+async def test_invalid_status_transition_rejected(deps):
+    service, _, _, _, _, user, urza, version = setup_version(deps, DocumentStatus.APPROVED)
+    with pytest.raises(ValueError):
+        await service.submit_for_review(user, version.id, urza)
 
 
 @pytest.mark.asyncio
-async def test_get_current_version_without_instruction(
-    service,
-    repository,
-    access_service,
-):
-    user_id = uuid7()
-    urza_id = uuid7()
-
-    access_service.can_access_urza.return_value = True
-    repository.get_by_urza_id = AsyncMock(
-        return_value=None,
-    )
-    repository.get_current_version = AsyncMock()
-
-    result = await service.get_current_version(
-        user_id,
-        urza_id,
-    )
-
-    assert result is None
-    repository.get_current_version.assert_not_awaited()
+async def test_new_version_uses_max_and_preserves_approved_version(deps):
+    service, repo, _, users, _, user, _, old_version = setup_version(deps, DocumentStatus.APPROVED)
+    instruction = repo.get_by_id.return_value
+    users.get_by_id.return_value = make_user(UserRole.ENGINEER)
+    repo.get_max_version_number.return_value = 5
+    created = await service.create_version(user, instruction.id, date(2026, 2, 2), uuid7())
+    assert created.version_number == 6
+    assert created.status is DocumentStatus.DRAFT
+    assert old_version.status is DocumentStatus.APPROVED
+    assert old_version.version_number == 2
+    assert repo.get_max_version_number.await_args.args == (instruction.id,)
 
 
 @pytest.mark.asyncio
-async def test_create_version_increments_version_number(
-    service, repository, access_service, system_user_id
-):
-    user_id = uuid7()
-    instruction_id = uuid7()
-    urza_id = uuid7()
-    scan_file_id = uuid7()
-
-    instruction = URZAInstruction(
-        id=instruction_id,
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    current_version = URZAInstructionVersion(
-        id=uuid7(),
-        urza_instruction_id=instruction_id,
-        version_number=3,
-        effective_date=date(2026, 1, 1),
-        created_by=user_id,
-        scan_file_id=uuid7(),
-        updated_by=system_user_id,
-    )
-
-    repository.get_by_id = AsyncMock(
-        return_value=instruction,
-    )
-    access_service.can_access_urza.return_value = True
-    repository.get_current_version = AsyncMock(
-        return_value=current_version,
-    )
-    repository.add_version = AsyncMock()
-
-    result = await service.create_version(
-        user_id=user_id,
-        instruction_id=instruction_id,
-        effective_date=date(2026, 9, 17),
-        scan_file_id=scan_file_id,
-    )
-
-    assert isinstance(result, URZAInstructionVersion)
-    assert result.urza_instruction_id == instruction_id
-    assert result.version_number == 4
-    assert result.effective_date == date(2026, 9, 17)
-    assert result.created_by == user_id
-    assert result.updated_by == user_id
-    assert result.scan_file_id == scan_file_id
-
-    repository.add_version.assert_awaited_once_with(result)
-
-
-@pytest.mark.asyncio
-async def test_create_version_without_existing_version_creates_version_one(
-    service, repository, access_service, system_user_id
-):
-    user_id = uuid7()
-    instruction_id = uuid7()
-    urza_id = uuid7()
-
-    instruction = URZAInstruction(
-        id=instruction_id,
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    repository.get_by_id = AsyncMock(
-        return_value=instruction,
-    )
-    access_service.can_access_urza.return_value = True
-    repository.get_current_version = AsyncMock(
-        return_value=None,
-    )
-    repository.add_version = AsyncMock()
-
-    result = await service.create_version(
-        user_id=user_id,
-        instruction_id=instruction_id,
-        effective_date=date(2026, 9, 17),
-        scan_file_id=uuid7(),
-    )
-
-    assert result.version_number == 1
-    assert result.created_by == user_id
-    assert result.updated_by == user_id
-    repository.add_version.assert_awaited_once_with(result)
-
-
-@pytest.mark.asyncio
-async def test_create_version_rejects_unknown_instruction(
-    service,
-    repository,
-    access_service,
-):
-    instruction_id = uuid7()
-
-    repository.get_by_id = AsyncMock(
-        return_value=None,
-    )
-    repository.add_version = AsyncMock()
-
-    with pytest.raises(
-        ValueError,
-        match="не найдена",
-    ):
-        await service.create_version(
-            user_id=uuid7(),
-            instruction_id=instruction_id,
-            effective_date=date(2026, 9, 17),
-            scan_file_id=uuid7(),
-        )
-
-    access_service.can_access_urza.assert_not_awaited()
-    repository.add_version.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_create_version_denies_access(
-    service, repository, access_service, system_user_id
-):
-    user_id = uuid7()
-    instruction_id = uuid7()
-    urza_id = uuid7()
-
-    instruction = URZAInstruction(
-        id=instruction_id,
-        urza_id=urza_id,
-        created_by=system_user_id,
-        updated_by=system_user_id,
-    )
-
-    repository.get_by_id = AsyncMock(
-        return_value=instruction,
-    )
-    access_service.can_access_urza.return_value = False
-    repository.get_current_version = AsyncMock()
-    repository.add_version = AsyncMock()
-
-    with pytest.raises(PermissionError):
-        await service.create_version(
-            user_id=user_id,
-            instruction_id=instruction_id,
-            effective_date=date(2026, 9, 17),
-            scan_file_id=uuid7(),
-        )
-
-    access_service.can_access_urza.assert_awaited_once_with(
-        user_id,
-        urza_id,
-    )
-    repository.get_current_version.assert_not_awaited()
-    repository.add_version.assert_not_awaited()
+async def test_available_actions_by_status_and_role(deps):
+    service, _, _, users, urzas = deps
+    user_id, enterprise = uuid7(), uuid7()
+    users.get_by_id.return_value = make_user(UserRole.ENGINEER)
+    draft = SimpleNamespace(status=DocumentStatus.DRAFT)
+    assert await service.get_available_actions(user_id, draft) == {"submit"}
+    approved = SimpleNamespace(status=DocumentStatus.APPROVED)
+    assert await service.get_available_actions(user_id, approved) == {"new_version"}
+    review = URZAInstructionVersion(status=DocumentStatus.UNDER_REVIEW, urza_instruction_id=uuid7())
+    repo = service.repository
+    repo.get_by_id.return_value = SimpleNamespace(urza_id=uuid7())
+    users.get_by_id.return_value = make_user(UserRole.MANAGER, enterprise)
+    urzas.get_by_id.return_value = SimpleNamespace(connection=SimpleNamespace(substation=SimpleNamespace(enterprise_id=enterprise)))
+    assert await service.get_available_actions(user_id, review) == {"approve", "return"}

@@ -10,12 +10,13 @@ from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,
 )
+from app.domain.enums import DocumentStatus
 
 
 @pytest.mark.asyncio
 async def test_get_by_id(system_user_id):
     session = MagicMock()
-    session.get = AsyncMock()
+    session.scalar = AsyncMock()
 
     instruction_id = uuid7()
     instruction = URZAInstruction(
@@ -25,17 +26,14 @@ async def test_get_by_id(system_user_id):
         updated_by=system_user_id,
     )
 
-    session.get.return_value = instruction
+    session.scalar.return_value = instruction
 
     repository = URZAInstructionRepository(session)
 
     result = await repository.get_by_id(instruction_id)
 
     assert result is instruction
-    session.get.assert_awaited_once_with(
-        URZAInstruction,
-        instruction_id,
-    )
+    session.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -64,22 +62,19 @@ async def test_get_by_urza_id(system_user_id):
 @pytest.mark.asyncio
 async def test_get_version_by_id():
     session = MagicMock()
-    session.get = AsyncMock()
+    session.scalar = AsyncMock()
 
     version_id = uuid7()
     version = MagicMock(spec=URZAInstructionVersion)
 
-    session.get.return_value = version
+    session.scalar.return_value = version
 
     repository = URZAInstructionRepository(session)
 
     result = await repository.get_version_by_id(version_id)
 
     assert result is version
-    session.get.assert_awaited_once_with(
-        URZAInstructionVersion,
-        version_id,
-    )
+    session.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -134,4 +129,19 @@ async def test_get_current_version():
     result = await repository.get_current_version(instruction_id)
 
     assert result is version
+    session.scalar.assert_awaited_once()
+    statement = str(session.scalar.await_args.args[0].compile(
+        compile_kwargs={"literal_binds": True},
+    ))
+    assert "urza_instruction_versions.status" in statement
+    assert "approved" in statement
+
+
+@pytest.mark.asyncio
+async def test_get_max_version_number():
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=4)
+    repository = URZAInstructionRepository(session)
+    result = await repository.get_max_version_number(uuid7())
+    assert result == 4
     session.scalar.assert_awaited_once()

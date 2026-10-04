@@ -235,6 +235,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
     current_version = SimpleNamespace(
         id=uuid7(),
         version_number=1,
+        status=DocumentStatus.APPROVED,
         effective_date=date(2025, 1, 1),
         creator=creator,
         scan_file_id=current_scan_id,
@@ -245,6 +246,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
     selected_version = SimpleNamespace(
         id=uuid7(),
         version_number=2,
+        status=DocumentStatus.DRAFT,
         effective_date=date(2026, 1, 1),
         change_description="Изменение",
         change_justification="Обоснование",
@@ -260,6 +262,9 @@ def test_instruction_template_links_files_from_selected_version() -> None:
         instruction=instruction,
         versions=[current_version, selected_version],
         selected_version=selected_version,
+        current_version=current_version,
+        actions=set(),
+        history_open=False,
     )
 
     assert "Версия 2" in html

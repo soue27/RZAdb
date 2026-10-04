@@ -1,10 +1,11 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, Text
+from sqlalchemy import Date, Enum, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
+from app.domain.enums import DocumentStatus
 from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base
@@ -34,6 +35,13 @@ class URZAInstructionVersion(
     Base,
 ):
     __tablename__ = "urza_instruction_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "urza_instruction_id",
+            "version_number",
+            name="uq_urza_instruction_versions_parent_version",
+        ),
+    )
 
     urza_instruction_id: Mapped[UUID] = mapped_column(
         ForeignKey("urza_instructions.id"),
@@ -41,6 +49,15 @@ class URZAInstructionVersion(
     )
 
     version_number: Mapped[int] = mapped_column(
+        nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
         nullable=False,
     )
 

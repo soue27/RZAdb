@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -8,6 +8,7 @@ from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,
 )
+from app.domain.enums import DocumentStatus
 
 
 class URZAInstructionRepository:
@@ -18,9 +19,11 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> URZAInstruction | None:
-        return await self.session.get(
-            URZAInstruction,
-            instruction_id,
+        return await self.session.scalar(
+            select(URZAInstruction).where(
+                URZAInstruction.id == instruction_id,
+                URZAInstruction.deleted_at.is_(None),
+            )
         )
 
     async def get_by_urza_id(
@@ -29,6 +32,7 @@ class URZAInstructionRepository:
     ) -> URZAInstruction | None:
         query = select(URZAInstruction).where(
             URZAInstruction.urza_id == urza_id,
+            URZAInstruction.deleted_at.is_(None),
         )
         return await self.session.scalar(query)
 
@@ -36,10 +40,11 @@ class URZAInstructionRepository:
         self,
         version_id: UUID,
     ) -> URZAInstructionVersion | None:
-        return await self.session.get(
-            URZAInstructionVersion,
-            version_id,
+        query = select(URZAInstructionVersion).where(
+            URZAInstructionVersion.id == version_id,
+            URZAInstructionVersion.deleted_at.is_(None),
         )
+        return await self.session.scalar(query)
 
     async def add_instruction(
         self,
@@ -50,6 +55,14 @@ class URZAInstructionRepository:
         return instruction
 
     async def add_version(
+        self,
+        version: URZAInstructionVersion,
+    ) -> URZAInstructionVersion:
+        self.session.add(version)
+        await self.session.flush()
+        return version
+
+    async def save(
         self,
         version: URZAInstructionVersion,
     ) -> URZAInstructionVersion:
@@ -69,10 +82,37 @@ class URZAInstructionRepository:
             .where(
                 URZAInstructionVersion.urza_instruction_id
                 == instruction_id,
+                URZAInstructionVersion.status == DocumentStatus.APPROVED,
+                URZAInstructionVersion.deleted_at.is_(None),
             )
             .order_by(
                 URZAInstructionVersion.version_number.desc(),
             )
+            .limit(1)
+        )
+        return await self.session.scalar(query)
+
+    async def get_max_version_number(
+        self,
+        instruction_id: UUID,
+    ) -> int | None:
+        query = select(func.max(URZAInstructionVersion.version_number)).where(
+            URZAInstructionVersion.urza_instruction_id == instruction_id,
+        )
+        return await self.session.scalar(query)
+
+    async def get_latest_working_version(
+        self,
+        instruction_id: UUID,
+    ) -> URZAInstructionVersion | None:
+        query = (
+            select(URZAInstructionVersion)
+            .options(selectinload(URZAInstructionVersion.creator))
+            .where(
+                URZAInstructionVersion.urza_instruction_id == instruction_id,
+                URZAInstructionVersion.deleted_at.is_(None),
+            )
+            .order_by(URZAInstructionVersion.version_number.desc())
             .limit(1)
         )
         return await self.session.scalar(query)
@@ -91,6 +131,7 @@ class URZAInstructionRepository:
             .where(
                 URZAInstructionVersion.urza_instruction_id
                 == instruction_id,
+                URZAInstructionVersion.deleted_at.is_(None),
             )
             .order_by(
                 URZAInstructionVersion.version_number.desc(),

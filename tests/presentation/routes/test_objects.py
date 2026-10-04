@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+import pytest
 from uuid6 import uuid7
 
 
@@ -35,6 +37,7 @@ from app.presentation.dependencies.services import (
     get_program_service,
     get_substation_service,
     get_file_service,
+    get_urza_instruction_service,
 )
 
 
@@ -288,6 +291,170 @@ def override_program_service(service: FakeProgramService):
         return service
 
     return dependency
+
+
+class FakeURZAInstructionService:
+    def __init__(self):
+        self.instruction = None
+        self.version = None
+        self.calls = []
+
+    async def get_by_urza(self, user_id, urza_id):
+        return self.instruction
+
+    async def get_versions(self, user_id, urza_id):
+        return [self.version] if self.version else []
+
+    async def get_current_version(self, user_id, urza_id):
+        return self.version if self.version and self.version.status is DocumentStatus.APPROVED else None
+
+    async def get_version_by_id(self, user_id, version_id):
+        return self.version if self.version and self.version.id == version_id else None
+
+    async def get_available_actions(self, user_id, version):
+        return {"submit", "approve", "return", "new_version"}
+
+    async def create(self, **kwargs):
+        self.calls.append(("create", kwargs))
+
+    async def create_version(self, **kwargs):
+        self.calls.append(("create_version", kwargs))
+        return self.version
+
+    async def submit_for_review(self, *args):
+        self.calls.append(("submit", args))
+
+    async def approve(self, *args):
+        self.calls.append(("approve", args))
+
+    async def return_to_draft(self, *args):
+        self.calls.append(("return", args))
+
+
+def override_urza_instruction_service(service):
+    def dependency():
+        return service
+    return dependency
+
+
+def instruction_file(file_id, name):
+    return SimpleNamespace(id=file_id, original_name=name)
+
+
+def make_instruction_version(status=DocumentStatus.DRAFT):
+    scan_id, version_id = uuid7(), uuid7()
+    version = SimpleNamespace(
+        id=version_id, version_number=1, status=status,
+        effective_date=date(2026, 1, 1), change_description="Изменение",
+        change_justification="Причина", creator=SimpleNamespace(full_name="Автор"),
+        scan_file_id=scan_id, scan_file=instruction_file(scan_id, "scan.pdf"),
+        editable_file_id=None, editable_file=None, urza_instruction_id=uuid7(),
+    )
+    return version
+
+
+def test_instruction_get_and_forms(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    object_service = FakeObjectService(result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА"))
+    fake_service = FakeURZAInstructionService()
+    fake_service.instruction = SimpleNamespace(id=uuid7(), urza_id=urza_id)
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(object_service)
+    app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(fake_service)
+    try:
+        client = TestClient(app)
+        listing = client.get(f"/objects/urza/{urza_id}/instruction")
+        first_form = client.get(f"/objects/urza/{urza_id}/instruction/new")
+        next_form = client.get(f"/objects/urza/{urza_id}/instruction/new-version")
+        assert listing.status_code == 200 and "ещё не создана" in listing.text
+        assert first_form.status_code == 200 and "Подписанный скан" in first_form.text
+        assert next_form.status_code == 200 and "Новая версия инструкции" in next_form.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_instruction_get_denies_access(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(error=ObjectAccessDeniedError()))
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/instruction")
+        assert response.status_code == 403
+        assert "Доступ" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_instruction_submit_denies_access(system_user_id):
+    user = make_user(system_user_id)
+    urza_id, version_id = uuid7(), uuid7()
+    fake_service = FakeURZAInstructionService()
+    async def denied(*args):
+        raise PermissionError("Доступ к URZA запрещён")
+    fake_service.submit_for_review = denied
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(fake_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/instruction/versions/{version_id}/submit")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Доступ к URZA запрещён"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("new_version", [False, True])
+def test_instruction_create_routes_upload_files(system_user_id, new_version):
+    user = make_user(system_user_id)
+    urza_id, instruction_id = uuid7(), uuid7()
+    fake_service = FakeURZAInstructionService()
+    fake_service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    fake_service.version = make_instruction_version()
+    fake_files = FakeFileService(SimpleNamespace(id=uuid7()))
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(FakeObjectService(
+        result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")))
+    app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(fake_service)
+    app.dependency_overrides[get_file_service] = lambda: fake_files
+    url = (f"/objects/urza/{urza_id}/instruction/{instruction_id}/versions"
+           if new_version else f"/objects/urza/{urza_id}/instruction")
+    try:
+        response = TestClient(app).post(url, data={"effective_date": "2026-10-01"},
+            files={"scan_file": ("signed.pdf", b"scan", "application/pdf")})
+        assert response.status_code == 200
+        assert len(fake_files.upload_calls) == 1
+        assert fake_service.calls[0][0] == ("create_version" if new_version else "create")
+        assert "Версия 1" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(("action", "method_name"), [
+    ("submit", "submit_for_review"),
+    ("approve", "approve"),
+    ("return", "return_to_draft"),
+])
+def test_instruction_workflow_routes(system_user_id, action, method_name):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    fake_service = FakeURZAInstructionService()
+    fake_service.instruction = SimpleNamespace(urza_id=urza_id)
+    fake_service.version = make_instruction_version()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(FakeObjectService(
+        result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")))
+    app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(fake_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/instruction/versions/{fake_service.version.id}/{action}")
+        assert response.status_code == 200
+        assert "Версия 1" in response.text
+        assert any(call[0] == action for call in fake_service.calls)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_get_object_requires_authentication() -> None:

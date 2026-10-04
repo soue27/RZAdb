@@ -262,4 +262,6 @@ def get_urza_instruction_service(
     return URZAInstructionService(
         repository=URZAInstructionRepository(session),
         access_service=access_service,
+        user_repository=UserRepository(session),
+        urza_repository=URZARepository(session),
     )
