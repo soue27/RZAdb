@@ -1,10 +1,18 @@
 from datetime import datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.tasks.service import TaskService
-from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
+from app.domain.enums import (
+    DocumentStatus,
+    MaintenanceType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
 from app.domain.maintenance import TORecord
 from app.domain.otd import OTDVersion
 from app.domain.program import Program, ProgramType
@@ -64,7 +72,12 @@ class FakeTaskRepository:
     async def get_schema_record_by_task_id(self, task_id):
         """Возвращает запись схем, связанную с указанной задачей."""
         return next(
-            (record for record in self.schema_records if record.task_id == task_id),
+            (
+                record
+                for record in self.schema_records
+                if record.task_id == task_id
+                and getattr(record, "deleted_at", None) is None
+            ),
             None,
         )
 
@@ -83,14 +96,39 @@ class FakeTaskRepository:
         )
 
 
+class FakeUserRepository:
+    def __init__(self) -> None:
+        self.users = {}
+
+    async def get_by_id(self, user_id):
+        return self.users.get(user_id)
+
+
+class FakeAccessService:
+    def __init__(self) -> None:
+        self.user_repository = FakeUserRepository()
+        self.access = {}
+
+    async def can_access_urza(self, user_id, urza_id):
+        return self.access.get((user_id, urza_id), True)
+
+
 @pytest.fixture
 def repository() -> FakeTaskRepository:
     return FakeTaskRepository()
 
 
 @pytest.fixture
-def service(repository: FakeTaskRepository) -> TaskService:
-    return TaskService(repository)
+def access_service() -> FakeAccessService:
+    return FakeAccessService()
+
+
+@pytest.fixture
+def service(
+    repository: FakeTaskRepository,
+    access_service: FakeAccessService,
+) -> TaskService:
+    return TaskService(repository, access_service)
 
 
 @pytest.mark.asyncio
@@ -823,7 +861,7 @@ async def test_complete_settings_task_with_result(system_user_id) -> None:
     )
     repository.settings_records.append(settings_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -854,7 +892,7 @@ async def test_complete_schemes_task_requires_schema_record(system_user_id) -> N
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -899,7 +937,7 @@ async def test_complete_schemes_task_with_scan_and_signed_form(system_user_id) -
     )
     repository.schema_records.append(schema_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -946,7 +984,7 @@ async def test_complete_schemes_task_requires_signed_form(system_user_id) -> Non
     )
     repository.schema_records.append(schema_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -993,7 +1031,7 @@ async def test_complete_schemes_task_requires_scan_or_editable_file(
     )
     repository.schema_records.append(schema_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -1040,7 +1078,7 @@ async def test_complete_schemes_task_with_editable_and_signed_form(
     )
     repository.schema_records.append(schema_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -1071,7 +1109,7 @@ async def test_complete_program_task_requires_program(system_user_id) -> None:
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -1112,7 +1150,7 @@ async def test_complete_program_task_with_scan(system_user_id) -> None:
     )
     repository.programs.append(program)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -1144,7 +1182,7 @@ async def test_complete_maintenance_task_requires_to_record(system_user_id) -> N
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -1187,7 +1225,7 @@ async def test_complete_maintenance_task_requires_protocol(system_user_id) -> No
     )
     repository.to_records.append(to_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -1232,7 +1270,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk(
     )
     repository.to_records.append(to_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -1286,7 +1324,7 @@ async def test_complete_maintenance_task_without_protocol_for_non_protocol_types
     )
     repository.to_records.append(to_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -1331,7 +1369,7 @@ async def test_complete_maintenance_task_with_protocol(system_user_id) -> None:
     )
     repository.to_records.append(to_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     completed_at = datetime.now().astimezone()
 
@@ -1379,7 +1417,7 @@ async def test_complete_maintenance_task_requires_matching_maintenance_type(
     )
     repository.to_records.append(to_record)
 
-    service = TaskService(repository)
+    service = TaskService(repository, FakeAccessService())
 
     with pytest.raises(
         ValueError,
@@ -1389,3 +1427,319 @@ async def test_complete_maintenance_task_requires_matching_maintenance_type(
             task=task,
             actor_id=engineer_id,
         )
+
+
+def _review_task(status, *, work_type=TaskWorkType.SCHEMES):
+    return Task(
+        id=uuid7(),
+        urza_id=uuid7(),
+        work_type=work_type,
+        created_by=uuid7(),
+        assigned_to=uuid7(),
+        status=status,
+        updated_by=uuid7(),
+    )
+
+
+def _add_manager(access_service, manager_id, *, active=True, deleted_at=None):
+    access_service.user_repository.users[manager_id] = SimpleNamespace(
+        role=UserRole.MANAGER,
+        active=active,
+        deleted_at=deleted_at,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method_name", "start", "target", "event_type"),
+    [
+        (
+            "submit_for_review",
+            TaskStatus.COMPLETED,
+            TaskStatus.UNDER_REVIEW,
+            "sent_to_review",
+        ),
+        (
+            "close_task",
+            TaskStatus.UNDER_REVIEW,
+            TaskStatus.CLOSED,
+            "review_approved",
+        ),
+        (
+            "return_for_revision",
+            TaskStatus.UNDER_REVIEW,
+            TaskStatus.IN_PROGRESS,
+            "review_rejected",
+        ),
+    ],
+)
+async def test_accessible_manager_can_perform_review_transition(
+    repository,
+    access_service,
+    system_user_id,
+    method_name,
+    start,
+    target,
+    event_type,
+) -> None:
+    task = _review_task(start, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    assert manager_id != task.created_by
+    assert manager_id != task.assigned_to
+    _add_manager(access_service, manager_id)
+    access_service.access[(manager_id, task.urza_id)] = True
+    service = TaskService(repository, access_service)
+
+    result = await getattr(service, method_name)(
+        task=task,
+        actor_id=manager_id,
+        comment="Проверено",
+    )
+
+    assert result.status is target
+    assert result.updated_by == manager_id
+    if target is TaskStatus.CLOSED:
+        assert result.closed_at is not None
+    history = repository.history[-1]
+    assert history.event_type == event_type
+    assert history.old_status is start
+    assert history.new_status is target
+    assert history.actor_id == manager_id
+    assert history.comment == "Проверено"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method_name", "status"),
+    [
+        ("submit_for_review", TaskStatus.COMPLETED),
+        ("close_task", TaskStatus.UNDER_REVIEW),
+        ("return_for_revision", TaskStatus.UNDER_REVIEW),
+    ],
+)
+async def test_review_transition_requires_access_to_task_urza(
+    repository,
+    access_service,
+    method_name,
+    status,
+) -> None:
+    task = _review_task(status, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    access_service.access[(manager_id, task.urza_id)] = False
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(PermissionError, match="нет доступа к URZA"):
+        await getattr(service, method_name)(task=task, actor_id=manager_id)
+
+    assert task.status is status
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN])
+async def test_review_transitions_are_manager_only(
+    repository,
+    access_service,
+    role,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    actor_id = uuid7()
+    access_service.user_repository.users[actor_id] = SimpleNamespace(
+        role=role,
+        active=True,
+        deleted_at=None,
+    )
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(PermissionError, match="только MANAGER"):
+        await service.submit_for_review(task=task, actor_id=actor_id)
+
+    assert task.status is TaskStatus.COMPLETED
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("active", "deleted_at"),
+    [(False, None), (True, datetime.now())],
+)
+async def test_inactive_manager_cannot_review(
+    repository,
+    access_service,
+    active,
+    deleted_at,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    _add_manager(
+        access_service,
+        manager_id,
+        active=active,
+        deleted_at=deleted_at,
+    )
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(PermissionError, match="неактивен"):
+        await service.submit_for_review(task=task, actor_id=manager_id)
+
+    assert task.status is TaskStatus.COMPLETED
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method_name", "status", "target"),
+    [
+        ("submit_for_review", TaskStatus.IN_PROGRESS, TaskStatus.UNDER_REVIEW),
+        ("close_task", TaskStatus.COMPLETED, TaskStatus.CLOSED),
+        ("return_for_revision", TaskStatus.COMPLETED, TaskStatus.IN_PROGRESS),
+    ],
+)
+async def test_review_methods_reject_invalid_source_status(
+    repository,
+    access_service,
+    method_name,
+    status,
+    target,
+) -> None:
+    task = _review_task(status, work_type=TaskWorkType.PROGRAM)
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(ValueError, match="Недопустимый переход"):
+        await getattr(service, method_name)(task=task, actor_id=uuid7())
+
+    assert task.status is status
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_close_schemes_task_requires_approved_active_schema_record(
+    repository,
+    access_service,
+    system_user_id,
+) -> None:
+    task = _review_task(TaskStatus.UNDER_REVIEW)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    service = TaskService(repository, access_service)
+    record = SimpleNamespace(
+        task_id=task.id,
+        status=DocumentStatus.APPROVED,
+        deleted_at=None,
+    )
+    repository.schema_records.append(record)
+
+    result = await service.close_task(task=task, actor_id=manager_id)
+
+    assert result.status is TaskStatus.CLOSED
+    assert record.status is DocumentStatus.APPROVED
+    assert repository.history[-1].old_status is TaskStatus.UNDER_REVIEW
+    assert repository.history[-1].new_status is TaskStatus.CLOSED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "record_status",
+    [DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW],
+)
+async def test_close_schemes_task_rejects_unapproved_schema_record(
+    repository,
+    access_service,
+    record_status,
+) -> None:
+    task = _review_task(TaskStatus.UNDER_REVIEW)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    repository.schema_records.append(
+        SimpleNamespace(
+            task_id=task.id,
+            status=record_status,
+            deleted_at=None,
+        )
+    )
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(ValueError, match="активного утверждённого результата"):
+        await service.close_task(task=task, actor_id=manager_id)
+
+    assert task.status is TaskStatus.UNDER_REVIEW
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "record",
+    [
+        None,
+        SimpleNamespace(
+            task_id=uuid7(),
+            status=DocumentStatus.APPROVED,
+            deleted_at=datetime.now(),
+        ),
+    ],
+)
+async def test_close_schemes_task_rejects_missing_or_deleted_result(
+    repository,
+    access_service,
+    record,
+) -> None:
+    task = _review_task(TaskStatus.UNDER_REVIEW)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    if record is not None:
+        record.task_id = task.id
+        repository.schema_records.append(record)
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(ValueError, match="активного утверждённого результата"):
+        await service.close_task(task=task, actor_id=manager_id)
+
+    assert task.status is TaskStatus.UNDER_REVIEW
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_close_non_schemes_task_keeps_existing_no_document_check(
+    repository,
+    access_service,
+) -> None:
+    task = _review_task(TaskStatus.UNDER_REVIEW, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    service = TaskService(repository, access_service)
+
+    result = await service.close_task(task=task, actor_id=manager_id)
+
+    assert result.status is TaskStatus.CLOSED
+    assert repository.history[-1].new_status is TaskStatus.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_task_review_transitions_do_not_change_schema_record_status(
+    repository,
+    access_service,
+) -> None:
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    service = TaskService(repository, access_service)
+
+    submit_task = _review_task(TaskStatus.COMPLETED)
+    draft_record = SimpleNamespace(
+        task_id=submit_task.id,
+        status=DocumentStatus.DRAFT,
+        deleted_at=None,
+    )
+    repository.schema_records.append(draft_record)
+    await service.submit_for_review(task=submit_task, actor_id=manager_id)
+    assert draft_record.status is DocumentStatus.DRAFT
+
+    return_task = _review_task(TaskStatus.UNDER_REVIEW)
+    review_record = SimpleNamespace(
+        task_id=return_task.id,
+        status=DocumentStatus.UNDER_REVIEW,
+        deleted_at=None,
+    )
+    repository.schema_records.append(review_record)
+    await service.return_for_revision(task=return_task, actor_id=manager_id)
+    assert review_record.status is DocumentStatus.UNDER_REVIEW

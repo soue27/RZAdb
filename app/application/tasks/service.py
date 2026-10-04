@@ -1,9 +1,16 @@
 from datetime import datetime, timedelta
 from uuid import UUID
 
+from app.application.access.service import AccessService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.workflow import validate_reason, validate_transition
-from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
+from app.domain.enums import (
+    DocumentStatus,
+    MaintenanceType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 
@@ -14,8 +21,28 @@ class TaskService:
     def __init__(
         self,
         task_repository: TaskRepository,
+        access_service: AccessService,
     ) -> None:
         self.task_repository = task_repository
+        self.access_service = access_service
+
+    async def _check_reviewer_access(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+    ) -> None:
+        actor = await self.access_service.user_repository.get_by_id(actor_id)
+        if actor is None:
+            raise ValueError("Проверяющий пользователь не найден.")
+        if not actor.active or actor.deleted_at is not None:
+            raise PermissionError("Проверяющий пользователь неактивен.")
+        if actor.role is not UserRole.MANAGER:
+            raise PermissionError("Проверять задачу может только MANAGER.")
+        if not await self.access_service.can_access_urza(actor_id, task.urza_id):
+            raise PermissionError(
+                "У MANAGER нет доступа к URZA, связанной с задачей."
+            )
 
     async def create_task(
         self,
@@ -67,6 +94,114 @@ class TaskService:
 
         self.task_repository.session.add(history)
 
+        return task
+
+    async def submit_for_review(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+        submitted_at: datetime | None = None,
+        comment: str | None = None,
+    ) -> Task:
+        """Передаёт завершённую задачу на проверку доступному MANAGER."""
+        validate_transition(task.status, TaskStatus.UNDER_REVIEW)
+        await self._check_reviewer_access(task=task, actor_id=actor_id)
+
+        review_time = submitted_at or datetime.now().astimezone()
+        old_status = task.status
+        task.status = TaskStatus.UNDER_REVIEW
+        task.updated_by = actor_id
+
+        await self.task_repository.save(task)
+        self.task_repository.session.add(
+            TaskHistory(
+                task_id=task.id,
+                event_type="sent_to_review",
+                old_status=old_status,
+                new_status=TaskStatus.UNDER_REVIEW,
+                actor_id=actor_id,
+                comment=comment.strip() if comment and comment.strip() else None,
+                created_at=review_time,
+            )
+        )
+        return task
+
+    async def close_task(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+        closed_at: datetime | None = None,
+        comment: str | None = None,
+    ) -> Task:
+        """Закрывает задачу после проверки результата MANAGER."""
+        validate_transition(task.status, TaskStatus.CLOSED)
+        await self._check_reviewer_access(task=task, actor_id=actor_id)
+
+        if task.work_type is TaskWorkType.SCHEMES:
+            schema_record = await self.task_repository.get_schema_record_by_task_id(
+                task.id
+            )
+            if (
+                schema_record is None
+                or schema_record.deleted_at is not None
+                or schema_record.status is not DocumentStatus.APPROVED
+            ):
+                raise ValueError(
+                    "Закрыть задачу по схемам можно только при наличии "
+                    "активного утверждённого результата."
+                )
+
+        review_time = closed_at or datetime.now().astimezone()
+        old_status = task.status
+        task.status = TaskStatus.CLOSED
+        task.closed_at = review_time
+        task.updated_by = actor_id
+
+        await self.task_repository.save(task)
+        self.task_repository.session.add(
+            TaskHistory(
+                task_id=task.id,
+                event_type="review_approved",
+                old_status=old_status,
+                new_status=TaskStatus.CLOSED,
+                actor_id=actor_id,
+                comment=comment.strip() if comment and comment.strip() else None,
+                created_at=review_time,
+            )
+        )
+        return task
+
+    async def return_for_revision(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+        returned_at: datetime | None = None,
+        comment: str | None = None,
+    ) -> Task:
+        """Возвращает задачу исполнителю на доработку."""
+        validate_transition(task.status, TaskStatus.IN_PROGRESS)
+        await self._check_reviewer_access(task=task, actor_id=actor_id)
+
+        review_time = returned_at or datetime.now().astimezone()
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS
+        task.updated_by = actor_id
+
+        await self.task_repository.save(task)
+        self.task_repository.session.add(
+            TaskHistory(
+                task_id=task.id,
+                event_type="review_rejected",
+                old_status=old_status,
+                new_status=TaskStatus.IN_PROGRESS,
+                actor_id=actor_id,
+                comment=comment.strip() if comment and comment.strip() else None,
+                created_at=review_time,
+            )
+        )
         return task
 
     async def assign_task(
