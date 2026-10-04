@@ -26,6 +26,32 @@ class TaskService:
         self.task_repository = task_repository
         self.access_service = access_service
 
+    async def get_available_actions(
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
+    ) -> set[str]:
+        """Returns review actions the current actor can perform on a task."""
+        if task.deleted_at is not None:
+            return set()
+
+        if task.status not in {
+            TaskStatus.COMPLETED,
+            TaskStatus.UNDER_REVIEW,
+        }:
+            return set()
+
+        if task.status is TaskStatus.COMPLETED:
+            return {"submit_for_review"} if task.assigned_to == actor_id else set()
+
+        try:
+            await self._check_reviewer_access(task=task, actor_id=actor_id)
+        except (PermissionError, ValueError):
+            return set()
+
+        return {"close_task", "return_for_revision"}
+
     async def _check_reviewer_access(
         self,
         *,
@@ -104,9 +130,14 @@ class TaskService:
         submitted_at: datetime | None = None,
         comment: str | None = None,
     ) -> Task:
-        """Передаёт завершённую задачу на проверку доступному MANAGER."""
+        """Назначенный исполнитель передаёт завершённую задачу на проверку."""
         validate_transition(task.status, TaskStatus.UNDER_REVIEW)
-        await self._check_reviewer_access(task=task, actor_id=actor_id)
+        if task.deleted_at is not None:
+            raise ValueError("Нельзя отправить удалённое задание на согласование.")
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Отправить задание на согласование может только назначенный исполнитель."
+            )
 
         review_time = submitted_at or datetime.now().astimezone()
         old_status = task.status

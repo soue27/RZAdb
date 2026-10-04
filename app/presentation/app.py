@@ -14,6 +14,7 @@ from app.presentation.routes.users import router as users_router
 from app.presentation.routes.settings import router as settings_router
 from app.presentation.routes.schemes import router as schemes_router
 from app.presentation.routes.urza_instructions import router as urza_instructions_router
+from app.presentation.routes.tasks import router as tasks_router
 
 
 def create_app() -> FastAPI:
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(urza_instructions_router)
     app.include_router(settings_router)
     app.include_router(schemes_router)
+    app.include_router(tasks_router)
 
 
     return app

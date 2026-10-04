@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Задания — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h4 mb-1">Задания</h1>
+            <p class="text-body-secondary mb-0">Задания по доступным объектам РЗА</p>
+        </div>
+    </div>
+
+    {% if tasks %}
+        <div class="table-responsive rzadb-surface-soft rounded-3">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Задание</th>
+                        <th>Тип работы</th>
+                        <th>УРЗА</th>
+                        <th>Исполнитель</th>
+                        <th>Статус</th>
+                        <th>Срок</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                        {% set actions = actions_by_task.get(task.id) or [] %}
+                        <tr>
+                            <td>
+                                <a href="/tasks/{{ task.id }}" class="fw-medium text-decoration-none">
+                                    {{ task.description or "Задание без описания" }}
+                                </a>
+                            </td>
+                            <td>{{ work_type_labels[task.work_type] }}</td>
+                            <td>{{ task.urza.dispatch_name }}</td>
+                            <td>{{ task.assigned_to_user.full_name if task.assigned_to_user else "Не назначен" }}</td>
+                            <td>
+                                <span class="badge {{ status_badges[task.status] }}">
+                                    {{ status_labels[task.status] }}
+                                </span>
+                            </td>
+                            <td>{{ task.deadline_at.strftime("%d.%m.%Y %H:%M") if task.deadline_at else "—" }}</td>
+                            <td>
+                                <a href="/tasks/{{ task.id }}" class="btn btn-sm btn-outline-primary">Открыть</a>
+                                {% if "submit_for_review" in actions %}
+                                    <span class="badge text-bg-primary">Доступно: Отправить на согласование</span>
+                                {% elif "close_task" in actions or "return_for_revision" in actions %}
+                                    <span class="badge text-bg-info">Доступна проверка</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="rzadb-surface-soft rounded-3 p-4 text-body-secondary">
+            Нет доступных заданий.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

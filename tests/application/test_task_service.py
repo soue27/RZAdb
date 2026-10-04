@@ -181,6 +181,73 @@ async def test_create_maintenance_task_requires_maintenance_type(
 
 
 @pytest.mark.asyncio
+async def test_available_actions_match_task_state_and_reviewer_access(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    manager_id = uuid7()
+    urza_id = uuid7()
+    manager = SimpleNamespace(
+        id=manager_id,
+        active=True,
+        deleted_at=None,
+        role=UserRole.MANAGER,
+    )
+    access_service.user_repository.users[manager_id] = manager
+    access_service.access[(manager_id, urza_id)] = True
+
+    completed = SimpleNamespace(
+        id=uuid7(), urza_id=urza_id, assigned_to=manager_id,
+        status=TaskStatus.COMPLETED, deleted_at=None
+    )
+    under_review = SimpleNamespace(
+        id=uuid7(), urza_id=urza_id, status=TaskStatus.UNDER_REVIEW, deleted_at=None
+    )
+    in_progress = SimpleNamespace(
+        id=uuid7(), urza_id=urza_id, status=TaskStatus.IN_PROGRESS, deleted_at=None
+    )
+
+    assert await service.get_available_actions(
+        task=completed,
+        actor_id=manager_id,
+    ) == {"submit_for_review"}
+    assert await service.get_available_actions(
+        task=under_review,
+        actor_id=manager_id,
+    ) == {"close_task", "return_for_revision"}
+    assert await service.get_available_actions(
+        task=in_progress,
+        actor_id=manager_id,
+    ) == set()
+
+
+@pytest.mark.asyncio
+async def test_available_review_actions_are_hidden_for_non_reviewer(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    engineer_id = uuid7()
+    urza_id = uuid7()
+    access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id,
+        active=True,
+        deleted_at=None,
+        role=UserRole.ENGINEER,
+    )
+    task = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        status=TaskStatus.UNDER_REVIEW,
+        deleted_at=None,
+    )
+
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=engineer_id,
+    ) == set()
+
+
+@pytest.mark.asyncio
 async def test_non_maintenance_task_cannot_have_maintenance_type(
     service: TaskService, system_user_id
 ) -> None:
@@ -1450,15 +1517,125 @@ def _add_manager(access_service, manager_id, *, active=True, deleted_at=None):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.MANAGER])
+async def test_assigned_executor_can_submit_completed_task_for_review(
+    repository,
+    access_service,
+    role,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    executor_id = task.assigned_to
+    access_service.user_repository.users[executor_id] = SimpleNamespace(
+        role=role,
+        active=True,
+        deleted_at=None,
+    )
+    service = TaskService(repository, access_service)
+
+    result = await service.submit_for_review(
+        task=task,
+        actor_id=executor_id,
+        comment="Результат готов",
+    )
+
+    assert result.status is TaskStatus.UNDER_REVIEW
+    assert result.updated_by == executor_id
+    history = repository.history[-1]
+    assert history.event_type == "sent_to_review"
+    assert history.old_status is TaskStatus.COMPLETED
+    assert history.new_status is TaskStatus.UNDER_REVIEW
+    assert history.actor_id == executor_id
+    assert history.comment == "Результат готов"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.MANAGER])
+async def test_only_assigned_executor_can_submit_task_for_review(
+    repository,
+    access_service,
+    role,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    actor_id = uuid7()
+    access_service.user_repository.users[actor_id] = SimpleNamespace(
+        role=role,
+        active=True,
+        deleted_at=None,
+    )
+    if role is UserRole.MANAGER:
+        access_service.access[(actor_id, task.urza_id)] = True
+    service = TaskService(repository, access_service)
+
+    with pytest.raises(ValueError, match="только назначенный исполнитель"):
+        await service.submit_for_review(task=task, actor_id=actor_id)
+
+    assert task.status is TaskStatus.COMPLETED
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_deleted_task_cannot_be_submitted_for_review(
+    repository,
+    access_service,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    task.deleted_at = datetime.now()
+
+    with pytest.raises(ValueError, match="удалённое задание"):
+        await TaskService(repository, access_service).submit_for_review(
+            task=task,
+            actor_id=task.assigned_to,
+        )
+
+    assert task.status is TaskStatus.COMPLETED
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_available_actions_use_assignment_for_completed_task(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    access_service.access[(manager_id, task.urza_id)] = True
+
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=task.assigned_to,
+    ) == {"submit_for_review"}
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=manager_id,
+    ) == set()
+
+
+@pytest.mark.asyncio
+async def test_available_reviewer_actions_still_require_manager_access(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    task = _review_task(TaskStatus.UNDER_REVIEW, work_type=TaskWorkType.PROGRAM)
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    access_service.access[(manager_id, task.urza_id)] = True
+
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=manager_id,
+    ) == {"close_task", "return_for_revision"}
+    access_service.access[(manager_id, task.urza_id)] = False
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=manager_id,
+    ) == set()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("method_name", "start", "target", "event_type"),
     [
-        (
-            "submit_for_review",
-            TaskStatus.COMPLETED,
-            TaskStatus.UNDER_REVIEW,
-            "sent_to_review",
-        ),
         (
             "close_task",
             TaskStatus.UNDER_REVIEW,
@@ -1512,7 +1689,6 @@ async def test_accessible_manager_can_perform_review_transition(
 @pytest.mark.parametrize(
     ("method_name", "status"),
     [
-        ("submit_for_review", TaskStatus.COMPLETED),
         ("close_task", TaskStatus.UNDER_REVIEW),
         ("return_for_revision", TaskStatus.UNDER_REVIEW),
     ],
@@ -1538,12 +1714,14 @@ async def test_review_transition_requires_access_to_task_urza(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN])
+@pytest.mark.parametrize("method_name", ["close_task", "return_for_revision"])
 async def test_review_transitions_are_manager_only(
     repository,
     access_service,
     role,
+    method_name,
 ) -> None:
-    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    task = _review_task(TaskStatus.UNDER_REVIEW, work_type=TaskWorkType.PROGRAM)
     actor_id = uuid7()
     access_service.user_repository.users[actor_id] = SimpleNamespace(
         role=role,
@@ -1553,9 +1731,9 @@ async def test_review_transitions_are_manager_only(
     service = TaskService(repository, access_service)
 
     with pytest.raises(PermissionError, match="только MANAGER"):
-        await service.submit_for_review(task=task, actor_id=actor_id)
+        await getattr(service, method_name)(task=task, actor_id=actor_id)
 
-    assert task.status is TaskStatus.COMPLETED
+    assert task.status is TaskStatus.UNDER_REVIEW
     assert repository.history == []
 
 
@@ -1564,13 +1742,15 @@ async def test_review_transitions_are_manager_only(
     ("active", "deleted_at"),
     [(False, None), (True, datetime.now())],
 )
+@pytest.mark.parametrize("method_name", ["close_task", "return_for_revision"])
 async def test_inactive_manager_cannot_review(
     repository,
     access_service,
     active,
     deleted_at,
+    method_name,
 ) -> None:
-    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    task = _review_task(TaskStatus.UNDER_REVIEW, work_type=TaskWorkType.PROGRAM)
     manager_id = uuid7()
     _add_manager(
         access_service,
@@ -1581,9 +1761,9 @@ async def test_inactive_manager_cannot_review(
     service = TaskService(repository, access_service)
 
     with pytest.raises(PermissionError, match="неактивен"):
-        await service.submit_for_review(task=task, actor_id=manager_id)
+        await getattr(service, method_name)(task=task, actor_id=manager_id)
 
-    assert task.status is TaskStatus.COMPLETED
+    assert task.status is TaskStatus.UNDER_REVIEW
     assert repository.history == []
 
 
@@ -1725,6 +1905,7 @@ async def test_task_review_transitions_do_not_change_schema_record_status(
     service = TaskService(repository, access_service)
 
     submit_task = _review_task(TaskStatus.COMPLETED)
+    submit_task.assigned_to = manager_id
     draft_record = SimpleNamespace(
         task_id=submit_task.id,
         status=DocumentStatus.DRAFT,

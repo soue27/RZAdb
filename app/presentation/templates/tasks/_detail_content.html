@@ -1,0 +1,96 @@
+<div id="task-page-content" class="container-fluid px-4 py-4">
+    <div class="mb-3">
+        <a href="/tasks" class="text-decoration-none">← Все задания</a>
+    </div>
+
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+
+    <section id="task-detail" class="rzadb-surface-soft rounded-3 p-4 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+                <h1 class="h4 mb-2">{{ task.description or "Задание без описания" }}</h1>
+                <span class="badge {{ status_badges[task.status] }}">{{ status_labels[task.status] }}</span>
+                <span class="badge text-bg-light border">{{ work_type_labels[task.work_type] }}</span>
+            </div>
+            <a class="btn btn-outline-primary" href="/objects/urza/{{ task.urza_id }}">{{ task.urza.dispatch_name }}</a>
+        </div>
+
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Объект</dt>
+            <dd class="col-sm-9">{{ task.urza.dispatch_name }}</dd>
+            <dt class="col-sm-3">Исполнитель</dt>
+            <dd class="col-sm-9">{{ task.assigned_to_user.full_name if task.assigned_to_user else "Не назначен" }}</dd>
+            <dt class="col-sm-3">Создатель</dt>
+            <dd class="col-sm-9">{{ task.created_by_user.full_name }}</dd>
+            <dt class="col-sm-3">Назначено</dt>
+            <dd class="col-sm-9">{{ task.assigned_at.strftime("%d.%m.%Y %H:%M") if task.assigned_at else "—" }}</dd>
+            <dt class="col-sm-3">Срок принятия</dt>
+            <dd class="col-sm-9">{{ task.acceptance_deadline_at.strftime("%d.%m.%Y %H:%M") if task.acceptance_deadline_at else "—" }}</dd>
+            <dt class="col-sm-3">Срок выполнения</dt>
+            <dd class="col-sm-9">{{ task.deadline_at.strftime("%d.%m.%Y %H:%M") if task.deadline_at else "—" }}</dd>
+            <dt class="col-sm-3">Выполнено</dt>
+            <dd class="col-sm-9">{{ task.completed_at.strftime("%d.%m.%Y %H:%M") if task.completed_at else "—" }}</dd>
+            <dt class="col-sm-3">Закрыто</dt>
+            <dd class="col-sm-9">{{ task.closed_at.strftime("%d.%m.%Y %H:%M") if task.closed_at else "—" }}</dd>
+        </dl>
+
+        {% if actions %}
+            <hr>
+            <div class="d-flex flex-wrap gap-2">
+                {% if "submit_for_review" in actions %}
+                    <form action="/tasks/{{ task.id }}/submit-for-review" method="post"
+                          hx-post="/tasks/{{ task.id }}/submit-for-review"
+                          hx-target="#task-page-content" hx-swap="outerHTML">
+                        <button type="submit" class="btn btn-primary">Отправить на согласование</button>
+                    </form>
+                {% endif %}
+                {% if "close_task" in actions %}
+                    <form action="/tasks/{{ task.id }}/close" method="post"
+                          hx-post="/tasks/{{ task.id }}/close"
+                          hx-target="#task-page-content" hx-swap="outerHTML">
+                        <button type="submit" class="btn btn-success">Закрыть</button>
+                    </form>
+                {% endif %}
+                {% if "return_for_revision" in actions %}
+                    <form action="/tasks/{{ task.id }}/return-for-revision" method="post" class="d-flex gap-2"
+                          hx-post="/tasks/{{ task.id }}/return-for-revision"
+                          hx-target="#task-page-content" hx-swap="outerHTML">
+                        <input type="text" name="comment" class="form-control" placeholder="Комментарий (необязательно)" aria-label="Комментарий к возврату">
+                        <button type="submit" class="btn btn-outline-warning text-nowrap">Вернуть на доработку</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="rzadb-surface-soft rounded-3 p-4">
+        <h2 class="h5 mb-3">История задания</h2>
+        {% if history %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th>Событие</th><th>Переход</th><th>Пользователь</th><th>Дата</th><th>Комментарий</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for event in history %}
+                            <tr>
+                                <td>{{ history_event_labels.get(event.event_type, event.event_type) }}</td>
+                                <td>
+                                    {{ status_labels[event.old_status] if event.old_status else "—" }}
+                                    {% if event.new_status %} → {{ status_labels[event.new_status] }}{% endif %}
+                                </td>
+                                <td>{{ event.actor.full_name }}</td>
+                                <td>{{ event.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+                                <td>{{ event.comment or "—" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-body-secondary mb-0">История пока пуста.</p>
+        {% endif %}
+    </section>
+</div>

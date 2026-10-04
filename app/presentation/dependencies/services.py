@@ -40,6 +40,7 @@ from app.application.settings.service import SettingsService
 from app.application.substations.repository import SubstationRepository
 from app.application.substations.service import SubstationService
 from app.application.tasks.repository import TaskRepository
+from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
@@ -242,6 +243,22 @@ def get_schema_service(
         repository=SchemaRepository(session),
         access_service=access_service,
         task_repository=TaskRepository(session),
+    )
+
+
+def get_task_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TaskRepository:
+    return TaskRepository(session)
+
+
+def get_task_service(
+    task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> TaskService:
+    return TaskService(
+        task_repository=task_repository,
+        access_service=access_service,
     )
 
 
