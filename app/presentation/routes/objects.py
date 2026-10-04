@@ -211,47 +211,7 @@ async def get_substation_inspections(
     )
 
 
-@router.get("/urza/{urza_id}/schemas")
-async def get_urza_schemas(
-    request: Request,
-    urza_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    object_service: Annotated[ObjectService, Depends(get_object_service)],
-    schema_service: Annotated[
-        SchemaService,
-        Depends(get_schema_service),
-    ],
-):
-    try:
-        await object_service.get_object(
-            user_id=current_user.id,
-            object_type="urza",
-            object_id=urza_id,
-        )
-    except ObjectAccessDeniedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ к объекту запрещён.",
-        ) from exc
-    except ObjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Объект не найден.",
-        ) from exc
 
-    schema_form, schema_records = await schema_service.get_details(
-        user_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="objects/urza_schemas.html",
-        context={
-            "schema_form": schema_form,
-            "schema_records": schema_records,
-        },
-    )
 
 
 @router.get("/urza/{urza_id}/maintenance")

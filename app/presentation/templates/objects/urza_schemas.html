@@ -1,14 +1,26 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
 <div id="urza-tab-content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="rzadb-otd-version-title">
+            Формуляр схем
+        </div>
+
+        {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
+            <button
+                type="button"
+                class="btn btn-primary"
+                hx-get="/objects/urza/{{ urza_id }}/schemas/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <span class="material-icons align-middle me-1">add</span>
+                Добавить схему
+            </button>
+        {% endif %}
+    </div>
 
     {% if schema_form %}
-
-        <div class="mb-3">
-            <div class="rzadb-otd-version-title">
-                Формуляр схем
-            </div>
-        </div>
 
         {% if schema_records %}
 
