@@ -1,5 +1,6 @@
 from datetime import date
 
+from app.domain.enums import DocumentStatus
 from app.domain.schema import SchemaForm, SchemaRecord
 
 
@@ -16,6 +17,7 @@ def test_schema_record_model(system_user_id) -> None:
         change_description="Изменена схема подключения защиты",
         change_justification="Модернизация устройства РЗА",
         upload_date=date(2026, 9, 13),
+        status=DocumentStatus.DRAFT,
         created_by=system_user_id,
         updated_by=system_user_id,
     )
@@ -25,6 +27,7 @@ def test_schema_record_model(system_user_id) -> None:
     assert record.change_description == "Изменена схема подключения защиты"
     assert record.change_justification == "Модернизация устройства РЗА"
     assert record.upload_date == date(2026, 9, 13)
+    assert record.status is DocumentStatus.DRAFT
 
     assert record.schema_form_id is None
     assert record.created_by == system_user_id

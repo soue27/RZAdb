@@ -162,6 +162,7 @@ async def owner_data(system_user_id):
             change_description="Change",
             change_justification="Reason",
             upload_date=date(2026, 1, 1),
+            status=DocumentStatus.APPROVED,
             scan_file=files["schema_scan"],
             editable_file=files["schema_editable"],
             signed_form_file=files["schema_signed"],

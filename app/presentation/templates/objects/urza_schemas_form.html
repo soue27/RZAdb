@@ -1,147 +1,159 @@
+{% from "objects/_file_actions.html" import file_actions %}
+{% set form_action = "/objects/urza/" ~ urza_id ~ "/schemas/" ~ record.id if record else "/objects/urza/" ~ urza_id ~ "/schemas" %}
+
 <div id="urza-tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="rzadb-otd-version-title">
-            Добавление схемы
+            {{ "Изменение черновика схемы" if is_edit else "Добавление схемы" }}
         </div>
-
-        <button
-            type="button"
+        <a
             class="btn btn-outline-secondary"
+            href="/objects/urza/{{ urza_id }}/schemas"
             hx-get="/objects/urza/{{ urza_id }}/schemas"
             hx-target="#urza-tab-content"
             hx-swap="outerHTML"
-        >
-            Отмена
-        </button>
+        >Отмена</a>
     </div>
+
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+
+    {% if task_id %}
+        <div class="alert alert-info" role="status">
+            Результат связан с заданием. Для его завершения нужен подписанный формуляр
+            и скан схемы либо редактируемый файл.
+        </div>
+    {% endif %}
 
     <form
         method="post"
+        action="{{ form_action }}"
         enctype="multipart/form-data"
-        hx-post="/objects/urza/{{ urza_id }}/schemas"
+        hx-post="{{ form_action }}"
         hx-target="#urza-tab-content"
         hx-swap="outerHTML"
     >
+        {% if task_id %}
+            <input type="hidden" name="task_id" value="{{ task_id }}">
+        {% endif %}
+
         <div class="mb-3">
-            <label for="schema_number" class="form-label">
-                № схемы <span class="text-danger">*</span>
-            </label>
+            <label for="schema_number" class="form-label">№ схемы <span class="text-danger">*</span></label>
             <input
                 type="text"
                 class="form-control"
                 id="schema_number"
                 name="schema_number"
+                value="{{ form_values.get('schema_number', record.schema_number if record else '') }}"
                 required
             >
         </div>
 
         <div class="mb-3">
-            <label for="schema_name" class="form-label">
-                Наименование <span class="text-danger">*</span>
-            </label>
+            <label for="schema_name" class="form-label">Наименование <span class="text-danger">*</span></label>
             <input
                 type="text"
                 class="form-control"
                 id="schema_name"
                 name="schema_name"
+                value="{{ form_values.get('schema_name', record.schema_name if record else '') }}"
                 required
             >
         </div>
 
         <div class="mb-3">
-            <label for="change_description" class="form-label">
-                Описание изменения <span class="text-danger">*</span>
-            </label>
+            <label for="change_description" class="form-label">Описание изменения <span class="text-danger">*</span></label>
             <textarea
                 class="form-control"
                 id="change_description"
                 name="change_description"
                 rows="3"
                 required
-            ></textarea>
+            >{{ form_values.get('change_description', record.change_description if record else '') }}</textarea>
         </div>
 
         <div class="mb-3">
-            <label for="change_justification" class="form-label">
-                Обоснование изменения <span class="text-danger">*</span>
-            </label>
+            <label for="change_justification" class="form-label">Обоснование изменения <span class="text-danger">*</span></label>
             <textarea
                 class="form-control"
                 id="change_justification"
                 name="change_justification"
                 rows="3"
                 required
-            ></textarea>
+            >{{ form_values.get('change_justification', record.change_justification if record else '') }}</textarea>
         </div>
 
         <div class="mb-3">
-            <label for="upload_date" class="form-label">
-                Дата загрузки <span class="text-danger">*</span>
-            </label>
+            <label for="upload_date" class="form-label">Дата изменения <span class="text-danger">*</span></label>
             <input
                 type="date"
                 class="form-control"
                 id="upload_date"
                 name="upload_date"
+                value="{{ form_values.get('upload_date', record.upload_date.isoformat() if record else '') }}"
                 required
             >
         </div>
 
+        {% if record and record.scan_file_id %}
+            <div class="mb-2">
+                <div class="small text-secondary">Текущий скан схемы</div>
+                {{ file_actions(record.scan_file_id) }}
+            </div>
+        {% endif %}
         <div class="mb-3">
-            <label for="scan_file" class="form-label">
-                Скан схемы
-            </label>
-            <input
-                type="file"
-                class="form-control"
-                id="scan_file"
-                name="scan_file"
-            >
+            <label for="scan_file" class="form-label">{{ "Заменить скан схемы" if record else "Скан схемы" }}</label>
+            <input type="file" class="form-control" id="scan_file" name="scan_file">
         </div>
 
+        {% if record and record.editable_file_id %}
+            <div class="mb-2">
+                <div class="small text-secondary">Текущий редактируемый файл</div>
+                {{ file_actions(record.editable_file_id) }}
+            </div>
+        {% endif %}
         <div class="mb-3">
-            <label for="editable_file" class="form-label">
-                Редактируемый файл
-            </label>
-            <input
-                type="file"
-                class="form-control"
-                id="editable_file"
-                name="editable_file"
-            >
+            <label for="editable_file" class="form-label">{{ "Заменить редактируемый файл" if record else "Редактируемый файл" }}</label>
+            <input type="file" class="form-control" id="editable_file" name="editable_file">
         </div>
 
+        {% if record and record.signed_form_file_id %}
+            <div class="mb-2">
+                <div class="small text-secondary">Текущий подписанный формуляр</div>
+                {{ file_actions(record.signed_form_file_id) }}
+                <div class="form-text">Если новый файл не выбран, текущий формуляр сохраняется.</div>
+            </div>
+        {% endif %}
         <div class="mb-3">
             <label for="signed_form_file" class="form-label">
-                Подписанная форма <span class="text-danger">*</span>
+                {{ "Заменить подписанный формуляр" if record else "Подписанный формуляр" }}
+                <span class="text-danger">*</span>
             </label>
             <input
                 type="file"
                 class="form-control"
                 id="signed_form_file"
                 name="signed_form_file"
-                required
+                {% if not record %}required{% endif %}
             >
+            {% if record %}
+                <div class="form-text">Подписанный формуляр остаётся обязательным для записи.</div>
+            {% endif %}
         </div>
 
         <div class="d-flex gap-2">
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
+            <button type="submit" class="btn btn-primary">
                 <span class="material-icons align-middle me-1">save</span>
-                Добавить схему
+                {{ "Сохранить изменения" if is_edit else "Добавить схему" }}
             </button>
-
-            <button
-                type="button"
+            <a
                 class="btn btn-outline-secondary"
+                href="/objects/urza/{{ urza_id }}/schemas"
                 hx-get="/objects/urza/{{ urza_id }}/schemas"
                 hx-target="#urza-tab-content"
                 hx-swap="outerHTML"
-            >
-                Отмена
-            </button>
+            >Отмена</a>
         </div>
     </form>
 </div>

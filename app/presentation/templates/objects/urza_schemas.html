@@ -2,100 +2,156 @@
 
 <div id="urza-tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="rzadb-otd-version-title">
-            Формуляр схем
-        </div>
-
-        {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
-            <button
-                type="button"
-                class="btn btn-primary"
-                hx-get="/objects/urza/{{ urza_id }}/schemas/new"
-                hx-target="#urza-tab-content"
-                hx-swap="outerHTML"
-            >
-                <span class="material-icons align-middle me-1">add</span>
-                Добавить схему
-            </button>
-        {% endif %}
+        <div class="rzadb-otd-version-title">Схемы</div>
+        <a
+            class="btn btn-primary"
+            href="/objects/urza/{{ urza_id }}/schemas/new"
+            hx-get="/objects/urza/{{ urza_id }}/schemas/new"
+            hx-target="#urza-tab-content"
+            hx-swap="outerHTML"
+        >
+            <span class="material-icons align-middle me-1">add</span>
+            Добавить схему
+        </a>
     </div>
 
-    {% if schema_form %}
-
-        {% if schema_records %}
-
-            <div class="table-responsive">
-                <table class="table table-sm align-middle rzadb-schemas-table">
-
-                    <thead>
-                        <tr>
-                            <th class="text-center">№ схемы</th>
-                            <th>Наименование</th>
-                            <th>Описание изменения</th>
-                            <th>Обоснование изменения</th>
-                            <th class="text-center">Дата загрузки</th>
-                            <th class="text-center">Кто добавил</th>
-                            <th>Файлы схемы</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for record in schema_records %}
-                            <tr>
-                                <td>{{ record.schema_number }}</td>
-                                <td>{{ record.schema_name }}</td>
-                                <td>{{ record.change_description }}</td>
-                                <td>{{ record.change_justification }}</td>
-                                <td>
-                                    {{ record.upload_date.strftime("%d.%m.%Y") }}
-                                </td>
-                                <td>
-                                    {{ record.creator.full_name if record.creator else "—" }}
-                                </td>
-
-                                <td>
-                                    <div class="d-flex flex-column gap-2">
-                                        {% if record.scan_file_id %}
-                                            <div>
-                                                <div class="small text-secondary">Скан</div>
-                                                {{ file_actions(record.scan_file_id) }}
-                                            </div>
-                                        {% endif %}
-                                        {% if record.editable_file_id %}
-                                            <div>
-                                                <div class="small text-secondary">Редактируемый файл</div>
-                                                {{ file_actions(record.editable_file_id) }}
-                                            </div>
-                                        {% endif %}
-                                        {% if record.signed_form_file_id %}
-                                            <div>
-                                                <div class="small text-secondary">Подписанная форма</div>
-                                                {{ file_actions(record.signed_form_file_id) }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-
-                </table>
-            </div>
-
-        {% else %}
-
-            <div class="text-secondary text-center py-5">
-                Схемы для данного УРЗА ещё не зарегистрированы.
-            </div>
-
-        {% endif %}
-
-    {% else %}
-
-        <div class="text-secondary text-center py-5">
-            Формуляр схем для данного УРЗА ещё не создан.
-        </div>
-
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+    {% if notice_message %}
+        <div class="alert alert-warning" role="alert">{{ notice_message }}</div>
     {% endif %}
 
+    {% if schema_records %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle rzadb-schemas-table">
+                <thead>
+                    <tr>
+                        <th>Дата изменения</th>
+                        <th>№ схемы</th>
+                        <th>Наименование</th>
+                        <th>Описание изменения</th>
+                        <th>Обоснование</th>
+                        <th>Статус</th>
+                        <th>Файлы</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in schema_records %}
+                        {% set actions = schema_actions.get(record.id) or [] %}
+                        <tr id="schema-record-{{ record.id }}">
+                            <td>
+                                {{ record.upload_date.strftime("%d.%m.%Y") }}
+                                {% if current_record and record.id == current_record.id %}
+                                    <div class="small text-success fw-semibold">Текущая</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.schema_number }}</td>
+                            <td>{{ record.schema_name }}</td>
+                            <td>{{ record.change_description }}</td>
+                            <td>{{ record.change_justification }}</td>
+                            <td>
+                                <span class="badge {{ record.status.badge_class }}">
+                                    {{ record.status.label }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column gap-2">
+                                    {% if record.scan_file_id %}
+                                        <div>
+                                            <div class="small text-secondary">Скан схемы</div>
+                                            {{ file_actions(record.scan_file_id) }}
+                                        </div>
+                                    {% endif %}
+                                    {% if record.editable_file_id %}
+                                        <div>
+                                            <div class="small text-secondary">Редактируемый файл</div>
+                                            {{ file_actions(record.editable_file_id) }}
+                                        </div>
+                                    {% endif %}
+                                    {% if record.signed_form_file_id %}
+                                        <div>
+                                            <div class="small text-secondary">Подписанный формуляр</div>
+                                            {{ file_actions(record.signed_form_file_id) }}
+                                        </div>
+                                    {% endif %}
+                                    {% if not record.scan_file_id and not record.editable_file_id and not record.signed_form_file_id %}
+                                        <span>Файлы не прикреплены</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    {% if "edit" in actions %}
+                                        <a
+                                            class="btn btn-sm btn-outline-primary"
+                                            href="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/edit"
+                                            hx-get="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/edit"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >Изменить</a>
+                                    {% endif %}
+                                    {% if "submit" in actions %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            hx-post="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/submit"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >Направить на согласование</button>
+                                    {% endif %}
+                                    {% if "approve" in actions %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-success"
+                                            hx-post="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/approve"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >Утвердить</button>
+                                    {% endif %}
+                                    {% if "return" in actions %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-warning"
+                                            hx-post="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/return"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >Вернуть на доработку</button>
+                                    {% endif %}
+                                    {% if "new_record" in actions %}
+                                        <a
+                                            class="btn btn-sm btn-outline-primary"
+                                            href="/objects/urza/{{ urza_id }}/schemas/new"
+                                            hx-get="/objects/urza/{{ urza_id }}/schemas/new"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                        >Новое изменение</a>
+                                    {% endif %}
+                                    {% if "delete" in actions %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            hx-post="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/delete"
+                                            hx-target="#urza-tab-content"
+                                            hx-swap="outerHTML"
+                                            hx-confirm="Удалить запись схемы? Запись будет скрыта из активного списка."
+                                        >Удалить</button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-secondary text-center py-5">
+            {% if schema_form %}
+                Схемы для данного УРЗА ещё не зарегистрированы.
+            {% else %}
+                Формуляр схем для данного УРЗА ещё не создан.
+            {% endif %}
+        </div>
+    {% endif %}
 </div>

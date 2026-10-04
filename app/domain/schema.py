@@ -1,9 +1,10 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, Enum, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.domain.enums import DocumentStatus
 from app.domain.file import File
 from app.domain.task import Task
 from app.domain.urza import URZA
@@ -30,6 +31,24 @@ class SchemaForm(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 class SchemaRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "schema_records"
+    __table_args__ = (
+        Index(
+            "uq_schema_records_one_active_unfinished_per_form",
+            "schema_form_id",
+            unique=True,
+            postgresql_where=text(
+                "deleted_at IS NULL AND status IN ('draft', 'under_review')"
+            ),
+        ),
+        Index(
+            "uq_schema_records_one_active_per_task",
+            "task_id",
+            unique=True,
+            postgresql_where=text(
+                "task_id IS NOT NULL AND deleted_at IS NULL"
+            ),
+        ),
+    )
 
     schema_form_id: Mapped[UUID] = mapped_column(
         ForeignKey("schema_forms.id"),
@@ -58,6 +77,15 @@ class SchemaRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     upload_date: Mapped[date] = mapped_column(
         Date,
+        nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
         nullable=False,
     )
 

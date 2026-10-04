@@ -61,7 +61,10 @@ class TaskRepository:
     ) -> SchemaRecord | None:
         """Находит запись схем, созданную в рамках указанной задачи."""
         result = await self.session.execute(
-            select(SchemaRecord).where(SchemaRecord.task_id == task_id)
+            select(SchemaRecord).where(
+                SchemaRecord.task_id == task_id,
+                SchemaRecord.deleted_at.is_(None),
+            )
         )
         return result.scalar_one_or_none()
 

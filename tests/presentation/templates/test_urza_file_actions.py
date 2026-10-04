@@ -179,11 +179,14 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
     scan_id, editable_id, signed_id = uuid7(), None, uuid7()
 
     record = SimpleNamespace(
+        id=uuid7(),
         schema_number="1",
         schema_name="Схема",
         change_description="Изменение",
         change_justification="Обоснование",
         upload_date=date(2026, 9, 1),
+        status=DocumentStatus.APPROVED,
+        deleted_at=None,
         creator=SimpleNamespace(full_name="Автор"),
         scan_file_id=scan_id,
         editable_file_id=editable_id,
@@ -195,25 +198,127 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
     )
 
     html = templates.get_template("objects/urza_schemas.html").render(
+        urza_id=uuid7(),
         schema_form=object(),
         schema_records=[record],
+        current_record=record,
+        schema_actions={record.id: {"new_record"}},
         current_user=current_user,
     )
 
-    assert "Скан" in html
+    assert "Скан схемы" in html
     assert "Редактируемый файл" not in html
-    assert "Подписанная форма" in html
+    assert "Подписанный формуляр" in html
+    assert "Текущая" in html
+    assert "Утверждено" in html
+    assert "Изменить" not in html
+    assert "Новое изменение" in html
     assert_file_actions(html, scan_id)
     assert_file_actions(html, signed_id)
     assert "/files/None/" not in html
 
     empty_html = templates.get_template("objects/urza_schemas.html").render(
+        urza_id=uuid7(),
         schema_form=None,
         schema_records=[],
+        current_record=None,
+        schema_actions={},
         current_user=current_user,
     )
 
     assert_no_file_actions(empty_html)
+
+
+def test_schemes_template_shows_only_available_workflow_and_delete_actions():
+    urza_id = uuid7()
+    draft, review, approved = [
+        SimpleNamespace(
+            id=uuid7(),
+            schema_number=f"SC-{index}",
+            schema_name=f"Схема {index}",
+            change_description="Изменение",
+            change_justification="Обоснование",
+            upload_date=date(2026, 9, index),
+            status=status,
+            creator=SimpleNamespace(full_name="Автор"),
+            scan_file_id=None,
+            editable_file_id=None,
+            signed_form_file_id=uuid7(),
+            deleted_at=None,
+        )
+        for index, status in enumerate(
+            [
+                DocumentStatus.DRAFT,
+                DocumentStatus.UNDER_REVIEW,
+                DocumentStatus.APPROVED,
+            ],
+            start=1,
+        )
+    ]
+    html = templates.get_template("objects/urza_schemas.html").render(
+        urza_id=urza_id,
+        schema_form=object(),
+        schema_records=[draft, review, approved],
+        current_record=approved,
+        schema_actions={
+            draft.id: {"edit", "submit", "delete"},
+            review.id: {"approve", "return"},
+            approved.id: {"new_record"},
+        },
+        current_user=SimpleNamespace(role=SimpleNamespace(value="admin")),
+    )
+
+    assert "Направить на согласование" in html
+    assert "Утвердить" in html
+    assert "Вернуть на доработку" in html
+    assert html.count("Изменить") == 1
+    assert html.count(">Удалить</button>") == 1
+    assert "Новое изменение" in html
+
+
+def test_schemes_form_create_and_edit_modes_keep_file_rules():
+    template = templates.get_template("objects/urza_schemas_form.html")
+    urza_id, task_id, signed_id = uuid7(), uuid7(), uuid7()
+    create_html = template.render(
+        urza_id=urza_id,
+        record=None,
+        task_id=task_id,
+        form_values={},
+        error_message=None,
+        is_edit=False,
+    )
+    assert 'name="signed_form_file"' in create_html
+    assert 'id="signed_form_file"' in create_html
+    assert 'name="scan_file"' in create_html
+    assert 'name="editable_file"' in create_html
+    assert 'name="task_id"' in create_html
+    assert "required" in create_html
+
+    record = SimpleNamespace(
+        id=uuid7(),
+        task_id=task_id,
+        schema_number="SC-1",
+        schema_name="Схема",
+        change_description="Изменение",
+        change_justification="Причина",
+        upload_date=date(2026, 9, 1),
+        signed_form_file_id=signed_id,
+        scan_file_id=None,
+        editable_file_id=None,
+    )
+    edit_html = template.render(
+        urza_id=urza_id,
+        record=record,
+        task_id=task_id,
+        form_values={},
+        error_message="Ошибка сохранения",
+        is_edit=True,
+    )
+    assert "Схема" in edit_html
+    assert "Ошибка сохранения" in edit_html
+    assert "Текущий подписанный формуляр" in edit_html
+    assert "Если новый файл не выбран" in edit_html
+    assert_file_actions(edit_html, signed_id)
 
 
 def test_maintenance_template_links_protocol_and_signed_form_roles() -> None:

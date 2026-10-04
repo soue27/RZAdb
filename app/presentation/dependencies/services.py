@@ -39,6 +39,7 @@ from app.application.settings.repository import SettingsRepository
 from app.application.settings.service import SettingsService
 from app.application.substations.repository import SubstationRepository
 from app.application.substations.service import SubstationService
+from app.application.tasks.repository import TaskRepository
 from app.application.tree.service import TreeService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
@@ -240,6 +241,7 @@ def get_schema_service(
     return SchemaService(
         repository=SchemaRepository(session),
         access_service=access_service,
+        task_repository=TaskRepository(session),
     )
 
 
