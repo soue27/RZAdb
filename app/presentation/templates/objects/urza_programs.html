@@ -26,27 +26,112 @@
                     <th>Тип программы</th>
                     <th>№ программы</th>
                     <th>Дата добавления</th>
+                    <th>Статус</th>
                     <th>Скан</th>
                     <th>Редактируемый файл</th>
                     <th>Кто добавил</th>
+                    <th>Действия</th>
                 </tr>
             </thead>
 
             <tbody>
                 {% for program in programs %}
+                    {% set actions = program_actions.get(program.id) or [] %}
+
                     <tr>
-                        <td>{{ program.program_type.label }}</td>
-                        <td>{{ program.program_number }}</td>
-                        <td>{{ program.created_at.strftime("%d.%m.%Y") }}</td>
-                        <td>{{ file_actions(program.scan_file_id) if program.scan_file_id }}</td>
                         <td>
-                            {{ file_actions(program.editable_file_id) if program.editable_file_id else "—" }}
+                            {{ program.program_type.label }}
                         </td>
-                        <td>{{ program.creator.full_name }}</td>
+
+                        <td>
+                            {{ program.program_number }}
+                        </td>
+
+                        <td>
+                            {{ program.created_at.strftime("%d.%m.%Y") }}
+                        </td>
+
+                        <td>
+                            <span class="badge {{ program.status.badge_class }}">
+                                {{ program.status.label }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if program.scan_file_id %}
+                                {{ file_actions(program.scan_file_id) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if program.editable_file_id %}
+                                {{ file_actions(program.editable_file_id) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ program.creator.full_name }}
+                        </td>
+
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+
+                                {% if "submit" in actions %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        hx-post="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/submit"
+                                        hx-target="#urza-tab-content"
+                                        hx-swap="outerHTML"
+                                    >
+                                        <span class="material-icons align-middle">
+                                            send
+                                        </span>
+                                        Направить на согласование
+                                    </button>
+                                {% endif %}
+
+                                {% if "approve" in actions %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-success"
+                                        hx-post="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/approve"
+                                        hx-target="#urza-tab-content"
+                                        hx-swap="outerHTML"
+                                    >
+                                        <span class="material-icons align-middle">
+                                            check
+                                        </span>
+                                        Утвердить
+                                    </button>
+                                {% endif %}
+
+                                {% if "return" in actions %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-warning"
+                                        hx-post="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/return"
+                                        hx-target="#urza-tab-content"
+                                        hx-swap="outerHTML"
+                                    >
+                                        <span class="material-icons align-middle">
+                                            undo
+                                        </span>
+                                        Вернуть на доработку
+                                    </button>
+                                {% endif %}
+
+                            </div>
+                        </td>
                     </tr>
+
                 {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted">
+                        <td colspan="8" class="text-center text-muted">
                             Программ нет
                         </td>
                     </tr>

@@ -250,6 +250,8 @@ def get_program_service(
     return ProgramService(
         repository=ProgramRepository(session),
         access_service=access_service,
+        user_repository=UserRepository(session),
+        urza_repository=URZARepository(session),
     )
 
 

@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.enums import ProgramType
+from app.domain.enums import DocumentStatus, ProgramType
 from app.domain.file import File
 from app.domain.task import Task
 from app.domain.urza import URZA
@@ -35,6 +35,15 @@ class Program(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     program_number: Mapped[str] = mapped_column(
         String(255),
+        nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
         nullable=False,
     )
 

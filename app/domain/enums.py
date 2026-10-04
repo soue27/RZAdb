@@ -153,6 +153,28 @@ class TaskStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class DocumentStatus(StrEnum):
+    DRAFT = "draft"
+    UNDER_REVIEW = "under_review"
+    APPROVED = "approved"
+
+    @property
+    def label(self) -> str:
+        return {
+            self.DRAFT: "Черновик",
+            self.UNDER_REVIEW: "На согласовании",
+            self.APPROVED: "Утверждено",
+        }[self]
+
+    @property
+    def badge_class(self) -> str:
+        return {
+            self.DRAFT: "text-bg-secondary",
+            self.UNDER_REVIEW: "text-bg-warning",
+            self.APPROVED: "text-bg-success",
+        }[self]
+
+
 class ProgramType(StrEnum):
     COMMISSIONING = "commissioning"
     DECOMMISSIONING = "decommissioning"

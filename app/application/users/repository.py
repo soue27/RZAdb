@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.user import User
 
-
 class UserRepository:
     """Работа с пользователями через SQLAlchemy."""
 

@@ -59,3 +59,11 @@ class ProgramRepository:
         await self.session.flush()
 
         return program
+
+    async def save(
+        self,
+        program: Program,
+    ) -> Program:
+        await self.session.flush()
+
+        return program

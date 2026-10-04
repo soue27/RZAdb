@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid6 import uuid7
 
 from fastapi.templating import Jinja2Templates
+
+from app.domain.enums import DocumentStatus
 
 templates = Jinja2Templates(directory="app/presentation/templates")
 
@@ -18,7 +20,7 @@ def assert_no_file_actions(html: str) -> None:
 
 
 def test_settings_template_links_signed_form_file() -> None:
-    file_id = uuid4()
+    file_id = uuid7()
     record = SimpleNamespace(
         change_date=date(2026, 9, 1),
         parameter_name="Параметр",
@@ -52,7 +54,8 @@ def test_settings_template_links_signed_form_file() -> None:
 
 
 def test_schemas_template_keeps_each_file_role_separate() -> None:
-    scan_id, editable_id, signed_id = uuid4(), None, uuid4()
+    scan_id, editable_id, signed_id = uuid7(), None, uuid7()
+
     record = SimpleNamespace(
         schema_number="1",
         schema_name="Схема",
@@ -65,9 +68,14 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
         signed_form_file_id=signed_id,
     )
 
+    current_user = SimpleNamespace(
+        role=SimpleNamespace(value="engineer"),
+    )
+
     html = templates.get_template("objects/urza_schemas.html").render(
         schema_form=object(),
         schema_records=[record],
+        current_user=current_user,
     )
 
     assert "Скан" in html
@@ -80,12 +88,14 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
     empty_html = templates.get_template("objects/urza_schemas.html").render(
         schema_form=None,
         schema_records=[],
+        current_user=current_user,
     )
+
     assert_no_file_actions(empty_html)
 
 
 def test_maintenance_template_links_protocol_and_signed_form_roles() -> None:
-    scan_id, editable_id, signed_id = uuid4(), uuid4(), uuid4()
+    scan_id, editable_id, signed_id = uuid7(), uuid7(), uuid7()
     record = SimpleNamespace(
         maintenance_date=date(2026, 9, 1),
         maintenance_type=SimpleNamespace(value="В"),
@@ -115,38 +125,115 @@ def test_maintenance_template_links_protocol_and_signed_form_roles() -> None:
 
 
 def test_programs_template_links_scan_and_optional_editable_file() -> None:
-    scan_id = uuid4()
+    scan_id = uuid7()
     program = SimpleNamespace(
+        id=uuid7(),
         program_type=SimpleNamespace(label="Рабочая программа"),
         program_number="1",
         created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        status=DocumentStatus.DRAFT,
         scan_file_id=scan_id,
         editable_file_id=None,
         creator=SimpleNamespace(full_name="Автор"),
     )
 
     html = templates.get_template("objects/urza_programs.html").render(
+        urza_id=uuid7(),
         programs=[program],
+        program_actions={program.id: {"submit"}},
     )
 
     assert_file_actions(html, scan_id)
     assert "/files/None/" not in html
 
     empty_html = templates.get_template("objects/urza_programs.html").render(
+        urza_id=uuid7(),
         programs=[],
+        program_actions={},
     )
     assert_no_file_actions(empty_html)
 
 
+def test_programs_template_shows_submit_action_for_draft() -> None:
+    program = SimpleNamespace(
+        id=uuid7(),
+        program_type=SimpleNamespace(label="Рабочая программа"),
+        program_number="1",
+        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        creator=SimpleNamespace(full_name="Автор"),
+    )
+
+    html = templates.get_template("objects/urza_programs.html").render(
+        urza_id=uuid7(),
+        programs=[program],
+        program_actions={program.id: {"submit"}},
+    )
+
+    assert "Черновик" in html
+    assert "Направить на согласование" in html
+    assert "Утвердить" not in html
+    assert "Вернуть на доработку" not in html
+
+
+def test_programs_template_shows_review_actions() -> None:
+    program = SimpleNamespace(
+        id=uuid7(),
+        program_type=SimpleNamespace(label="Рабочая программа"),
+        program_number="1",
+        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        status=DocumentStatus.UNDER_REVIEW,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        creator=SimpleNamespace(full_name="Автор"),
+    )
+
+    html = templates.get_template("objects/urza_programs.html").render(
+        urza_id=uuid7(),
+        programs=[program],
+        program_actions={program.id: {"approve", "return"}},
+    )
+
+    assert "На согласовании" in html
+    assert "Утвердить" in html
+    assert "Вернуть на доработку" in html
+    assert "Направить на согласование" not in html
+
+
+def test_programs_template_hides_workflow_actions_for_approved() -> None:
+    program = SimpleNamespace(
+        id=uuid7(),
+        program_type=SimpleNamespace(label="Рабочая программа"),
+        program_number="1",
+        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        status=DocumentStatus.APPROVED,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        creator=SimpleNamespace(full_name="Автор"),
+    )
+
+    html = templates.get_template("objects/urza_programs.html").render(
+        urza_id=uuid7(),
+        programs=[program],
+        program_actions={program.id: set()},
+    )
+
+    assert "Утверждено" in html
+    assert "Направить на согласование" not in html
+    assert "Утвердить" not in html
+    assert "Вернуть на доработку" not in html
+
 def test_instruction_template_links_files_from_selected_version() -> None:
     current_scan_id, selected_scan_id, selected_editable_id = (
-        uuid4(),
-        uuid4(),
-        uuid4(),
+        uuid7(),
+        uuid7(),
+        uuid7(),
     )
     creator = SimpleNamespace(full_name="Автор")
     current_version = SimpleNamespace(
-        id=uuid4(),
+        id=uuid7(),
         version_number=1,
         effective_date=date(2025, 1, 1),
         creator=creator,
@@ -156,7 +243,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
         editable_file=None,
     )
     selected_version = SimpleNamespace(
-        id=uuid4(),
+        id=uuid7(),
         version_number=2,
         effective_date=date(2026, 1, 1),
         change_description="Изменение",
@@ -167,7 +254,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
         editable_file_id=selected_editable_id,
         editable_file=SimpleNamespace(original_name="selected.docx"),
     )
-    instruction = SimpleNamespace(urza_id=uuid4())
+    instruction = SimpleNamespace(urza_id=uuid7())
 
     html = templates.get_template("objects/urza_instruction.html").render(
         instruction=instruction,
@@ -189,7 +276,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
 
 
 def test_common_file_actions_render_icons_text_and_protected_urls() -> None:
-    file_id = uuid4()
+    file_id = uuid7()
     macro = templates.get_template("objects/_file_actions.html").module
 
     html = str(macro.file_actions(file_id))
