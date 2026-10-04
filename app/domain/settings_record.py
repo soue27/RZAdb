@@ -1,10 +1,11 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, Enum, ForeignKey, Index, String, Text, desc, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
+from app.domain.enums import DocumentStatus
 from app.domain.rza_settings import SettingsForm
 from app.domain.task import Task
 from app.domain.user import User
@@ -18,6 +19,24 @@ from app.infrastructure.database.mixins import (
 
 class SettingsRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "settings_records"
+    __table_args__ = (
+        Index(
+            "uq_settings_records_one_active_unfinished_per_form",
+            "settings_form_id",
+            unique=True,
+            postgresql_where=text(
+                "deleted_at IS NULL AND status IN ('draft', 'under_review')"
+            ),
+        ),
+        Index(
+            "ix_settings_records_active_form_change_date",
+            "settings_form_id",
+            desc("change_date"),
+            desc("created_at"),
+            desc("id"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     settings_form_id: Mapped[UUID] = mapped_column(
         ForeignKey("settings_forms.id"),
@@ -46,6 +65,15 @@ class SettingsRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     change_reason: Mapped[str] = mapped_column(
         Text,
+        nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
         nullable=False,
     )
 

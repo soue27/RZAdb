@@ -10,6 +10,8 @@ from uuid6 import uuid7
 
 from app.domain.program import Program
 from app.domain.file import File
+from app.domain.rza_settings import SettingsForm
+from app.domain.settings_record import SettingsRecord
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.objects.exceptions import (
@@ -35,6 +37,7 @@ from app.presentation.dependencies.services import (
     get_inspection_service,
     get_object_service,
     get_program_service,
+    get_settings_service,
     get_substation_service,
     get_file_service,
     get_urza_instruction_service,
@@ -88,6 +91,7 @@ class FakeFileService:
     def __init__(self, file: File) -> None:
         self.file = file
         self.upload_calls: list[dict] = []
+        self.archive_calls: list[dict] = []
 
     async def upload(
         self,
@@ -110,6 +114,107 @@ class FakeFileService:
             }
         )
         return self.file
+
+    async def archive(self, *, file_id: UUID, user_id: UUID) -> File:
+        self.archive_calls.append({"file_id": file_id, "user_id": user_id})
+        return self.file
+
+
+class FakeSettingsService:
+    def __init__(
+        self,
+        *,
+        records=None,
+        current_approved=None,
+        actions=None,
+        error_by_method=None,
+        create_status=DocumentStatus.DRAFT,
+    ):
+        self.records = records or []
+        self.current_approved = current_approved
+        self.actions = actions or {}
+        self.error_by_method = error_by_method or {}
+        self.create_status = create_status
+        self.calls = []
+        self.settings_form = None
+
+    async def get_details(self, user_id, urza_id):
+        records = [record for record in self.records if record.deleted_at is None]
+        return self.settings_form, records
+
+    async def get_current_approved(self, user_id, urza_id):
+        return self.current_approved
+
+    async def get_available_actions(self, user_id, record):
+        return self.actions.get(record.id, set())
+
+    async def create_record(self, **kwargs):
+        self.calls.append(("create_record", kwargs))
+        error = self.error_by_method.get("create_record")
+        if error:
+            raise error
+        record = SimpleNamespace(
+            id=uuid7(),
+            settings_form_id=uuid7(),
+            change_date=kwargs["change_date"],
+            parameter_name=kwargs["parameter_name"],
+            initial_setting=kwargs["initial_setting"],
+            new_setting=kwargs["new_setting"],
+            change_reason=kwargs["change_reason"],
+            status=self.create_status,
+            signed_form_file_id=kwargs["signed_form_file_id"],
+            creator=SimpleNamespace(full_name="Автор"),
+            deleted_at=None,
+        )
+        self.records.insert(0, record)
+        return record
+
+    async def update_draft(self, **kwargs):
+        self.calls.append(("update_draft", kwargs))
+        error = self.error_by_method.get("update_draft")
+        if error:
+            raise error
+        record = next(record for record in self.records if record.id == kwargs["record_id"])
+        for field in (
+            "change_date", "parameter_name", "initial_setting",
+            "new_setting", "change_reason",
+        ):
+            setattr(record, field, kwargs[field])
+        if kwargs["signed_form_file_id"] is not None:
+            record.signed_form_file_id = kwargs["signed_form_file_id"]
+        return record
+
+    async def submit_for_review(self, **kwargs):
+        return await self._transition("submit_for_review", kwargs, DocumentStatus.UNDER_REVIEW)
+
+    async def approve(self, **kwargs):
+        return await self._transition("approve", kwargs, DocumentStatus.APPROVED)
+
+    async def return_to_draft(self, **kwargs):
+        return await self._transition("return_to_draft", kwargs, DocumentStatus.DRAFT)
+
+    async def _transition(self, name, kwargs, new_status):
+        self.calls.append((name, kwargs))
+        error = self.error_by_method.get(name)
+        if error:
+            raise error
+        record = next(record for record in self.records if record.id == kwargs["record_id"])
+        record.status = new_status
+        return record
+
+    async def delete_record(self, **kwargs):
+        self.calls.append(("delete_record", kwargs))
+        error = self.error_by_method.get("delete_record")
+        if error:
+            raise error
+        record = next(record for record in self.records if record.id == kwargs["record_id"])
+        record.deleted_at = datetime.now(timezone.utc)
+
+
+def override_settings_service(service: FakeSettingsService):
+    def dependency():
+        return service
+    return dependency
 
 class FakeProgramService:
     def __init__(
@@ -335,6 +440,58 @@ def override_urza_instruction_service(service):
     def dependency():
         return service
     return dependency
+
+
+def settings_record(
+    urza_id: UUID,
+    status: DocumentStatus,
+    *,
+    record_id: UUID | None = None,
+    file_id: UUID | None = None,
+    deleted_at=None,
+):
+    return SimpleNamespace(
+        id=record_id or uuid7(),
+        settings_form_id=uuid7(),
+        urza_id=urza_id,
+        change_date=date(2026, 9, 1),
+        parameter_name="Ток срабатывания",
+        initial_setting="1.0 A",
+        new_setting="1.2 A",
+        change_reason="Корректировка уставки",
+        status=status,
+        signed_form_file_id=file_id or uuid7(),
+        creator=SimpleNamespace(full_name="Автор"),
+        deleted_at=deleted_at,
+    )
+
+
+def settings_file(file_id: UUID, filename="signed.pdf") -> File:
+    return File(
+        id=file_id,
+        s3_key=f"files/{filename}",
+        original_name=filename,
+        display_name=filename,
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        created_by=uuid7(),
+        updated_by=uuid7(),
+    )
+
+
+def set_settings_dependencies(user, urza_id, settings_service, file_service=None, object_error=None):
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА 1"),
+            error=object_error,
+        )
+    )
+    app.dependency_overrides[get_settings_service] = override_settings_service(settings_service)
+    if file_service is not None:
+        app.dependency_overrides[get_file_service] = lambda: file_service
 
 
 def instruction_file(file_id, name):
@@ -1147,5 +1304,399 @@ def test_return_urza_program(system_user_id) -> None:
         assert "Утвердить" not in response.text
         assert "Вернуть на доработку" not in response.text
 
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_urza_settings_renders_records_status_and_current(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    approved = settings_record(urza_id, DocumentStatus.APPROVED)
+    draft = settings_record(urza_id, DocumentStatus.DRAFT)
+    approved.parameter_name = "Approved параметр"
+    draft.parameter_name = "Draft параметр"
+    deleted = settings_record(
+        urza_id, DocumentStatus.APPROVED, deleted_at=datetime.now(timezone.utc)
+    )
+    service = FakeSettingsService(
+        records=[draft, approved, deleted],
+        current_approved=approved,
+        actions={draft.id: {"edit", "submit"}, approved.id: set()},
+    )
+    set_settings_dependencies(user, urza_id, service)
+
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/settings")
+        assert response.status_code == 200
+        assert "Draft параметр" in response.text
+        assert "Черновик" in response.text
+        assert "Утверждено" in response.text
+        assert "Текущие уставки" in response.text
+        assert str(deleted.id) not in response.text
+        assert "Внести изменение уставок" in response.text
+        assert response.text.index("Draft параметр") < response.text.index(
+            "Approved параметр"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_new_settings_form_is_blank_and_requires_signed_file(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    set_settings_dependencies(user, urza_id, FakeSettingsService())
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/settings/new")
+        assert response.status_code == 200
+        assert 'name="signed_form_file"' in response.text
+        assert "required" in response.text
+        assert "Ток срабатывания" not in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_settings_record_uploads_required_file(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    uploaded_file = settings_file(uuid7())
+    file_service = FakeFileService(uploaded_file)
+    settings_service = FakeSettingsService()
+    set_settings_dependencies(user, urza_id, settings_service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings",
+            data={
+                "change_date": "2026-09-01",
+                "parameter_name": "Ток срабатывания",
+                "initial_setting": "1.0 A",
+                "new_setting": "1.2 A",
+                "change_reason": "Корректировка",
+            },
+            files={"signed_form_file": ("signed.pdf", b"scan", "application/pdf")},
+        )
+        assert response.status_code == 200
+        assert len(file_service.upload_calls) == 1
+        assert settings_service.calls[0][0] == "create_record"
+        assert settings_service.calls[0][1]["signed_form_file_id"] == uploaded_file.id
+        assert "Ток срабатывания" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_settings_record_without_file_returns_validation_message(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    file_service = FakeFileService(settings_file(uuid7()))
+    settings_service = FakeSettingsService()
+    set_settings_dependencies(user, urza_id, settings_service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings",
+            data={
+                "change_date": "2026-09-01",
+                "parameter_name": "Параметр",
+                "initial_setting": "1",
+                "new_setting": "2",
+                "change_reason": "Причина",
+            },
+        )
+        assert response.status_code == 422
+        assert "Загрузите подписанный формуляр" in response.text
+        assert not file_service.upload_calls
+        assert not settings_service.calls
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_settings_record_unfinished_error_archives_uploaded_file(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    uploaded_file = settings_file(uuid7())
+    file_service = FakeFileService(uploaded_file)
+    settings_service = FakeSettingsService(
+        error_by_method={"create_record": ValueError("Уже есть незавершённая запись.")}
+    )
+    set_settings_dependencies(user, urza_id, settings_service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings",
+            data={
+                "change_date": "2026-09-01",
+                "parameter_name": "Параметр",
+                "initial_setting": "1",
+                "new_setting": "2",
+                "change_reason": "Причина",
+            },
+            files={"signed_form_file": ("signed.pdf", b"scan", "application/pdf")},
+        )
+        assert response.status_code == 400
+        assert "незавершённая запись" in response.text
+        assert file_service.archive_calls == [{"file_id": uploaded_file.id, "user_id": user.id}]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_settings_routes_return_403_for_inaccessible_urza(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    set_settings_dependencies(
+        user, urza_id, FakeSettingsService(), object_error=ObjectAccessDeniedError()
+    )
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/settings")
+        assert response.status_code == 403
+        assert "Доступ к объекту запрещён" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_edit_settings_draft_shows_values_and_current_file(system_user_id):
+    user = make_user(system_user_id)
+    urza_id, file_id = uuid7(), uuid7()
+    record = settings_record(urza_id, DocumentStatus.DRAFT, file_id=file_id)
+    service = FakeSettingsService(records=[record], actions={record.id: {"edit", "submit"}})
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/settings/{record.id}/edit"
+        )
+        assert response.status_code == 200
+        assert "Изменение черновика уставок" in response.text
+        assert "Ток срабатывания" in response.text
+        assert "1.0 A" in response.text and "1.2 A" in response.text
+        assert f'href="/files/{file_id}/view"' in response.text
+        assert f'href="/files/{file_id}/download"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("document_status", [DocumentStatus.APPROVED, DocumentStatus.UNDER_REVIEW])
+def test_get_edit_settings_rejects_non_draft(system_user_id, document_status):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    record = settings_record(urza_id, document_status)
+    service = FakeSettingsService(records=[record], actions={record.id: set()})
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/settings/{record.id}/edit"
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_settings_draft_without_replacement_keeps_signed_file(system_user_id):
+    user = make_user(system_user_id)
+    urza_id, file_id = uuid7(), uuid7()
+    record = settings_record(urza_id, DocumentStatus.DRAFT, file_id=file_id)
+    service = FakeSettingsService(records=[record])
+    file_service = FakeFileService(settings_file(uuid7()))
+    set_settings_dependencies(user, urza_id, service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}",
+            data={
+                "change_date": "2026-09-02",
+                "parameter_name": "Изменено",
+                "initial_setting": "1.0 A",
+                "new_setting": "1.3 A",
+                "change_reason": "Причина",
+            },
+        )
+        assert response.status_code == 200
+        update_kwargs = next(kwargs for name, kwargs in service.calls if name == "update_draft")
+        assert update_kwargs["signed_form_file_id"] is None
+        assert record.signed_form_file_id == file_id
+        assert not file_service.upload_calls
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_settings_draft_replaces_file_and_archives_old(system_user_id):
+    user = make_user(system_user_id)
+    urza_id, old_file_id = uuid7(), uuid7()
+    replacement = settings_file(uuid7(), "replacement.pdf")
+    record = settings_record(urza_id, DocumentStatus.DRAFT, file_id=old_file_id)
+    service = FakeSettingsService(records=[record])
+    file_service = FakeFileService(replacement)
+    set_settings_dependencies(user, urza_id, service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}",
+            data={
+                "change_date": "2026-09-02",
+                "parameter_name": "Изменено",
+                "initial_setting": "1.0 A",
+                "new_setting": "1.3 A",
+                "change_reason": "Причина",
+            },
+            files={"signed_form_file": ("replacement.pdf", b"new scan", "application/pdf")},
+        )
+        assert response.status_code == 200
+        update_kwargs = next(kwargs for name, kwargs in service.calls if name == "update_draft")
+        assert update_kwargs["signed_form_file_id"] == replacement.id
+        assert file_service.archive_calls == [{"file_id": old_file_id, "user_id": user.id}]
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    ("path_action", "initial_status", "expected_status", "service_method", "role"),
+    [
+        ("submit", DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW, "submit_for_review", UserRole.ENGINEER),
+        ("submit", DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW, "submit_for_review", UserRole.MANAGER),
+        ("approve", DocumentStatus.UNDER_REVIEW, DocumentStatus.APPROVED, "approve", UserRole.MANAGER),
+        ("return", DocumentStatus.UNDER_REVIEW, DocumentStatus.DRAFT, "return_to_draft", UserRole.MANAGER),
+    ],
+)
+def test_settings_workflow_routes(
+    system_user_id, path_action, initial_status, expected_status, service_method, role
+):
+    user = make_user(system_user_id)
+    user.role = role
+    urza_id = uuid7()
+    record = settings_record(urza_id, initial_status)
+    service = FakeSettingsService(records=[record])
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/{path_action}"
+        )
+        assert response.status_code == 200
+        assert record.status is expected_status
+        assert any(name == service_method for name, _ in service.calls)
+        assert expected_status.label in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_settings_workflow_denies_wrong_reviewer(system_user_id):
+    user = make_user(system_user_id)
+    user.role = UserRole.MANAGER
+    urza_id = uuid7()
+    record = settings_record(urza_id, DocumentStatus.UNDER_REVIEW)
+    service = FakeSettingsService(
+        records=[record],
+        error_by_method={"approve": PermissionError("Manager не отвечает за URZA.")},
+    )
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/approve"
+        )
+        assert response.status_code == 403
+        assert "не отвечает" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_settings_workflow_denies_non_manager_approval(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    record = settings_record(urza_id, DocumentStatus.UNDER_REVIEW)
+    service = FakeSettingsService(
+        records=[record],
+        error_by_method={"approve": PermissionError("Согласовывать может только Manager.")},
+    )
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/approve"
+        )
+        assert response.status_code == 403
+        assert "только Manager" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_returned_settings_draft_can_be_submitted_again(system_user_id):
+    user = make_user(system_user_id)
+    user.role = UserRole.MANAGER
+    urza_id = uuid7()
+    record = settings_record(urza_id, DocumentStatus.UNDER_REVIEW)
+    service = FakeSettingsService(records=[record])
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        client = TestClient(app)
+        returned = client.post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/return"
+        )
+        assert returned.status_code == 200
+        assert record.status is DocumentStatus.DRAFT
+        resubmitted = client.post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/submit"
+        )
+        assert resubmitted.status_code == 200
+        assert record.status is DocumentStatus.UNDER_REVIEW
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("document_status", [DocumentStatus.APPROVED, DocumentStatus.UNDER_REVIEW])
+def test_post_update_non_draft_is_rejected(system_user_id, document_status):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    record = settings_record(urza_id, document_status)
+    service = FakeSettingsService(
+        records=[record],
+        error_by_method={"update_draft": ValueError("Изменять можно только черновик уставок.")},
+    )
+    file_service = FakeFileService(settings_file(uuid7()))
+    set_settings_dependencies(user, urza_id, service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}",
+            data={
+                "change_date": "2026-09-02",
+                "parameter_name": "Изменено",
+                "initial_setting": "1",
+                "new_setting": "2",
+                "change_reason": "Причина",
+            },
+        )
+        assert response.status_code == 400
+        assert "только черновик" in response.text
+        assert not file_service.upload_calls
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.SUPERADMIN])
+def test_settings_delete_soft_deletes_and_hides_record(system_user_id, role):
+    user = make_user(system_user_id)
+    user.role = role
+    urza_id = uuid7()
+    record = settings_record(urza_id, DocumentStatus.APPROVED)
+    service = FakeSettingsService(records=[record])
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/delete"
+        )
+        assert response.status_code == 200
+        assert record.deleted_at is not None
+        assert str(record.id) not in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.MANAGER])
+def test_settings_delete_denies_roles_without_permission(system_user_id, role):
+    user = make_user(system_user_id)
+    user.role = role
+    urza_id = uuid7()
+    record = settings_record(urza_id, DocumentStatus.APPROVED)
+    service = FakeSettingsService(
+        records=[record],
+        error_by_method={"delete_record": PermissionError("Удаление запрещено")},
+    )
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}/delete"
+        )
+        assert response.status_code == 403
+        assert record.deleted_at is None
     finally:
         app.dependency_overrides.clear()

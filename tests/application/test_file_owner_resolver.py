@@ -144,6 +144,7 @@ async def owner_data(system_user_id):
             initial_setting="1",
             new_setting="2",
             change_reason="Test",
+            status=DocumentStatus.APPROVED,
             signed_form_file=files["settings"],
             created_by=system_user_id,
             updated_by=system_user_id,

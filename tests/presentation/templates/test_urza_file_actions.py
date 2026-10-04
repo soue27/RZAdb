@@ -21,12 +21,15 @@ def assert_no_file_actions(html: str) -> None:
 
 def test_settings_template_links_signed_form_file() -> None:
     file_id = uuid7()
+    record_id = uuid7()
     record = SimpleNamespace(
+        id=record_id,
         change_date=date(2026, 9, 1),
         parameter_name="Параметр",
         initial_setting="1",
         new_setting="2",
         change_reason="Причина",
+        status=DocumentStatus.DRAFT,
         creator=SimpleNamespace(full_name="Автор"),
         signed_form_file_id=file_id,
     )
@@ -36,21 +39,140 @@ def test_settings_template_links_signed_form_file() -> None:
     )
 
     html = templates.get_template("objects/urza_settings.html").render(
+        urza_id=uuid7(),
         settings_form=object(),
         settings_records=[record],
+        current_approved=None,
+        actions_by_record={record_id: {"edit", "submit"}},
         current_user=current_user,
     )
 
-    assert "Подписанная форма" in html
+    assert "Подписанный формуляр" in html
+    assert "Черновик" in html
+    assert "Изменить" in html
+    assert "Направить на согласование" in html
+    assert "Удалить" not in html
     assert_file_actions(html, file_id)
 
     empty_html = templates.get_template("objects/urza_settings.html").render(
+        urza_id=uuid7(),
         settings_form=None,
         settings_records=[],
+        current_approved=None,
+        actions_by_record={},
         current_user=current_user,
     )
 
     assert_no_file_actions(empty_html)
+
+
+def test_settings_template_shows_current_approved_and_available_actions():
+    approved_id, review_id, file_id = uuid7(), uuid7(), uuid7()
+    approved = SimpleNamespace(
+        id=approved_id,
+        change_date=date(2026, 9, 1),
+        parameter_name="Текущая уставка",
+        initial_setting="1",
+        new_setting="2",
+        change_reason="Причина",
+        status=DocumentStatus.APPROVED,
+        creator=SimpleNamespace(full_name="Автор"),
+        signed_form_file_id=file_id,
+    )
+    under_review = SimpleNamespace(
+        id=review_id,
+        change_date=date(2026, 9, 2),
+        parameter_name="На проверке",
+        initial_setting="2",
+        new_setting="3",
+        change_reason="Причина",
+        status=DocumentStatus.UNDER_REVIEW,
+        creator=SimpleNamespace(full_name="Автор"),
+        signed_form_file_id=uuid7(),
+    )
+    manager = SimpleNamespace(role=SimpleNamespace(value="manager"))
+    html = templates.get_template("objects/urza_settings.html").render(
+        urza_id=uuid7(),
+        settings_records=[under_review, approved],
+        current_approved=approved,
+        actions_by_record={review_id: {"approve", "return"}, approved_id: set()},
+        current_user=manager,
+    )
+
+    assert "Текущие уставки" in html
+    assert "На согласовании" in html
+    assert "Утвердить" in html
+    assert "Вернуть в черновик" in html
+    assert "Изменить" not in html
+    assert "Направить на согласование" not in html
+    assert "Удалить" not in html
+    assert_file_actions(html, file_id)
+
+
+def test_settings_template_shows_delete_only_when_action_is_available():
+    record_id = uuid7()
+    record = SimpleNamespace(
+        id=record_id,
+        change_date=date(2026, 9, 1),
+        parameter_name="Параметр",
+        initial_setting="1",
+        new_setting="2",
+        change_reason="Причина",
+        status=DocumentStatus.APPROVED,
+        creator=None,
+        signed_form_file_id=None,
+    )
+    admin = SimpleNamespace(role=SimpleNamespace(value="admin"))
+    html = templates.get_template("objects/urza_settings.html").render(
+        urza_id=uuid7(),
+        settings_records=[record],
+        current_approved=record,
+        actions_by_record={record_id: {"delete"}},
+        current_user=admin,
+    )
+    assert "Текущие уставки" in html
+    assert "Удалить" in html
+    assert "Изменить" not in html
+    assert "Утвердить" not in html
+
+
+def test_settings_form_create_and_edit_modes():
+    template = templates.get_template("objects/urza_settings_form.html")
+    urza_id = uuid7()
+    create_html = template.render(
+        urza_id=urza_id,
+        is_edit=False,
+        record=None,
+        form_values={},
+        error_message=None,
+    )
+    assert 'name="signed_form_file"' in create_html
+    assert 'name="signed_form_file"' in create_html
+    assert 'type="file"' in create_html
+    assert "required" in create_html
+    assert "Ток срабатывания" not in create_html
+
+    file_id = uuid7()
+    record = SimpleNamespace(
+        id=uuid7(),
+        change_date=date(2026, 9, 1),
+        parameter_name="Ток срабатывания",
+        initial_setting="1",
+        new_setting="2",
+        change_reason="Причина",
+        signed_form_file_id=file_id,
+    )
+    edit_html = template.render(
+        urza_id=urza_id,
+        is_edit=True,
+        record=record,
+        form_values={},
+        error_message="Ошибка проверки",
+    )
+    assert "Ток срабатывания" in edit_html
+    assert "Ошибка проверки" in edit_html
+    assert "Если новый файл не выбран" in edit_html
+    assert_file_actions(edit_html, file_id)
 
 
 def test_schemas_template_keeps_each_file_role_separate() -> None:

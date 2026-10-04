@@ -1,6 +1,12 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
 <div id="urza-tab-content">
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+    {% if notice_message %}
+        <div class="alert alert-warning" role="alert">{{ notice_message }}</div>
+    {% endif %}
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="rzadb-otd-version-title">
@@ -16,99 +22,102 @@
                 hx-swap="outerHTML"
             >
                 <span class="material-icons align-middle me-1">add</span>
-                Добавить запись
+                Внести изменение уставок
             </button>
         {% endif %}
     </div>
 
-    {% if settings_records %}
-
-        <div class="table-responsive">
-            <table class="table table-sm align-middle rzadb-settings-table">
-
-                <thead>
-                    <tr>
-                        <th class="text-center">Дата</th>
-                        <th>Параметр</th>
-                        <th class="text-center">Было</th>
-                        <th class="text-center">Стало</th>
-                        <th>Причина изменения</th>
-                        <th class="text-center">Кто внес</th>
-                        <th>Подписанная форма</th>
-                        <th class="text-center">Действия</th>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle rzadb-settings-table">
+            <thead>
+                <tr>
+                    <th>Дата изменения</th>
+                    <th>Параметр</th>
+                    <th>Было</th>
+                    <th>Стало</th>
+                    <th>Причина изменения</th>
+                    <th>Статус</th>
+                    <th>Кто внес</th>
+                    <th>Подписанный формуляр</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in settings_records %}
+                    {% set actions = actions_by_record.get(record.id) or [] %}
+                    <tr id="settings-record-{{ record.id }}">
+                        <td>{{ record.change_date.strftime("%d.%m.%Y") }}</td>
+                        <td>{{ record.parameter_name }}</td>
+                        <td>{{ record.initial_setting }}</td>
+                        <td>{{ record.new_setting }}</td>
+                        <td>{{ record.change_reason }}</td>
+                        <td>
+                            <span class="badge {{ record.status.badge_class }}">
+                                {{ record.status.label }}
+                            </span>
+                            {% if current_approved and record.id == current_approved.id %}
+                                <span class="badge text-bg-primary">Текущие уставки</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ record.creator.full_name if record.creator else "—" }}</td>
+                        <td>
+                            {% if record.signed_form_file_id %}
+                                {{ file_actions(record.signed_form_file_id) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+                                {% if "edit" in actions %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        hx-get="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/edit"
+                                        hx-target="#urza-tab-content"
+                                        hx-swap="outerHTML"
+                                    >Изменить</button>
+                                {% endif %}
+                                {% if "submit" in actions %}
+                                    <form method="post" action="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/submit"
+                                          hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/submit"
+                                          hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Направить на согласование</button>
+                                    </form>
+                                {% endif %}
+                                {% if "approve" in actions %}
+                                    <form method="post" action="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/approve"
+                                          hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/approve"
+                                          hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Утвердить</button>
+                                    </form>
+                                {% endif %}
+                                {% if "return" in actions %}
+                                    <form method="post" action="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/return"
+                                          hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/return"
+                                          hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Вернуть в черновик</button>
+                                    </form>
+                                {% endif %}
+                                {% if "delete" in actions %}
+                                    <form method="post" action="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
+                                          hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
+                                          hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                    </form>
+                                {% endif %}
+                                {% if not actions %}—{% endif %}
+                            </div>
+                        </td>
                     </tr>
-                </thead>
-
-                <tbody>
-                    {% for record in settings_records %}
-                        <tr>
-                            <td>
-                                {{ record.change_date.strftime("%d.%m.%Y") }}
-                            </td>
-
-                            <td>
-                                {{ record.parameter_name }}
-                            </td>
-
-                            <td>
-                                {{ record.initial_setting }}
-                            </td>
-
-                            <td>
-                                {{ record.new_setting }}
-                            </td>
-
-                            <td>
-                                {{ record.change_reason }}
-                            </td>
-
-                            <td>
-                                {{ record.creator.full_name if record.creator else "—" }}
-                            </td>
-
-                            <td>
-                                {% if record.signed_form_file_id %}
-                                    {{ file_actions(record.signed_form_file_id) }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-
-                            <td class="text-center">
-                                {% if current_user.role.value in ["superadmin", "admin", "manager"] %}
-                                    <div class="rzadb-settings-actions">
-                                        <form
-                                            method="post"
-                                            hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
-                                            hx-target="#urza-tab-content"
-                                            hx-swap="outerHTML"
-                                        >
-                                            <button
-                                                type="submit"
-                                                class="btn btn-danger"
-                                            >
-                                                <span class="material-icons">delete</span>
-                                                Удалить
-                                            </button>
-                                        </form>
-                                    </div>
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-
-            </table>
-        </div>
-
-    {% else %}
-
-        <div class="text-secondary text-center py-5">
-            Изменений уставок ещё не зарегистрировано.
-        </div>
-
-    {% endif %}
-
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            Изменений уставок ещё не зарегистрировано.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
