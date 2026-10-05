@@ -128,6 +128,18 @@ class TaskWorkType(StrEnum):
     SCHEMES = "schemes"
     MAINTENANCE = "maintenance"
     PROGRAM = "program"
+    INSTRUCTION = "instruction"
+
+    @property
+    def label(self) -> str:
+        return {
+            self.OTD: "ОТД",
+            self.SETTINGS: "Уставки",
+            self.SCHEMES: "Схема",
+            self.MAINTENANCE: "Техническое обслуживание",
+            self.PROGRAM: "Программа",
+            self.INSTRUCTION: "Инструкция",
+        }[self]
 
 
 class MaintenanceType(StrEnum):

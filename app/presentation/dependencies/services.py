@@ -253,12 +253,14 @@ def get_task_repository(
 
 
 def get_task_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
     task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> TaskService:
     return TaskService(
         task_repository=task_repository,
         access_service=access_service,
+        urza_instruction_repository=URZAInstructionRepository(session),
     )
 
 

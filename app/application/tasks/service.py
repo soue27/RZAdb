@@ -4,6 +4,7 @@ from uuid import UUID
 from app.application.access.service import AccessService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.workflow import validate_reason, validate_transition
+from app.application.urza_instructions.repository import URZAInstructionRepository
 from app.domain.enums import (
     DocumentStatus,
     MaintenanceType,
@@ -22,9 +23,11 @@ class TaskService:
         self,
         task_repository: TaskRepository,
         access_service: AccessService,
+        urza_instruction_repository: URZAInstructionRepository,
     ) -> None:
         self.task_repository = task_repository
         self.access_service = access_service
+        self.urza_instruction_repository = urza_instruction_repository
 
     async def get_available_actions(
         self,
@@ -70,6 +73,31 @@ class TaskService:
                 "У MANAGER нет доступа к URZA, связанной с задачей."
             )
 
+    async def can_issue_task(
+        self,
+        *,
+        actor_id: UUID,
+        urza_id: UUID,
+    ) -> bool:
+        actor = await self.access_service.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            return False
+
+        if not actor.active or actor.deleted_at is not None:
+            return False
+
+        if actor.role not in {
+            UserRole.MANAGER,
+            UserRole.SUPERADMIN,
+        }:
+            return False
+
+        return await self.access_service.can_access_urza(
+            actor_id,
+            urza_id,
+        )
+
     async def create_task(
         self,
         *,
@@ -81,6 +109,13 @@ class TaskService:
         now: datetime | None = None,
     ) -> Task:
         # Передаём время явно для тестируемости и фиксируем оба срока от одного момента.
+        if not await self.can_issue_task(
+                actor_id=created_by,
+                urza_id=urza_id,
+        ):
+            raise PermissionError(
+                "Пользователь не может выдавать задания для этого URZA."
+            )
         created_at = now or datetime.now().astimezone()
 
         if work_type == TaskWorkType.MAINTENANCE and maintenance_type is None:
@@ -182,6 +217,34 @@ class TaskService:
                 raise ValueError(
                     "Закрыть задачу по схемам можно только при наличии "
                     "активного утверждённого результата."
+                )
+
+        if task.work_type is TaskWorkType.INSTRUCTION:
+            instruction = (
+                await self.urza_instruction_repository.get_by_urza_id(
+                    task.urza_id,
+                )
+            )
+
+            if instruction is None:
+                raise ValueError(
+                    "Закрыть задачу по инструкции можно только при наличии инструкции."
+                )
+
+            instruction_version = (
+                await self.urza_instruction_repository.get_latest_working_version(
+                    instruction.id,
+                )
+            )
+
+            if (
+                    instruction_version is None
+                    or instruction_version.created_at <= task.created_at
+                    or instruction_version.status is not DocumentStatus.APPROVED
+            ):
+                raise ValueError(
+                    "Закрыть задачу по инструкции можно только при наличии "
+                    "активной утверждённой новой версии инструкции."
                 )
 
         review_time = closed_at or datetime.now().astimezone()
@@ -438,6 +501,36 @@ class TaskService:
             if program is None:
                 raise ValueError(
                     "Для завершения задачи по программе необходимо сохранить программу."
+                )
+
+        # Для инструкции результатом выполнения является новая версия
+        # инструкции, созданная после выдачи задачи.
+        if task.work_type == TaskWorkType.INSTRUCTION:
+            instruction = (
+                await self.urza_instruction_repository.get_by_urza_id(
+                    task.urza_id,
+                )
+            )
+
+            if instruction is None:
+                raise ValueError(
+                    "Для данного URZA не создана инструкция."
+                )
+
+            instruction_version = (
+                await self.urza_instruction_repository.get_latest_working_version(
+                    instruction.id,
+                )
+            )
+
+            if instruction_version is None:
+                raise ValueError(
+                    "Для завершения задачи необходимо создать версию инструкции."
+                )
+
+            if instruction_version.created_at <= task.created_at:
+                raise ValueError(
+                    "Для завершения задачи необходимо создать новую версию инструкции."
                 )
 
         completion_time = completed_at or datetime.now().astimezone()
