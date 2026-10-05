@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -20,6 +21,39 @@ from app.presentation.dependencies.services import (
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 templates = Jinja2Templates(directory="app/presentation/templates")
+
+
+async def _task_create_form_response(
+    *,
+    request: Request,
+    current_user: User,
+    urza,
+    urza_id: UUID | None,
+    work_type: TaskWorkType | None,
+    engineers: list,
+    error_message: str | None = None,
+    deadline_at: str = "",
+    engineer_id: str = "",
+    description: str = "",
+    status_code: int = 200,
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="tasks/create.html",
+        context={
+            "current_user": current_user,
+            "urza": urza,
+            "urza_id": urza_id,
+            "work_type": work_type,
+            "work_type_label": WORK_TYPE_LABELS.get(work_type, "Не выбран"),
+            "engineers": engineers,
+            "error_message": error_message,
+            "deadline_at": deadline_at,
+            "engineer_id": engineer_id,
+            "description": description,
+        },
+        status_code=status_code,
+    )
 
 TASK_STATUS_LABELS = {
     TaskStatus.CREATED: "Создано",
@@ -45,6 +79,7 @@ WORK_TYPE_LABELS = {
     TaskWorkType.SCHEMES: "Схемы",
     TaskWorkType.MAINTENANCE: "Техническое обслуживание",
     TaskWorkType.PROGRAM: "Программы",
+    TaskWorkType.INSTRUCTION: "Инструкция",
 }
 HISTORY_EVENT_LABELS = {
     "created": "Задание создано",
@@ -87,6 +122,196 @@ def _task_context(task: Task, history: list, actions: set[str]) -> dict:
         "work_type_labels": WORK_TYPE_LABELS,
         "history_event_labels": HISTORY_EVENT_LABELS,
     }
+
+
+@router.get("/create")
+async def get_task_create_form(
+    request: Request,
+    urza_id: UUID,
+    work_type: TaskWorkType,
+    current_user: Annotated[User, Depends(get_current_user)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+):
+    if not await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь не может выдавать задания для этого URZA.",
+        )
+
+    urza = await access_service.urza_repository.get_by_id(urza_id)
+    if urza is None:
+        raise HTTPException(status_code=404, detail="URZA не найден.")
+
+    engineers = await task_service.get_available_assignees(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    )
+    return await _task_create_form_response(
+        request=request,
+        current_user=current_user,
+        urza=urza,
+        urza_id=urza_id,
+        work_type=work_type,
+        engineers=engineers,
+    )
+
+
+@router.post("/create")
+async def create_task(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    urza_id: Annotated[str, Form()] = "",
+    work_type: Annotated[str, Form()] = "",
+    engineer_id: Annotated[str, Form()] = "",
+    deadline_at: Annotated[str, Form()] = "",
+    description: Annotated[str, Form()] = "",
+):
+    try:
+        parsed_urza_id = UUID(urza_id)
+        parsed_work_type = TaskWorkType(work_type)
+        parsed_engineer_id = UUID(engineer_id)
+    except ValueError:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=None,
+            urza_id=None,
+            work_type=None,
+            engineers=[],
+            error_message="Проверьте выбранный объект, тип работы и исполнителя.",
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=parsed_urza_id,
+    ):
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=None,
+            urza_id=None,
+            work_type=parsed_work_type,
+            engineers=[],
+            error_message="Пользователь не может выдавать задания для этого URZA.",
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    urza = await access_service.urza_repository.get_by_id(parsed_urza_id)
+    if urza is None:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=urza,
+            urza_id=None,
+            work_type=parsed_work_type,
+            engineers=[],
+            error_message="URZA не найден.",
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        engineers = await task_service.get_available_assignees(
+            actor_id=current_user.id,
+            urza_id=parsed_urza_id,
+        )
+    except PermissionError as exc:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=urza,
+            urza_id=parsed_urza_id,
+            work_type=parsed_work_type,
+            engineers=[],
+            error_message=str(exc),
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    if parsed_engineer_id not in {engineer.id for engineer in engineers}:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=urza,
+            urza_id=parsed_urza_id,
+            work_type=parsed_work_type,
+            engineers=engineers,
+            error_message="Выбранный исполнитель не является доступным активным инженером этого отделения.",
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        parsed_deadline_at = datetime.fromisoformat(deadline_at)
+    except ValueError:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=urza,
+            urza_id=parsed_urza_id,
+            work_type=parsed_work_type,
+            engineers=engineers,
+            error_message="Укажите корректный срок выполнения.",
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if parsed_deadline_at.tzinfo is None:
+        parsed_deadline_at = parsed_deadline_at.astimezone()
+
+    try:
+        task = await task_service.create_task(
+            urza_id=parsed_urza_id,
+            work_type=parsed_work_type,
+            created_by=current_user.id,
+            description=description.strip() or None,
+            deadline_at=parsed_deadline_at,
+        )
+    except (PermissionError, ValueError) as exc:
+        return await _task_create_form_response(
+            request=request,
+            current_user=current_user,
+            urza=urza,
+            urza_id=parsed_urza_id,
+            work_type=parsed_work_type,
+            engineers=engineers,
+            error_message=str(exc),
+            deadline_at=deadline_at,
+            engineer_id=engineer_id,
+            description=description,
+            status_code=403 if isinstance(exc, PermissionError) else 400,
+        )
+
+    await task_service.assign_task(
+        task=task,
+        assigned_to=parsed_engineer_id,
+        actor_id=current_user.id,
+    )
+
+    return RedirectResponse(
+        url=f"/tasks/{task.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("")

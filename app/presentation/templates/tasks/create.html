@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Выдать задание — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <div class="mb-3">
+        <a href="/tasks" class="text-decoration-none">← Все задания</a>
+    </div>
+
+    <h1 class="h4 mb-4">Выдать задание</h1>
+
+    <section class="rzadb-surface-soft rounded-3 p-4 mb-4">
+        <h2 class="h5">{{ urza.dispatch_name }}</h2>
+        <p class="mb-0">Тип работы: {{ work_type_label }}</p>
+    </section>
+
+    <section class="rzadb-surface-soft rounded-3 p-4">
+        {% if error_message %}
+            <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+        {% endif %}
+        <h2 class="h5 mb-3">Исполнитель</h2>
+        {% if urza_id and work_type %}
+            <form action="/tasks/create" method="post">
+                <input type="hidden" name="urza_id" value="{{ urza_id }}">
+                <input type="hidden" name="work_type" value="{{ work_type.value }}">
+
+                {% if engineers %}
+                    <div class="mb-3">
+                        <label for="task-assignee" class="form-label">Выберите инженера</label>
+                        <select id="task-assignee" class="form-select" name="engineer_id" required>
+                            {% for engineer in engineers %}
+                                <option value="{{ engineer.id }}" {% if engineer_id == engineer.id|string %}selected{% endif %}>
+                                    {{ engineer.full_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% else %}
+                    <p class="text-body-secondary">
+                        Для этого производственного отделения нет доступных инженеров.
+                    </p>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="task-deadline" class="form-label">Срок выполнения</label>
+                    <input
+                        id="task-deadline"
+                        type="datetime-local"
+                        class="form-control"
+                        name="deadline_at"
+                        value="{{ deadline_at }}"
+                        required
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label for="task-description" class="form-label">Описание задания</label>
+                    <textarea
+                        id="task-description"
+                        class="form-control"
+                        name="description"
+                        rows="3"
+                    >{{ description }}</textarea>
+                </div>
+
+                {% if engineers %}
+                    <button type="submit" class="btn btn-primary">Выдать задание</button>
+                {% endif %}
+            </form>
+        {% elif not error_message %}
+            <p class="text-body-secondary mb-0">
+                Нельзя отобразить форму: не задан URZA или тип работы.
+            </p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

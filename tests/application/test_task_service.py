@@ -99,14 +99,29 @@ class FakeTaskRepository:
 class FakeUserRepository:
     def __init__(self) -> None:
         self.users = {}
+        self.engineers_by_enterprise = {}
+        self.requested_enterprise_ids = []
 
     async def get_by_id(self, user_id):
         return self.users.get(user_id)
+
+    async def get_active_engineers_by_enterprise(self, enterprise_id):
+        self.requested_enterprise_ids.append(enterprise_id)
+        return self.engineers_by_enterprise.get(enterprise_id, [])
+
+
+class FakeURZARepository:
+    def __init__(self) -> None:
+        self.urzas = {}
+
+    async def get_by_id(self, urza_id):
+        return self.urzas.get(urza_id)
 
 
 class FakeAccessService:
     def __init__(self) -> None:
         self.user_repository = FakeUserRepository()
+        self.urza_repository = FakeURZARepository()
         self.access = {}
 
     async def can_access_urza(self, user_id, urza_id):
@@ -283,6 +298,104 @@ async def test_user_without_issue_permission_cannot_create_task(
 
     assert repository.tasks == []
     assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_manager_with_urza_access_gets_available_assignees(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    manager_id = uuid7()
+    urza_id = uuid7()
+    enterprise_id = uuid7()
+    engineers = [
+        SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER),
+        SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER),
+    ]
+    access_service.user_repository.users[manager_id] = SimpleNamespace(
+        id=manager_id,
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+    )
+    access_service.access[(manager_id, urza_id)] = True
+    access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(enterprise_id=enterprise_id),
+        ),
+    )
+    access_service.user_repository.engineers_by_enterprise[enterprise_id] = engineers
+
+    result = await service.get_available_assignees(
+        actor_id=manager_id,
+        urza_id=urza_id,
+    )
+
+    assert result == engineers
+    assert access_service.user_repository.requested_enterprise_ids == [enterprise_id]
+
+
+@pytest.mark.asyncio
+async def test_manager_without_urza_access_cannot_get_available_assignees(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    manager_id = uuid7()
+    urza_id = uuid7()
+    access_service.user_repository.users[manager_id] = SimpleNamespace(
+        id=manager_id,
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+    )
+    access_service.access[(manager_id, urza_id)] = False
+
+    with pytest.raises(PermissionError, match="не может выдавать задания"):
+        await service.get_available_assignees(actor_id=manager_id, urza_id=urza_id)
+
+    assert access_service.user_repository.requested_enterprise_ids == []
+
+
+@pytest.mark.asyncio
+async def test_engineer_cannot_get_available_assignees(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    engineer_id = uuid7()
+    urza_id = uuid7()
+    access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    access_service.access[(engineer_id, urza_id)] = True
+
+    with pytest.raises(PermissionError, match="не может выдавать задания"):
+        await service.get_available_assignees(actor_id=engineer_id, urza_id=urza_id)
+
+    assert access_service.user_repository.requested_enterprise_ids == []
+
+
+@pytest.mark.asyncio
+async def test_missing_urza_after_issue_permission_raises_value_error(
+    service: TaskService,
+    access_service: FakeAccessService,
+) -> None:
+    manager_id = uuid7()
+    urza_id = uuid7()
+    access_service.user_repository.users[manager_id] = SimpleNamespace(
+        id=manager_id,
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+    )
+    access_service.access[(manager_id, urza_id)] = True
+
+    with pytest.raises(ValueError, match="URZA не найден"):
+        await service.get_available_assignees(actor_id=manager_id, urza_id=urza_id)
+
+    assert access_service.user_repository.requested_enterprise_ids == []
 
 
 @pytest.mark.asyncio

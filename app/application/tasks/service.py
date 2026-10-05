@@ -14,6 +14,7 @@ from app.domain.enums import (
 )
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
+from app.domain.user import User
 
 
 class TaskService:
@@ -98,6 +99,32 @@ class TaskService:
             urza_id,
         )
 
+    async def get_available_assignees(
+            self,
+            *,
+            actor_id: UUID,
+            urza_id: UUID,
+    ) -> list[User]:
+        if not await self.can_issue_task(
+                actor_id=actor_id,
+                urza_id=urza_id,
+        ):
+            raise PermissionError(
+                "Пользователь не может выдавать задания для этого URZA."
+            )
+
+        urza = await self.access_service.urza_repository.get_by_id(urza_id)
+
+        if urza is None:
+            raise ValueError("URZA не найден.")
+
+        enterprise_id = urza.connection.substation.enterprise_id
+
+        return await (
+            self.access_service.user_repository
+            .get_active_engineers_by_enterprise(enterprise_id)
+        )
+
     async def create_task(
         self,
         *,
@@ -106,6 +133,7 @@ class TaskService:
         created_by: UUID,
         maintenance_type: MaintenanceType | None = None,
         description: str | None = None,
+        deadline_at: datetime | None = None,
         now: datetime | None = None,
     ) -> Task:
         # Передаём время явно для тестируемости и фиксируем оба срока от одного момента.
@@ -136,7 +164,11 @@ class TaskService:
             created_by=created_by,
             updated_by=created_by,
             status=TaskStatus.CREATED,
-            deadline_at=created_at + timedelta(days=7),
+            deadline_at=(
+                deadline_at
+                if deadline_at is not None
+                else created_at + timedelta(days=7)
+            ),
         )
 
         task.created_at = created_at

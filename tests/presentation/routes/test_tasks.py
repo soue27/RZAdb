@@ -62,16 +62,54 @@ class FakeTaskRepository:
 class FakeAccessService:
     def __init__(self, denied_urzas=()):
         self.denied_urzas = set(denied_urzas)
+        self.urza_repository = FakeURZARepository()
 
     async def can_access_urza(self, user_id, urza_id):
         return urza_id not in self.denied_urzas
 
 
+class FakeURZARepository:
+    def __init__(self):
+        self.urzas = {}
+
+    async def get_by_id(self, urza_id):
+        return self.urzas.get(urza_id)
+
+
 class FakeTaskService:
-    def __init__(self, actions=None, errors=None):
+    def __init__(self, actions=None, errors=None, *, can_issue=True, engineers=None):
         self.actions = actions or {}
         self.errors = errors or {}
         self.calls = []
+        self.can_issue = can_issue
+        self.engineers = engineers or []
+        self.created_task = None
+
+    async def can_issue_task(self, *, actor_id, urza_id):
+        self.calls.append(("can_issue_task", actor_id, urza_id))
+        return self.can_issue
+
+    async def get_available_assignees(self, *, actor_id, urza_id):
+        self.calls.append(("get_available_assignees", actor_id, urza_id))
+        return self.engineers
+
+    async def create_task(self, **kwargs):
+        self.calls.append(("create_task", kwargs))
+        error = self.errors.get("create_task")
+        if error:
+            raise error
+        self.created_task = SimpleNamespace(
+            id=uuid7(),
+            status=TaskStatus.CREATED,
+            **kwargs,
+        )
+        return self.created_task
+
+    async def assign_task(self, *, task, assigned_to, actor_id):
+        self.calls.append(("assign_task", task.id, assigned_to, actor_id))
+        task.assigned_to = assigned_to
+        task.status = TaskStatus.ASSIGNED
+        return task
 
     async def get_available_actions(self, *, task, actor_id):
         return self.actions.get(task.id, set())
@@ -121,10 +159,169 @@ def _user(user_id, role=UserRole.ENGINEER):
 def test_task_routes_are_registered_in_openapi():
     paths = app.openapi()["paths"]
     assert "get" in paths["/tasks"]
+    assert "get" in paths["/tasks/create"]
     assert "get" in paths["/tasks/{task_id}"]
     assert "post" in paths["/tasks/{task_id}/submit-for-review"]
     assert "post" in paths["/tasks/{task_id}/close"]
     assert "post" in paths["/tasks/{task_id}/return-for-revision"]
+
+
+def test_task_create_form_shows_urza_work_type_and_available_engineers(
+    system_user_id,
+):
+    user = _user(system_user_id, UserRole.MANAGER)
+    urza_id = uuid7()
+    engineer = SimpleNamespace(id=uuid7(), full_name="Инженер отделения")
+    access = FakeAccessService()
+    access.urza_repository.urzas[urza_id] = SimpleNamespace(
+        id=urza_id,
+        dispatch_name="УРЗА-42",
+    )
+    service = FakeTaskService(engineers=[engineer])
+
+    with _client(user, FakeTaskRepository([]), access, service) as client:
+        response = client.get(
+            "/tasks/create",
+            params={"urza_id": str(urza_id), "work_type": "instruction"},
+        )
+
+    assert response.status_code == 200
+    assert "УРЗА-42" in response.text
+    assert "Инструкция" in response.text
+    assert "Инженер отделения" in response.text
+    assert f'value="{engineer.id}"' in response.text
+    assert service.calls == [
+        ("can_issue_task", user.id, urza_id),
+        ("get_available_assignees", user.id, urza_id),
+    ]
+
+
+def test_task_create_form_denies_user_without_issue_permission(system_user_id):
+    user = _user(system_user_id, UserRole.ENGINEER)
+    urza_id = uuid7()
+    access = FakeAccessService()
+    service = FakeTaskService(can_issue=False)
+
+    with _client(user, FakeTaskRepository([]), access, service) as client:
+        response = client.get(
+            "/tasks/create",
+            params={"urza_id": str(urza_id), "work_type": "schemes"},
+        )
+
+    assert response.status_code == 403
+    assert service.calls == [("can_issue_task", user.id, urza_id)]
+
+
+def test_task_create_post_creates_and_assigns_task(system_user_id):
+    user = _user(system_user_id, UserRole.MANAGER)
+    urza_id = uuid7()
+    engineer = SimpleNamespace(id=uuid7(), full_name="Исполнитель")
+    access = FakeAccessService()
+    access.urza_repository.urzas[urza_id] = SimpleNamespace(
+        id=urza_id,
+        dispatch_name="УРЗА-42",
+    )
+    service = FakeTaskService(engineers=[engineer])
+    form_data = {
+        "urza_id": str(urza_id),
+        "work_type": "instruction",
+        "engineer_id": str(engineer.id),
+        "deadline_at": "2026-10-30T12:45",
+        "description": "Проверить инструкцию",
+    }
+
+    with _client(user, FakeTaskRepository([]), access, service) as client:
+        response = client.post("/tasks/create", data=form_data, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/tasks/{service.created_task.id}"
+    assert service.created_task.status is TaskStatus.ASSIGNED
+    assert service.created_task.assigned_to == engineer.id
+    assert service.created_task.description == form_data["description"]
+    assert service.created_task.deadline_at.replace(tzinfo=None) == datetime(
+        2026,
+        10,
+        30,
+        12,
+        45,
+    )
+    assert service.calls == [
+        ("can_issue_task", user.id, urza_id),
+        ("get_available_assignees", user.id, urza_id),
+        (
+            "create_task",
+            {
+                "urza_id": urza_id,
+                "work_type": TaskWorkType.INSTRUCTION,
+                "created_by": user.id,
+                "description": form_data["description"],
+                "deadline_at": service.created_task.deadline_at,
+            },
+        ),
+        ("assign_task", service.created_task.id, engineer.id, user.id),
+    ]
+
+
+def test_task_create_post_denies_user_without_issue_permission(system_user_id):
+    user = _user(system_user_id, UserRole.ENGINEER)
+    urza_id = uuid7()
+    engineer = SimpleNamespace(id=uuid7(), full_name="Исполнитель")
+    service = FakeTaskService(can_issue=False, engineers=[engineer])
+
+    with _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        service,
+    ) as client:
+        response = client.post(
+            "/tasks/create",
+            data={
+                "urza_id": str(urza_id),
+                "work_type": "schemes",
+                "engineer_id": str(engineer.id),
+                "deadline_at": "2026-10-30T12:45",
+                "description": "",
+            },
+        )
+
+    assert response.status_code == 403
+    assert "не может выдавать задания" in response.text
+    assert service.created_task is None
+    assert service.calls == [("can_issue_task", user.id, urza_id)]
+
+
+def test_task_create_post_rejects_engineer_outside_available_assignees(
+    system_user_id,
+):
+    user = _user(system_user_id, UserRole.MANAGER)
+    urza_id = uuid7()
+    allowed_engineer = SimpleNamespace(id=uuid7(), full_name="Допустимый инженер")
+    forged_engineer_id = uuid7()
+    access = FakeAccessService()
+    access.urza_repository.urzas[urza_id] = SimpleNamespace(
+        id=urza_id,
+        dispatch_name="УРЗА-42",
+    )
+    service = FakeTaskService(engineers=[allowed_engineer])
+
+    with _client(user, FakeTaskRepository([]), access, service) as client:
+        response = client.post(
+            "/tasks/create",
+            data={
+                "urza_id": str(urza_id),
+                "work_type": "schemes",
+                "engineer_id": str(forged_engineer_id),
+                "deadline_at": "2026-10-30T12:45",
+                "description": "Проверка схемы",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "не является доступным активным инженером" in response.text
+    assert "Допустимый инженер" in response.text
+    assert service.created_task is None
+    assert all(call[0] != "create_task" for call in service.calls)
 
 
 def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
