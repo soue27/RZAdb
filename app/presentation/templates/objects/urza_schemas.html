@@ -2,17 +2,30 @@
 
 <div id="urza-tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="rzadb-otd-version-title">Схемы</div>
-        <a
-            class="btn btn-primary"
-            href="/objects/urza/{{ urza_id }}/schemas/new"
-            hx-get="/objects/urza/{{ urza_id }}/schemas/new"
-            hx-target="#urza-tab-content"
-            hx-swap="outerHTML"
-        >
-            <span class="material-icons align-middle me-1">add</span>
-            Добавить схему
-        </a>
+    <div class="rzadb-otd-version-title">Схемы</div>
+
+        <div class="d-flex gap-2">
+            {% if can_issue_task %}
+                <a
+                    class="btn btn-outline-primary"
+                    href="/tasks/create?urza_id={{ urza_id }}&work_type=schemes"
+                >
+                    <span class="material-icons align-middle me-1">assignment</span>
+                    Выдать задание
+                </a>
+            {% endif %}
+
+            <a
+                class="btn btn-primary"
+                href="/objects/urza/{{ urza_id }}/schemas/new"
+                hx-get="/objects/urza/{{ urza_id }}/schemas/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <span class="material-icons align-middle me-1">add</span>
+                Добавить схему
+            </a>
+        </div>
     </div>
 
     {% if error_message %}

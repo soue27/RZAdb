@@ -14,6 +14,7 @@ from app.application.objects.exceptions import (
 )
 from app.application.objects.service import ObjectService
 from app.application.schema.service import SchemaService
+from app.application.tasks.service import TaskService
 from app.domain.schema import SchemaRecord
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -21,6 +22,7 @@ from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
     get_schema_service,
+    get_task_service,
 )
 
 
@@ -57,6 +59,7 @@ async def _render_schemes(
     urza_id: UUID,
     current_user: User,
     schema_service: SchemaService,
+    task_service: TaskService,
     *,
     error_message: str | None = None,
     notice_message: str | None = None,
@@ -77,6 +80,10 @@ async def _render_schemes(
         )
         for record in schema_records
     }
+    can_issue_task = await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    )
     return templates.TemplateResponse(
         request=request,
         name="objects/urza_schemas.html",
@@ -89,6 +96,7 @@ async def _render_schemes(
             "current_user": current_user,
             "error_message": error_message,
             "notice_message": notice_message,
+            "can_issue_task": can_issue_task,
         },
         status_code=response_status,
     )
@@ -216,6 +224,7 @@ async def get_urza_schemas(
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     await _check_urza_access(object_service, current_user.id, urza_id)
     try:
@@ -224,6 +233,7 @@ async def get_urza_schemas(
             urza_id,
             current_user,
             schema_service,
+            task_service,
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -276,6 +286,7 @@ async def create_urza_schema_record(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     file_service: Annotated[FileService, Depends(get_file_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
     signed_form_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     scan_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     editable_file: Annotated[UploadFile | None, FastAPIFile()] = None,
@@ -376,7 +387,7 @@ async def create_urza_schema_record(
             response_status=500,
         )
 
-    return await _render_schemes(request, urza_id, current_user, schema_service)
+    return await _render_schemes(request, urza_id, current_user, schema_service, task_service)
 
 
 @router.get("/urza/{urza_id}/schemas/{record_id}/edit")
@@ -552,6 +563,7 @@ async def _run_workflow_action(
     record_id: UUID,
     current_user: User,
     schema_service: SchemaService,
+    task_service: TaskService,
     action: str,
 ):
     method = {
@@ -572,7 +584,7 @@ async def _run_workflow_action(
             status_code=_record_value_error_status(exc),
             detail=str(exc),
         ) from exc
-    return await _render_schemes(request, urza_id, current_user, schema_service)
+    return await _render_schemes(request, urza_id, current_user, schema_service, task_service,)
 
 
 @router.post("/urza/{urza_id}/schemas/{record_id}/submit")
@@ -582,9 +594,12 @@ async def submit_urza_schema_record(
     record_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     return await _run_workflow_action(
-        request, urza_id, record_id, current_user, schema_service, "submit"
+        request, urza_id, record_id, current_user, schema_service,
+        task_service,
+        "submit"
     )
 
 
@@ -595,9 +610,12 @@ async def approve_urza_schema_record(
     record_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     return await _run_workflow_action(
-        request, urza_id, record_id, current_user, schema_service, "approve"
+        request, urza_id, record_id, current_user, schema_service,
+        task_service,
+        "approve"
     )
 
 
@@ -608,9 +626,13 @@ async def return_urza_schema_record(
     record_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     return await _run_workflow_action(
-        request, urza_id, record_id, current_user, schema_service, "return"
+        request, urza_id, record_id, current_user,
+        schema_service,
+        task_service,
+        "return"
     )
 
 
@@ -622,6 +644,7 @@ async def delete_urza_schema_record(
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     await _check_urza_access(object_service, current_user.id, urza_id)
     try:
@@ -637,4 +660,8 @@ async def delete_urza_schema_record(
             status_code=_record_value_error_status(exc),
             detail=str(exc),
         ) from exc
-    return await _render_schemes(request, urza_id, current_user, schema_service)
+    return await _render_schemes(request, urza_id,
+        current_user,
+        schema_service,
+        task_service,
+    )
