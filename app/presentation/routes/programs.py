@@ -13,6 +13,7 @@ from app.application.objects.exceptions import (
 )
 from app.application.objects.service import ObjectService
 from app.application.programs.service import ProgramService
+from app.application.tasks.service import TaskService
 from app.domain.enums import ProgramType
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -20,6 +21,7 @@ from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
     get_program_service,
+    get_task_service,
 )
 
 router = APIRouter(
@@ -37,6 +39,7 @@ async def _render_urza_programs(
     urza_id: UUID,
     current_user: User,
     program_service: ProgramService,
+    task_service: TaskService,
 ):
     programs = await program_service.get_by_urza(
         user_id=current_user.id,
@@ -51,6 +54,11 @@ async def _render_urza_programs(
         for program in programs
     }
 
+    can_issue_task = await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="objects/urza_programs.html",
@@ -58,6 +66,7 @@ async def _render_urza_programs(
             "urza_id": urza_id,
             "programs": programs,
             "program_actions": program_actions,
+            "can_issue_task": can_issue_task,
         },
     )
 
@@ -71,6 +80,10 @@ async def get_urza_programs(
     program_service: Annotated[
         ProgramService,
         Depends(get_program_service),
+    ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
     ],
 ):
     try:
@@ -95,6 +108,7 @@ async def get_urza_programs(
         urza_id=urza_id,
         current_user=current_user,
         program_service=program_service,
+        task_service=task_service,
     )
 
 
@@ -148,6 +162,10 @@ async def create_urza_program(
     file_service: Annotated[
         FileService,
         Depends(get_file_service),
+    ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
     ],
     editable_file: Annotated[
         UploadFile | None,
@@ -220,6 +238,7 @@ async def create_urza_program(
         urza_id=urza_id,
         current_user=current_user,
         program_service=program_service,
+        task_service=task_service,
     )
 
 
@@ -233,6 +252,11 @@ async def submit_urza_program(
         ProgramService,
         Depends(get_program_service),
     ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
+    ],
+
 ):
     try:
         await program_service.submit_for_review(
@@ -256,6 +280,7 @@ async def submit_urza_program(
         urza_id=urza_id,
         current_user=current_user,
         program_service=program_service,
+        task_service=task_service,
     )
 
 
@@ -268,6 +293,10 @@ async def approve_urza_program(
     program_service: Annotated[
         ProgramService,
         Depends(get_program_service),
+    ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
     ],
 ):
     try:
@@ -292,6 +321,7 @@ async def approve_urza_program(
         urza_id=urza_id,
         current_user=current_user,
         program_service=program_service,
+        task_service=task_service,
     )
 
 
@@ -304,6 +334,10 @@ async def return_urza_program(
     program_service: Annotated[
         ProgramService,
         Depends(get_program_service),
+    ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
     ],
 ):
     try:
@@ -328,4 +362,5 @@ async def return_urza_program(
         urza_id=urza_id,
         current_user=current_user,
         program_service=program_service,
+        task_service=task_service,
     )

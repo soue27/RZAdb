@@ -7,16 +7,28 @@
             Программы
         </div>
 
-        <button
-            type="button"
-            class="btn btn-primary"
-            hx-get="/objects/urza/{{ urza_id }}/programs/new"
-            hx-target="#urza-tab-content"
-            hx-swap="outerHTML"
-        >
-            <span class="material-icons align-middle me-1">add</span>
-            Добавить программу
-        </button>
+        <div class="d-flex gap-2">
+            {% if can_issue_task %}
+                <a
+                    class="btn btn-outline-primary"
+                    href="/tasks/create?urza_id={{ urza_id }}&work_type=program"
+                >
+                    <span class="material-icons align-middle me-1">assignment</span>
+                    Выдать задание
+                </a>
+            {% endif %}
+
+            <button
+                type="button"
+                class="btn btn-primary"
+                hx-get="/objects/urza/{{ urza_id }}/programs/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <span class="material-icons align-middle me-1">add</span>
+                Добавить программу
+            </button>
+        </div>
     </div>
 
     <div class="table-responsive">
