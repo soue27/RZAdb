@@ -10,7 +10,7 @@ from app.application.access.service import AccessService
 from app.application.tree.service import TreeService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
-from app.domain.enums import TaskStatus, TaskWorkType
+from app.domain.enums import TaskStatus, TaskWorkType, MaintenanceType
 from app.domain.task import Task
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -124,6 +124,7 @@ async def _task_create_form_response(
     return_url: str,
     error_message: str | None = None,
     deadline_at: str = "",
+    maintenance_type: str = "",
     engineer_id: str = "",
     description: str = "",
     status_code: int = 200,
@@ -145,6 +146,8 @@ async def _task_create_form_response(
             "deadline_at": deadline_at,
             "engineer_id": engineer_id,
             "description": description,
+            "maintenance_types": list(MaintenanceType),
+            "maintenance_type": maintenance_type,
             "tree": tree,
             "return_url": return_url,
         },
@@ -260,6 +263,7 @@ async def create_task(
     work_type: Annotated[str, Form()] = "",
     engineer_id: Annotated[str, Form()] = "",
     deadline_at: Annotated[str, Form()] = "",
+    maintenance_type: Annotated[str, Form()] = "",
     description: Annotated[str, Form()] = "",
     return_url: Annotated[str, Form()] = "",
 ):
@@ -285,6 +289,7 @@ async def create_task(
                 "Проверьте выбранный объект, тип работы и исполнителя."
             ),
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -313,6 +318,7 @@ async def create_task(
                 "Пользователь не может выдавать задания для этого URZA."
             ),
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_403_FORBIDDEN,
@@ -334,6 +340,7 @@ async def create_task(
             return_url=normalized_return_url,
             error_message="URZA не найден.",
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_404_NOT_FOUND,
@@ -356,6 +363,7 @@ async def create_task(
             return_url=normalized_return_url,
             error_message=str(exc),
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_403_FORBIDDEN,
@@ -379,6 +387,7 @@ async def create_task(
                 "активным инженером этого отделения."
             ),
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -398,6 +407,7 @@ async def create_task(
             return_url=normalized_return_url,
             error_message="Укажите корректный срок выполнения.",
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -406,6 +416,29 @@ async def create_task(
     if parsed_deadline_at.tzinfo is None:
         parsed_deadline_at = parsed_deadline_at.astimezone()
 
+    parsed_maintenance_type = None
+
+    if parsed_work_type == TaskWorkType.MAINTENANCE:
+        try:
+            parsed_maintenance_type = MaintenanceType(maintenance_type)
+        except ValueError:
+            return await _task_create_form_response(
+                request=request,
+                current_user=current_user,
+                urza=urza,
+                urza_id=parsed_urza_id,
+                work_type=parsed_work_type,
+                engineers=engineers,
+                tree=tree,
+                return_url=normalized_return_url,
+                error_message="Укажите вид технического обслуживания.",
+                deadline_at=deadline_at,
+                maintenance_type=maintenance_type,
+                engineer_id=engineer_id,
+                description=description,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
     try:
         task = await task_service.create_task(
             urza_id=parsed_urza_id,
@@ -413,6 +446,7 @@ async def create_task(
             created_by=current_user.id,
             description=description.strip() or None,
             deadline_at=parsed_deadline_at,
+            maintenance_type=parsed_maintenance_type,
         )
     except (PermissionError, ValueError) as exc:
         return await _task_create_form_response(
@@ -426,6 +460,7 @@ async def create_task(
             return_url=normalized_return_url,
             error_message=str(exc),
             deadline_at=deadline_at,
+            maintenance_type=maintenance_type,
             engineer_id=engineer_id,
             description=description,
             status_code=(

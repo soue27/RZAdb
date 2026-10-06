@@ -51,12 +51,36 @@
                         Для этого производственного отделения нет доступных инженеров.
                     </p>
                 {% endif %}
+                {% if work_type.value == "maintenance" %}
+                    <div class="mb-3">
+                        <label for="maintenance-type" class="form-label">
+                            Вид технического обслуживания
+                        </label>
 
+                        <select
+                            id="maintenance-type"
+                            name="maintenance_type"
+                            class="form-select"
+                            required
+                        >
+                            <option value="">Выберите вид ТО</option>
+
+                            {% for maintenance in maintenance_types %}
+                                <option
+                                    value="{{ maintenance.value }}"
+                                    {% if maintenance.value == maintenance_type %}selected{% endif %}
+                                >
+                                    {{ maintenance.value }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
                 <div class="mb-3">
                     <label for="task-deadline" class="form-label">Срок выполнения</label>
                     <input
                         id="task-deadline"
-                        type="datetime-local"
+                        type="date"
                         class="form-control"
                         name="deadline_at"
                         value="{{ deadline_at }}"
