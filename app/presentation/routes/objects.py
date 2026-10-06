@@ -236,6 +236,10 @@ async def get_urza_maintenance(
         TORecordService,
         Depends(get_maintenance_service),
     ],
+    task_service: Annotated[
+            TaskService,
+            Depends(get_task_service),
+    ],
 ):
     try:
         await object_service.get_object(
@@ -259,11 +263,18 @@ async def get_urza_maintenance(
         urza_id=urza_id,
     )
 
+    can_issue_task = await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="objects/urza_maintenance.html",
         context={
             "maintenance_records": maintenance_records,
+            "can_issue_task": can_issue_task,
+            "urza_id": urza_id,
         },
     )
 

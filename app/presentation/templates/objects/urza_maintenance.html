@@ -4,10 +4,20 @@
 
     {% if maintenance_records %}
 
-        <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="rzadb-otd-version-title">
                 Журнал технического обслуживания
             </div>
+
+            {% if can_issue_task %}
+                <a
+                    class="btn btn-outline-primary"
+                    href="/tasks/create?urza_id={{ urza_id }}&work_type=maintenance"
+                >
+                    <span class="material-icons align-middle me-1">assignment</span>
+                    Выдать задание
+                </a>
+            {% endif %}
         </div>
 
         <div class="table-responsive">
