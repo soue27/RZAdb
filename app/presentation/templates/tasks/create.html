@@ -4,8 +4,17 @@
 
 {% block body %}
 <div class="container-fluid px-4 py-4">
-    <div class="mb-3">
-        <a href="/tasks" class="text-decoration-none">← Все задания</a>
+    <div class="mb-3 d-flex gap-3">
+        <a
+            href="#"
+            class="text-decoration-none"
+            onclick="history.back(); return false;"
+        >
+            ← Отмена
+        </a>
+        <a href="/tasks" class="text-decoration-none">
+            Все задания
+        </a>
     </div>
 
     <h1 class="h4 mb-4">Выдать задание</h1>
@@ -24,6 +33,7 @@
             <form action="/tasks/create" method="post">
                 <input type="hidden" name="urza_id" value="{{ urza_id }}">
                 <input type="hidden" name="work_type" value="{{ work_type.value }}">
+                <input type="hidden" name="return_url" value="{{ return_url }}">
 
                 {% if engineers %}
                     <div class="mb-3">

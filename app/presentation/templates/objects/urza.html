@@ -199,6 +199,7 @@
                     type="button"
                     class="nav-link active"
                     data-rzadb-tab
+                    data-tab="otd"
                     hx-get="/objects/urza/{{ urza.id }}"
                     hx-select="#urza-tab-content"
                     hx-target="#urza-tab-content"
@@ -213,6 +214,7 @@
                     type="button"
                     class="nav-link"
                     data-rzadb-tab
+                    data-tab="settings"
                     hx-get="/objects/urza/{{ urza.id }}/settings"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
@@ -226,6 +228,7 @@
                     type="button"
                     class="nav-link"
                     data-rzadb-tab
+                    data-tab="schemas"
                     hx-get="/objects/urza/{{ urza.id }}/schemas"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
@@ -280,6 +283,17 @@
              ========================================================= -->
         <div id="urza-tab-content">
 
+            <div class="d-flex justify-content-end mb-3">
+                {% if can_issue_task %}
+                    <a
+                        href="/tasks/create?urza_id={{ urza.id }}&work_type=otd"
+                        class="btn btn-outline-primary"
+                    >
+                        <span class="material-icons align-middle me-1">assignment</span>
+                        Выдать задание
+                    </a>
+                {% endif %}
+            </div>
             {% if otd and otd.current_version %}
 
                 {% set displayed_version = otd.selected_version or otd.current_version %}
@@ -524,3 +538,4 @@
     </div>
 
 </div>
+

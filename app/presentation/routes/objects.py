@@ -30,6 +30,7 @@ from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.application.schema.service import SchemaService
 from app.application.programs.service import ProgramService
+from app.application.tasks.service import TaskService
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
@@ -44,6 +45,7 @@ from app.presentation.dependencies.services import (
     get_program_service,
     get_file_service,
     get_settings_service,
+    get_task_service,
 )
 
 router = APIRouter(
@@ -83,7 +85,12 @@ async def get_object(
         SettingsService,
         Depends(get_settings_service),
     ],
+    task_service: Annotated[
+        TaskService,
+        Depends(get_task_service),
+    ],
     otd_version: UUID | None = Query(default=None),
+    tab: str | None = Query(default=None),
 ):
     try:
         selected_object = await object_service.get_object(
@@ -132,6 +139,11 @@ async def get_object(
                 urza_id=object_id,
             )
 
+            can_issue_task = await task_service.can_issue_task(
+                actor_id=current_user.id,
+                urza_id=object_id,
+            )
+
             return templates.TemplateResponse(
                 request=request,
                 name="objects/urza.html",
@@ -141,6 +153,8 @@ async def get_object(
                     "settings_form": settings_form,
                     "settings_records": settings_records,
                     "current_user": current_user,
+                    "active_tab": tab,
+                    "can_issue_task": can_issue_task,
                 },
             )
 

@@ -13,18 +13,30 @@
             Формуляр регистрации изменений уставок
         </div>
 
-        {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
-            <button
-                type="button"
-                class="btn btn-primary"
-                hx-get="/objects/urza/{{ urza_id }}/settings/new"
-                hx-target="#urza-tab-content"
-                hx-swap="outerHTML"
-            >
-                <span class="material-icons align-middle me-1">add</span>
-                Внести изменение уставок
-            </button>
-        {% endif %}
+        <div class="d-flex gap-2">
+            {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    hx-get="/objects/urza/{{ urza_id }}/settings/new"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
+                >
+                    <span class="material-icons align-middle me-1">add</span>
+                    Внести изменение уставок
+                </button>
+            {% endif %}
+
+            {% if can_issue_task %}
+                <a
+                    href="/tasks/create?urza_id={{ urza_id }}&work_type=settings"
+                    class="btn btn-outline-primary"
+                >
+                    <span class="material-icons align-middle me-1">assignment</span>
+                    Выдать задание
+                </a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="table-responsive">
