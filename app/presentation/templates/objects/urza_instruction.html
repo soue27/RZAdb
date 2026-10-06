@@ -1,53 +1,244 @@
 {% from "objects/_file_actions.html" import file_actions %}
+
 <div id="urza-tab-content">
+
     {% if instruction and versions %}
         {% set approved_version = current_version %}
         {% set displayed_version = selected_version or approved_version or versions[0] %}
+
         <div class="d-flex justify-content-between align-items-start mb-3">
+
             <div>
-                <div class="rzadb-otd-version-title">Версия {{ displayed_version.version_number }}</div>
-                <div class="rzadb-otd-version-date">Действует с {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}</div>
-                <span class="badge text-bg-secondary">{{ displayed_version.status.label }}</span>
+                <div class="rzadb-otd-version-title">
+                    Версия {{ displayed_version.version_number }}
+                </div>
+
+                <div class="rzadb-otd-version-date">
+                    Действует с {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
+                </div>
+
+                <span class="badge text-bg-secondary">
+                    {{ displayed_version.status.label }}
+                </span>
             </div>
-            {% if "new_version" in actions %}
-                <a class="btn btn-outline-primary" href="/objects/urza/{{ instruction.urza_id }}/instruction/new-version" hx-get="/objects/urza/{{ instruction.urza_id }}/instruction/new-version" hx-target="#urza-tab-content" hx-swap="outerHTML">Новая версия</a>
-            {% endif %}
+
+            <div class="d-flex gap-2">
+
+                {% if can_issue_task %}
+                    <a
+                        class="btn btn-outline-primary"
+                        href="/tasks/create?urza_id={{ urza_id }}&work_type=instruction"
+                    >
+                        <span class="material-icons align-middle me-1">assignment</span>
+                        Выдать задание
+                    </a>
+                {% endif %}
+
+                {% if "new_version" in actions %}
+                    <a
+                        class="btn btn-outline-primary"
+                        href="/objects/urza/{{ instruction.urza_id }}/instruction/new-version"
+                        hx-get="/objects/urza/{{ instruction.urza_id }}/instruction/new-version"
+                        hx-target="#urza-tab-content"
+                        hx-swap="outerHTML"
+                    >
+                        Новая версия
+                    </a>
+                {% endif %}
+
+            </div>
         </div>
+
         {% if "submit" in actions %}
-            <form method="post" action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/submit" hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/submit" hx-target="#urza-tab-content" hx-swap="outerHTML"><button class="btn btn-primary">Направить на согласование</button></form>
+            <form
+                method="post"
+                action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/submit"
+                hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/submit"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <button class="btn btn-primary">
+                    Направить на согласование
+                </button>
+            </form>
         {% endif %}
+
         {% if "approve" in actions %}
-            <form class="d-inline" method="post" action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/approve" hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/approve" hx-target="#urza-tab-content" hx-swap="outerHTML"><button class="btn btn-success">Утвердить</button></form>
+            <form
+                class="d-inline"
+                method="post"
+                action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/approve"
+                hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/approve"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <button class="btn btn-success">
+                    Утвердить
+                </button>
+            </form>
         {% endif %}
+
         {% if "return" in actions %}
-            <form class="d-inline" method="post" action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/return" hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/return" hx-target="#urza-tab-content" hx-swap="outerHTML"><button class="btn btn-warning">Вернуть в черновик</button></form>
+            <form
+                class="d-inline"
+                method="post"
+                action="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/return"
+                hx-post="/objects/urza/{{ instruction.urza_id }}/instruction/versions/{{ displayed_version.id }}/return"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <button class="btn btn-warning">
+                    Вернуть в черновик
+                </button>
+            </form>
         {% endif %}
+
         <dl class="rzadb-property-list mt-3">
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Дата вступления в действие</dt><dd class="rzadb-property-value">{{ displayed_version.effective_date.strftime("%d.%m.%Y") }}</dd></div>
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Описание изменений</dt><dd class="rzadb-property-value">{{ displayed_version.change_description or "—" }}</dd></div>
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Обоснование изменений</dt><dd class="rzadb-property-value">{{ displayed_version.change_justification or "—" }}</dd></div>
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Изменения внесены</dt><dd class="rzadb-property-value">{{ displayed_version.creator.full_name or "—" }}</dd></div>
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Скан инструкции</dt><dd class="rzadb-property-value">{{ displayed_version.scan_file.original_name }} {{ file_actions(displayed_version.scan_file_id) }}</dd></div>
-            <div class="rzadb-property-row"><dt class="rzadb-property-label">Редактируемый файл</dt><dd class="rzadb-property-value">{% if displayed_version.editable_file %}{{ displayed_version.editable_file.original_name }} {{ file_actions(displayed_version.editable_file_id) }}{% else %}—{% endif %}</dd></div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Дата вступления в действие
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Описание изменений
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.change_description or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Обоснование изменений
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.change_justification or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Изменения внесены
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.creator.full_name or "—" }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Скан инструкции
+                </dt>
+                <dd class="rzadb-property-value">
+                    {{ displayed_version.scan_file.original_name }}
+                    {{ file_actions(displayed_version.scan_file_id) }}
+                </dd>
+            </div>
+
+            <div class="rzadb-property-row">
+                <dt class="rzadb-property-label">
+                    Редактируемый файл
+                </dt>
+                <dd class="rzadb-property-value">
+                    {% if displayed_version.editable_file %}
+                        {{ displayed_version.editable_file.original_name }}
+                        {{ file_actions(displayed_version.editable_file_id) }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </dd>
+            </div>
+
         </dl>
+
         {% if versions|length > 1 %}
-            <details class="mt-4 rzadb-otd-history" {% if history_open %}open{% endif %}>
-                <summary class="small fw-semibold text-secondary">История версий</summary>
+            <details
+                class="mt-4 rzadb-otd-history"
+                {% if history_open %}open{% endif %}
+            >
+                <summary class="small fw-semibold text-secondary">
+                    История версий
+                </summary>
+
                 <div class="list-group mt-3">
+
                     {% for version in versions %}
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <button type="button" class="btn btn-link p-0 text-start text-decoration-none" hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}" hx-target="#urza-tab-content" hx-swap="outerHTML" hx-push-url="true">
-                                <span class="fw-semibold">Версия {{ version.version_number }}</span>
-                                <span class="small text-secondary">{{ version.status.label }} · {{ version.effective_date.strftime("%d.%m.%Y") }}</span>
+                        <div
+                            class="list-group-item d-flex justify-content-between align-items-center"
+                        >
+
+                            <button
+                                type="button"
+                                class="btn btn-link p-0 text-start text-decoration-none"
+                                hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
+                                hx-target="#urza-tab-content"
+                                hx-swap="outerHTML"
+                                hx-push-url="true"
+                            >
+                                <span class="fw-semibold">
+                                    Версия {{ version.version_number }}
+                                </span>
+
+                                <span class="small text-secondary">
+                                    {{ version.status.label }}
+                                    ·
+                                    {{ version.effective_date.strftime("%d.%m.%Y") }}
+                                </span>
                             </button>
-                            {% if approved_version and version.id == approved_version.id %}<span class="badge text-bg-success">Последняя утверждённая</span>{% endif %}
+
+                            {% if approved_version and version.id == approved_version.id %}
+                                <span class="badge text-bg-success">
+                                    Последняя утверждённая
+                                </span>
+                            {% endif %}
+
                         </div>
                     {% endfor %}
+
                 </div>
             </details>
         {% endif %}
+
     {% else %}
-        <div class="text-secondary text-center py-5">Инструкция для данного УРЗА ещё не создана.</div>
-        {% if can_create %}<a class="btn btn-primary" href="/objects/urza/{{ urza_id }}/instruction/new" hx-get="/objects/urza/{{ urza_id }}/instruction/new" hx-target="#urza-tab-content" hx-swap="outerHTML">Создать инструкцию</a>{% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+
+            <div class="text-secondary">
+                Инструкция для данного УРЗА ещё не создана.
+            </div>
+
+            {% if can_issue_task %}
+                <a
+                    class="btn btn-outline-primary"
+                    href="/tasks/create?urza_id={{ urza_id }}&work_type=instruction"
+                >
+                    <span class="material-icons align-middle me-1">
+                        assignment
+                    </span>
+                    Выдать задание
+                </a>
+            {% endif %}
+
+        </div>
+
+        {% if can_create %}
+            <a
+                class="btn btn-primary"
+                href="/objects/urza/{{ urza_id }}/instruction/new"
+                hx-get="/objects/urza/{{ urza_id }}/instruction/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                Создать инструкцию
+            </a>
+        {% endif %}
+
     {% endif %}
+
 </div>
