@@ -17,6 +17,8 @@ from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
     get_schema_service,
+    get_task_service,
+
 )
 
 
@@ -73,6 +75,17 @@ class FakeFileService:
 
     async def archive(self, *, file_id, user_id):
         self.archive_calls.append({"file_id": file_id, "user_id": user_id})
+
+
+class FakeTaskService:
+    async def can_issue_task(
+        self,
+        *,
+        actor_id,
+        urza_id,
+        work_type=None,
+    ):
+        return False
 
 
 class FakeSchemaService:
@@ -208,14 +221,18 @@ def _setup(
     object_error=None,
 ):
     object_service = FakeObjectService(object_error)
+    task_service = FakeTaskService()
+
     _roles_by_user[user.id] = user.role
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_object_service] = lambda: object_service
     app.dependency_overrides[get_schema_service] = lambda: schema_service
+    app.dependency_overrides[get_task_service] = lambda: task_service
+
     if file_service is not None:
         app.dependency_overrides[get_file_service] = lambda: file_service
-    return object_service
 
+    return object_service
 
 def _user(system_user_id, role=UserRole.ENGINEER):
     return SimpleNamespace(id=system_user_id, role=role)
@@ -617,6 +634,8 @@ def test_update_draft_replaces_file_and_archives_old_after_save(system_user_id):
         ("return", DocumentStatus.UNDER_REVIEW, DocumentStatus.DRAFT, "return_to_draft", UserRole.MANAGER),
     ],
 )
+
+
 def test_schema_workflow_routes(system_user_id, action, initial, expected, method, role):
     user = _user(system_user_id, role)
     urza_id = uuid7()

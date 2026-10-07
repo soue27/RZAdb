@@ -154,6 +154,9 @@ class SchemaRepository:
         await self.session.flush()
         return record
 
+    async def rollback(self) -> None:
+        await self.session.rollback()
+
     async def soft_delete(
         self,
         record: SchemaRecord,

@@ -67,6 +67,9 @@ class FakeAccessService:
     async def can_access_urza(self, user_id, urza_id):
         return urza_id not in self.denied_urzas
 
+    async def get_accessible_enterprise_roots(self, user_id):
+        return []
+
 
 class FakeURZARepository:
     def __init__(self):
@@ -256,6 +259,7 @@ def test_task_create_post_creates_and_assigns_task(system_user_id):
                 "created_by": user.id,
                 "description": form_data["description"],
                 "deadline_at": service.created_task.deadline_at,
+                "maintenance_type": None,
             },
         ),
         ("assign_task", service.created_task.id, engineer.id, user.id),

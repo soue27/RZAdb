@@ -41,6 +41,7 @@ from app.presentation.dependencies.services import (
     get_substation_service,
     get_file_service,
     get_urza_instruction_service,
+    get_task_service,
 )
 
 
@@ -215,6 +216,18 @@ def override_settings_service(service: FakeSettingsService):
     def dependency():
         return service
     return dependency
+
+
+class FakeTaskService:
+    async def can_issue_task(
+        self,
+        *,
+        actor_id,
+        urza_id,
+        work_type=None,
+    ):
+        return False
+
 
 class FakeProgramService:
     def __init__(
@@ -490,6 +503,8 @@ def set_settings_dependencies(user, urza_id, settings_service, file_service=None
         )
     )
     app.dependency_overrides[get_settings_service] = override_settings_service(settings_service)
+    app.dependency_overrides[get_task_service] = lambda: FakeTaskService()
+
     if file_service is not None:
         app.dependency_overrides[get_file_service] = lambda: file_service
 

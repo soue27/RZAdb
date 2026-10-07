@@ -261,19 +261,24 @@ class SchemaService:
         try:
             return await self.repository.add_record(record)
         except IntegrityError as exc:
+            await self.repository.rollback()
+
             if self._is_unfinished_conflict(exc):
                 raise ValueError(
                     "Для данного формуляра уже существует незавершённая запись схем."
                 ) from exc
+
             original = exc.orig
             constraint_name = getattr(original, "constraint_name", None)
+
             if (
-                constraint_name == _TASK_RECORD_INDEX
-                or _TASK_RECORD_INDEX in str(original)
+                    constraint_name == _TASK_RECORD_INDEX
+                    or _TASK_RECORD_INDEX in str(original)
             ):
                 raise ValueError(
                     "Для задачи уже существует активный результат схем."
                 ) from exc
+
             raise
 
     async def create_record(

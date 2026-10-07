@@ -428,6 +428,7 @@ async def update_urza_schema_record(
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
     file_service: Annotated[FileService, Depends(get_file_service)],
     signed_form_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     scan_file: Annotated[UploadFile | None, FastAPIFile()] = None,
@@ -553,6 +554,7 @@ async def update_urza_schema_record(
         urza_id,
         current_user,
         schema_service,
+        task_service,
         notice_message=notice,
     )
 
