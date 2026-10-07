@@ -430,29 +430,7 @@ Substation
 
 ## 17. Tasks
 
-### Назначение
-
-Task — рабочее поручение исполнителю. Task не является конкретной записью документа.
-
-Задание создаётся в контексте:
-
-```text
-URZA + TaskWorkType
-```
-
-Например:
-
-```text
-URZA
-└── Уставки
-    └── [Выдать задание]
-```
-
-означает поручение:
-
-> выполнить работу с уставками для данного URZA.
-
-### Типы задач
+Типы задач:
 
 ```text
 OTD
@@ -462,7 +440,7 @@ MAINTENANCE
 PROGRAM
 ```
 
-### Статусы
+Статусы:
 
 ```text
 CREATED
@@ -474,231 +452,16 @@ CLOSED
 REJECTED
 ```
 
-### UI: «Выдать задание»
-
-На каждой вкладке карточки URZA должна быть одна кнопка:
+Активные рабочие состояния:
 
 ```text
-[Выдать задание]
-```
-
-Кнопка относится ко всей вкладке, а не к отдельной существующей записи.
-
-```text
-ОТД           → OTD
-Уставки       → SETTINGS
-Схемы         → SCHEMES
-ТО            → MAINTENANCE
-Программы     → PROGRAM
-Инструкция    → соответствующий TaskWorkType
-```
-
-При открытии формы уже известны:
-
-```text
-urza_id
-work_type
-```
-
-Не предлагать пользователю выбирать URZA или существующую запись документа повторно.
-
-Кнопку видят только пользователи, имеющие право выдачи задания для данного URZA.
-
-Текущее решение:
-
-```text
-MANAGER    → может выдавать в доступной области
-SUPERADMIN → может выдавать для доступных ему объектов
-ADMIN      → не выдаёт
-ENGINEER   → не выдаёт
-SPECIALIST → не выдаёт, если отдельным решением не определено иное
-```
-
-Право должно учитывать и роль, и область доступа:
-
-```text
-can_issue_task(user, urza)
-```
-
-Проверка в UI не заменяет проверку в application/service layer.
-
-### Форма выдачи
-
-Минимальный состав:
-
-```text
-УРЗА        — read-only
-Вид работы  — read-only
-Исполнитель — выбор инженера
-Срок        — ввод
-Описание    — ввод
-```
-
-После подтверждения руководитель создаёт/назначает задание конкретному инженеру.
-
-### Workflow
-
-Основной путь:
-
-```text
-CREATED
-  ↓
 ASSIGNED
-  ↓
 IN_PROGRESS
-  ↓
-COMPLETED
-  ↓
-UNDER_REVIEW
-  ↓
-CLOSED
-```
-
-Возврат:
-
-```text
-UNDER_REVIEW
-  ↓
-IN_PROGRESS
-  ↓
-COMPLETED
-  ↓
 UNDER_REVIEW
 ```
 
-Отдельная терминальная ветка:
+Инспекции/осмотры ПС — отдельный процесс и не должны автоматически становиться обычными Tasks.
 
-```text
-ASSIGNED → REJECTED
-```
-
-`COMPLETED` означает завершение работы исполнителем, а не принятие результата.
-
-### Права
-
-- создание и назначение задания — MANAGER в своей доступной области;
-- ADMIN не назначает;
-- SUPERADMIN может выполнять операции с любым доступным объектом;
-- `COMPLETED → UNDER_REVIEW` — назначенный исполнитель;
-- `UNDER_REVIEW → CLOSED` — любой активный MANAGER с доступом к URZA;
-- `UNDER_REVIEW → IN_PROGRESS` — любой активный MANAGER с доступом к URZA;
-- проверяющий не обязан быть тем же руководителем, который создавал/назначал Task;
-- причина возврата на доработку обязательна.
-
-### Выполнение задания
-
-В «Мои задания»:
-
-```text
-[Выполнить задание]
-```
-
-открывает контекст:
-
-```text
-Task
-→ URZA
-→ вкладка по work_type
-```
-
-Соответствие:
-
-```text
-OTD         → ОТД
-SETTINGS    → Уставки
-SCHEMES     → Схемы
-MAINTENANCE → ТО
-PROGRAM     → Программы
-```
-
-`task_id` должен сохраняться при переходе к форме результата.
-
-### Task и результат
-
-Task и документный результат являются двумя отдельными state machine.
-
-Не выполнять автоматическую синхронизацию статусов Task и документа без отдельного решения.
-
-Для `SCHEMES` закрытие Task возможно только при наличии активного `SchemaRecord` со статусом `APPROVED`.
-
-Для остальных типов окончательные gate-условия должны быть отдельно зафиксированы перед реализацией.
-
-Soft-deleted результат не считается активным результатом.
-
-Task-linked результат должен:
-
-- ссылаться на существующий Task;
-- иметь тот же URZA;
-- соответствовать `work_type`;
-- принадлежать текущему назначенному исполнителю;
-- создаваться/изменяться в разрешённом состоянии Task;
-- не учитывать soft-deleted записи как активные.
-
-### Прямой ввод
-
-Прямой ввод из вкладки URZA не должен обходить review.
-
-После:
-
-```text
-[Направить на согласование]
-```
-
-результат проходит тот же review workflow:
-
-```text
-UNDER_REVIEW
-→ MANAGER
-→ CLOSED
-```
-
-или:
-
-```text
-UNDER_REVIEW
-→ IN_PROGRESS
-→ повторное согласование
-```
-
-Отдельную сущность согласования для прямого ввода не создавать.
-
-### Формуляры
-
-Для Уставок, Схем и ТО, где требуется подписанный формуляр, формуляр создаётся на каждую отдельную операцию.
-
-Шаблоны:
-
-```text
-data/document_templates/
-├── schemes/
-├── settings/
-└── maintenance/
-```
-
-Формуляр содержит шапку конкретного объекта, одну строку текущей операции и место для подписи исполнителя.
-
-На текущем этапе используется DOCX без серверной конвертации в PDF.
-
-### Фактическое состояние по аудиту
-
-Application/service часть Task workflow в значительной степени реализована.
-
-HTTP/UI ещё не завершён:
-
-- нет полноценной выдачи задания из вкладок URZA;
-- нет законченного UI назначения;
-- нет полного «Мои задания»;
-- нет полноценного «Выполнить задание»;
-- нет сквозного сохранения `task_id`;
-- нет полного HTTP/UI review;
-- Task routes теряют tree/sidebar context.
-
-Подтверждённые технические замечания:
-
-- `return_for_revision()` должен реально вызывать проверку обязательной причины;
-- запросы результатов для OTD/Settings/Program/TO должны исключать soft-deleted записи;
-- условие закрытия должно проверять именно активный результат;
-- один активный `SchemaRecord` на Task уже ограничивается отдельным partial unique index.
 ---
 
 ## 18. Inspections / Осмотры
@@ -923,30 +686,38 @@ SAP/ASUREO не делать глобально уникальными без о
 
 ## 25. Текущий статус
 
-### DONE
+Завершено:
 
 ```text
 Authentication
 AccessService
 Enterprise
-Substation read UI
-Connection read UI
+Substation
+Connection
+URZA
+Tree
+Sidebar
+Substation card
+Connection card
 URZA card
-Tree / Sidebar
-OTD read + history + versioning
-Settings workflow
-Schemes workflow
-Programs status/review workflow
-URZA Instruction version workflow
+OTD
+OTD versioning
+OTD history
+Settings
+Schemes
+Maintenance
+Programs
+URZA Instruction
+URZA Instruction versioning
 Universal audit
 FileOwnerResolver
 FileAccessService
 Secure file view/download
 Substation read-only tabs
-RZA Instruction read/history
+RZA Instruction history
 ```
 
-Все шесть вкладок URZA существуют:
+Все шесть вкладок URZA реализованы:
 
 ```text
 ОТД
@@ -957,54 +728,18 @@ RZA Instruction read/history
 Инструкция
 ```
 
-Навигация остаётся:
+Карточки Substation / Connection / URZA прошли контрольный функциональный аудит.
+
+Принятое правило навигации:
 
 ```text
 Holding → Branch → Production Department → Substation → Connection → URZA
 ```
 
-Дочерние объекты не дублируются отдельными вкладками карточек.
+Иерархическая навигация выполняется деревом. Не добавлять в карточку Substation вкладку со списком Connections и не добавлять в карточку Connection вкладку со списком URZA только ради дублирования дерева.
 
-### PARTIAL
+В дереве стрелка раскрытия показывается только для узлов, имеющих дочерние объекты.
 
-```text
-OTD
-Settings
-Schemes
-Maintenance
-Programs
-URZA Instruction
-Tasks
-Files
-Inspection
-Substation Instruction
-Selectivity Scheme
-Substation / Connection / URZA write
-```
-
-Причины PARTIAL:
-
-- ОТД: отсутствует write route/UI; специальный workflow остаётся отдельным доменным решением.
-- Уставки: основной workflow реализован; остаются общие Tasks/file integration issues.
-- Схемы: основной workflow реализован; остаются CSS и Task end-to-end.
-- ТО: отсутствуют write routes/UI и DocumentStatus workflow.
-- Программы: нет полноценного UI изменения APPROVED через новую запись/версию.
-- Инструкция URZA: workflow реализован; остаётся race-safe version numbering и Task integration.
-- Tasks: service/application готов в значительной степени, HTTP/UI end-to-end отсутствует.
-- Files: защищённое чтение готово, write/upload/attach UI не завершены.
-- Inspection: read/service есть, полноценный write UI отсутствует.
-- Substation Instruction / Selectivity Scheme: read/history есть, write workflow отсутствует.
-
-### Подтверждённые UI/technical issues
-
-1. Task routes не загружают `tree`, поэтому Tasks теряет ожидаемый sidebar/tree context.
-2. В таблице Schemes CSS ширины колонок не соответствуют фактическим 8 колонкам.
-3. В таблице Maintenance последняя колонка не имеет корректной ширины, file action buttons слишком малы.
-4. `return_for_revision()` должен валидировать обязательную причину.
-5. Soft-deleted результаты не должны считаться активными результатами Task.
-6. `Connections` не являются вкладкой Substation; дерево — основной способ навигации.
-
-Контрольный аудит является текущим baseline и не должен повторяться без изменения кода или отдельной причины.
 ---
 
 ## 26. Контрольный аудит — завершён
@@ -1044,29 +779,16 @@ TECHNICAL DEBT
 
 ## 27. Актуальный roadmap
 
-Рабочий порядок реализации:
+Контрольный аудит завершён. Ниже — текущий рабочий порядок реализации с учётом уже выполненного функционала.
 
 ```text
-1. Tasks HTTP/UI end-to-end
-   ├── «Выдать задание» на каждой вкладке URZA
-   ├── can_issue_task
-   ├── форма выдачи
-   ├── выбор инженера
-   ├── «Мои задания»
-   ├── «Выполнить задание»
-   ├── переход URZA + вкладка
-   ├── task_id context
-   ├── submit for review
-   ├── review руководителем
-   ├── обязательная причина возврата
-   └── history / tests
+1. Закончить file write/UI
+   ├── upload
+   ├── привязка File к доменным сущностям
+   ├── file actions в document tabs
+   └── тесты write/access сценариев
 
-2. Подтверждённые Task/document fixes
-   ├── soft-delete filtering
-   ├── tree/sidebar в Tasks
-   └── проверки gate conditions
-
-3. Write/UI документных вкладок URZA
+2. Полноценный CRUD документов URZA
    ├── ОТД
    ├── Уставки
    ├── Схемы
@@ -1074,30 +796,42 @@ TECHNICAL DEBT
    ├── Программы
    └── Инструкция
 
-4. File write/UI
-   ├── upload
-   ├── atomic attach
-   ├── file actions
-   └── orphan cleanup
+3. Tasks workflow через HTTP/UI
+   ├── список
+   ├── карточка
+   ├── назначение
+   ├── статусы
+   ├── review
+   └── результаты
 
-5. Inspection workflow HTTP/UI
+4. Inspection workflow через HTTP/UI
+   ├── создание/назначение
+   ├── исполнитель и сроки
+   ├── статусы
+   ├── результат
+   ├── документы
+   └── история
 
-6. Write Substation / Connection / URZA
+5. Write-функциональность объектов
+   ├── Substation
+   ├── Connection
+   └── URZA
 
-7. Production S3
+6. Production S3
 
-8. Backup / Restore
+7. Backup / Restore
 
-9. Cold S3 / archive
+8. Cold S3 / архивирование
 
-10. Archive UI
+9. Archive UI
 
-11. Search
+10. Search по дереву
 
-12. Notifications / automation
+11. Notifications / automation
 ```
 
-Не откладывать основной workflow из-за косметического UI-аудита.
+Не откладывать основной функционал ради косметического UI-аудита.
+
 ---
 
 ## 28. Отложенные вопросы
@@ -1122,62 +856,7 @@ Production S3 подключать после стабилизации file abst
 
 ---
 
-## 29. Зафиксированные UI-решения по Tasks
-
-### Кнопка «Выдать задание»
-
-Кнопка находится **на уровне вкладки карточки URZA**.
-
-Правильно:
-
-```text
-URZA
-└── Уставки
-    └── [Выдать задание]
-```
-
-Неправильно:
-
-```text
-URZA
-└── Уставки
-    ├── запись №1 [Выдать задание]
-    ├── запись №2 [Выдать задание]
-    └── запись №3 [Выдать задание]
-```
-
-Кнопка означает:
-
-> выдать инженеру работу с данным типом данных для данного URZA.
-
-Она не создаёт связь с существующей записью документа на момент выдачи.
-
-Форма выдачи получает:
-
-```text
-urza_id
-work_type
-```
-
-и предлагает руководителю выбрать исполнителя, срок и описание.
-
-После выполнения конкретный результат может быть связан с Task через `task_id`.
-
-### Навигация
-
-Task является входной точкой в рабочий процесс, но результат выполняется в контексте:
-
-```text
-Task
-→ URZA
-→ вкладка
-→ форма результата
-```
-
-Поэтому UI должен сохранять контекст Task при переходе из «Мои задания» в соответствующую вкладку.
-
-
-## 30. Основной принцип
+## 29. Основной принцип
 
 База данных должна отражать согласованную предметную область.
 
