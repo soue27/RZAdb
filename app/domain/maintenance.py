@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, Enum, ForeignKey, Text
+from sqlalchemy import Boolean, Date, Enum, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enums import MaintenanceType
@@ -25,9 +25,11 @@ class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=False,
     )
 
-    historical_data: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
+    historical_data: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
     )
 
     maintenance_date: Mapped[date] = mapped_column(

@@ -372,3 +372,51 @@ async def test_create_denies_access(
         )
 
     repository.add.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_saves_historical_data(
+    service,
+    repository,
+    access_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+
+    access_service.can_access_urza.return_value = True
+    repository.add = AsyncMock()
+
+    result = await service.create(
+        user_id=user_id,
+        urza_id=urza_id,
+        maintenance_date=date(2026, 9, 17),
+        maintenance_type=MaintenanceType.TK,
+        signed_form_file_id=uuid7(),
+        historical_data=True,
+    )
+
+    assert result.historical_data is True
+
+    repository.add.assert_awaited_once_with(result)
+
+
+@pytest.mark.asyncio
+async def test_create_uses_default_historical_data(
+    service,
+    repository,
+    access_service,
+):
+    access_service.can_access_urza.return_value = True
+    repository.add = AsyncMock()
+
+    result = await service.create(
+        user_id=uuid7(),
+        urza_id=uuid7(),
+        maintenance_date=date(2026, 9, 17),
+        maintenance_type=MaintenanceType.TK,
+        signed_form_file_id=uuid7(),
+    )
+
+    assert result.historical_data is False
+
+    repository.add.assert_awaited_once_with(result)

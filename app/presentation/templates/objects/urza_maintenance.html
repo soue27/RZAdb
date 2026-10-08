@@ -2,23 +2,44 @@
 
 <div id="urza-tab-content">
 
-    {% if maintenance_records %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="rzadb-otd-version-title">
-                Журнал технического обслуживания
-            </div>
+        <div class="rzadb-otd-version-title">
+            Журнал технического обслуживания
+        </div>
+
+        <div class="d-flex gap-2">
 
             {% if can_issue_task %}
                 <a
                     class="btn btn-outline-primary"
                     href="/tasks/create?urza_id={{ urza_id }}&work_type=maintenance"
                 >
-                    <span class="material-icons align-middle me-1">assignment</span>
+                    <span class="material-icons align-middle me-1">
+                        assignment
+                    </span>
                     Выдать задание
                 </a>
             {% endif %}
+
+            <a
+                class="btn btn-primary"
+                href="/objects/urza/{{ urza_id }}/maintenance/new"
+                hx-get="/objects/urza/{{ urza_id }}/maintenance/new"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >
+                <span class="material-icons align-middle me-1">
+                    add
+                </span>
+                Добавить запись ТО
+            </a>
+
         </div>
+
+    </div>
+
+    {% if maintenance_records %}
 
         <div class="table-responsive">
             <table class="table table-sm align-middle rzadb-maintenance-table">
@@ -29,7 +50,7 @@
                         <th class="text-center">Вид ТО</th>
                         <th>Выявленные отклонения</th>
                         <th>Принятые меры</th>
-                        <th>Исторические данные</th>
+                        <th class="text-center">Исторические данные</th>
                         <th class="text-center">Кто выполнил</th>
                         <th>Документы ТО</th>
                     </tr>
@@ -38,11 +59,12 @@
                 <tbody>
                     {% for record in maintenance_records %}
                         <tr>
-                            <td>
+
+                            <td class="text-center">
                                 {{ record.maintenance_date.strftime("%d.%m.%Y") }}
                             </td>
 
-                            <td>
+                            <td class="text-center">
                                 {{ record.maintenance_type.value }}
                             </td>
 
@@ -54,36 +76,62 @@
                                 {{ record.measures_taken }}
                             </td>
 
-                            <td>
-                                {{ record.historical_data or "—" }}
+                            <td class="text-center">
+                                {% if record.historical_data %}
+                                    <span
+                                        class="material-icons"
+                                        title="Исторические данные"
+                                    >
+                                        check
+                                    </span>
+                                {% else %}
+                                    —
+                                {% endif %}
                             </td>
 
-                            <td>
+                            <td class="text-center">
                                 {{ record.creator.full_name if record.creator else "—" }}
                             </td>
 
                             <td>
                                 <div class="d-flex flex-column gap-2">
+
                                     {% if record.scan_protocol_id %}
                                         <div>
-                                            <div class="small text-secondary">Скан протокола</div>
+                                            <div class="small text-secondary">
+                                                Скан протокола
+                                            </div>
                                             {{ file_actions(record.scan_protocol_id) }}
                                         </div>
                                     {% endif %}
+
                                     {% if record.editable_protocol_id %}
                                         <div>
-                                            <div class="small text-secondary">Редактируемый протокол</div>
+                                            <div class="small text-secondary">
+                                                Редактируемый протокол
+                                            </div>
                                             {{ file_actions(record.editable_protocol_id) }}
                                         </div>
                                     {% endif %}
+
                                     {% if record.signed_form_file_id %}
                                         <div>
-                                            <div class="small text-secondary">Подписанная форма</div>
+                                            <div class="small text-secondary">
+                                                Подписанная форма
+                                            </div>
                                             {{ file_actions(record.signed_form_file_id) }}
                                         </div>
                                     {% endif %}
+
+                                    {% if not record.scan_protocol_id
+                                          and not record.editable_protocol_id
+                                          and not record.signed_form_file_id %}
+                                        —
+                                    {% endif %}
+
                                 </div>
                             </td>
+
                         </tr>
                     {% endfor %}
                 </tbody>

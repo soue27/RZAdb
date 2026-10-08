@@ -24,12 +24,8 @@ from app.application.selectivity_schemes.service import (
 from app.application.settings.service import SettingsService
 from app.application.substations.service import SubstationService
 from app.application.urzas.service import URZAService
-from app.application.maintenance.service import TORecordService
-from app.domain.enums import ProgramType
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
-from app.application.schema.service import SchemaService
-from app.application.programs.service import ProgramService
 from app.application.tasks.service import TaskService
 from app.presentation.dependencies.services import (
     get_connection_service,
@@ -40,10 +36,6 @@ from app.presentation.dependencies.services import (
     get_selectivity_scheme_service,
     get_substation_service,
     get_urza_service,
-    get_schema_service,
-    get_maintenance_service,
-    get_program_service,
-    get_file_service,
     get_settings_service,
     get_task_service,
 )
@@ -226,57 +218,7 @@ async def get_substation_inspections(
 
 
 
-@router.get("/urza/{urza_id}/maintenance")
-async def get_urza_maintenance(
-    request: Request,
-    urza_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    object_service: Annotated[ObjectService, Depends(get_object_service)],
-    maintenance_service: Annotated[
-        TORecordService,
-        Depends(get_maintenance_service),
-    ],
-    task_service: Annotated[
-            TaskService,
-            Depends(get_task_service),
-    ],
-):
-    try:
-        await object_service.get_object(
-            user_id=current_user.id,
-            object_type="urza",
-            object_id=urza_id,
-        )
-    except ObjectAccessDeniedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ к объекту запрещён.",
-        ) from exc
-    except ObjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Объект не найден.",
-        ) from exc
 
-    maintenance_records = await maintenance_service.get_by_urza(
-        user_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    can_issue_task = await task_service.can_issue_task(
-        actor_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="objects/urza_maintenance.html",
-        context={
-            "maintenance_records": maintenance_records,
-            "can_issue_task": can_issue_task,
-            "urza_id": urza_id,
-        },
-    )
 
 
 @router.get("/substation/{substation_id}/details")

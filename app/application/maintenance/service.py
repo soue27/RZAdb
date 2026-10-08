@@ -58,7 +58,7 @@ class TORecordService:
         editable_protocol_id: UUID | None = None,
         detected_deviations: str = "Не выявлено",
         measures_taken: str = "Не требуется",
-        historical_data: str | None = None,
+        historical_data: bool = False,
         task_id: UUID | None = None,
     ) -> TORecord:
         if not await self.access_service.can_access_urza(

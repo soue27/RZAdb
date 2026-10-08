@@ -1,0 +1,384 @@
+<div id="urza-tab-content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="rzadb-otd-version-title">
+            Новая запись технического обслуживания
+        </div>
+
+        <a
+            href="/objects/urza/{{ urza_id }}/maintenance"
+            class="btn btn-outline-secondary"
+            hx-get="/objects/urza/{{ urza_id }}/maintenance"
+            hx-target="#urza-tab-content"
+            hx-swap="outerHTML"
+        >
+            <span class="material-icons align-middle me-1">
+                arrow_back
+            </span>
+            Назад
+        </a>
+    </div>
+
+    {% if error_message %}
+        <div
+            class="alert alert-danger"
+            role="alert"
+        >
+            {{ error_message }}
+        </div>
+    {% endif %}
+
+    <form
+        method="post"
+        action="/objects/urza/{{ urza_id }}/maintenance"
+        enctype="multipart/form-data"
+    >
+
+        {% if task_id %}
+            <input type="hidden" name="task_id" value="{{ task_id }}">
+        {% endif %}
+
+        <div class="row g-3">
+
+            <!-- Дата ТО -->
+            <div class="col-12">
+                <label
+                    for="maintenance-date"
+                    class="form-label"
+                >
+                    Дата ТО
+                </label>
+
+                <input
+                    id="maintenance-date"
+                    name="maintenance_date"
+                    type="date"
+                    class="form-control"
+                    value="{{ form_values.get('maintenance_date', '') }}"
+                    required
+                >
+            </div>
+
+            <!-- Вид ТО -->
+            <div class="col-12">
+                <label
+                    for="maintenance-type"
+                    class="form-label"
+                >
+                    Вид ТО
+                </label>
+
+                <select
+                    id="maintenance-type"
+                    name="maintenance_type"
+                    class="form-select"
+                    required
+                >
+                    <option value="">
+                        Выберите вид ТО
+                    </option>
+
+                    {% for maintenance_type in maintenance_types %}
+                        <option
+                            value="{{ maintenance_type.value }}"
+                            {% if form_values.get('maintenance_type') == maintenance_type.value %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ maintenance_type.value }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Исторические данные -->
+            <div class="col-12">
+                <div class="form-check">
+
+                    <input
+                        id="historical-data"
+                        name="historical_data"
+                        type="checkbox"
+                        class="form-check-input"
+                        value="true"
+                        {% if form_values.get('historical_data') %}
+                            checked
+                        {% endif %}
+                    >
+
+                    <label
+                        class="form-check-label"
+                        for="historical-data"
+                    >
+                        Исторические данные
+                    </label>
+
+                </div>
+            </div>
+
+            <!-- Выявленные отклонения -->
+            <div class="col-12">
+                <label
+                    for="detected-deviations"
+                    class="form-label"
+                >
+                    Выявленные отклонения
+                </label>
+
+                <textarea
+                    id="detected-deviations"
+                    name="detected_deviations"
+                    class="form-control"
+                    rows="3"
+                >{{ form_values.get('detected_deviations', 'Не выявлено') }}</textarea>
+            </div>
+
+            <!-- Принятые меры -->
+            <div class="col-12">
+                <label
+                    for="measures-taken"
+                    class="form-label"
+                >
+                    Принятые меры
+                </label>
+
+                <textarea
+                    id="measures-taken"
+                    name="measures_taken"
+                    class="form-control"
+                    rows="3"
+                >{{ form_values.get('measures_taken', 'Не требуется') }}</textarea>
+            </div>
+
+            <!-- Информация о протоколе -->
+            <div class="col-12">
+
+                <div
+                    id="protocol-status"
+                    class="border rounded p-3"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div class="d-flex align-items-start gap-3">
+
+                        <span
+                            id="protocol-status-icon"
+                            class="material-icons"
+                            aria-hidden="true"
+                        >
+                            help_outline
+                        </span>
+
+                        <div>
+
+                            <div
+                                id="protocol-status-title"
+                                class="fw-semibold"
+                            >
+                                Выберите вид ТО
+                            </div>
+
+                            <div
+                                id="protocol-status-text"
+                                class="text-secondary small mt-1"
+                            >
+                                После выбора вида ТО здесь будет указано,
+                                требуется ли протокол.
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Скан протокола -->
+            <div class="col-12">
+
+                <label
+                    for="scan-protocol"
+                    class="form-label"
+                >
+                    Скан протокола
+                </label>
+
+                <input
+                    id="scan-protocol"
+                    name="scan_protocol_file"
+                    type="file"
+                    class="form-control"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                >
+
+                <div class="form-text">
+                    PDF, JPG или PNG.
+                </div>
+
+            </div>
+
+            <!-- Редактируемый протокол -->
+            <div class="col-12">
+
+                <label
+                    for="editable-protocol"
+                    class="form-label"
+                >
+                    Редактируемый протокол
+                </label>
+
+                <input
+                    id="editable-protocol"
+                    name="editable_protocol_file"
+                    type="file"
+                    class="form-control"
+                    accept=".doc,.docx,.xls,.xlsx,.odt,.ods"
+                >
+
+                <div class="form-text">
+                    Необязательный редактируемый файл протокола.
+                </div>
+
+            </div>
+
+            <!-- Подписанная форма -->
+            <div class="col-12">
+
+                <label
+                    for="signed-form"
+                    class="form-label"
+                >
+                    Подписанная форма ТО
+                    <span class="text-danger">*</span>
+                </label>
+
+                <input
+                    id="signed-form"
+                    name="signed_form_file"
+                    type="file"
+                    class="form-control"
+                    required
+                    accept=".pdf,.jpg,.jpeg,.png"
+                >
+
+                <div class="form-text">
+                    Подписанная форма обязательна.
+                </div>
+
+            </div>
+
+            <!-- Кнопки -->
+            <div class="col-12">
+
+                <div class="d-flex justify-content-end gap-2 pt-3">
+
+                    <a
+                        href="/objects/urza/{{ urza_id }}/maintenance"
+                        class="btn btn-outline-secondary"
+                        hx-get="/objects/urza/{{ urza_id }}/maintenance"
+                        hx-target="#urza-tab-content"
+                        hx-swap="outerHTML"
+                    >
+                        Отмена
+                    </a>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        <span class="material-icons align-middle me-1">
+                            save
+                        </span>
+                        Сохранить запись
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </form>
+
+</div>
+
+<script>
+    (() => {
+        const maintenanceType =
+            document.getElementById("maintenance-type");
+
+        const scanProtocol =
+            document.getElementById("scan-protocol");
+
+        const editableProtocol =
+            document.getElementById("editable-protocol");
+
+        const statusIcon =
+            document.getElementById("protocol-status-icon");
+
+        const statusTitle =
+            document.getElementById("protocol-status-title");
+
+        const statusText =
+            document.getElementById("protocol-status-text");
+
+        const protocolOptionalTypes =
+            new Set(["ТК", "О", "ОСМ"]);
+
+        function updateProtocolFields() {
+            const value = maintenanceType.value;
+
+            if (!value) {
+                scanProtocol.disabled = true;
+                scanProtocol.required = false;
+
+                editableProtocol.disabled = true;
+
+                statusIcon.textContent = "help_outline";
+                statusTitle.textContent = "Выберите вид ТО";
+                statusText.textContent =
+                    "После выбора вида ТО здесь будет указано, " +
+                    "требуется ли протокол.";
+
+                return;
+            }
+
+            if (protocolOptionalTypes.has(value)) {
+                scanProtocol.disabled = true;
+                scanProtocol.required = false;
+                scanProtocol.value = "";
+
+                editableProtocol.disabled = true;
+                editableProtocol.value = "";
+
+                statusIcon.textContent = "check_circle";
+                statusTitle.textContent =
+                    "Протокол не требуется";
+                statusText.textContent =
+                    `Для ТО «${value}» скан протокола и ` +
+                    "редактируемый протокол не требуются.";
+
+                return;
+            }
+
+            scanProtocol.disabled = false;
+            scanProtocol.required = true;
+
+            editableProtocol.disabled = false;
+
+            statusIcon.textContent = "info";
+            statusTitle.textContent =
+                "Протокол обязателен";
+            statusText.textContent =
+                `Для ТО «${value}» необходимо приложить ` +
+                "скан протокола.";
+        }
+
+        maintenanceType.addEventListener(
+            "change",
+            updateProtocolFields,
+        );
+
+        updateProtocolFields();
+    })();
+</script>
