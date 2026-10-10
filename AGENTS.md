@@ -269,13 +269,15 @@ File(owner_type, owner_id)
 - защищённые routes просмотра и скачивания;
 - проверки аутентификации, владельца, архивного `File`, orphan и ambiguous ownership.
 
-Следующая работа с файлами — **write/UI**: загрузка, привязка и действия с файлами в документных вкладках URZA.
+Общий file write/UI остаётся в roadmap, но ближайший этап по текущему плану — Tasks executor HTTP/UI. Отдельный известный дефект: при неуспешном сохранении Programs и URZA Instruction cleanup загруженных файлов непоследователен; исправить его после executor actions.
 
 ---
 
 ## 11. Tasks
 
-Типы:
+### Типы заданий: доменный контракт и текущий код
+
+Зафиксированные в `DATABASE_DESIGN.md` типы:
 
 ```text
 OTD
@@ -285,21 +287,86 @@ MAINTENANCE
 PROGRAM
 ```
 
-Статусы:
+В текущем коде также существует `TaskWorkType.INSTRUCTION` и UI для создания такого задания. Это **реальное состояние кода, но не подтверждённое отдельным доменным решением**. Не удалять `INSTRUCTION`, не добавлять его в доменный контракт и не создавать/менять миграции по собственной инициативе. До изменения поведения требуется отдельное решение пользователя.
+
+### Статусы и переходы
 
 ```text
-CREATED
-ASSIGNED
-IN_PROGRESS
-COMPLETED
-UNDER_REVIEW
-CLOSED
-REJECTED
+CREATED → ASSIGNED → IN_PROGRESS → COMPLETED → UNDER_REVIEW → CLOSED
+                   ↑                           │
+                   └──── return for revision ──┘
 ```
 
-Инспекции/осмотры ПС — отдельный процесс.
+Дополнительные переходы:
 
----
+- `ASSIGNED → REJECTED` — отказ назначенного исполнителя с обязательной причиной.
+- `UNDER_REVIEW → IN_PROGRESS` — руководитель возвращает задание на доработку; комментарий допустим.
+- `UNDER_REVIEW → CLOSED` — руководитель закрывает задание после проверки результата.
+
+Назначение создаёт состояние `ASSIGNED`. В текущем HTTP/UI создание задания и назначение исполнителя объединены в один сценарий.
+
+### Существующая логика application service
+
+`TaskService` уже содержит методы:
+
+- `create_task()`;
+- `assign_task()`;
+- `accept_task()` — `ASSIGNED → IN_PROGRESS`;
+- `complete_task()` — `IN_PROGRESS → COMPLETED`, с проверкой результата по типу работы;
+- `reject_task()` — `ASSIGNED → REJECTED`, причина обязательна;
+- `submit_for_review()` — `COMPLETED → UNDER_REVIEW`;
+- `close_task()` — `UNDER_REVIEW → CLOSED`;
+- `return_for_revision()` — `UNDER_REVIEW → IN_PROGRESS`;
+- `reassign_task()` — переназначение в разрешённом сервисом состоянии.
+
+Не дублировать эти проверки в routes/Jinja и не переносить бизнес-логику в presentation layer. `get_available_actions()` является источником действий, которые UI показывает текущему пользователю.
+
+### Текущая задача executor HTTP/UI
+
+Следующий узкий этап — предоставить HTTP/UI для уже реализованных сервисных действий:
+
+```text
+POST /tasks/{task_id}/accept
+POST /tasks/{task_id}/complete
+POST /tasks/{task_id}/reject
+```
+
+Требования:
+
+- все routes используют существующие зависимости и `_get_accessible_task()` либо эквивалентный единый механизм доступа;
+- перед вызовом сервиса проверяется доступ к URZA; окончательная авторизация и проверка статуса остаются в `TaskService`;
+- отказ требует обязательную причину;
+- обычный POST возвращает redirect на карточку задания;
+- HTMX возвращает обновлённый фрагмент карточки;
+- ошибки `PermissionError`/`ValueError` показываются пользователю без traceback;
+- действия доступны только назначенному исполнителю в соответствующем состоянии;
+- сохранить действующие review routes и их поведение.
+
+Для `get_available_actions()` ожидается:
+
+- `ASSIGNED` + назначенный исполнитель → `accept_task`, `reject_task`;
+- `IN_PROGRESS` + назначенный исполнитель → `complete_task`;
+- `COMPLETED` + назначенный исполнитель → `submit_for_review`;
+- `UNDER_REVIEW` + доступный руководитель с правом review → `close_task`, `return_for_revision`.
+
+Не менять другие действия и проверки без необходимости. Не создавать новые сущности, поля или миграции для этого этапа.
+
+### Проверка результата и связь с документами
+
+`complete_task()` проверяет наличие результата, соответствующего `work_type`, и применимые требования к файлам. Нельзя обходить эту проверку ради удобства UI.
+
+Текущая связка `task_id` с результатами неполная: связь используется в сценариях схем и ТО; для Уставок, Программ и Инструкции URZA HTTP/UI-путь создания результата из задания не завершён; у ОТД нет полноценного write-пути. Не объявлять весь workflow результатов завершённым, пока эти пути не реализованы и не покрыты тестами.
+
+Не добавлять форму/сущность результата задания, если её необходимость не подтверждена текущей доменной моделью. Связывать результат с заданием через уже предусмотренные поля и сервисы.
+
+### Тесты Tasks
+
+- Дополнять существующие тесты, не создавать дубликаты без причины.
+- Покрывать action visibility, HTTP status/redirect, вызов application service, передачу причины отказа, ошибки, HTMX и регистрацию routes в OpenAPI.
+- Fake service в тестах должен корректно моделировать каждый переход статуса отдельно; не использовать общий fallback, который присваивает неверный статус для `reject_task`.
+- После этапа запускать сначала целевые тесты, затем `uv run pytest -q`.
+
+Осмотры/Inspection — отдельный процесс, не автоматически обычная Task.
 
 ## 12. Audit
 
@@ -457,6 +524,9 @@ git push
 - универсальный audit-refactor;
 - общий механизм безопасного чтения файлов;
 - интеграция file actions в текущие read-only вкладки Substation;
+- Tasks service transitions, history, permissions, result validation;
+- Task list/detail UI, create+assign, manager review/close/return;
+- write workflow ТО с поддержкой `task_id`;
 - история версий Инструкции РЗА уровня подстанции;
 - аудит готовых карточек Substation / Connection / URZA;
 - принцип навигации: иерархия `Holding → Branch → Production Department → Substation → Connection → URZA` обслуживается деревом, а карточки не дублируют дочерние объекты отдельными вкладками;
@@ -466,18 +536,22 @@ git push
 
 Основной приоритет — реализация функциональности, а не дальнейший полный UI-аудит.
 
-Следующий рабочий блок:
+Текущее состояние контрольной точки (ветка `feature/document-results-workflow`, HEAD `6215205`, 2026-10-08): 791 тест проходил локально. Это зафиксированная контрольная точка, а не гарантия результата после последующих изменений.
+
+Ближайший рабочий блок — executor HTTP/UI для Tasks: `accept`, `complete`, `reject`, action visibility и тесты. Затем завершить task-result linking и cleanup загрузок, после чего продолжить общий roadmap.
 
 ```text
-Files write/UI
-→ CRUD документов URZA
-→ Tasks workflow
-→ Inspection workflow
-→ write-функциональность объектов
-→ Production S3
-→ Backup / Restore
-→ Cold S3 / archive
-→ Search / Notifications / automation
+1. Tasks executor HTTP/UI (accept / complete / reject)
+2. Связать task → результат для Settings / Programs / Instruction / OTD
+3. Исправить/покрыть cleanup загруженных файлов при неуспешном сохранении
+4. Восстановить навигационное дерево на /tasks и /tasks/{task_id}; добавить регрессионные тесты
+5. Завершить file write/UI и CRUD документов URZA
+6. Inspection workflow через HTTP/UI
+7. Write-функциональность Substation / Connection / URZA
+8. Production S3
+9. Backup / Restore
+10. Cold S3 / archive и Archive UI
+11. Search / Notifications / automation
 ```
 
 Контрольный аудит проекта выполнен в достаточном объёме для построения текущего roadmap. Дальнейшие мелкие UI-замечания не должны вытеснять основной функционал, если они не влияют на безопасность или корректность.
@@ -543,11 +617,13 @@ Files write/UI
 
 ## 19. Особые отложенные вопросы
 
+### TaskWorkType.INSTRUCTION
+
+Код поддерживает `TaskWorkType.INSTRUCTION`, включая форму выдачи задания. В списке типов Tasks в `DATABASE_DESIGN.md` пока зафиксированы только OTD, SETTINGS, SCHEMES, MAINTENANCE и PROGRAM. Требуется отдельное доменное решение о включении INSTRUCTION в контракт; до решения не удалять и не переопределять существующее поведение.
+
 ### Исторические ТО
 
-Текущее поле `historical_data` в модели ТО пока не перерабатывать без отдельного доменного решения.
-
-По исходному workflow исторические ТО должны вводиться отдельным процессом.
+`historical_data` — boolean; исторические записи остаются в `TORecord`, отдельную history table не создавать. Отдельный сценарий ввода исторических ТО не даёт права менять модель без согласования.
 
 ### Уникальность dispatch_name
 

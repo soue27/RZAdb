@@ -303,11 +303,7 @@ URZA
 
 ### Исторические ТО
 
-Текущая модель не перерабатывается без отдельного доменного решения.
-
-Исходный workflow предусматривает отдельный процесс ввода исторических ТО.
-
-Вопрос исторических ТО является отложенным.
+`historical_data` — булево поле (`bool`), а не текстовое описание. Исторические ТО остаются в общей таблице `TORecord`; отдельную таблицу истории ТО не создавать. Отдельный сценарий ввода исторических записей может быть самостоятельным workflow/UI, но не меняет согласованную структуру модели.
 
 ---
 
@@ -430,7 +426,11 @@ Substation
 
 ## 17. Tasks
 
-Типы задач:
+### 17.1. Назначение и типы
+
+Task представляет назначенную работу по документу/результату URZA. Осмотры подстанций — отдельный процесс и не должны автоматически становиться обычными Tasks.
+
+В согласованном списке типов Tasks зафиксированы:
 
 ```text
 OTD
@@ -440,7 +440,9 @@ MAINTENANCE
 PROGRAM
 ```
 
-Статусы:
+**Несогласованность реализации:** в текущем коде также есть `TaskWorkType.INSTRUCTION` и UI выдачи заданий этого типа. Сам факт наличия enum/UI не считается доменным решением. До отдельного подтверждения пользователя тип `INSTRUCTION` имеет статус `NEEDS DOMAIN DECISION`: не удалять его из кода и не объявлять частью утверждённого доменного контракта; не создавать миграции только для документационного выравнивания.
+
+### 17.2. Статусы
 
 ```text
 CREATED
@@ -452,17 +454,97 @@ CLOSED
 REJECTED
 ```
 
-Активные рабочие состояния:
+Основной workflow:
 
 ```text
-ASSIGNED
-IN_PROGRESS
-UNDER_REVIEW
+CREATED → ASSIGNED → IN_PROGRESS → COMPLETED → UNDER_REVIEW → CLOSED
+                   ↑                           │
+                   └──── return for revision ──┘
 ```
 
-Инспекции/осмотры ПС — отдельный процесс и не должны автоматически становиться обычными Tasks.
+Дополнительный переход:
 
----
+```text
+ASSIGNED → REJECTED
+```
+
+`REJECTED` — отказ назначенного исполнителя с обязательной причиной.
+
+### 17.3. Переходы и ответственность
+
+- `CREATED → ASSIGNED`: задание назначается исполнителю. Текущий HTTP/UI-сценарий создания одновременно назначает выбранного инженера.
+- `ASSIGNED → IN_PROGRESS`: назначенный исполнитель принимает задание (`accept_task`).
+- `ASSIGNED → REJECTED`: назначенный исполнитель отказывается от задания; причина обязательна (`reject_task`).
+- `IN_PROGRESS → COMPLETED`: назначенный исполнитель завершает работу (`complete_task`) после проверки наличия требуемого результата.
+- `COMPLETED → UNDER_REVIEW`: исполнитель отправляет результат руководителю (`submit_for_review`).
+- `UNDER_REVIEW → CLOSED`: руководитель закрывает задание после проверки результата (`close_task`).
+- `UNDER_REVIEW → IN_PROGRESS`: руководитель возвращает задание на доработку (`return_for_revision`).
+
+Назначение, принятие, завершение, отказ, отправка на согласование, закрытие и возврат должны фиксироваться в истории задания существующим механизмом истории. Не вводить параллельную историю или дублирующие сущности без отдельного решения.
+
+### 17.4. Дедлайны
+
+Текущая реализация `TaskService` задаёт срок выполнения по умолчанию на 7 дней и срок принятия назначения на 1 день. Не менять эти значения и семантику без отдельного доменного решения.
+
+### 17.5. Проверка результата
+
+`complete_task()` валидирует наличие результата в зависимости от типа задания. Существующие проверки включают:
+
+- OTD — связанная `OTDVersion`;
+- SCHEMES — связанная `SchemaRecord` и обязательные документы/файлы по действующим правилам;
+- SETTINGS — связанная `SettingsRecord`;
+- MAINTENANCE — связанная `TORecord`, совпадение типа ТО с заданием и соблюдение правил обязательности протокола;
+- PROGRAM — связанная `Program`;
+- INSTRUCTION — соответствующая проверка уже существует в коде, но доменный статус самого типа `INSTRUCTION` требует отдельного решения.
+
+Не ослаблять эти проверки ради добавления HTTP-кнопки. Если результата ещё нет, route должен отобразить понятную ошибку сервиса, а не обходить валидацию.
+
+### 17.6. HTTP/UI: текущее состояние и следующий этап
+
+В коде уже существуют список и карточка задания, создание с назначением, а также HTTP/UI для:
+
+```text
+submit-for-review
+close
+return-for-revision
+```
+
+Сервисные методы `accept_task`, `complete_task`, `reject_task` существуют, но на контрольной точке 2026-10-08 HTTP/UI для этих действий ещё отсутствовал. Следующий этап — добавить:
+
+```text
+POST /tasks/{task_id}/accept
+POST /tasks/{task_id}/complete
+POST /tasks/{task_id}/reject
+```
+
+Ожидаемые действия интерфейса:
+
+- `ASSIGNED` + назначенный исполнитель: принять / отказаться;
+- `IN_PROGRESS` + назначенный исполнитель: завершить;
+- `COMPLETED` + назначенный исполнитель: отправить на согласование;
+- `UNDER_REVIEW` + руководитель, имеющий право review: закрыть / вернуть на доработку.
+
+Причина отказа обязательна. Обычные POST используют redirect на карточку; HTMX возвращает обновлённый фрагмент. Доступ к URZA проверяется единообразно через существующий механизм, а окончательная проверка роли, назначения и статуса остаётся в application service.
+
+Это UI-расширение не требует новых сущностей, полей или миграций само по себе.
+
+### 17.7. Связь задания с результатом
+
+Увязка Task с результатами реализована не полностью. На контрольной точке:
+
+- Schemes и Maintenance write-flow принимают `task_id`;
+- Settings, Programs и URZA Instruction write-flow ещё не завершены для сценария создания результата из задания;
+- у OTD отсутствует полноценный write/create path в этом потоке.
+
+Не считать полный task-result workflow готовым, пока каждый утверждённый тип задания не имеет корректного пути создания/привязки результата и регрессионных тестов. Не добавлять новые поля связи, пока не исследованы существующие модели и не подтверждена необходимость доменным решением.
+
+### 17.8. Правила изменения Tasks
+
+- Не помещать workflow-валидацию в routes или Jinja.
+- Не дублировать проверки `TaskService` в presentation layer.
+- `get_available_actions()` должен учитывать состояние, назначенного исполнителя и доступ к review; UI не должен показывать действия пользователю, который не может их выполнить.
+- Routes обязаны проверять доступ пользователя к URZA через существующий механизм.
+- Изменения покрывать unit- и HTTP-тестами, включая action visibility, ошибки, передачу причины отказа, HTMX и OpenAPI.
 
 ## 18. Inspections / Осмотры
 
@@ -686,61 +768,42 @@ SAP/ASUREO не делать глобально уникальными без о
 
 ## 25. Текущий статус
 
-Завершено:
+Контрольная точка feature-ветки `feature/document-results-workflow`, HEAD `6215205` (`feat: complete maintenance write workflow`, 2026-10-08): локально проходило 791 тест. Это результат на указанной контрольной точке; после новых изменений тесты необходимо запускать повторно.
+
+Завершено или реализовано на этой контрольной точке:
 
 ```text
 Authentication
 AccessService
-Enterprise
-Substation
-Connection
-URZA
-Tree
-Sidebar
-Substation card
-Connection card
-URZA card
-OTD
-OTD versioning
-OTD history
-Settings
-Schemes
-Maintenance
-Programs
-URZA Instruction
-URZA Instruction versioning
+Enterprise / Substation / Connection / URZA read flows
+Tree / Sidebar
+OTD read/versioning/history
+Settings read/write workflow
+Schemes read/write workflow
+Maintenance write workflow (including task_id)
+Programs read/write workflow
+URZA Instruction read/versioning/write workflow
 Universal audit
 FileOwnerResolver
 FileAccessService
 Secure file view/download
-Substation read-only tabs
-RZA Instruction history
+Task service transitions/history/permissions/result validation
+Task list/detail UI
+Task create + assign UI
+Task manager review/close/return HTTP/UI
 ```
 
-Все шесть вкладок URZA реализованы:
+Ограничения, которые нельзя считать закрытыми:
 
-```text
-ОТД
-Уставки
-Схемы
-ТО
-Программы
-Инструкция
-```
+- executor HTTP/UI для `accept`, `complete`, `reject`;
+- сквозная связь задания с результатом для Settings / Programs / Instruction / OTD;
+- единообразная очистка загруженных файлов при ошибке сохранения во всех write routes;
+- write/create flow ОТД;
+- generic archive UI для файлов;
+- восстановление и регрессионное покрытие навигационного дерева на `/tasks` и `/tasks/{task_id}`;
+- формальное доменное решение о `TaskWorkType.INSTRUCTION`.
 
-Карточки Substation / Connection / URZA прошли контрольный функциональный аудит.
-
-Принятое правило навигации:
-
-```text
-Holding → Branch → Production Department → Substation → Connection → URZA
-```
-
-Иерархическая навигация выполняется деревом. Не добавлять в карточку Substation вкладку со списком Connections и не добавлять в карточку Connection вкладку со списком URZA только ради дублирования дерева.
-
-В дереве стрелка раскрытия показывается только для узлов, имеющих дочерние объекты.
-
----
+Фактический статус следует перепроверять по коду и тестам перед каждым новым этапом; этот документ не заменяет проверку ветки.
 
 ## 26. Контрольный аудит — завершён
 
@@ -779,72 +842,57 @@ TECHNICAL DEBT
 
 ## 27. Актуальный roadmap
 
-Контрольный аудит завершён. Ниже — текущий рабочий порядок реализации с учётом уже выполненного функционала.
+Порядок ближайшей работы на основе контрольной точки 2026-10-08:
 
 ```text
-1. Закончить file write/UI
-   ├── upload
-   ├── привязка File к доменным сущностям
-   ├── file actions в document tabs
-   └── тесты write/access сценариев
+1. Tasks executor HTTP/UI
+   ├── POST accept
+   ├── POST complete
+   ├── POST reject (reason required)
+   ├── action visibility
+   └── HTTP / HTMX / OpenAPI regression tests
 
-2. Полноценный CRUD документов URZA
-   ├── ОТД
-   ├── Уставки
-   ├── Схемы
-   ├── ТО
-   ├── Программы
-   └── Инструкция
+2. Task → document result linking
+   ├── Settings
+   ├── Programs
+   ├── URZA Instruction (after domain decision where relevant)
+   └── OTD write/create path
 
-3. Tasks workflow через HTTP/UI
-   ├── список
-   ├── карточка
-   ├── назначение
-   ├── статусы
-   ├── review
-   └── результаты
+3. Write-route file cleanup
+   ├── failed Programs save
+   ├── failed URZA Instruction save
+   └── consistency tests for upload cleanup
 
-4. Inspection workflow через HTTP/UI
-   ├── создание/назначение
-   ├── исполнитель и сроки
-   ├── статусы
-   ├── результат
-   ├── документы
-   └── история
+4. Restore tree navigation in task pages
+   ├── /tasks
+   ├── /tasks/{task_id}
+   └── regression tests for Holding → Branch → Production Department → Substation → Connection → URZA
 
-5. Write-функциональность объектов
-   ├── Substation
-   ├── Connection
-   └── URZA
-
-6. Production S3
-
-7. Backup / Restore
-
-8. Cold S3 / архивирование
-
-9. Archive UI
-
-10. Search по дереву
-
-11. Notifications / automation
+5. Complete file write/UI and document CRUD where still partial
+6. Inspection workflow via HTTP/UI
+7. Write functionality for Substation / Connection / URZA
+8. Production S3
+9. Database + file backup/restore
+10. Cold S3 transfer and archive UI
+11. Search
+12. Notifications / automation
 ```
 
-Не откладывать основной функционал ради косметического UI-аудита.
-
----
+Не начинать следующий крупный этап до закрытия тестов текущего этапа. Не блокировать основной функционал косметическими UI-аудитами, кроме дефектов безопасности, целостности данных или навигации, мешающей рабочему сценарию.
 
 ## 28. Отложенные вопросы
 
 ### Исторические ТО
 
-Не изменять `historical_data` без отдельного решения.
-
-Исходный workflow требует отдельного процесса ввода исторических данных.
+Решение по модели принято: `historical_data` — boolean, записи остаются в `TORecord`, отдельная history table не создаётся. Отдельный UI/workflow ввода исторических ТО ещё может требовать реализации, но не является основанием менять модель.
 
 ### Уникальность dispatch_name
 
 Перед добавлением DB-ограничений необходимо отдельно зафиксировать области уникальности `dispatch_name` для Enterprise / Substation / Connection / URZA и проверить существующие данные.
+
+### TaskWorkType.INSTRUCTION
+
+В коде есть `TaskWorkType.INSTRUCTION` и UI выдачи таких заданий, но утверждённый список типов Tasks в этом документе пока включает только OTD, SETTINGS, SCHEMES, MAINTENANCE и PROGRAM. Требуется отдельное решение пользователя: включить INSTRUCTION в доменный контракт или оставить его вне утверждённого списка. До решения не менять код/БД по собственной инициативе.
 
 ### S3
 
