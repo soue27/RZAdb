@@ -701,6 +701,178 @@ async def _run_review_action(
     )
 
 
+
+async def _run_executor_action(
+    *,
+    request: Request,
+    task_id: UUID,
+    current_user: User,
+    repository: TaskRepository,
+    access_service: AccessService,
+    task_service: TaskService,
+    tree_service: TreeService,
+    action: str,
+    reason: str | None = None,
+):
+    task = await _get_accessible_task(
+        repository,
+        access_service,
+        current_user.id,
+        task_id,
+    )
+
+    try:
+        if action == "accept_task":
+            await task_service.accept_task(
+                task=task,
+                actor_id=current_user.id,
+            )
+        elif action == "complete_task":
+            await task_service.complete_task(
+                task=task,
+                actor_id=current_user.id,
+            )
+        elif action == "reject_task":
+            await task_service.reject_task(
+                task=task,
+                actor_id=current_user.id,
+                reason=reason or "",
+            )
+        else:
+            raise ValueError(f"Неизвестное действие: {action}")
+
+    except (PermissionError, ValueError) as exc:
+        history = await repository.get_history(task.id)
+        actions = await task_service.get_available_actions(
+            task=task,
+            actor_id=current_user.id,
+        )
+        tree = await tree_service.get_tree(
+            user_id=current_user.id,
+        )
+
+        is_htmx = request.headers.get("HX-Request") == "true"
+
+        return templates.TemplateResponse(
+            request=request,
+            name=(
+                "tasks/_detail_content.html"
+                if is_htmx
+                else "tasks/detail.html"
+            ),
+            context={
+                "current_user": current_user,
+                "tree": tree,
+                **_task_context(task, history, actions),
+                "error_message": str(exc),
+            },
+            status_code=(
+                200
+                if is_htmx
+                else (
+                    403
+                    if isinstance(exc, PermissionError)
+                    else 400
+                )
+            ),
+        )
+
+    if request.headers.get("HX-Request") == "true":
+        history = await repository.get_history(task.id)
+        actions = await task_service.get_available_actions(
+            task=task,
+            actor_id=current_user.id,
+        )
+        tree = await tree_service.get_tree(
+            user_id=current_user.id,
+        )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="tasks/_detail_content.html",
+            context={
+                "current_user": current_user,
+                "tree": tree,
+                **_task_context(task, history, actions),
+                "error_message": None,
+            },
+        )
+
+    return RedirectResponse(
+        url=f"/tasks/{task_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/{task_id}/accept")
+async def accept_task(
+    request: Request,
+    task_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    return await _run_executor_action(
+        request=request,
+        task_id=task_id,
+        current_user=current_user,
+        repository=repository,
+        access_service=access_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="accept_task",
+    )
+
+
+@router.post("/{task_id}/complete")
+async def complete_task(
+    request: Request,
+    task_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    return await _run_executor_action(
+        request=request,
+        task_id=task_id,
+        current_user=current_user,
+        repository=repository,
+        access_service=access_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="complete_task",
+    )
+
+
+@router.post("/{task_id}/reject")
+async def reject_task(
+    request: Request,
+    task_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    reason: Annotated[str, Form()],
+):
+    return await _run_executor_action(
+        request=request,
+        task_id=task_id,
+        current_user=current_user,
+        repository=repository,
+        access_service=access_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="reject_task",
+        reason=reason,
+    )
+
+
+
 @router.post("/{task_id}/submit-for-review")
 async def submit_task_for_review(
     request: Request,

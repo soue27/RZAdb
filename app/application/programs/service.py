@@ -1,11 +1,20 @@
+
 from uuid import UUID
 
 from app.application.access.service import AccessService
 from app.application.programs.repository import ProgramRepository
+from app.application.tasks.repository import TaskRepository
 from app.application.users.repository import UserRepository
 from app.application.urzas.repository import URZARepository
-from app.domain.enums import DocumentStatus, ProgramType, UserRole
+from app.domain.enums import (
+    DocumentStatus,
+    ProgramType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
 from app.domain.program import Program
+
 
 
 class ProgramService:
@@ -15,11 +24,13 @@ class ProgramService:
             access_service: AccessService,
             user_repository: UserRepository,
             urza_repository: URZARepository,
+            task_repository: TaskRepository,
     ) -> None:
         self.repository = repository
         self.access_service = access_service
         self.user_repository = user_repository
         self.urza_repository = urza_repository
+        self.task_repository = task_repository
 
     async def _check_manager_reviewer(
             self,
@@ -137,6 +148,66 @@ class ProgramService:
             task_id,
         )
 
+
+    async def _validate_task_for_result(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+        task_id: UUID,
+    ):
+        """Проверяет, можно ли создать программу по указанной задаче."""
+        task = await self.task_repository.get_by_id(task_id)
+
+        if task is None or task.deleted_at is not None:
+            raise ValueError("Активная задача не найдена.")
+
+        if task.work_type is not TaskWorkType.PROGRAM:
+            raise ValueError(
+                "Задача не предназначена для создания программы."
+            )
+
+        if task.urza_id != urza_id:
+            raise ValueError("Задача относится к другому устройству РЗА.")
+
+        if task.assigned_to != user_id:
+            raise PermissionError(
+                "Создать результат может только назначенный исполнитель задачи."
+            )
+
+        if task.status is not TaskStatus.IN_PROGRESS:
+            raise ValueError(
+                "Создавать результат можно только по задаче в работе."
+            )
+
+        existing_program = await self.repository.get_by_task_id(task_id)
+
+        if existing_program is not None:
+            raise ValueError("Для задачи уже существует программа.")
+
+        return task
+
+    async def validate_task_for_result(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+        task_id: UUID,
+    ):
+        """Проверяет доступ пользователя и допустимость создания результата."""
+        if not await self.access_service.can_access_urza(
+            user_id,
+            urza_id,
+        ):
+            raise PermissionError(
+                "Нет доступа к устройству РЗА."
+            )
+
+        return await self._validate_task_for_result(
+            user_id=user_id,
+            urza_id=urza_id,
+            task_id=task_id,
+        )
+
+
     async def create(
         self,
         user_id: UUID,
@@ -153,6 +224,13 @@ class ProgramService:
         ):
             raise PermissionError("Доступ к URZA запрещён")
         user = await self.user_repository.get_by_id(user_id)
+
+        if task_id is not None:
+            await self._validate_task_for_result(
+                user_id=user_id,
+                urza_id=urza_id,
+                task_id=task_id,
+            )
 
         if user is None:
             raise ValueError("Пользователь не найден.")
@@ -185,6 +263,8 @@ class ProgramService:
         await self.repository.add(program)
 
         return program
+
+
 
     async def submit_for_review(
         self,

@@ -31,30 +31,48 @@ class TaskService:
         self.urza_instruction_repository = urza_instruction_repository
 
     async def get_available_actions(
-        self,
-        *,
-        task: Task,
-        actor_id: UUID,
+            self,
+            *,
+            task: Task,
+            actor_id: UUID,
     ) -> set[str]:
-        """Returns review actions the current actor can perform on a task."""
+        """Возвращает доступные действия с учётом статуса и прав пользователя."""
         if task.deleted_at is not None:
             return set()
 
-        if task.status not in {
-            TaskStatus.COMPLETED,
-            TaskStatus.UNDER_REVIEW,
-        }:
+        if task.status is TaskStatus.ASSIGNED:
+            if task.assigned_to == actor_id:
+                return {"accept_task", "reject_task"}
+            return set()
+
+        if task.status is TaskStatus.IN_PROGRESS:
+            if task.assigned_to == actor_id:
+                actions = {"complete_task"}
+
+                if getattr(task, "work_type", None) is TaskWorkType.PROGRAM:
+                    actions.add("create_result")
+
+                return actions
+
             return set()
 
         if task.status is TaskStatus.COMPLETED:
-            return {"submit_for_review"} if task.assigned_to == actor_id else set()
-
-        try:
-            await self._check_reviewer_access(task=task, actor_id=actor_id)
-        except (PermissionError, ValueError):
+            if task.assigned_to == actor_id:
+                return {"submit_for_review"}
             return set()
 
-        return {"close_task", "return_for_revision"}
+        if task.status is TaskStatus.UNDER_REVIEW:
+            try:
+                await self._check_reviewer_access(
+                    task=task,
+                    actor_id=actor_id,
+                )
+            except (PermissionError, ValueError):
+                return set()
+
+            return {"close_task", "return_for_revision"}
+
+        return set()
 
     async def _check_reviewer_access(
         self,

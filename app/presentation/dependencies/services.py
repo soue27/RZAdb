@@ -264,6 +264,7 @@ def get_task_service(
     )
 
 
+
 def get_program_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
@@ -273,7 +274,9 @@ def get_program_service(
         access_service=access_service,
         user_repository=UserRepository(session),
         urza_repository=URZARepository(session),
+        task_repository=TaskRepository(session),
     )
+
 
 
 def get_urza_instruction_service(

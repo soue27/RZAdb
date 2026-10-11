@@ -16,12 +16,15 @@
         </button>
     </div>
 
-    <form
-        method="post"
-        enctype="multipart/form-data"
-        hx-post="/objects/urza/{{ urza_id }}/programs"
-        hx-target="#urza-tab-content"
-    >
+    <form method="post"
+      action="/objects/urza/{{ urza_id }}/programs"
+      enctype="multipart/form-data"
+      hx-post="/objects/urza/{{ urza_id }}/programs"
+      hx-target="#urza-tab-content"
+      hx-swap="outerHTML">
+        {% if task_id %}
+            <input type="hidden" name="task_id" value="{{ task_id }}">
+        {% endif %}
         <div class="mb-3">
             <label class="form-label" for="program-type">
                 Тип программы

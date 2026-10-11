@@ -5,6 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi import Form, UploadFile
 from fastapi.templating import Jinja2Templates
 from fastapi import File as FastAPIFile
+from fastapi.responses import RedirectResponse
+
+from app.application.tree.service import TreeService
 
 from app.application.files.service import FileService
 from app.application.objects.exceptions import (
@@ -22,6 +25,7 @@ from app.presentation.dependencies.services import (
     get_object_service,
     get_program_service,
     get_task_service,
+    get_tree_service
 )
 
 router = APIRouter(
@@ -40,6 +44,7 @@ async def _render_urza_programs(
     current_user: User,
     program_service: ProgramService,
     task_service: TaskService,
+    tree_service: TreeService,
 ):
     programs = await program_service.get_by_urza(
         user_id=current_user.id,
@@ -59,14 +64,30 @@ async def _render_urza_programs(
         urza_id=urza_id,
     )
 
+    context = {
+        "urza_id": urza_id,
+        "programs": programs,
+        "program_actions": program_actions,
+        "can_issue_task": can_issue_task,
+    }
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/urza_programs.html",
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+
     return templates.TemplateResponse(
         request=request,
-        name="objects/urza_programs.html",
+        name="objects/urza_programs_page.html",
         context={
-            "urza_id": urza_id,
-            "programs": programs,
-            "program_actions": program_actions,
-            "can_issue_task": can_issue_task,
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "content_template": "objects/urza_programs.html",
         },
     )
 
@@ -84,6 +105,10 @@ async def get_urza_programs(
     task_service: Annotated[
         TaskService,
         Depends(get_task_service),
+    ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
     ],
 ):
     try:
@@ -109,7 +134,9 @@ async def get_urza_programs(
         current_user=current_user,
         program_service=program_service,
         task_service=task_service,
+        tree_service=tree_service,
     )
+
 
 
 @router.get("/urza/{urza_id}/programs/new")
@@ -118,6 +145,15 @@ async def get_new_urza_program_form(
     urza_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
+    program_service: Annotated[
+        ProgramService,
+        Depends(get_program_service),
+    ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
+    task_id: UUID | None = None,
 ):
     try:
         await object_service.get_object(
@@ -136,14 +172,50 @@ async def get_new_urza_program_form(
             detail="Объект не найден.",
         ) from exc
 
+    if task_id is not None:
+        try:
+            await program_service.validate_task_for_result(
+                user_id=current_user.id,
+                urza_id=urza_id,
+                task_id=task_id,
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(exc),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
+    context = {
+        "urza_id": urza_id,
+        "program_types": list(ProgramType),
+        "task_id": task_id,
+    }
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/urza_program_form.html",
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+
     return templates.TemplateResponse(
         request=request,
-        name="objects/urza_program_form.html",
+        name="objects/urza_programs_page.html",
         context={
-            "urza_id": urza_id,
-            "program_types": list(ProgramType),
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "content_template": "objects/urza_program_form.html",
         },
     )
+
 
 
 @router.post("/urza/{urza_id}/programs")
@@ -167,11 +239,18 @@ async def create_urza_program(
         TaskService,
         Depends(get_task_service),
     ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
+    task_id: Annotated[UUID | None, Form()] = None,
     editable_file: Annotated[
         UploadFile | None,
         FastAPIFile(),
     ] = None,
 ):
+
+
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -183,11 +262,24 @@ async def create_urza_program(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Доступ к объекту запрещён.",
         ) from exc
-    except ObjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Объект не найден.",
-        ) from exc
+
+    if task_id is not None:
+        try:
+            await program_service.validate_task_for_result(
+                user_id=current_user.id,
+                urza_id=urza_id,
+                task_id=task_id,
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(exc),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
     scan_content = await scan_file.read()
 
@@ -231,7 +323,14 @@ async def create_urza_program(
         program_number=program_number,
         scan_file_id=saved_scan.id,
         editable_file_id=editable_file_id,
+        task_id=task_id,
     )
+
+    if request.headers.get("HX-Request") != "true":
+        return RedirectResponse(
+            url=f"/objects/urza/{urza_id}/programs",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
     return await _render_urza_programs(
         request=request,
@@ -239,6 +338,7 @@ async def create_urza_program(
         current_user=current_user,
         program_service=program_service,
         task_service=task_service,
+        tree_service=tree_service,
     )
 
 
@@ -256,6 +356,11 @@ async def submit_urza_program(
         TaskService,
         Depends(get_task_service),
     ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
+
 
 ):
     try:
@@ -281,6 +386,7 @@ async def submit_urza_program(
         current_user=current_user,
         program_service=program_service,
         task_service=task_service,
+        tree_service=tree_service,
     )
 
 
@@ -298,6 +404,11 @@ async def approve_urza_program(
         TaskService,
         Depends(get_task_service),
     ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
+
 ):
     try:
         await program_service.approve(
@@ -322,6 +433,7 @@ async def approve_urza_program(
         current_user=current_user,
         program_service=program_service,
         task_service=task_service,
+        tree_service=tree_service,
     )
 
 
@@ -339,6 +451,11 @@ async def return_urza_program(
         TaskService,
         Depends(get_task_service),
     ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
+
 ):
     try:
         await program_service.return_to_draft(
@@ -363,4 +480,5 @@ async def return_urza_program(
         current_user=current_user,
         program_service=program_service,
         task_service=task_service,
+        tree_service=tree_service,
     )

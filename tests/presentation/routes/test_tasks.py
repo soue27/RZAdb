@@ -13,6 +13,7 @@ from app.presentation.dependencies.services import (
     get_access_service,
     get_task_repository,
     get_task_service,
+    get_tree_service,
 )
 
 
@@ -57,6 +58,30 @@ class FakeTaskRepository:
 
     async def get_history(self, task_id):
         return self.history.get(task_id, [])
+
+
+class FakeTreeService:
+    async def get_tree(self, *, user_id):
+        urza = SimpleNamespace(id=uuid7(), dispatch_name="УРЗА из дерева")
+        connection = SimpleNamespace(
+            id=uuid7(),
+            dispatch_name="Присоединение",
+            urzas=[urza],
+        )
+        substation = SimpleNamespace(
+            id=uuid7(),
+            dispatch_name="Подстанция",
+            connections=[connection],
+        )
+        return [
+            SimpleNamespace(
+                id=uuid7(),
+                type="holding",
+                full_name="Холдинг",
+                children=[],
+                substations=[substation],
+            )
+        ]
 
 
 class FakeAccessService:
@@ -117,18 +142,48 @@ class FakeTaskService:
     async def get_available_actions(self, *, task, actor_id):
         return self.actions.get(task.id, set())
 
-    async def _run(self, name, *, task, actor_id, comment=None):
+
+    async def _run(
+        self,
+        name,
+        *,
+        task,
+        actor_id,
+        comment=None,
+    ):
         self.calls.append((name, task.id, actor_id, comment))
         error = self.errors.get(name)
         if error:
             raise error
-        if name == "submit_for_review":
+
+        if name == "accept_task":
+            task.status = TaskStatus.IN_PROGRESS
+        elif name == "reject_task":
+            task.status = TaskStatus.REJECTED
+        elif name == "complete_task":
+            task.status = TaskStatus.COMPLETED
+        elif name == "submit_for_review":
             task.status = TaskStatus.UNDER_REVIEW
         elif name == "close_task":
             task.status = TaskStatus.CLOSED
-        else:
+        elif name == "return_for_revision":
             task.status = TaskStatus.IN_PROGRESS
+
         return task
+
+    async def accept_task(self, **kwargs):
+        return await self._run("accept_task", **kwargs)
+
+    async def reject_task(self, *, task, actor_id, reason):
+        return await self._run(
+            "reject_task",
+            task=task,
+            actor_id=actor_id,
+            comment=reason,
+        )
+
+    async def complete_task(self, **kwargs):
+        return await self._run("complete_task", **kwargs)
 
     async def submit_for_review(self, **kwargs):
         return await self._run("submit_for_review", **kwargs)
@@ -140,11 +195,13 @@ class FakeTaskService:
         return await self._run("return_for_revision", **kwargs)
 
 
+
 def _client(user, repository, access_service, task_service):
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_task_repository] = lambda: repository
     app.dependency_overrides[get_access_service] = lambda: access_service
     app.dependency_overrides[get_task_service] = lambda: task_service
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
     return TestClient(app)
 
 
@@ -167,6 +224,9 @@ def test_task_routes_are_registered_in_openapi():
     assert "post" in paths["/tasks/{task_id}/submit-for-review"]
     assert "post" in paths["/tasks/{task_id}/close"]
     assert "post" in paths["/tasks/{task_id}/return-for-revision"]
+    assert "post" in paths["/tasks/{task_id}/accept"]
+    assert "post" in paths["/tasks/{task_id}/reject"]
+    assert "post" in paths["/tasks/{task_id}/complete"]
 
 
 def test_task_create_form_shows_urza_work_type_and_available_engineers(
@@ -348,6 +408,9 @@ def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
     assert "Выполнено" in response.text
     assert response.text.count("Проверить схему") == 1
     assert "Отправить на согласование" in response.text
+    assert 'id="object-content"' in response.text
+    assert 'hx-target="#object-content"' in response.text
+    assert "УРЗА из дерева" in response.text
 
 
 def test_task_detail_displays_history_and_review_actions(system_user_id):
@@ -376,6 +439,9 @@ def test_task_detail_displays_history_and_review_actions(system_user_id):
     assert "Проверьте, пожалуйста" in response.text
     assert "Закрыть" in response.text
     assert "Вернуть на доработку" in response.text
+    assert 'id="object-content"' in response.text
+    assert 'hx-target="#object-content"' in response.text
+    assert "УРЗА из дерева" in response.text
 
 
 def test_task_detail_denies_user_without_urza_access(system_user_id):
@@ -441,6 +507,83 @@ def test_task_post_actions_call_application_methods(
     assert response.headers["location"] == f"/tasks/{task.id}"
     assert task.status is new_status
     assert service.calls == [(method_name, task.id, user.id, "Проверено")]
+
+
+
+@pytest.mark.parametrize(
+    ("path", "method_name", "initial_status", "new_status"),
+    [
+        (
+            "accept",
+            "accept_task",
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+        ),
+        (
+            "complete",
+            "complete_task",
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.COMPLETED,
+        ),
+    ],
+)
+def test_task_executor_post_actions_call_application_methods(
+    system_user_id,
+    path,
+    method_name,
+    initial_status,
+    new_status,
+):
+    user = _user(system_user_id, UserRole.ENGINEER)
+    task = _task(user.id, initial_status)
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService()
+
+    with _client(
+        user,
+        repository,
+        FakeAccessService(),
+        service,
+    ) as client:
+        response = client.post(
+            f"/tasks/{task.id}/{path}",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/tasks/{task.id}"
+    assert task.status is new_status
+    assert service.calls == [
+        (method_name, task.id, user.id, None),
+    ]
+
+
+def test_task_executor_can_reject_task_with_reason(system_user_id):
+    user = _user(system_user_id, UserRole.ENGINEER)
+    task = _task(user.id, TaskStatus.ASSIGNED)
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService()
+    reason = "Нет необходимого допуска для выполнения работы"
+
+    with _client(
+        user,
+        repository,
+        FakeAccessService(),
+        service,
+    ) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reject",
+            data={"reason": reason},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/tasks/{task.id}"
+    assert task.status is TaskStatus.REJECTED
+    assert service.calls == [
+        ("reject_task", task.id, user.id, reason),
+    ]
+
 
 
 @pytest.mark.parametrize(

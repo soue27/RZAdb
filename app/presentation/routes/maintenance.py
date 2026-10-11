@@ -14,6 +14,7 @@ from fastapi import (
     status,
 )
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 
 from app.application.files.service import FileService
 from app.application.maintenance.service import TORecordService
@@ -23,6 +24,7 @@ from app.application.objects.exceptions import (
 )
 from app.application.objects.service import ObjectService
 from app.application.tasks.service import TaskService
+from app.application.tree.service import TreeService
 from app.domain.enums import MaintenanceType
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -31,6 +33,7 @@ from app.presentation.dependencies.services import (
     get_maintenance_service,
     get_object_service,
     get_task_service,
+    get_tree_service,
 )
 
 
@@ -41,6 +44,42 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="app/presentation/templates")
+
+
+async def _render_maintenance_template(
+    *,
+    request: Request,
+    template_name: str,
+    context: dict,
+    current_user: User,
+    tree_service: TreeService,
+    status_code: int = status.HTTP_200_OK,
+):
+    is_htmx = request.headers.get("HX-Request") == "true"
+    if is_htmx:
+        return templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context=context,
+            status_code=(
+                status.HTTP_200_OK
+                if status_code >= status.HTTP_400_BAD_REQUEST
+                else status_code
+            ),
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/urza_maintenance_page.html",
+        context={
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "content_template": template_name,
+        },
+        status_code=status_code,
+    )
 
 
 async def _archive_uploaded_files(
@@ -75,6 +114,10 @@ async def get_urza_maintenance(
         TaskService,
         Depends(get_task_service),
     ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
+    ],
 ):
     try:
         await object_service.get_object(
@@ -103,14 +146,16 @@ async def get_urza_maintenance(
         urza_id=urza_id,
     )
 
-    return templates.TemplateResponse(
+    return await _render_maintenance_template(
         request=request,
-        name="objects/urza_maintenance.html",
+        template_name="objects/urza_maintenance.html",
         context={
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
             "urza_id": urza_id,
         },
+        current_user=current_user,
+        tree_service=tree_service,
     )
 
 
@@ -122,6 +167,10 @@ async def get_new_urza_maintenance_form(
     object_service: Annotated[
         ObjectService,
         Depends(get_object_service),
+    ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
     ],
     task_id: UUID | None = None,
 ):
@@ -142,9 +191,9 @@ async def get_new_urza_maintenance_form(
             detail="Объект не найден.",
         ) from exc
 
-    return templates.TemplateResponse(
+    return await _render_maintenance_template(
         request=request,
-        name="objects/urza_maintenance_form.html",
+        template_name="objects/urza_maintenance_form.html",
         context={
             "urza_id": urza_id,
             "maintenance_types": list(MaintenanceType),
@@ -152,6 +201,8 @@ async def get_new_urza_maintenance_form(
             "task_id": task_id,
             "error_message": None,
         },
+        current_user=current_user,
+        tree_service=tree_service,
     )
 
 
@@ -179,6 +230,10 @@ async def create_urza_maintenance(
     task_service: Annotated[
         TaskService,
         Depends(get_task_service),
+    ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
     ],
     historical_data: Annotated[bool, Form()] = False,
     signed_form_file: Annotated[
@@ -221,9 +276,9 @@ async def create_urza_maintenance(
     }
 
     if signed_form_file is None or not signed_form_file.filename:
-        return templates.TemplateResponse(
+        return await _render_maintenance_template(
             request=request,
-            name="objects/urza_maintenance_form.html",
+            template_name="objects/urza_maintenance_form.html",
             context={
                 "urza_id": urza_id,
                 "maintenance_types": list(MaintenanceType),
@@ -231,6 +286,8 @@ async def create_urza_maintenance(
                 "task_id": task_id,
                 "error_message": "Загрузите подписанную форму ТО.",
             },
+            current_user=current_user,
+            tree_service=tree_service,
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
@@ -332,9 +389,9 @@ async def create_urza_maintenance(
             current_user.id,
         )
 
-        return templates.TemplateResponse(
+        return await _render_maintenance_template(
             request=request,
-            name="objects/urza_maintenance_form.html",
+            template_name="objects/urza_maintenance_form.html",
             context={
                 "urza_id": urza_id,
                 "maintenance_types": list(MaintenanceType),
@@ -342,6 +399,8 @@ async def create_urza_maintenance(
                 "task_id": task_id,
                 "error_message": str(exc),
             },
+            current_user=current_user,
+            tree_service=tree_service,
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
@@ -352,9 +411,9 @@ async def create_urza_maintenance(
             current_user.id,
         )
 
-        return templates.TemplateResponse(
+        return await _render_maintenance_template(
             request=request,
-            name="objects/urza_maintenance_form.html",
+            template_name="objects/urza_maintenance_form.html",
             context={
                 "urza_id": urza_id,
                 "maintenance_types": list(MaintenanceType),
@@ -362,6 +421,8 @@ async def create_urza_maintenance(
                 "task_id": task_id,
                 "error_message": str(exc),
             },
+            current_user=current_user,
+            tree_service=tree_service,
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -377,9 +438,9 @@ async def create_urza_maintenance(
             urza_id,
         )
 
-        return templates.TemplateResponse(
+        return await _render_maintenance_template(
             request=request,
-            name="objects/urza_maintenance_form.html",
+            template_name="objects/urza_maintenance_form.html",
             context={
                 "urza_id": urza_id,
                 "maintenance_types": list(MaintenanceType),
@@ -389,7 +450,15 @@ async def create_urza_maintenance(
                     "Не удалось сохранить запись технического обслуживания."
                 ),
             },
+            current_user=current_user,
+            tree_service=tree_service,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    if request.headers.get("HX-Request") != "true":
+        return RedirectResponse(
+            url=f"/objects/urza/{urza_id}/maintenance",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
 
     maintenance_records = await maintenance_service.get_by_urza(
@@ -402,12 +471,14 @@ async def create_urza_maintenance(
         urza_id=urza_id,
     )
 
-    return templates.TemplateResponse(
+    return await _render_maintenance_template(
         request=request,
-        name="objects/urza_maintenance.html",
+        template_name="objects/urza_maintenance.html",
         context={
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
             "urza_id": urza_id,
         },
+        current_user=current_user,
+        tree_service=tree_service,
     )

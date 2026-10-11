@@ -416,7 +416,10 @@ async def test_available_actions_match_task_state_and_reviewer_access(
     access_service: FakeAccessService,
 ) -> None:
     manager_id = uuid7()
+    executor_id = uuid7()
+    other_user_id = uuid7()
     urza_id = uuid7()
+
     manager = SimpleNamespace(
         id=manager_id,
         active=True,
@@ -426,28 +429,75 @@ async def test_available_actions_match_task_state_and_reviewer_access(
     access_service.user_repository.users[manager_id] = manager
     access_service.access[(manager_id, urza_id)] = True
 
-    completed = SimpleNamespace(
-        id=uuid7(), urza_id=urza_id, assigned_to=manager_id,
-        status=TaskStatus.COMPLETED, deleted_at=None
+    # Исполнитель может принять назначенное ему задание
+    # или отказаться от него с указанием причины.
+    assigned = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        assigned_to=executor_id,
+        status=TaskStatus.ASSIGNED,
+        deleted_at=None,
     )
-    under_review = SimpleNamespace(
-        id=uuid7(), urza_id=urza_id, status=TaskStatus.UNDER_REVIEW, deleted_at=None
-    )
+
+    # Исполнитель может завершить работу по своему заданию.
     in_progress = SimpleNamespace(
-        id=uuid7(), urza_id=urza_id, status=TaskStatus.IN_PROGRESS, deleted_at=None
+        id=uuid7(),
+        urza_id=urza_id,
+        assigned_to=executor_id,
+        status=TaskStatus.IN_PROGRESS,
+        deleted_at=None,
+    )
+
+    # Исполнитель может передать завершённое задание на проверку.
+    completed = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        assigned_to=executor_id,
+        status=TaskStatus.COMPLETED,
+        deleted_at=None,
+    )
+
+    # Руководитель с доступом к объекту может проверить задание.
+    under_review = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        assigned_to=executor_id,
+        status=TaskStatus.UNDER_REVIEW,
+        deleted_at=None,
+    )
+
+    # Чужое назначенное задание недоступно исполнителю.
+    assigned_to_other = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        assigned_to=other_user_id,
+        status=TaskStatus.ASSIGNED,
+        deleted_at=None,
     )
 
     assert await service.get_available_actions(
+        task=assigned,
+        actor_id=executor_id,
+    ) == {"accept_task", "reject_task"}
+
+    assert await service.get_available_actions(
+        task=in_progress,
+        actor_id=executor_id,
+    ) == {"complete_task"}
+
+    assert await service.get_available_actions(
         task=completed,
-        actor_id=manager_id,
+        actor_id=executor_id,
     ) == {"submit_for_review"}
+
     assert await service.get_available_actions(
         task=under_review,
         actor_id=manager_id,
     ) == {"close_task", "return_for_revision"}
+
     assert await service.get_available_actions(
-        task=in_progress,
-        actor_id=manager_id,
+        task=assigned_to_other,
+        actor_id=executor_id,
     ) == set()
 
 

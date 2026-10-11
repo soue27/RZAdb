@@ -31,6 +31,10 @@
     <form
         method="post"
         action="/objects/urza/{{ urza_id }}/maintenance"
+        hx-post="/objects/urza/{{ urza_id }}/maintenance"
+        hx-target="#urza-tab-content"
+        hx-swap="outerHTML"
+        hx-encoding="multipart/form-data"
         enctype="multipart/form-data"
     >
 

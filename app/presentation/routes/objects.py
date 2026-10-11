@@ -24,6 +24,7 @@ from app.application.selectivity_schemes.service import (
 from app.application.settings.service import SettingsService
 from app.application.substations.service import SubstationService
 from app.application.urzas.service import URZAService
+from app.application.tree.service import TreeService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.application.tasks.service import TaskService
@@ -38,6 +39,7 @@ from app.presentation.dependencies.services import (
     get_urza_service,
     get_settings_service,
     get_task_service,
+    get_tree_service,
 )
 
 router = APIRouter(
@@ -80,6 +82,10 @@ async def get_object(
     task_service: Annotated[
         TaskService,
         Depends(get_task_service),
+    ],
+    tree_service: Annotated[
+        TreeService,
+        Depends(get_tree_service),
     ],
     otd_version: UUID | None = Query(default=None),
     tab: str | None = Query(default=None),
@@ -136,17 +142,30 @@ async def get_object(
                 urza_id=object_id,
             )
 
+            context = {
+                "urza": urza,
+                "otd": otd,
+                "settings_form": settings_form,
+                "settings_records": settings_records,
+                "current_user": current_user,
+                "active_tab": tab,
+                "can_issue_task": can_issue_task,
+            }
+
+            if request.headers.get("HX-Request") == "true":
+                return templates.TemplateResponse(
+                    request=request,
+                    name="objects/urza.html",
+                    context=context,
+                )
+
+            tree = await tree_service.get_tree(user_id=current_user.id)
             return templates.TemplateResponse(
                 request=request,
-                name="objects/urza.html",
+                name="objects/urza_page.html",
                 context={
-                    "urza": urza,
-                    "otd": otd,
-                    "settings_form": settings_form,
-                    "settings_records": settings_records,
-                    "current_user": current_user,
-                    "active_tab": tab,
-                    "can_issue_task": can_issue_task,
+                    **context,
+                    "tree": tree,
                 },
             )
 

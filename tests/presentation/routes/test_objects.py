@@ -42,6 +42,9 @@ from app.presentation.dependencies.services import (
     get_file_service,
     get_urza_instruction_service,
     get_task_service,
+    get_otd_service,
+    get_tree_service,
+    get_urza_service,
 )
 
 
@@ -58,6 +61,28 @@ class FakeSubstationService:
             longitude=Decimal("60.605700"),
             operational_current_type=OperationalCurrentType.PERMANENT,
         )
+
+
+class FakeURZAService:
+    def __init__(self, details):
+        self.details = details
+
+    async def get_details(self, urza_id):
+        return self.details
+
+
+class FakeOTDService:
+    async def get_details(self, *, user_id, urza_id, version_id=None):
+        return SimpleNamespace(
+            current_version=None,
+            selected_version=None,
+            versions=[],
+        )
+
+
+class FakeTreeService:
+    async def get_tree(self, *, user_id):
+        return []
 
 
 class FakeConnectionService:
@@ -266,7 +291,9 @@ class FakeProgramService:
             program_number: str,
             scan_file_id: UUID,
             editable_file_id: UUID | None = None,
+            task_id: UUID | None = None,
     ):
+
         program = Program(
             id=uuid7(),
             urza_id=urza_id,
@@ -275,6 +302,7 @@ class FakeProgramService:
             status=DocumentStatus.DRAFT,
             scan_file_id=scan_file_id,
             editable_file_id=editable_file_id,
+            task_id=task_id,
             created_by=user_id,
             updated_by=user_id,
             created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
@@ -640,6 +668,62 @@ def test_get_object_requires_authentication() -> None:
 
     app.dependency_overrides.clear()
 
+
+@pytest.mark.parametrize("headers", [{}, {"HX-Request": "true"}])
+def test_urza_route_returns_full_page_or_htmx_fragment(
+    system_user_id,
+    headers,
+):
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    urza = SimpleNamespace(
+        id=urza_id,
+        dispatch_name="УРЗА тестовая",
+        substation=SimpleNamespace(dispatch_name="ПС тестовая"),
+        connection=SimpleNamespace(dispatch_name="ВЛ тестовая"),
+        element_base=SimpleNamespace(label="Микропроцессорная"),
+        complexity=False,
+        category=SimpleNamespace(value="III"),
+        rdu_subordination=False,
+        status=SimpleNamespace(badge_class="text-bg-success", label="В работе"),
+        inventory_number=None,
+        commissioning_date=date(2020, 1, 1),
+        room_category=SimpleNamespace(value="I"),
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА тестовая",
+            )
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: FakeURZAService(urza)
+    app.dependency_overrides[get_otd_service] = lambda: FakeOTDService()
+    app.dependency_overrides[get_settings_service] = lambda: FakeSettingsService()
+    app.dependency_overrides[get_task_service] = lambda: FakeTaskService()
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        assert "УРЗА тестовая" in response.text
+        if headers:
+            assert "<!doctype html>" not in response.text.lower()
+            assert 'id="object-content"' not in response.text
+            assert 'id="urza-tab-content"' in response.text
+        else:
+            assert "<!doctype html>" in response.text.lower()
+            assert 'id="app-sidebar"' in response.text
+            assert 'id="object-content"' in response.text
+    finally:
+        app.dependency_overrides.clear()
 
 def test_get_object_returns_selected_object(system_user_id) -> None:
     user = make_user(system_user_id=system_user_id)

@@ -18,6 +18,7 @@ from app.presentation.dependencies.services import (
     get_maintenance_service,
     get_object_service,
     get_task_service,
+    get_tree_service,
 )
 
 
@@ -125,6 +126,11 @@ class FakeMaintenanceService:
         return record
 
 
+class FakeTreeService:
+    async def get_tree(self, *, user_id):
+        return []
+
+
 def _user(system_user_id, role=UserRole.ENGINEER):
     return SimpleNamespace(
         id=system_user_id,
@@ -163,6 +169,9 @@ def _setup(
     )
     app.dependency_overrides[get_task_service] = (
         lambda: task_service
+    )
+    app.dependency_overrides[get_tree_service] = (
+        lambda: FakeTreeService()
     )
 
     return (
@@ -230,6 +239,8 @@ def test_get_maintenance_list_returns_records(system_user_id):
         )
 
         assert response.status_code == 200
+        assert "<!doctype html>" in response.text.lower()
+        assert 'id="app-sidebar"' in response.text
         assert "17.09.2026" in response.text
         assert "К" in response.text
         assert "Не выявлено" in response.text
@@ -271,6 +282,24 @@ def test_get_maintenance_list_returns_403_for_inaccessible_urza(
 
         assert response.status_code == 403
         assert not maintenance_service.calls
+    finally:
+        _cleanup(user)
+
+
+def test_maintenance_get_returns_fragment_for_htmx(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    _setup(user)
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/maintenance",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert "<!doctype html>" not in response.text.lower()
+        assert 'id="urza-tab-content"' in response.text
     finally:
         _cleanup(user)
 
@@ -326,6 +355,10 @@ def test_get_new_maintenance_form_preserves_task_id(system_user_id):
         assert 'name="editable_protocol_file"' in response.text
 
         assert f'name="task_id" value="{task_id}"' in response.text
+        assert "<!doctype html>" in response.text.lower()
+        assert 'hx-post="/objects/urza/' in response.text
+        assert 'hx-target="#urza-tab-content"' in response.text
+        assert 'hx-encoding="multipart/form-data"' in response.text
 
         assert 'name="signed_form_file"' in response.text
         assert "required" in response.text
@@ -349,13 +382,16 @@ def test_create_maintenance_rejects_missing_signed_form(
     )
 
     try:
-        response = TestClient(app).post(
+        client = TestClient(app)
+        response = client.post(
             f"/objects/urza/{urza_id}/maintenance",
             data=_post_data(),
         )
 
         assert response.status_code == 422
         assert "подписан" in response.text.lower()
+        assert "<!doctype html>" in response.text.lower()
+        assert 'id="app-sidebar"' in response.text
 
         assert not files.upload_calls
         assert not maintenance_service.calls
@@ -381,8 +417,10 @@ def test_create_maintenance_direct_input_uploads_only_signed_form(
     )
 
     try:
-        response = TestClient(app).post(
+        client = TestClient(app)
+        response = client.post(
             f"/objects/urza/{urza_id}/maintenance",
+            follow_redirects=False,
             data=_post_data(
                 maintenance_type=MaintenanceType.TK.value,
             ),
@@ -395,9 +433,17 @@ def test_create_maintenance_direct_input_uploads_only_signed_form(
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 303
+        assert response.headers["location"] == (
+            f"/objects/urza/{urza_id}/maintenance"
+        )
+        page = client.get(response.headers["location"])
+        assert page.status_code == 200
+        assert "<!doctype html>" in page.text.lower()
+        assert 'id="app-sidebar"' in page.text
 
         assert len(files.upload_calls) == 1
+        assert sum(name == "create" for name, _ in maintenance_service.calls) == 1
 
         name, kwargs = maintenance_service.calls[0]
 
@@ -406,6 +452,83 @@ def test_create_maintenance_direct_input_uploads_only_signed_form(
         assert kwargs["scan_protocol_id"] is None
         assert kwargs["editable_protocol_id"] is None
         assert kwargs["task_id"] is None
+    finally:
+        _cleanup(user)
+
+
+def test_create_maintenance_htmx_returns_updated_tab_fragment(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    signed = SimpleNamespace(id=uuid7())
+    files = FakeFileService(signed)
+    maintenance_service = FakeMaintenanceService()
+    _setup(
+        user,
+        maintenance_service=maintenance_service,
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/maintenance",
+            data=_post_data(maintenance_type=MaintenanceType.TK.value),
+            files={
+                "signed_form_file": (
+                    "signed.pdf",
+                    b"signed",
+                    "application/pdf",
+                ),
+            },
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert "<!doctype html>" not in response.text.lower()
+        assert 'id="urza-tab-content"' in response.text
+        assert len(maintenance_service.records) == 1
+        assert len(files.upload_calls) == 1
+    finally:
+        _cleanup(user)
+
+
+def test_create_maintenance_htmx_error_keeps_form_context(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    signed = SimpleNamespace(id=uuid7())
+    files = FakeFileService(signed)
+    maintenance_service = FakeMaintenanceService(
+        create_error=ValueError("Не удалось проверить результат")
+    )
+    _setup(
+        user,
+        maintenance_service=maintenance_service,
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/maintenance",
+            data=_post_data(
+                maintenance_type=MaintenanceType.K.value,
+                task_id=str(uuid7()),
+            ),
+            files={
+                "signed_form_file": (
+                    "signed.pdf",
+                    b"signed",
+                    "application/pdf",
+                ),
+            },
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert "Не удалось проверить результат" in response.text
+        assert 'id="urza-tab-content"' in response.text
+        assert 'value="2026-10-01"' in response.text
+        assert ">Не выявлено</textarea>" in response.text
+        assert 'name="task_id"' in response.text
+        assert len(files.archive_calls) == 1
     finally:
         _cleanup(user)
 
@@ -437,6 +560,7 @@ def test_create_maintenance_with_task_and_protocol_files(
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/maintenance",
+            follow_redirects=False,
             data=_post_data(
                 task_id=str(task_id),
                 maintenance_type=MaintenanceType.K.value,
@@ -461,7 +585,10 @@ def test_create_maintenance_with_task_and_protocol_files(
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 303
+        assert response.headers["location"] == (
+            f"/objects/urza/{urza_id}/maintenance"
+        )
         assert len(files.upload_calls) == 3
 
         name, kwargs = maintenance_service.calls[0]
@@ -504,6 +631,7 @@ def test_create_maintenance_special_types_do_not_require_protocol(
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/maintenance",
+            follow_redirects=False,
             data=_post_data(
                 maintenance_type=maintenance_type.value,
             ),
@@ -516,7 +644,10 @@ def test_create_maintenance_special_types_do_not_require_protocol(
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 303
+        assert response.headers["location"] == (
+            f"/objects/urza/{urza_id}/maintenance"
+        )
 
         assert len(files.upload_calls) == 1
 
@@ -612,6 +743,10 @@ def test_create_maintenance_archives_uploaded_files_after_service_error(
         )
 
         assert response.status_code == 400
+        assert "<!doctype html>" in response.text.lower()
+        assert 'id="app-sidebar"' in response.text
+        assert "требуется протокол" in response.text
+        assert 'value="2026-10-01"' in response.text
         assert len(files.archive_calls) == 2
         assert {
             call["file_id"]

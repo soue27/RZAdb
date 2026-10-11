@@ -5,13 +5,25 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.programs.service import ProgramService
-from app.domain.enums import DocumentStatus, ProgramType, UserRole
+
+from app.domain.enums import (
+    DocumentStatus,
+    ProgramType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
+
 from app.domain.program import Program
+
 
 
 @pytest.fixture
 def repository():
-    return MagicMock()
+    repository = MagicMock()
+    repository.get_by_task_id = AsyncMock(return_value=None)
+    return repository
+
 
 
 @pytest.fixture
@@ -37,19 +49,32 @@ def urza_repository():
     return repository
 
 
+
+@pytest.fixture
+def task_repository():
+    repository = MagicMock()
+    repository.get_by_id = AsyncMock()
+    return repository
+
+
+
+
 @pytest.fixture
 def service(
     repository,
     access_service,
     user_repository,
     urza_repository,
+    task_repository,
 ):
     return ProgramService(
         repository=repository,
         access_service=access_service,
         user_repository=user_repository,
         urza_repository=urza_repository,
+        task_repository=task_repository,
     )
+
 
 
 @pytest.mark.asyncio
@@ -225,12 +250,21 @@ async def test_create_program(
     repository,
     access_service,
     user_repository,
+    task_repository,
 ):
     user_id = uuid7()
     urza_id = uuid7()
     scan_file_id = uuid7()
     editable_file_id = uuid7()
     task_id = uuid7()
+
+    task_repository.get_by_id.return_value = SimpleNamespace(
+        deleted_at=None,
+        work_type=TaskWorkType.PROGRAM,
+        urza_id=urza_id,
+        assigned_to=user_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
 
     access_service.can_access_urza.return_value = True
     repository.add = AsyncMock()
