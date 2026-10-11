@@ -318,22 +318,22 @@ class TaskService:
         return task
 
     async def return_for_revision(
-        self,
-        *,
-        task: Task,
-        actor_id: UUID,
-        returned_at: datetime | None = None,
-        comment: str | None = None,
+            self,
+            *,
+            task: Task,
+            actor_id: UUID,
+            returned_at: datetime | None = None,
+            comment: str | None = None,
     ) -> Task:
         """Возвращает задачу исполнителю на доработку."""
         validate_transition(task.status, TaskStatus.IN_PROGRESS)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
+        validate_reason(comment)
 
         review_time = returned_at or datetime.now().astimezone()
         old_status = task.status
         task.status = TaskStatus.IN_PROGRESS
         task.updated_by = actor_id
-
         await self.task_repository.save(task)
         self.task_repository.session.add(
             TaskHistory(
@@ -342,7 +342,7 @@ class TaskService:
                 old_status=old_status,
                 new_status=TaskStatus.IN_PROGRESS,
                 actor_id=actor_id,
-                comment=comment.strip() if comment and comment.strip() else None,
+                comment=comment.strip(),
                 created_at=review_time,
             )
         )

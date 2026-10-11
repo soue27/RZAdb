@@ -1966,6 +1966,35 @@ async def test_accessible_manager_can_perform_review_transition(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("comment", [None, "", "   "])
+async def test_return_for_revision_requires_reason(
+    repository,
+    access_service,
+    system_user_id,
+    comment,
+) -> None:
+    task = _review_task(
+        TaskStatus.UNDER_REVIEW,
+        work_type=TaskWorkType.PROGRAM,
+    )
+    manager_id = uuid7()
+    _add_manager(access_service, manager_id)
+    access_service.access[(manager_id, task.urza_id)] = True
+
+    service = make_task_service(repository, access_service)
+
+    with pytest.raises(ValueError, match="Причина обязательна"):
+        await service.return_for_revision(
+            task=task,
+            actor_id=manager_id,
+            comment=comment,
+        )
+
+    assert task.status is TaskStatus.UNDER_REVIEW
+    assert repository.history == []
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("method_name", "status"),
     [
@@ -2202,7 +2231,9 @@ async def test_task_review_transitions_do_not_change_schema_record_status(
         deleted_at=None,
     )
     repository.schema_records.append(review_record)
-    await service.return_for_revision(task=return_task, actor_id=manager_id)
+    await service.return_for_revision(task=return_task,
+                                      actor_id=manager_id,
+                                      comment="Требуется доработка",)
     assert review_record.status is DocumentStatus.UNDER_REVIEW
 
 

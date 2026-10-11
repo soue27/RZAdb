@@ -122,20 +122,37 @@
                                     </button>
                                 {% endif %}
 
+
                                 {% if "return" in actions %}
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-warning"
+                                    <form
+                                        class="d-flex flex-column gap-2"
+                                        method="post"
+                                        action="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/return"
                                         hx-post="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/return"
                                         hx-target="#urza-tab-content"
                                         hx-swap="outerHTML"
                                     >
-                                        <span class="material-icons align-middle">
-                                            undo
-                                        </span>
-                                        Вернуть на доработку
-                                    </button>
+                                        {% if program.task_id %}
+                                            <input
+                                                type="text"
+                                                name="comment"
+                                                class="form-control form-control-sm"
+                                                placeholder="Причина возврата на доработку"
+                                                aria-label="Причина возврата на доработку"
+                                                required
+                                            >
+                                        {% endif %}
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-outline-warning"
+                                        >
+                                            <span class="material-icons align-middle">undo</span>
+                                            Вернуть на доработку
+                                        </button>
+                                    </form>
                                 {% endif %}
+
 
                             </div>
                         </td>

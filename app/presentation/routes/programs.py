@@ -442,6 +442,7 @@ async def return_urza_program(
     request: Request,
     urza_id: UUID,
     program_id: UUID,
+
     current_user: Annotated[User, Depends(get_current_user)],
     program_service: Annotated[
         ProgramService,
@@ -455,13 +456,14 @@ async def return_urza_program(
         TreeService,
         Depends(get_tree_service),
     ],
-
+    comment: Annotated[str | None, Form()] = None,
 ):
     try:
         await program_service.return_to_draft(
             user_id=current_user.id,
             program_id=program_id,
             urza_id=urza_id,
+            comment=comment,
         )
     except PermissionError as exc:
         raise HTTPException(

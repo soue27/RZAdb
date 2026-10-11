@@ -34,6 +34,16 @@ def access_service():
 
 
 @pytest.fixture
+def task_service():
+    service = MagicMock()
+    service.complete_task = AsyncMock()
+    service.submit_for_review = AsyncMock()
+    service.close_task = AsyncMock()
+    service.return_for_revision = AsyncMock()
+    return service
+
+
+@pytest.fixture
 def user_repository():
     repository = MagicMock()
     repository.get_by_id = AsyncMock(
@@ -66,6 +76,7 @@ def service(
     user_repository,
     urza_repository,
     task_repository,
+    task_service,
 ):
     return ProgramService(
         repository=repository,
@@ -73,6 +84,7 @@ def service(
         user_repository=user_repository,
         urza_repository=urza_repository,
         task_repository=task_repository,
+        task_service=task_service,
     )
 
 
@@ -422,6 +434,7 @@ async def test_submit_for_review_changes_status_to_under_review(
         urza_id=urza_id,
         status=DocumentStatus.DRAFT,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -502,6 +515,7 @@ async def test_submit_for_review_allows_document_author_roles(
         urza_id=urza_id,
         status=DocumentStatus.DRAFT,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -536,6 +550,7 @@ async def test_submit_for_review_denies_manager(
         urza_id=urza_id,
         status=DocumentStatus.DRAFT,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -575,6 +590,7 @@ async def test_approve_allows_manager_of_urza_department(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     manager = SimpleNamespace(
@@ -631,6 +647,7 @@ async def test_approve_denies_manager_of_another_department(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     manager = SimpleNamespace(
@@ -638,6 +655,7 @@ async def test_approve_denies_manager_of_another_department(
         active=True,
         deleted_at=None,
         enterprise_id=manager_department_id,
+        task_id=None,
     )
 
     urza = SimpleNamespace(
@@ -682,6 +700,7 @@ async def test_approve_denies_engineer(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -721,6 +740,7 @@ async def test_approve_denies_inactive_manager(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -792,6 +812,7 @@ async def test_return_to_draft_allows_manager_of_urza_department(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     manager = SimpleNamespace(
@@ -848,6 +869,7 @@ async def test_return_to_draft_denies_manager_of_another_department(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     manager = SimpleNamespace(
@@ -899,6 +921,7 @@ async def test_return_to_draft_denies_engineer(
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
         updated_by=None,
+        task_id=None,
     )
 
     access_service.can_access_urza.return_value = True
@@ -997,6 +1020,7 @@ async def test_get_available_actions_draft_engineer(
         id=uuid7(),
         urza_id=uuid7(),
         status=DocumentStatus.DRAFT,
+        task_id=None,
     )
 
     actions = await service.get_available_actions(
@@ -1022,6 +1046,7 @@ async def test_get_available_actions_draft_manager(
         id=uuid7(),
         urza_id=uuid7(),
         status=DocumentStatus.DRAFT,
+        task_id=None,
     )
 
     actions = await service.get_available_actions(
@@ -1061,6 +1086,7 @@ async def test_get_available_actions_under_review_manager_same_department(
         id=uuid7(),
         urza_id=urza_id,
         status=DocumentStatus.UNDER_REVIEW,
+        task_id=None,
     )
 
     actions = await service.get_available_actions(
@@ -1098,6 +1124,7 @@ async def test_get_available_actions_under_review_manager_other_department(
         id=uuid7(),
         urza_id=uuid7(),
         status=DocumentStatus.UNDER_REVIEW,
+        task_id=None,
     )
 
     actions = await service.get_available_actions(
@@ -1124,6 +1151,7 @@ async def test_get_available_actions_approved(
         id=uuid7(),
         urza_id=uuid7(),
         status=DocumentStatus.APPROVED,
+        task_id=None,
     )
 
     actions = await service.get_available_actions(
@@ -1134,3 +1162,200 @@ async def test_get_available_actions_approved(
     assert actions == set()
 
 
+
+@pytest.mark.asyncio
+async def test_submit_for_review_updates_linked_task(
+    service,
+    repository,
+    access_service,
+    user_repository,
+    task_repository,
+    task_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program_id = uuid7()
+    task_id = uuid7()
+
+    program = SimpleNamespace(
+        id=program_id,
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+        updated_by=None,
+        task_id=task_id,
+    )
+    task = SimpleNamespace(
+        id=task_id,
+        urza_id=urza_id,
+        work_type=TaskWorkType.PROGRAM,
+        assigned_to=user_id,
+        deleted_at=None,
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock()
+    user_repository.get_by_id = AsyncMock(
+        return_value=SimpleNamespace(role=UserRole.ENGINEER),
+    )
+    task_repository.get_by_id = AsyncMock(return_value=task)
+
+    result = await service.submit_for_review(
+        user_id,
+        program_id,
+        urza_id,
+    )
+
+    assert result is program
+    assert program.status is DocumentStatus.UNDER_REVIEW
+
+    task_repository.get_by_id.assert_awaited_once_with(task_id)
+    task_service.complete_task.assert_awaited_once_with(
+        task=task,
+        actor_id=user_id,
+    )
+    task_service.submit_for_review.assert_awaited_once_with(
+        task=task,
+        actor_id=user_id,
+    )
+    repository.save.assert_awaited_once_with(program)
+
+
+@pytest.mark.asyncio
+async def test_approve_closes_linked_task(
+    service,
+    repository,
+    access_service,
+    user_repository,
+    urza_repository,
+    task_repository,
+    task_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program_id = uuid7()
+    task_id = uuid7()
+    enterprise_id = uuid7()
+
+    program = SimpleNamespace(
+        id=program_id,
+        urza_id=urza_id,
+        status=DocumentStatus.UNDER_REVIEW,
+        updated_by=None,
+        task_id=task_id,
+    )
+    task = SimpleNamespace(
+        id=task_id,
+        urza_id=urza_id,
+        work_type=TaskWorkType.PROGRAM,
+        deleted_at=None,
+        status=TaskStatus.UNDER_REVIEW,
+    )
+    manager = SimpleNamespace(
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+        enterprise_id=enterprise_id,
+    )
+    urza = SimpleNamespace(
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(
+                enterprise_id=enterprise_id,
+            ),
+        ),
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock()
+    user_repository.get_by_id = AsyncMock(return_value=manager)
+    urza_repository.get_by_id = AsyncMock(return_value=urza)
+    task_repository.get_by_id = AsyncMock(return_value=task)
+
+    result = await service.approve(
+        user_id,
+        program_id,
+        urza_id,
+    )
+
+    assert result is program
+    assert program.status is DocumentStatus.APPROVED
+
+    task_repository.get_by_id.assert_awaited_once_with(task_id)
+    task_service.close_task.assert_awaited_once_with(
+        task=task,
+        actor_id=user_id,
+    )
+    repository.save.assert_awaited_once_with(program)
+
+
+@pytest.mark.asyncio
+async def test_return_to_draft_returns_linked_task_for_revision(
+    service,
+    repository,
+    access_service,
+    user_repository,
+    urza_repository,
+    task_repository,
+    task_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program_id = uuid7()
+    task_id = uuid7()
+    enterprise_id = uuid7()
+    comment = "Исправить параметры программы."
+
+    program = SimpleNamespace(
+        id=program_id,
+        urza_id=urza_id,
+        status=DocumentStatus.UNDER_REVIEW,
+        updated_by=None,
+        task_id=task_id,
+    )
+    task = SimpleNamespace(
+        id=task_id,
+        urza_id=urza_id,
+        work_type=TaskWorkType.PROGRAM,
+        deleted_at=None,
+        status=TaskStatus.UNDER_REVIEW,
+    )
+    manager = SimpleNamespace(
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+        enterprise_id=enterprise_id,
+    )
+    urza = SimpleNamespace(
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(
+                enterprise_id=enterprise_id,
+            ),
+        ),
+    )
+
+    access_service.can_access_urza.return_value = True
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock()
+    user_repository.get_by_id = AsyncMock(return_value=manager)
+    urza_repository.get_by_id = AsyncMock(return_value=urza)
+    task_repository.get_by_id = AsyncMock(return_value=task)
+
+    result = await service.return_to_draft(
+        user_id,
+        program_id,
+        urza_id,
+        comment=comment,
+    )
+
+    assert result is program
+    assert program.status is DocumentStatus.DRAFT
+
+    task_repository.get_by_id.assert_awaited_once_with(task_id)
+    task_service.return_for_revision.assert_awaited_once_with(
+        task=task,
+        actor_id=user_id,
+        comment=comment,
+    )
+    repository.save.assert_awaited_once_with(program)

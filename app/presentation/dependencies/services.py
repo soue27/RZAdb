@@ -268,6 +268,7 @@ def get_task_service(
 def get_program_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> ProgramService:
     return ProgramService(
         repository=ProgramRepository(session),
@@ -275,6 +276,7 @@ def get_program_service(
         user_repository=UserRepository(session),
         urza_repository=URZARepository(session),
         task_repository=TaskRepository(session),
+        task_service=task_service,
     )
 
 

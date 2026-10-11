@@ -19,3 +19,5 @@ wheels/
 .pytest_cache
 
 
+
+.DS_Store

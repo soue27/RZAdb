@@ -109,7 +109,14 @@
                     <form action="/tasks/{{ task.id }}/return-for-revision" method="post" class="d-flex gap-2"
                           hx-post="/tasks/{{ task.id }}/return-for-revision"
                           hx-target="#task-page-content" hx-swap="outerHTML">
-                        <input type="text" name="comment" class="form-control" placeholder="Комментарий (необязательно)" aria-label="Комментарий к возврату">
+                        <input
+                            type="text"
+                            name="comment"
+                            class="form-control"
+                            placeholder="Причина возврата на доработку"
+                            aria-label="Причина возврата на доработку"
+                            required
+                        >
                         <button type="submit" class="btn btn-outline-warning text-nowrap">Вернуть на доработку</button>
                     </form>
                 {% endif %}

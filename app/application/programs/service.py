@@ -4,6 +4,7 @@ from uuid import UUID
 from app.application.access.service import AccessService
 from app.application.programs.repository import ProgramRepository
 from app.application.tasks.repository import TaskRepository
+from app.application.tasks.service import TaskService
 from app.application.users.repository import UserRepository
 from app.application.urzas.repository import URZARepository
 from app.domain.enums import (
@@ -19,18 +20,20 @@ from app.domain.program import Program
 
 class ProgramService:
     def __init__(
-            self,
-            repository: ProgramRepository,
-            access_service: AccessService,
-            user_repository: UserRepository,
-            urza_repository: URZARepository,
-            task_repository: TaskRepository,
+        self,
+        repository: ProgramRepository,
+        access_service: AccessService,
+        user_repository: UserRepository,
+        urza_repository: URZARepository,
+        task_repository: TaskRepository,
+        task_service: TaskService,
     ) -> None:
         self.repository = repository
         self.access_service = access_service
         self.user_repository = user_repository
         self.urza_repository = urza_repository
         self.task_repository = task_repository
+        self.task_service = task_service
 
     async def _check_manager_reviewer(
             self,
@@ -264,18 +267,13 @@ class ProgramService:
 
         return program
 
-
-
     async def submit_for_review(
-        self,
-        user_id: UUID,
-        program_id: UUID,
-        urza_id: UUID,
+            self,
+            user_id: UUID,
+            program_id: UUID,
+            urza_id: UUID,
     ) -> Program:
-        if not await self.access_service.can_access_urza(
-            user_id,
-            urza_id,
-        ):
+        if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён")
 
         program = await self.repository.get_by_id(program_id)
@@ -284,14 +282,10 @@ class ProgramService:
             raise ValueError("Программа не найдена.")
 
         if program.urza_id != urza_id:
-            raise ValueError(
-                "Программа не принадлежит указанной URZA."
-            )
+            raise ValueError("Программа не принадлежит указанной URZA.")
 
         if program.status is not DocumentStatus.DRAFT:
-            raise ValueError(
-                "На согласование можно отправить только черновик."
-            )
+            raise ValueError("На согласование можно отправить только черновик.")
 
         user = await self.user_repository.get_by_id(user_id)
 
@@ -308,6 +302,34 @@ class ProgramService:
                 "может только ENGINEER, ADMIN или SUPERADMIN."
             )
 
+        # Если программа связана с заданием, синхронизируем workflow задания.
+        if program.task_id is not None:
+            task = await self.task_repository.get_by_id(program.task_id)
+
+            if task is None or task.deleted_at is not None:
+                raise ValueError("Связанное активное задание не найдено.")
+
+            if task.work_type is not TaskWorkType.PROGRAM:
+                raise ValueError("Связанное задание не предназначено для программы.")
+
+            if task.urza_id != urza_id:
+                raise ValueError("Задание относится к другому устройству РЗА.")
+
+            if task.assigned_to != user_id:
+                raise PermissionError(
+                    "Отправить программу на согласование может "
+                    "только назначенный исполнитель."
+                )
+
+            await self.task_service.complete_task(
+                task=task,
+                actor_id=user_id,
+            )
+            await self.task_service.submit_for_review(
+                task=task,
+                actor_id=user_id,
+            )
+
         program.status = DocumentStatus.UNDER_REVIEW
         program.updated_by = user_id
 
@@ -316,15 +338,12 @@ class ProgramService:
         return program
 
     async def approve(
-        self,
-        user_id: UUID,
-        program_id: UUID,
-        urza_id: UUID,
+            self,
+            user_id: UUID,
+            program_id: UUID,
+            urza_id: UUID,
     ) -> Program:
-        if not await self.access_service.can_access_urza(
-            user_id,
-            urza_id,
-        ):
+        if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён")
 
         program = await self.repository.get_by_id(program_id)
@@ -333,38 +352,48 @@ class ProgramService:
             raise ValueError("Программа не найдена.")
 
         if program.urza_id != urza_id:
-            raise ValueError(
-                "Программа не принадлежит указанной URZA."
-            )
+            raise ValueError("Программа не принадлежит указанной URZA.")
 
         if program.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError(
-                "Утвердить можно только программу "
-                "на согласовании."
+                "Утвердить можно только программу на согласовании."
             )
 
-        await self._check_manager_reviewer(
-            user_id,
-            urza_id,
-        )
+        await self._check_manager_reviewer(user_id, urza_id)
 
+        # Сначала утверждаем результат, затем закрываем связанное задание.
         program.status = DocumentStatus.APPROVED
         program.updated_by = user_id
 
         await self.repository.save(program)
 
+        if program.task_id is not None:
+            task = await self.task_repository.get_by_id(program.task_id)
+
+            if task is None or task.deleted_at is not None:
+                raise ValueError("Связанное активное задание не найдено.")
+
+            if task.work_type is not TaskWorkType.PROGRAM:
+                raise ValueError("Связанное задание не предназначено для программы.")
+
+            if task.urza_id != urza_id:
+                raise ValueError("Задание относится к другому устройству РЗА.")
+
+            await self.task_service.close_task(
+                task=task,
+                actor_id=user_id,
+            )
+
         return program
 
     async def return_to_draft(
-        self,
-        user_id: UUID,
-        program_id: UUID,
-        urza_id: UUID,
+            self,
+            user_id: UUID,
+            program_id: UUID,
+            urza_id: UUID,
+            comment: str | None = None,
     ) -> Program:
-        if not await self.access_service.can_access_urza(
-            user_id,
-            urza_id,
-        ):
+        if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён")
 
         program = await self.repository.get_by_id(program_id)
@@ -373,20 +402,36 @@ class ProgramService:
             raise ValueError("Программа не найдена.")
 
         if program.urza_id != urza_id:
-            raise ValueError(
-                "Программа не принадлежит указанной URZA."
-            )
+            raise ValueError("Программа не принадлежит указанной URZA.")
 
         if program.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError(
-                "Вернуть на доработку можно только программу "
-                "на согласовании."
+                "Вернуть на доработку можно только программу на согласовании."
             )
 
-        await self._check_manager_reviewer(
-            user_id,
-            urza_id,
-        )
+        await self._check_manager_reviewer(user_id, urza_id)
+
+        # Причина нужна для истории связанного задания.
+        if program.task_id is not None:
+            if not comment or not comment.strip():
+                raise ValueError("Укажите причину возврата на доработку.")
+
+            task = await self.task_repository.get_by_id(program.task_id)
+
+            if task is None or task.deleted_at is not None:
+                raise ValueError("Связанное активное задание не найдено.")
+
+            if task.work_type is not TaskWorkType.PROGRAM:
+                raise ValueError("Связанное задание не предназначено для программы.")
+
+            if task.urza_id != urza_id:
+                raise ValueError("Задание относится к другому устройству РЗА.")
+
+            await self.task_service.return_for_revision(
+                task=task,
+                actor_id=user_id,
+                comment=comment,
+            )
 
         program.status = DocumentStatus.DRAFT
         program.updated_by = user_id

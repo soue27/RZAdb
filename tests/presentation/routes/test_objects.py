@@ -349,6 +349,7 @@ class FakeProgramService:
         user_id: UUID,
         program_id: UUID,
         urza_id: UUID,
+        comment: str | None = None,
     ) -> Program:
         if self.error is not None:
             raise self.error
