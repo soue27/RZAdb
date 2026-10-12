@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -162,7 +162,7 @@ class SchemaRepository:
         record: SchemaRecord,
         user_id: UUID,
     ) -> SchemaRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         record.deleted_at = now
         record.deleted_by = user_id
         record.updated_at = now

@@ -5,7 +5,6 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.programs.service import ProgramService
-
 from app.domain.enums import (
     DocumentStatus,
     ProgramType,
@@ -13,9 +12,7 @@ from app.domain.enums import (
     TaskWorkType,
     UserRole,
 )
-
 from app.domain.program import Program
-
 
 
 @pytest.fixture
@@ -416,6 +413,205 @@ async def test_create_denies_access(
         )
 
     repository.add.assert_not_awaited()
+
+
+
+@pytest.mark.asyncio
+async def test_update_program(service, repository, access_service, user_repository):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program_id = uuid7()
+    old_scan_id = uuid7()
+    new_scan_id = uuid7()
+    old_editable_id = uuid7()
+    new_editable_id = uuid7()
+
+    program = SimpleNamespace(
+        id=program_id,
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+        program_type=ProgramType.WORK,
+        program_number="OLD-001",
+        scan_file_id=old_scan_id,
+        editable_file_id=old_editable_id,
+        updated_by=None,
+    )
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock(return_value=program)
+    access_service.can_access_urza.return_value = True
+    user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+
+    result = await service.update(
+        user_id=user_id,
+        program_id=program_id,
+        urza_id=urza_id,
+        program_type=ProgramType.COMMISSIONING,
+        program_number="  NEW-001  ",
+        scan_file_id=new_scan_id,
+        editable_file_id=new_editable_id,
+    )
+
+    assert result.program_type is ProgramType.COMMISSIONING
+    assert result.program_number == "NEW-001"
+    assert result.scan_file_id == new_scan_id
+    assert result.editable_file_id == new_editable_id
+    assert result.updated_by == user_id
+    repository.save.assert_awaited_once_with(program)
+
+
+@pytest.mark.asyncio
+async def test_update_program_keeps_files_when_ids_not_provided(
+    service, repository, access_service, user_repository,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+        program_type=ProgramType.WORK,
+        program_number="OLD-001",
+        scan_file_id=uuid7(),
+        editable_file_id=uuid7(),
+        updated_by=None,
+    )
+    original_scan_id = program.scan_file_id
+    original_editable_id = program.editable_file_id
+
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock(return_value=program)
+    access_service.can_access_urza.return_value = True
+    user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+
+    await service.update(
+        user_id=user_id,
+        program_id=program.id,
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="NEW-001",
+    )
+
+    assert program.scan_file_id == original_scan_id
+    assert program.editable_file_id == original_editable_id
+
+
+@pytest.mark.asyncio
+async def test_update_program_removes_editable_file(
+    service, repository, access_service, user_repository,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+        program_type=ProgramType.WORK,
+        program_number="OLD-001",
+        scan_file_id=uuid7(),
+        editable_file_id=uuid7(),
+        updated_by=None,
+    )
+
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock(return_value=program)
+    access_service.can_access_urza.return_value = True
+    user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+
+    await service.update(
+        user_id=user_id,
+        program_id=program.id,
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="NEW-001",
+        remove_editable_file=True,
+    )
+
+    assert program.editable_file_id is None
+    repository.save.assert_awaited_once_with(program)
+
+
+@pytest.mark.asyncio
+async def test_update_program_rejects_approved_program(
+    service, repository, access_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        status=DocumentStatus.APPROVED,
+        program_type=ProgramType.WORK,
+        program_number="OLD-001",
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        updated_by=None,
+    )
+
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock()
+    access_service.can_access_urza.return_value = True
+
+    with pytest.raises(ValueError, match="только программу"):
+        await service.update(
+            user_id=user_id,
+            program_id=program.id,
+            urza_id=urza_id,
+            program_type=ProgramType.WORK,
+            program_number="NEW-001",
+        )
+
+    repository.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_program_rejects_empty_number(
+    service, repository, access_service, user_repository,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    program = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+        program_type=ProgramType.WORK,
+        program_number="OLD-001",
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        updated_by=None,
+    )
+
+    repository.get_by_id = AsyncMock(return_value=program)
+    repository.save = AsyncMock()
+    access_service.can_access_urza.return_value = True
+    user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+
+    with pytest.raises(ValueError, match="не может быть пустым"):
+        await service.update(
+            user_id=user_id,
+            program_id=program.id,
+            urza_id=urza_id,
+            program_type=ProgramType.WORK,
+            program_number="   ",
+        )
+
+    repository.save.assert_not_awaited()
+
 
 
 @pytest.mark.asyncio
@@ -1028,7 +1224,7 @@ async def test_get_available_actions_draft_engineer(
         program=program,
     )
 
-    assert actions == {"submit"}
+    assert actions == {"submit", "edit"}
 
 
 @pytest.mark.asyncio

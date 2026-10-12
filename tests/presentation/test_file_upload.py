@@ -1,9 +1,9 @@
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from uuid import UUID, uuid4
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote
+from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
@@ -20,6 +20,7 @@ from app.application.files.service import FileService
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.file import File
 from app.domain.user import User
+from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
@@ -27,7 +28,6 @@ from app.presentation.dependencies.services import (
     get_file_access_service,
     get_file_service,
 )
-from app.infrastructure.database.session import get_session
 
 
 @pytest.fixture

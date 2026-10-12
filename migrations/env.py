@@ -9,8 +9,6 @@ from app.core.config import get_settings
 from app.infrastructure.database import models  # noqa: F401
 from app.infrastructure.database.base import Base
 
-
-
 config = context.config
 
 if config.config_file_name is not None:

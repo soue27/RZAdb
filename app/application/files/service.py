@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -8,6 +9,7 @@ from app.application.files.repository import FileRepository
 from app.domain.file import File
 from app.infrastructure.storage.base import ObjectStorage
 
+logger = logging.getLogger(__name__)
 
 class FileService:
     def __init__(
@@ -58,7 +60,18 @@ class FileService:
             updated_by=actor_id,
         )
 
-        await self.repository.add(file)
+        try:
+            await self.repository.add(file)
+        except Exception:
+            try:
+                await self.storage.delete(key=key)
+            except Exception:
+                logger.exception(
+                    "Не удалось удалить загруженный объект после "
+                    "ошибки сохранения метаданных: key=%s",
+                    key,
+                )
+            raise
 
         return file
 

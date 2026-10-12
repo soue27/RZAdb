@@ -1,8 +1,8 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
-from uuid6 import uuid7
 
 from fastapi.templating import Jinja2Templates
+from uuid6 import uuid7
 
 from app.domain.enums import DocumentStatus
 
@@ -357,7 +357,7 @@ def test_programs_template_links_scan_and_optional_editable_file() -> None:
         id=uuid7(),
         program_type=SimpleNamespace(label="Рабочая программа"),
         program_number="1",
-        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
         status=DocumentStatus.DRAFT,
         scan_file_id=scan_id,
         editable_file_id=None,
@@ -386,7 +386,7 @@ def test_programs_template_shows_submit_action_for_draft() -> None:
         id=uuid7(),
         program_type=SimpleNamespace(label="Рабочая программа"),
         program_number="1",
-        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
         status=DocumentStatus.DRAFT,
         scan_file_id=uuid7(),
         editable_file_id=None,
@@ -410,7 +410,7 @@ def test_programs_template_shows_review_actions() -> None:
         id=uuid7(),
         program_type=SimpleNamespace(label="Рабочая программа"),
         program_number="1",
-        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
         status=DocumentStatus.UNDER_REVIEW,
         scan_file_id=uuid7(),
         editable_file_id=None,
@@ -434,7 +434,7 @@ def test_programs_template_hides_workflow_actions_for_approved() -> None:
         id=uuid7(),
         program_type=SimpleNamespace(label="Рабочая программа"),
         program_number="1",
-        created_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
         status=DocumentStatus.APPROVED,
         scan_file_id=uuid7(),
         editable_file_id=None,

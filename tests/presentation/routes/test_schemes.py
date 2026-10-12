@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -8,7 +8,6 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
-    ObjectNotFoundError,
 )
 from app.domain.enums import DocumentStatus, UserRole
 from app.presentation.app import app
@@ -18,7 +17,6 @@ from app.presentation.dependencies.services import (
     get_object_service,
     get_schema_service,
     get_task_service,
-
 )
 
 
@@ -200,7 +198,7 @@ class FakeSchemaService:
         self.calls.append(("delete", kwargs))
         self._error("delete")
         record = next(item for item in self.records if item.id == kwargs["record_id"])
-        record.deleted_at = datetime.now(timezone.utc)
+        record.deleted_at = datetime.now(UTC)
         if self.current is record:
             self.current = None
 
@@ -275,7 +273,7 @@ def test_get_schemes_list_shows_status_current_files_and_hides_deleted(system_us
     deleted = _record(
         urza_id,
         DocumentStatus.APPROVED,
-        deleted_at=datetime.now(timezone.utc),
+        deleted_at=datetime.now(UTC),
     )
     service = FakeSchemaService(
         urza_id,

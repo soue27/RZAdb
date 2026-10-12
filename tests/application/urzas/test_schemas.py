@@ -1,4 +1,3 @@
-from datetime import date
 
 from uuid6 import uuid7
 

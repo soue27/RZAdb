@@ -1,6 +1,5 @@
 from datetime import date
 from types import SimpleNamespace
-from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient

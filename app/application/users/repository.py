@@ -3,8 +3,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.user import User
 from app.domain.enums import UserRole
+from app.domain.user import User
+
 
 class UserRepository:
     """Работа с пользователями через SQLAlchemy."""

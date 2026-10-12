@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.program import Program
+from app.domain.enums import DocumentStatus
 
 
 class ProgramRepository:
@@ -12,13 +13,21 @@ class ProgramRepository:
         self.session = session
 
     async def get_by_id(
-        self,
-        program_id: UUID,
+            self,
+            program_id: UUID,
     ) -> Program | None:
-        return await self.session.get(
-            Program,
-            program_id,
+        query = (
+            select(Program)
+            .options(
+                selectinload(Program.scan_file),
+                selectinload(Program.editable_file),
+            )
+            .where(
+                Program.id == program_id,
+            )
         )
+
+        return await self.session.scalar(query)
 
     async def get_by_urza_id(
             self,
@@ -67,3 +76,21 @@ class ProgramRepository:
         await self.session.flush()
 
         return program
+
+    async def list_standalone_under_review(self) -> list[Program]:
+        query = (
+            select(Program)
+            .options(
+                selectinload(Program.urza),
+                selectinload(Program.creator),
+            )
+            .where(
+                Program.task_id.is_(None),
+                Program.status == DocumentStatus.UNDER_REVIEW,
+                Program.deleted_at.is_(None),
+            )
+            .order_by(Program.updated_at.desc())
+        )
+
+        result = await self.session.scalars(query)
+        return list(result.all())

@@ -1,8 +1,13 @@
+
 <div id="urza-tab-content">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="rzadb-otd-version-title">
-            Добавление программы
+            {% if is_edit|default(false) %}
+                Редактирование программы
+            {% else %}
+                Добавление программы
+            {% endif %}
         </div>
 
         <button
@@ -16,15 +21,33 @@
         </button>
     </div>
 
-    <form method="post"
-      action="/objects/urza/{{ urza_id }}/programs"
-      enctype="multipart/form-data"
-      hx-post="/objects/urza/{{ urza_id }}/programs"
-      hx-target="#urza-tab-content"
-      hx-swap="outerHTML">
+    {% set editing = is_edit|default(false) %}
+    {% if not editing and creation_status_notice %}
+        <div class="alert alert-info mb-3" role="status">
+            <span class="material-icons align-middle me-1">
+                info
+            </span>
+            {{ creation_status_notice }}
+        </div>
+    {% endif %}
+    {% if editing %}
+        {% set form_url = "/objects/urza/" ~ urza_id ~ "/programs/" ~ program.id ~ "/edit" %}
+    {% else %}
+        {% set form_url = "/objects/urza/" ~ urza_id ~ "/programs" %}
+    {% endif %}
+
+    <form
+        method="post"
+        action="{{ form_url }}"
+        enctype="multipart/form-data"
+        hx-post="{{ form_url }}"
+        hx-target="#urza-tab-content"
+        hx-swap="outerHTML"
+    >
         {% if task_id %}
             <input type="hidden" name="task_id" value="{{ task_id }}">
         {% endif %}
+
         <div class="mb-3">
             <label class="form-label" for="program-type">
                 Тип программы
@@ -34,9 +57,15 @@
                 id="program-type"
                 name="program_type"
                 class="form-select"
+                required
             >
                 {% for program_type in program_types %}
-                    <option value="{{ program_type.value }}">
+                    <option
+                        value="{{ program_type.value }}"
+                        {% if editing and program.program_type == program_type %}
+                            selected
+                        {% endif %}
+                    >
                         {{ program_type.label }}
                     </option>
                 {% endfor %}
@@ -53,6 +82,8 @@
                 name="program_number"
                 type="text"
                 class="form-control"
+                value="{{ program.program_number if editing else '' }}"
+                maxlength="255"
                 required
             >
         </div>
@@ -62,12 +93,31 @@
                 Скан программы
             </label>
 
+            {% if editing %}
+                <div class="mb-2">
+                    <div class="form-text mb-1">
+                        Текущий скан:
+                    </div>
+                    <a
+                        href="/files/{{ program.scan_file_id }}/view"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        {{ program.scan_file.display_name or program.scan_file.original_name }}
+                    </a>
+                    <div class="form-text mt-1">
+                        Чтобы заменить скан, выберите новый файл.
+                        Если файл не выбирать, текущий останется без изменений.
+                    </div>
+                </div>
+            {% endif %}
+
             <input
                 id="scan-file"
                 name="scan_file"
                 type="file"
                 class="form-control"
-                required
+                {% if not editing %}required{% endif %}
             >
         </div>
 
@@ -75,6 +125,45 @@
             <label class="form-label" for="editable-file">
                 Редактируемый файл
             </label>
+
+            {% if editing and program.editable_file_id %}
+                <div class="mb-2">
+                    <div class="form-text mb-1">
+                        Текущий редактируемый файл:
+                    </div>
+                    <a
+                        href="/files/{{ program.editable_file_id }}/view"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        {{ program.editable_file.display_name or program.editable_file.original_name }}
+                    </a>
+                    <div class="form-text mt-1">
+                        Выберите новый файл, чтобы заменить текущий,
+                        или отметьте флажок ниже, чтобы убрать его.
+                    </div>
+                </div>
+
+                <div class="form-check mb-2">
+                    <input
+                        id="remove-editable-file"
+                        name="remove_editable_file"
+                        type="checkbox"
+                        class="form-check-input"
+                        value="true"
+                    >
+                    <label
+                        class="form-check-label"
+                        for="remove-editable-file"
+                    >
+                        Убрать редактируемый файл
+                    </label>
+                </div>
+            {% elif editing %}
+                <div class="form-text mb-2">
+                    Редактируемый файл не прикреплён.
+                </div>
+            {% endif %}
 
             <input
                 id="editable-file"
@@ -88,7 +177,11 @@
             type="submit"
             class="btn btn-primary"
         >
-            Сохранить программу
+            {% if editing %}
+                Сохранить изменения
+            {% else %}
+                Сохранить программу
+            {% endif %}
         </button>
     </form>
 

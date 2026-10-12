@@ -5,10 +5,10 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.urzas.repository import URZARepository
-from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus
-from app.domain.urza import URZA
 from app.domain.connection import Connection
+from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus
 from app.domain.substation import Substation
+from app.domain.urza import URZA
 
 
 @pytest.mark.asyncio

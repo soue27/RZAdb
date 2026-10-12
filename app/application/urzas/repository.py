@@ -1,8 +1,8 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.connection import Connection
 from app.domain.urza import URZA

@@ -8,7 +8,6 @@ from app.application.users.repository import UserRepository
 from app.domain.enums import DocumentStatus, UserRole
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 
-
 _AUTHOR_ROLES = {UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN}
 
 

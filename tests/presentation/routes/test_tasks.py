@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -31,8 +31,8 @@ def _task(user_id: UUID, status: TaskStatus = TaskStatus.COMPLETED):
         status=status,
         assigned_at=None,
         acceptance_deadline_at=None,
-        deadline_at=datetime(2026, 10, 20, tzinfo=timezone.utc),
-        completed_at=datetime(2026, 10, 1, tzinfo=timezone.utc),
+        deadline_at=datetime(2026, 10, 20, tzinfo=UTC),
+        completed_at=datetime(2026, 10, 1, tzinfo=UTC),
         closed_at=None,
         deleted_at=None,
     )
@@ -392,7 +392,7 @@ def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
     user = _user(system_user_id)
     visible = _task(user.id)
     hidden = _task(user.id)
-    hidden.deleted_at = datetime.now(timezone.utc)
+    hidden.deleted_at = datetime.now(UTC)
     no_access = _task(user.id)
     repository = FakeTaskRepository([visible, hidden, no_access])
     access = FakeAccessService({no_access.urza_id})
@@ -421,7 +421,7 @@ def test_task_detail_displays_history_and_review_actions(system_user_id):
         old_status=TaskStatus.COMPLETED,
         new_status=TaskStatus.UNDER_REVIEW,
         actor=SimpleNamespace(full_name="Инженер"),
-        created_at=datetime(2026, 10, 2, tzinfo=timezone.utc),
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
         comment="Проверьте, пожалуйста",
     )
     repository = FakeTaskRepository([task])

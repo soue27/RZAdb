@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -323,7 +323,7 @@ async def test_create_accepts_valid_task_result() -> None:
         ({"assigned_to": None}, PermissionError, "назначенный исполнитель"),
         ({"status": TaskStatus.ASSIGNED}, ValueError, "только по задаче в работе"),
         ({"status": TaskStatus.COMPLETED}, ValueError, "только по задаче в работе"),
-        ({"deleted_at": datetime.now(timezone.utc)}, ValueError, "не найдена"),
+        ({"deleted_at": datetime.now(UTC)}, ValueError, "не найдена"),
     ],
 )
 async def test_create_rejects_ineligible_task(overrides, error, message) -> None:
@@ -606,7 +606,7 @@ async def test_get_available_actions_for_draft_and_approved() -> None:
 async def test_get_available_actions_excludes_soft_deleted_record() -> None:
     service, repository, _, user_id, urza_id = _service(UserRole.ADMIN)
     record = _record(user_id, uuid7(), DocumentStatus.APPROVED)
-    record.deleted_at = datetime.now(timezone.utc)
+    record.deleted_at = datetime.now(UTC)
 
     assert await service.get_available_actions(user_id, record) == set()
     repository.get_form_by_id.assert_not_awaited()

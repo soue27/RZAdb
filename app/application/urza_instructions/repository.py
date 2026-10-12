@@ -4,11 +4,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.domain.enums import DocumentStatus
 from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,
 )
-from app.domain.enums import DocumentStatus
 
 
 class URZAInstructionRepository:

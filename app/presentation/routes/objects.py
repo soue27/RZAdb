@@ -1,13 +1,15 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi import Form, UploadFile
-from fastapi import File as FastAPIFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.templating import Jinja2Templates
-
-
-from app.application.files.service import FileService
 
 from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_service import InspectionService
@@ -23,11 +25,11 @@ from app.application.selectivity_schemes.service import (
 )
 from app.application.settings.service import SettingsService
 from app.application.substations.service import SubstationService
-from app.application.urzas.service import URZAService
+from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
+from app.application.urzas.service import URZAService
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
-from app.application.tasks.service import TaskService
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
@@ -35,11 +37,11 @@ from app.presentation.dependencies.services import (
     get_otd_service,
     get_rza_instruction_service,
     get_selectivity_scheme_service,
-    get_substation_service,
-    get_urza_service,
     get_settings_service,
+    get_substation_service,
     get_task_service,
     get_tree_service,
+    get_urza_service,
 )
 
 router = APIRouter(

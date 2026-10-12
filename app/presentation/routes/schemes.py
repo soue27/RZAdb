@@ -3,8 +3,8 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File as FastAPIFile, Form, HTTPException
-from fastapi import Request, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
@@ -24,7 +24,6 @@ from app.presentation.dependencies.services import (
     get_schema_service,
     get_task_service,
 )
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/objects", tags=["schemes"])

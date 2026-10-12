@@ -1,11 +1,9 @@
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
 
 from app.application.schema.repository import SchemaRepository
-from app.domain.enums import DocumentStatus
 from app.domain.schema import SchemaForm, SchemaRecord
 
 

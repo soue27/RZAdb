@@ -19,6 +19,7 @@ def repository():
 def storage():
     storage = MagicMock()
     storage.upload = AsyncMock()
+    storage.delete = AsyncMock()
     return storage
 
 
@@ -66,6 +67,55 @@ async def test_upload_file(
     )
 
     repository.add.assert_awaited_once_with(result)
+
+
+@pytest.mark.asyncio
+async def test_upload_deletes_storage_object_when_repository_add_fails(
+    service,
+    repository,
+    storage,
+    system_user_id,
+):
+    repository.add.side_effect = RuntimeError("database error")
+
+    with pytest.raises(RuntimeError, match="database error"):
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"test file content",
+            original_name="scan.pdf",
+            display_name="Скан протокола.pdf",
+            extension=".pdf",
+            mime_type="application/pdf",
+        )
+
+    storage.upload.assert_awaited_once()
+    storage.delete.assert_awaited_once_with(
+        key=storage.upload.await_args.kwargs["key"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_upload_preserves_repository_error_when_storage_cleanup_fails(
+    service,
+    repository,
+    storage,
+    system_user_id,
+):
+    repository.add.side_effect = RuntimeError("database error")
+    storage.delete.side_effect = OSError("storage cleanup error")
+
+    with pytest.raises(RuntimeError, match="database error"):
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"test file content",
+            original_name="scan.pdf",
+            display_name="Скан протокола.pdf",
+            extension=".pdf",
+            mime_type="application/pdf",
+        )
+
+    storage.delete.assert_awaited_once()
+
 
 
 @pytest.mark.asyncio

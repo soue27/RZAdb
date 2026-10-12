@@ -10,7 +10,6 @@ from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,
 )
-from app.domain.enums import DocumentStatus
 
 
 @pytest.mark.asyncio

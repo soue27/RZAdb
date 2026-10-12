@@ -18,16 +18,18 @@
                 </a>
             {% endif %}
 
-            <button
-                type="button"
-                class="btn btn-primary"
-                hx-get="/objects/urza/{{ urza_id }}/programs/new"
-                hx-target="#urza-tab-content"
-                hx-swap="outerHTML"
-            >
-                <span class="material-icons align-middle me-1">add</span>
-                Добавить программу
-            </button>
+            {% if can_create_program %}
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    hx-get="/objects/urza/{{ urza_id }}/programs/new"
+                    hx-target="#urza-tab-content"
+                    hx-swap="outerHTML"
+                >
+                    <span class="material-icons align-middle me-1">add</span>
+                    Добавить программу
+                </button>
+            {% endif %}
         </div>
     </div>
 
@@ -91,6 +93,19 @@
 
                         <td>
                             <div class="d-flex gap-1 flex-wrap">
+
+                                {% if "edit" in actions %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        hx-get="/objects/urza/{{ urza_id }}/programs/{{ program.id }}/edit"
+                                        hx-target="#urza-tab-content"
+                                        hx-swap="outerHTML"
+                                    >
+                                        <span class="material-icons align-middle">edit</span>
+                                        Редактировать
+                                    </button>
+                                {% endif %}
 
                                 {% if "submit" in actions %}
                                     <button

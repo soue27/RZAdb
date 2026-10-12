@@ -9,13 +9,12 @@ from app.application.files.exceptions import AmbiguousFileOwnershipError
 from app.application.files.owner_repository import FileOwnerRepository
 from app.application.files.owner_resolver import FileOwnerResolver
 from app.application.files.owners import FileAccessTargetType, FileOwnerType
-from app.domain import urza
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
+    DocumentStatus,
     ElementBase,
     EnterpriseType,
-    DocumentStatus,
     HighestVoltage,
     MaintenanceType,
     OperationalCurrentType,
@@ -45,7 +44,6 @@ from app.domain.urza_instruction import (
     URZAInstructionVersion,
 )
 from app.infrastructure.database.engine import async_session_factory
-from app.presentation.routes import files
 
 
 def _new_file(system_user_id: UUID, *, deleted: bool = False) -> File:

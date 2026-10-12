@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -8,7 +8,6 @@ from app.application.settings.repository import SettingsRepository
 from app.domain.enums import DocumentStatus, UserRole
 from app.domain.rza_settings import SettingsForm
 from app.domain.settings_record import SettingsRecord
-
 
 _RECORD_ROLES = {
     UserRole.ENGINEER,
@@ -270,7 +269,7 @@ class SettingsService:
         user = await self._get_user(user_id)
         if user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN}:
             raise PermissionError("Удалять записи уставок может только ADMIN или SUPERADMIN.")
-        record.deleted_at = datetime.now(timezone.utc)
+        record.deleted_at = datetime.now(UTC)
         record.deleted_by = user_id
         record.updated_by = user_id
         await self.repository.save(record)

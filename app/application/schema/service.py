@@ -10,7 +10,6 @@ from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
 from app.domain.schema import SchemaForm, SchemaRecord
 from app.domain.task import Task
 
-
 _RECORD_ROLES = {
     UserRole.ENGINEER,
     UserRole.MANAGER,

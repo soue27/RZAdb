@@ -1,17 +1,11 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from uuid import UUID
 from types import SimpleNamespace
+from uuid import UUID
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from uuid6 import uuid7
-
-
-from app.domain.program import Program
-from app.domain.file import File
-from app.domain.rza_settings import SettingsForm
-from app.domain.settings_record import SettingsRecord
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.objects.exceptions import (
@@ -28,22 +22,24 @@ from app.domain.enums import (
     ProgramType,
     UserRole,
 )
+from app.domain.file import File
 from app.domain.inspection import Inspection
+from app.domain.program import Program
 from app.domain.user import User
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_file_service,
     get_inspection_service,
     get_object_service,
+    get_otd_service,
     get_program_service,
     get_settings_service,
     get_substation_service,
-    get_file_service,
-    get_urza_instruction_service,
     get_task_service,
-    get_otd_service,
     get_tree_service,
+    get_urza_instruction_service,
     get_urza_service,
 )
 
@@ -113,11 +109,23 @@ class FakeInspectionService:
         return self.inspections
 
 
+class FakeObjectStorage:
+    def __init__(self) -> None:
+        self.delete_calls: list[dict] = []
+        self.delete_error: Exception | None = None
+
+    async def delete(self, *, key: str) -> None:
+        self.delete_calls.append({"key": key})
+        if self.delete_error is not None:
+            raise self.delete_error
+
+
 class FakeFileService:
     def __init__(self, file: File) -> None:
         self.file = file
         self.upload_calls: list[dict] = []
         self.archive_calls: list[dict] = []
+        self.storage = FakeObjectStorage()
 
     async def upload(
         self,
@@ -234,7 +242,7 @@ class FakeSettingsService:
         if error:
             raise error
         record = next(record for record in self.records if record.id == kwargs["record_id"])
-        record.deleted_at = datetime.now(timezone.utc)
+        record.deleted_at = datetime.now(UTC)
 
 
 def override_settings_service(service: FakeSettingsService):
@@ -260,10 +268,14 @@ class FakeProgramService:
         programs: list[Program] | None = None,
         actions: dict[UUID, set[str]] | None = None,
         error: Exception | None = None,
+        create_error: Exception | None = None,
+
     ) -> None:
         self.programs = programs or []
         self.actions = actions or {}
         self.error = error
+        self.create_error = create_error
+        self.update_calls = []
 
     async def get_by_urza(
         self,
@@ -293,6 +305,8 @@ class FakeProgramService:
             editable_file_id: UUID | None = None,
             task_id: UUID | None = None,
     ):
+        if self.create_error is not None:
+            raise self.create_error
 
         program = Program(
             id=uuid7(),
@@ -305,12 +319,87 @@ class FakeProgramService:
             task_id=task_id,
             created_by=user_id,
             updated_by=user_id,
-            created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 30, tzinfo=UTC),
         )
 
         self.programs.append(program)
 
         return program
+
+
+    async def get_by_id(
+        self,
+        user_id: UUID,
+        program_id: UUID,
+        urza_id: UUID,
+    ) -> Program | None:
+        if self.error is not None:
+            raise self.error
+
+        return next(
+            (
+                program
+                for program in self.programs
+                if program.id == program_id
+            ),
+            None,
+        )
+
+    async def update(
+        self,
+        *,
+        user_id: UUID,
+        program_id: UUID,
+        urza_id: UUID,
+        program_type: ProgramType,
+        program_number: str,
+        scan_file_id: UUID | None = None,
+        editable_file_id: UUID | None = None,
+        remove_editable_file: bool = False,
+    ) -> Program:
+        if self.error is not None:
+            raise self.error
+
+        program = next(
+            (
+                program
+                for program in self.programs
+                if program.id == program_id
+            ),
+            None,
+        )
+
+        if program is None:
+            raise ValueError("Программа не найдена.")
+
+        self.update_calls.append(
+            {
+                "user_id": user_id,
+                "program_id": program_id,
+                "urza_id": urza_id,
+                "program_type": program_type,
+                "program_number": program_number,
+                "scan_file_id": scan_file_id,
+                "editable_file_id": editable_file_id,
+                "remove_editable_file": remove_editable_file,
+            }
+        )
+
+        program.program_type = program_type
+        program.program_number = program_number
+
+        if scan_file_id is not None:
+            program.scan_file_id = scan_file_id
+
+        if remove_editable_file:
+            program.editable_file_id = None
+        elif editable_file_id is not None:
+            program.editable_file_id = editable_file_id
+
+        program.updated_by = user_id
+
+        return program
+
 
     async def submit_for_review(
         self,
@@ -517,7 +606,7 @@ def settings_file(file_id: UUID, filename="signed.pdf") -> File:
         extension=".pdf",
         size=4,
         mime_type="application/pdf",
-        uploaded_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
         created_by=uuid7(),
         updated_by=uuid7(),
     )
@@ -903,7 +992,7 @@ def test_get_urza_programs_returns_programs(system_user_id) -> None:
         editable_file_id=None,
         created_by=user.id,
         updated_by=user.id,
-        created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
     )
 
     program.creator = user
@@ -944,6 +1033,776 @@ def test_get_urza_programs_returns_programs(system_user_id) -> None:
         assert "Направить на согласование" in response.text
         assert "Утвердить" not in response.text
         assert "Вернуть на доработку" not in response.text
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_get_edit_urza_program_form(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    program_service = FakeProgramService(programs=[program])
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.get(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+        )
+        assert response.status_code == 200
+        assert "Редактирование программы" in response.text
+        assert "123" in response.text
+        assert f"/objects/urza/{urza_id}/programs/{program.id}/edit" in response.text
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_update_urza_program_without_replacing_scan(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    task_id = uuid7()
+    scan_file_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=scan_file_id,
+        editable_file_id=None,
+        task_id=task_id,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    program_service = FakeProgramService(programs=[program])
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.COMMISSIONING.value,
+                "program_number": " 456 ",
+            },
+        )
+
+        assert response.status_code == 200
+        assert len(program_service.update_calls) == 1
+
+        call = program_service.update_calls[0]
+        assert call["program_type"] is ProgramType.COMMISSIONING
+        assert call["program_number"] == "456"
+        assert call["scan_file_id"] is None
+        assert call["editable_file_id"] is None
+        assert call["remove_editable_file"] is False
+
+        assert program.scan_file_id == scan_file_id
+        assert program.task_id == task_id
+        assert program.program_type is ProgramType.COMMISSIONING
+        assert program.program_number == "456"
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_update_urza_program_rejects_approved_program(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.APPROVED,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    program_service = FakeProgramService(programs=[program])
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Редактировать можно только черновик."
+        )
+        assert program_service.update_calls == []
+        assert program.program_number == "123"
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_update_urza_program_replaces_files(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    new_scan = File(
+        id=uuid7(),
+        s3_key="files/new-scan.pdf",
+        original_name="new-scan.pdf",
+        display_name="new-scan.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    new_editable = File(
+        id=uuid7(),
+        s3_key="files/new-editable.docx",
+        original_name="new-editable.docx",
+        display_name="new-editable.docx",
+        extension=".docx",
+        size=7,
+        mime_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    class FakeFileServiceWithReplacements(FakeFileService):
+        def __init__(self) -> None:
+            super().__init__(new_scan)
+            self.upload_count = 0
+
+        async def upload(
+            self,
+            *,
+            actor_id: UUID,
+            content: bytes,
+            original_name: str,
+            display_name: str,
+            extension: str,
+            mime_type: str,
+        ) -> File:
+            self.upload_calls.append(
+                {
+                    "actor_id": actor_id,
+                    "content": content,
+                    "original_name": original_name,
+                    "display_name": display_name,
+                    "extension": extension,
+                    "mime_type": mime_type,
+                }
+            )
+            self.upload_count += 1
+            return new_scan if self.upload_count == 1 else new_editable
+
+    program_service = FakeProgramService(programs=[program])
+    file_service = FakeFileServiceWithReplacements()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+            files=[
+                ("scan_file", ("new-scan.pdf", b"scan", "application/pdf")),
+                (
+                    "editable_file",
+                    (
+                        "new-editable.docx",
+                        b"editable",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+            ],
+        )
+
+        assert response.status_code == 200
+        assert len(file_service.upload_calls) == 2
+        assert len(program_service.update_calls) == 1
+
+        call = program_service.update_calls[0]
+        assert call["scan_file_id"] == new_scan.id
+        assert call["editable_file_id"] == new_editable.id
+        assert call["remove_editable_file"] is False
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+#Исправить
+def test_update_urza_program_replaces_only_scan(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    old_scan_file_id = uuid7()
+    old_editable_file_id = uuid7()
+    task_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=old_scan_file_id,
+        editable_file_id=old_editable_file_id,
+        task_id=task_id,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    new_scan = File(
+        id=uuid7(),
+        s3_key="files/new-scan.pdf",
+        original_name="new-scan.pdf",
+        display_name="new-scan.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    program_service = FakeProgramService(programs=[program])
+    file_service = FakeFileService(new_scan)
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+            files={
+                "scan_file": (
+                    "new-scan.pdf",
+                    b"scan",
+                    "application/pdf",
+                ),
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert len(file_service.upload_calls) == 1
+        assert len(program_service.update_calls) == 1
+
+        call = program_service.update_calls[0]
+
+        # Новый скан передан сервису обновления.
+        assert call["scan_file_id"] == new_scan.id
+
+        # Другой файл не заменяется и не удаляется.
+        assert call["editable_file_id"] is None
+        assert call["remove_editable_file"] is False
+
+        # Связанные данные исходного объекта не изменились.
+        assert program.editable_file_id == old_editable_file_id
+        assert program.task_id == task_id
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_urza_program_replaces_only_editable_file(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    old_scan_file_id = uuid7()
+    old_editable_file_id = uuid7()
+    task_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=old_scan_file_id,
+        editable_file_id=old_editable_file_id,
+        task_id=task_id,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    new_editable = File(
+        id=uuid7(),
+        s3_key="files/new-editable.docx",
+        original_name="new-editable.docx",
+        display_name="new-editable.docx",
+        extension=".docx",
+        size=4,
+        mime_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    program_service = FakeProgramService(programs=[program])
+    file_service = FakeFileService(new_editable)
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+            files={
+                "editable_file": (
+                    "new-editable.docx",
+                    b"docx",
+                    (
+                        "application/vnd.openxmlformats-officedocument."
+                        "wordprocessingml.document"
+                    ),
+                ),
+            },
+        )
+
+        assert response.status_code == 200
+        assert len(file_service.upload_calls) == 1
+        assert len(program_service.update_calls) == 1
+
+        call = program_service.update_calls[0]
+
+        # Новый редактируемый файл передан сервису.
+        assert call["editable_file_id"] == new_editable.id
+
+        # Скан не заменяется, удаление файла не запрашивается.
+        assert call["scan_file_id"] is None
+        assert call["remove_editable_file"] is False
+
+        # Исходные ссылки на скан и задание сохраняются.
+        assert program.scan_file_id == old_scan_file_id
+        assert program.task_id == task_id
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_urza_program_cleans_up_uploaded_file_on_update_error(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    new_scan = File(
+        id=uuid7(),
+        s3_key="files/new-scan.pdf",
+        original_name="new-scan.pdf",
+        display_name="new-scan.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    class FailingProgramService(FakeProgramService):
+        async def update(self, **kwargs):
+            raise ValueError("Ошибка обновления программы.")
+
+    program_service = FailingProgramService(programs=[program])
+    file_service = FakeFileService(new_scan)
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+            files={
+                "scan_file": (
+                    "new-scan.pdf",
+                    b"scan",
+                    "application/pdf",
+                ),
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Ошибка обновления программы."
+        )
+        assert file_service.storage.delete_calls == [
+            {"key": "files/new-scan.pdf"},
+        ]
+
+        # Исходные данные программы не изменились.
+        assert program.program_number == "123"
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_urza_program_removes_editable_file(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    old_editable_file_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=old_editable_file_id,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    program_service = FakeProgramService(programs=[program])
+    file_service = FakeFileService(
+        File(
+            id=uuid7(),
+            s3_key="files/unused.pdf",
+            original_name="unused.pdf",
+            display_name="unused.pdf",
+            extension=".pdf",
+            size=4,
+            mime_type="application/pdf",
+            uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+            created_by=user.id,
+            updated_by=user.id,
+        )
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "123",
+                "remove_editable_file": "true",
+            },
+        )
+
+        assert response.status_code == 200
+        assert file_service.upload_calls == []
+        assert len(program_service.update_calls) == 1
+
+        call = program_service.update_calls[0]
+        assert call["scan_file_id"] is None
+        assert call["editable_file_id"] is None
+        assert call["remove_editable_file"] is True
+
+        assert program.editable_file_id is None
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_urza_program_cleans_up_scan_when_editable_upload_fails(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    program = Program(
+        id=uuid7(),
+        urza_id=urza_id,
+        program_type=ProgramType.WORK,
+        program_number="123",
+        status=DocumentStatus.DRAFT,
+        scan_file_id=uuid7(),
+        editable_file_id=None,
+        created_by=user.id,
+        updated_by=user.id,
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
+    )
+    program.creator = user
+
+    new_scan = File(
+        id=uuid7(),
+        s3_key="files/new-scan.pdf",
+        original_name="new-scan.pdf",
+        display_name="new-scan.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    class FailingEditableFileService(FakeFileService):
+        def __init__(self) -> None:
+            super().__init__(new_scan)
+            self.upload_count = 0
+
+        async def upload(
+            self,
+            *,
+            actor_id: UUID,
+            content: bytes,
+            original_name: str,
+            display_name: str,
+            extension: str,
+            mime_type: str,
+        ) -> File:
+            self.upload_count += 1
+
+            if self.upload_count == 1:
+                return new_scan
+
+            raise RuntimeError("Ошибка загрузки редактируемого файла.")
+
+    program_service = FakeProgramService(programs=[program])
+    file_service = FailingEditableFileService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs/{program.id}/edit",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "456",
+            },
+            files=[
+                ("scan_file", ("new-scan.pdf", b"scan", "application/pdf")),
+                (
+                    "editable_file",
+                    (
+                        "editable.docx",
+                        b"editable",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+            ],
+        )
+
+        assert response.status_code == 500
+        assert file_service.upload_count == 2
+        assert file_service.storage.delete_calls == [
+            {"key": "files/new-scan.pdf"},
+        ]
+        assert program_service.update_calls == []
+        assert program.program_number == "123"
 
     finally:
         app.dependency_overrides.clear()
@@ -994,7 +1853,7 @@ def test_create_urza_program(system_user_id) -> None:
         extension=".pdf",
         size=4,
         mime_type="application/pdf",
-        uploaded_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
         created_by=user.id,
         updated_by=user.id,
     )
@@ -1073,7 +1932,7 @@ def test_create_urza_program_with_editable_file(system_user_id) -> None:
         extension=".pdf",
         size=4,
         mime_type="application/pdf",
-        uploaded_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
         created_by=user.id,
         updated_by=user.id,
     )
@@ -1089,7 +1948,7 @@ def test_create_urza_program_with_editable_file(system_user_id) -> None:
             "application/vnd.openxmlformats-officedocument."
             "wordprocessingml.document"
         ),
-        uploaded_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
         created_by=user.id,
         updated_by=user.id,
     )
@@ -1202,6 +2061,308 @@ def test_create_urza_program_with_editable_file(system_user_id) -> None:
     finally:
         app.dependency_overrides.clear()
 
+
+def test_create_urza_program_empty_editable_file_cleans_up_scan(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    scan_file = File(
+        id=uuid7(),
+        s3_key="files/test-scan.pdf",
+        original_name="program.pdf",
+        display_name="program.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    file_service = FakeFileService(scan_file)
+    program_service = FakeProgramService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "1",
+            },
+            files=[
+                (
+                    "scan_file",
+                    ("program.pdf", b"scan", "application/pdf"),
+                ),
+                (
+                    "editable_file",
+                    ("program.docx", b"", "application/octet-stream"),
+                ),
+            ],
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Загруженный редактируемый файл пуст."
+        assert file_service.storage.delete_calls == [
+            {"key": scan_file.s3_key},
+        ]
+        assert program_service.programs == []
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_urza_program_cleans_up_files_on_create_error(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    scan_file = File(
+        id=uuid7(),
+        s3_key="files/test-scan.pdf",
+        original_name="program.pdf",
+        display_name="program.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    editable_file = File(
+        id=uuid7(),
+        s3_key="files/test-editable.docx",
+        original_name="program.docx",
+        display_name="program.docx",
+        extension=".docx",
+        size=7,
+        mime_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    class FakeFileServiceWithEditable(FakeFileService):
+        def __init__(self) -> None:
+            super().__init__(scan_file)
+            self.upload_count = 0
+
+        async def upload(
+            self,
+            *,
+            actor_id: UUID,
+            content: bytes,
+            original_name: str,
+            display_name: str,
+            extension: str,
+            mime_type: str,
+        ) -> File:
+            self.upload_calls.append(
+                {
+                    "actor_id": actor_id,
+                    "content": content,
+                    "original_name": original_name,
+                    "display_name": display_name,
+                    "extension": extension,
+                    "mime_type": mime_type,
+                }
+            )
+            self.upload_count += 1
+            return (
+                scan_file
+                if self.upload_count == 1
+                else editable_file
+            )
+
+    file_service = FakeFileServiceWithEditable()
+    program_service = FakeProgramService(
+        create_error=ValueError("Ошибка создания программы"),
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "1",
+            },
+            files=[
+                (
+                    "scan_file",
+                    ("program.pdf", b"scan", "application/pdf"),
+                ),
+                (
+                    "editable_file",
+                    (
+                        "program.docx",
+                        b"editable",
+                        "application/octet-stream",
+                    ),
+                ),
+            ],
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Ошибка создания программы"
+        assert file_service.storage.delete_calls == [
+            {"key": scan_file.s3_key},
+            {"key": editable_file.s3_key},
+        ]
+        assert program_service.programs == []
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_create_urza_program_cleans_up_scan_when_editable_upload_fails(
+    system_user_id,
+) -> None:
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+
+    scan_file = File(
+        id=uuid7(),
+        s3_key="files/test-scan.pdf",
+        original_name="program.pdf",
+        display_name="program.pdf",
+        extension=".pdf",
+        size=4,
+        mime_type="application/pdf",
+        uploaded_at=datetime(2026, 9, 30, tzinfo=UTC),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+
+    class FakeFileServiceWithUploadError(FakeFileService):
+        def __init__(self) -> None:
+            super().__init__(scan_file)
+            self.upload_count = 0
+
+        async def upload(
+            self,
+            *,
+            actor_id: UUID,
+            content: bytes,
+            original_name: str,
+            display_name: str,
+            extension: str,
+            mime_type: str,
+        ) -> File:
+            self.upload_calls.append(
+                {
+                    "actor_id": actor_id,
+                    "content": content,
+                    "original_name": original_name,
+                    "display_name": display_name,
+                    "extension": extension,
+                    "mime_type": mime_type,
+                }
+            )
+
+            self.upload_count += 1
+
+            if self.upload_count == 1:
+                return scan_file
+
+            raise RuntimeError("Ошибка загрузки редактируемого файла")
+
+    file_service = FakeFileServiceWithUploadError()
+    program_service = FakeProgramService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="УРЗА 1",
+            ),
+        )
+    )
+    app.dependency_overrides[get_program_service] = override_program_service(
+        program_service,
+    )
+    app.dependency_overrides[get_file_service] = lambda: file_service
+
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/programs",
+            data={
+                "program_type": ProgramType.WORK.value,
+                "program_number": "1",
+            },
+            files=[
+                (
+                    "scan_file",
+                    ("program.pdf", b"scan", "application/pdf"),
+                ),
+                (
+                    "editable_file",
+                    (
+                        "program.docx",
+                        b"editable",
+                        "application/octet-stream",
+                    ),
+                ),
+            ],
+        )
+
+        assert response.status_code == 500
+        assert len(file_service.upload_calls) == 2
+        assert file_service.storage.delete_calls == [
+            {"key": scan_file.s3_key},
+        ]
+        assert program_service.programs == []
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+
 def test_submit_urza_program(system_user_id) -> None:
     user = make_user(system_user_id=system_user_id)
     urza_id = uuid7()
@@ -1216,7 +2377,7 @@ def test_submit_urza_program(system_user_id) -> None:
         editable_file_id=None,
         created_by=user.id,
         updated_by=user.id,
-        created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
     )
 
     program.creator = user
@@ -1275,7 +2436,7 @@ def test_approve_urza_program(system_user_id) -> None:
         editable_file_id=None,
         created_by=user.id,
         updated_by=user.id,
-        created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
     )
 
     program.creator = user
@@ -1367,7 +2528,7 @@ def test_return_urza_program(system_user_id) -> None:
         editable_file_id=None,
         created_by=user.id,
         updated_by=user.id,
-        created_at=datetime(2026, 9, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 30, tzinfo=UTC),
     )
 
     program.creator = user
@@ -1416,7 +2577,7 @@ def test_get_urza_settings_renders_records_status_and_current(system_user_id):
     approved.parameter_name = "Approved параметр"
     draft.parameter_name = "Draft параметр"
     deleted = settings_record(
-        urza_id, DocumentStatus.APPROVED, deleted_at=datetime.now(timezone.utc)
+        urza_id, DocumentStatus.APPROVED, deleted_at=datetime.now(UTC)
     )
     service = FakeSettingsService(
         records=[draft, approved, deleted],

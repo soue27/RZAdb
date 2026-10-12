@@ -30,20 +30,30 @@ class TaskService:
         self.access_service = access_service
         self.urza_instruction_repository = urza_instruction_repository
 
+
     async def get_available_actions(
-            self,
-            *,
-            task: Task,
-            actor_id: UUID,
+        self,
+        *,
+        task: Task,
+        actor_id: UUID,
     ) -> set[str]:
         """Возвращает доступные действия с учётом статуса и прав пользователя."""
         if task.deleted_at is not None:
             return set()
 
         if task.status is TaskStatus.ASSIGNED:
+            actions = set()
+
             if task.assigned_to == actor_id:
-                return {"accept_task", "reject_task"}
-            return set()
+                actions.update({"accept_task", "reject_task"})
+
+            if await self.can_issue_task(
+                actor_id=actor_id,
+                urza_id=task.urza_id,
+            ):
+                actions.add("reassign_task")
+
+            return actions
 
         if task.status is TaskStatus.IN_PROGRESS:
             if task.assigned_to == actor_id:
@@ -73,6 +83,7 @@ class TaskService:
             return {"close_task", "return_for_revision"}
 
         return set()
+
 
     async def _check_reviewer_access(
         self,

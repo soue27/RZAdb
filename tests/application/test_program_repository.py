@@ -29,32 +29,21 @@ async def test_get_by_id():
 
 
 @pytest.mark.asyncio
-async def test_get_by_urza_id():
+async def test_get_by_id():
     session = MagicMock()
-    session.scalars = AsyncMock()
+    session.scalar = AsyncMock()
 
-    urza_id = uuid7()
+    program_id = uuid7()
+    program = MagicMock(spec=Program)
 
-    program_1 = MagicMock(spec=Program)
-    program_2 = MagicMock(spec=Program)
-
-    scalars_result = MagicMock()
-    scalars_result.all.return_value = [
-        program_1,
-        program_2,
-    ]
-
-    session.scalars.return_value = scalars_result
+    session.scalar.return_value = program
 
     repository = ProgramRepository(session)
 
-    result = await repository.get_by_urza_id(urza_id)
+    result = await repository.get_by_id(program_id)
 
-    assert result == [
-        program_1,
-        program_2,
-    ]
-    session.scalars.assert_awaited_once()
+    assert result is program
+    session.scalar.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import Date, Enum, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.file import File
 from app.domain.enums import DocumentStatus
+from app.domain.file import File
 from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base

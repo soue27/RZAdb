@@ -7,10 +7,16 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.access.service import AccessService
-from app.application.tree.service import TreeService
 from app.application.tasks.repository import TaskRepository
+from app.application.programs.service import ProgramService
 from app.application.tasks.service import TaskService
-from app.domain.enums import TaskStatus, TaskWorkType, MaintenanceType
+from app.application.tree.service import TreeService
+from app.domain.enums import (
+    MaintenanceType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
 from app.domain.task import Task
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -19,8 +25,8 @@ from app.presentation.dependencies.services import (
     get_task_repository,
     get_task_service,
     get_tree_service,
+    get_program_service,
 )
-
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -158,7 +164,7 @@ async def _task_create_form_response(
 async def _get_accessible_task(
     repository: TaskRepository,
     access_service: AccessService,
-    user_id: UUID,
+    current_user: User,
     task_id: UUID,
 ) -> Task:
     task = await repository.get_active_by_id(task_id)
@@ -170,12 +176,22 @@ async def _get_accessible_task(
         )
 
     if not await access_service.can_access_urza(
-        user_id,
+        current_user.id,
         task.urza_id,
     ):
         raise HTTPException(
             status_code=403,
             detail="Доступ к заданию запрещён.",
+        )
+
+    # Инженер может открывать только назначенные ему задания.
+    if (
+        current_user.role is UserRole.ENGINEER
+        and task.assigned_to != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Задание не назначено этому инженеру.",
         )
 
     return task
@@ -490,14 +506,25 @@ async def get_tasks(
     access_service: Annotated[AccessService, Depends(get_access_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    program_service: Annotated[
+        ProgramService,
+        Depends(get_program_service),
+    ],
 ):
     visible_tasks = []
     actions_by_task = {}
 
     for task in await repository.list_active():
         if not await access_service.can_access_urza(
-            current_user.id,
-            task.urza_id,
+                current_user.id,
+                task.urza_id,
+        ):
+            continue
+
+        # Инженер видит только задания, назначенные ему.
+        if (
+                current_user.role is UserRole.ENGINEER
+                and task.assigned_to != current_user.id
         ):
             continue
 
@@ -509,6 +536,12 @@ async def get_tasks(
                 actor_id=current_user.id,
             )
         )
+
+    standalone_programs = (
+        await program_service.list_standalone_under_review(
+            current_user.id,
+        )
+    )
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -525,6 +558,7 @@ async def get_tasks(
             "status_labels": TASK_STATUS_LABELS,
             "status_badges": TASK_STATUS_BADGES,
             "work_type_labels": WORK_TYPE_LABELS,
+            "standalone_programs": standalone_programs,
         },
     )
 
@@ -542,9 +576,17 @@ async def get_task_detail(
     task = await _get_accessible_task(
         repository,
         access_service,
-        current_user.id,
+        current_user,
         task_id,
     )
+
+    program_result = None
+
+    if task.work_type is TaskWorkType.PROGRAM:
+        program_result = await repository.get_program_by_task_id(task.id)
+
+        if program_result is not None and program_result.deleted_at is not None:
+            program_result = None
 
     history = await repository.get_history(task.id)
 
@@ -552,6 +594,13 @@ async def get_task_detail(
         task=task,
         actor_id=current_user.id,
     )
+
+    available_assignees = []
+    if "reassign_task" in actions:
+        available_assignees = await task_service.get_available_assignees(
+            actor_id=current_user.id,
+            urza_id=task.urza_id,
+        )
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -564,6 +613,8 @@ async def get_task_detail(
             "current_user": current_user,
             "tree": tree,
             **_task_context(task, history, actions),
+            "available_assignees": available_assignees,
+            "program_result": program_result,
             "error_message": None,
         },
     )
@@ -584,7 +635,7 @@ async def _run_review_action(
     task = await _get_accessible_task(
         repository,
         access_service,
-        current_user.id,
+        current_user,
         task_id,
     )
 
@@ -717,7 +768,7 @@ async def _run_executor_action(
     task = await _get_accessible_task(
         repository,
         access_service,
-        current_user.id,
+        current_user,
         task_id,
     )
 
@@ -942,4 +993,104 @@ async def return_task_for_revision(
         task_service=task_service,
         tree_service=tree_service,
         action="return_for_revision",
+    )
+
+
+
+@router.post("/{task_id}/reassign")
+async def reassign_task(
+    request: Request,
+    task_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    engineer_id: Annotated[str, Form()],
+):
+    task = await _get_accessible_task(
+        repository,
+        access_service,
+        current_user,
+        task_id,
+    )
+
+    try:
+        if not await task_service.can_issue_task(
+            actor_id=current_user.id,
+            urza_id=task.urza_id,
+        ):
+            raise PermissionError(
+                "Пользователь не может переназначать это задание."
+            )
+
+        engineers = await task_service.get_available_assignees(
+            actor_id=current_user.id,
+            urza_id=task.urza_id,
+        )
+
+        parsed_engineer_id = UUID(engineer_id)
+        if parsed_engineer_id not in {engineer.id for engineer in engineers}:
+            raise ValueError(
+                "Выбранный исполнитель не является доступным "
+                "активным инженером этого предприятия."
+            )
+
+        await task_service.reassign_task(
+            task=task,
+            assigned_to=parsed_engineer_id,
+            actor_id=current_user.id,
+        )
+
+    except (PermissionError, ValueError) as exc:
+        history = await repository.get_history(task.id)
+        actions = await task_service.get_available_actions(
+            task=task,
+            actor_id=current_user.id,
+        )
+        tree = await tree_service.get_tree(user_id=current_user.id)
+
+        is_htmx = request.headers.get("HX-Request") == "true"
+        return templates.TemplateResponse(
+            request=request,
+            name=(
+                "tasks/_detail_content.html"
+                if is_htmx
+                else "tasks/detail.html"
+            ),
+            context={
+                "current_user": current_user,
+                "tree": tree,
+                **_task_context(task, history, actions),
+                "error_message": str(exc),
+            },
+            status_code=(
+                200
+                if is_htmx
+                else 403 if isinstance(exc, PermissionError) else 400
+            ),
+        )
+
+    if request.headers.get("HX-Request") == "true":
+        history = await repository.get_history(task.id)
+        actions = await task_service.get_available_actions(
+            task=task,
+            actor_id=current_user.id,
+        )
+        tree = await tree_service.get_tree(user_id=current_user.id)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="tasks/_detail_content.html",
+            context={
+                "current_user": current_user,
+                "tree": tree,
+                **_task_context(task, history, actions),
+                "error_message": None,
+            },
+        )
+
+    return RedirectResponse(
+        url=f"/tasks/{task_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
     )

@@ -5,8 +5,8 @@ from app.application.access.service import AccessService
 from app.application.programs.repository import ProgramRepository
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
-from app.application.users.repository import UserRepository
 from app.application.urzas.repository import URZARepository
+from app.application.users.repository import UserRepository
 from app.domain.enums import (
     DocumentStatus,
     ProgramType,
@@ -15,7 +15,6 @@ from app.domain.enums import (
     UserRole,
 )
 from app.domain.program import Program
-
 
 
 class ProgramService:
@@ -88,7 +87,7 @@ class ProgramService:
                 UserRole.ADMIN,
                 UserRole.SUPERADMIN,
             }:
-                actions.add("submit")
+                actions.update({"submit", "edit"})
 
         elif program.status is DocumentStatus.UNDER_REVIEW:
             if user.role is UserRole.MANAGER:
@@ -267,6 +266,80 @@ class ProgramService:
 
         return program
 
+
+    async def update(
+        self,
+        user_id: UUID,
+        program_id: UUID,
+        urza_id: UUID,
+        program_type: ProgramType,
+        program_number: str,
+        scan_file_id: UUID | None = None,
+        editable_file_id: UUID | None = None,
+        remove_editable_file: bool = False,
+    ) -> Program:
+        """Обновляет черновик программы без изменения связанного задания."""
+        if not await self.access_service.can_access_urza(
+            user_id,
+            urza_id,
+        ):
+            raise PermissionError("Доступ к URZA запрещён")
+
+        program = await self.repository.get_by_id(program_id)
+
+        if program is None:
+            raise ValueError("Программа не найдена.")
+
+        if program.urza_id != urza_id:
+            raise ValueError("Программа не принадлежит указанной URZA.")
+
+        if program.status is not DocumentStatus.DRAFT:
+            raise ValueError(
+                "Редактировать можно только программу в статусе «Черновик»."
+            )
+
+        user = await self.user_repository.get_by_id(user_id)
+
+        if user is None:
+            raise ValueError("Пользователь не найден.")
+
+        if not user.active or user.deleted_at is not None:
+            raise PermissionError("Пользователь неактивен.")
+
+        if user.role not in {
+            UserRole.ENGINEER,
+            UserRole.ADMIN,
+            UserRole.SUPERADMIN,
+        }:
+            raise PermissionError(
+                "Редактировать программу с текущей ролью запрещено."
+            )
+
+        normalized_number = program_number.strip()
+        if not normalized_number:
+            raise ValueError("Номер программы не может быть пустым.")
+
+        if len(normalized_number) > 255:
+            raise ValueError("Номер программы не должен превышать 255 символов.")
+
+        program.program_type = program_type
+        program.program_number = normalized_number
+
+        if scan_file_id is not None:
+            program.scan_file_id = scan_file_id
+
+        if remove_editable_file:
+            program.editable_file_id = None
+        elif editable_file_id is not None:
+            program.editable_file_id = editable_file_id
+
+        program.updated_by = user_id
+
+        await self.repository.save(program)
+
+        return program
+
+
     async def submit_for_review(
             self,
             user_id: UUID,
@@ -439,3 +512,37 @@ class ProgramService:
         await self.repository.save(program)
 
         return program
+
+    async def list_standalone_under_review(
+        self,
+        user_id: UUID,
+    ) -> list[Program]:
+        user = await self.user_repository.get_by_id(user_id)
+
+        if user is None or not user.active or user.deleted_at is not None:
+            return []
+
+        if user.role is not UserRole.MANAGER:
+            return []
+
+        programs = await self.repository.list_standalone_under_review()
+        visible_programs = []
+
+        for program in programs:
+            if not await self.access_service.can_access_urza(
+                user_id,
+                program.urza_id,
+            ):
+                continue
+
+            try:
+                await self._check_manager_reviewer(
+                    user_id=user_id,
+                    urza_id=program.urza_id,
+                )
+            except (PermissionError, ValueError):
+                continue
+
+            visible_programs.append(program)
+
+        return visible_programs

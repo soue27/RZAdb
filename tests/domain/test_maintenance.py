@@ -1,9 +1,6 @@
 from app.domain.maintenance import TORecord
 
 
-from app.domain.maintenance import TORecord
-
-
 def test_to_record_model(system_user_id) -> None:
     record = TORecord(created_by=system_user_id, updated_by=system_user_id)
 

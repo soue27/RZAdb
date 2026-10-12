@@ -15,13 +15,13 @@ from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
 )
+from app.domain.rza_settings import SettingsForm
 from app.domain.schema import SchemaForm, SchemaRecord
 from app.domain.selectivity_scheme import (
     SelectivityScheme,
     SelectivitySchemeVersion,
 )
 from app.domain.settings_record import SettingsRecord
-from app.domain.rza_settings import SettingsForm
 from app.domain.urza_instruction import (
     URZAInstruction,
     URZAInstructionVersion,

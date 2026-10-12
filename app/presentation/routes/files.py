@@ -1,7 +1,7 @@
 import logging
 from typing import Annotated
-from uuid import UUID
 from urllib.parse import quote
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi import File as FastAPIFile

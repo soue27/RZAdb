@@ -6,15 +6,17 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
-    File as FastAPIFile,
     Form,
     HTTPException,
     Request,
     UploadFile,
     status,
 )
-from fastapi.templating import Jinja2Templates
+from fastapi import (
+    File as FastAPIFile,
+)
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
 from app.application.maintenance.service import TORecordService
@@ -35,7 +37,6 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
 )
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter(

@@ -8,8 +8,8 @@ from app.application.programs.repository import ProgramRepository
 from app.application.programs.service import ProgramService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
-from app.application.users.repository import UserRepository
 from app.application.urzas.repository import URZARepository
+from app.application.users.repository import UserRepository
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
@@ -32,8 +32,8 @@ from app.domain.program import Program
 from app.domain.substation import Substation
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
-from app.domain.user import User
 from app.domain.urza import URZA
+from app.domain.user import User
 
 
 @pytest.mark.asyncio

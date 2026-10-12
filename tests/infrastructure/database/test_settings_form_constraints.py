@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
-    ElementBase,
     DocumentStatus,
+    ElementBase,
     EnterpriseType,
     HighestVoltage,
     OperationalCurrentType,
@@ -15,8 +15,8 @@ from app.domain.enums import (
     URZACategory,
     URZAStatus,
 )
-from app.domain.rza_settings import SettingsForm
 from app.domain.file import File
+from app.domain.rza_settings import SettingsForm
 from app.domain.settings_record import SettingsRecord
 from app.domain.substation import Substation
 from app.domain.urza import URZA

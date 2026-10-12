@@ -27,14 +27,14 @@ from app.application.programs.repository import ProgramRepository
 from app.application.programs.service import ProgramService
 from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
+from app.application.schema.repository import SchemaRepository
+from app.application.schema.service import SchemaService
 from app.application.selectivity_schemes.repository import (
     SelectivitySchemeRepository,
 )
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
-from app.application.schema.repository import SchemaRepository
-from app.application.schema.service import SchemaService
 from app.application.settings.repository import SettingsRepository
 from app.application.settings.service import SettingsService
 from app.application.substations.repository import SubstationRepository
@@ -42,12 +42,12 @@ from app.application.substations.service import SubstationService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
-from app.application.urzas.repository import URZARepository
-from app.application.urzas.service import URZAService
-from app.application.urza_instructions.service import URZAInstructionService
 from app.application.urza_instructions.repository import (
     URZAInstructionRepository,
 )
+from app.application.urza_instructions.service import URZAInstructionService
+from app.application.urzas.repository import URZARepository
+from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage

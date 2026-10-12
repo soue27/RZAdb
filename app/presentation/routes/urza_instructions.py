@@ -5,13 +5,14 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
-    File as FastAPIFile,
     Form,
     HTTPException,
     Query,
     Request,
     UploadFile,
-    status,
+)
+from fastapi import (
+    File as FastAPIFile,
 )
 from fastapi.templating import Jinja2Templates
 
@@ -31,7 +32,6 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_urza_instruction_service,
 )
-
 
 router = APIRouter(
     prefix="/objects",
