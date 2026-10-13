@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.users.repository import UserRepository
+from app.domain.enums import UserRole
 from app.domain.user import User
 from app.infrastructure.database.session import get_session
 
@@ -38,3 +39,14 @@ async def get_current_user(
         )
 
     return user
+
+
+async def require_non_specialist(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if current_user.role is UserRole.SPECIALIST:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для выполнения этого действия.",
+        )
+    return current_user

@@ -260,6 +260,62 @@ def test_get_maintenance_list_returns_records(system_user_id):
         _cleanup(user)
 
 
+def test_specialist_can_view_maintenance_but_not_create(system_user_id):
+    urza_id = uuid7()
+    record = SimpleNamespace(
+        maintenance_date=date(2026, 9, 17),
+        maintenance_type=MaintenanceType.K,
+        detected_deviations="Нет",
+        measures_taken="Нет",
+        historical_data=False,
+        signed_form_file_id=None,
+        scan_protocol_id=None,
+        editable_protocol_id=None,
+        creator=SimpleNamespace(full_name="Автор"),
+    )
+    maintenance_service = FakeMaintenanceService(records=[record])
+    object_service, _, file_service, _ = _setup(
+        _user(system_user_id, UserRole.SPECIALIST),
+        maintenance_service=maintenance_service,
+    )
+    client = TestClient(app)
+    try:
+        view = client.get(f"/objects/urza/{urza_id}/maintenance")
+        form = client.get(f"/objects/urza/{urza_id}/maintenance/new")
+        created = client.post(
+            f"/objects/urza/{urza_id}/maintenance",
+            data=_post_data(),
+        )
+
+        assert view.status_code == 200
+        assert "Добавить запись ТО" not in view.text
+        assert 'href="/tasks"' not in view.text
+        assert "Нет" in view.text
+        assert form.status_code == 403
+        assert created.status_code == 403
+        assert not any(name == "create" for name, _ in maintenance_service.calls)
+        assert file_service.upload_calls == []
+        assert len(object_service.calls) == 1
+    finally:
+        _cleanup(None)
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.ENGINEER],
+)
+def test_existing_roles_keep_maintenance_creation_form_access(system_user_id, role):
+    urza_id = uuid7()
+    _setup(_user(system_user_id, role))
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/maintenance/new"
+        )
+        assert response.status_code == 200
+    finally:
+        _cleanup(None)
+
+
 def test_get_maintenance_list_returns_403_for_inaccessible_urza(
     system_user_id,
 ):

@@ -22,6 +22,7 @@
                 </a>
             {% endif %}
 
+            {% if can_create_maintenance %}
             <a
                 class="btn btn-primary"
                 href="/objects/urza/{{ urza_id }}/maintenance/new"
@@ -34,6 +35,7 @@
                 </span>
                 Добавить запись ТО
             </a>
+            {% endif %}
 
         </div>
 

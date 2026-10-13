@@ -49,6 +49,14 @@ from app.application.urza_instructions.service import URZAInstructionService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
+from app.application.work_items.service import (
+    InstructionWorkItemSource,
+    ProgramWorkItemSource,
+    SchemaWorkItemSource,
+    SettingsWorkItemSource,
+    TaskWorkItemSource,
+    WorkItemService,
+)
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
@@ -290,4 +298,37 @@ def get_urza_instruction_service(
         access_service=access_service,
         user_repository=UserRepository(session),
         urza_repository=URZARepository(session),
+    )
+
+
+def get_work_item_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    program_service: Annotated[ProgramService, Depends(get_program_service)],
+) -> WorkItemService:
+    settings_service = SettingsService(
+        repository=SettingsRepository(session),
+        access_service=access_service,
+    )
+    schema_service = SchemaService(
+        repository=SchemaRepository(session),
+        access_service=access_service,
+        task_repository=task_repository,
+    )
+    instruction_service = URZAInstructionService(
+        repository=URZAInstructionRepository(session),
+        access_service=access_service,
+        user_repository=UserRepository(session),
+        urza_repository=URZARepository(session),
+    )
+    return WorkItemService(
+        sources=[
+            TaskWorkItemSource(task_repository, access_service, task_service),
+            ProgramWorkItemSource(program_service),
+            SettingsWorkItemSource(settings_service),
+            SchemaWorkItemSource(schema_service),
+            InstructionWorkItemSource(instruction_service),
+        ]
     )

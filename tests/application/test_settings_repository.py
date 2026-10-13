@@ -113,6 +113,21 @@ async def test_get_unfinished_filters_to_active_draft_and_under_review():
 
 
 @pytest.mark.asyncio
+async def test_list_standalone_work_items_filters_linked_and_inactive_records():
+    session = AsyncMock()
+    scalar_result = MagicMock()
+    scalar_result.all.return_value = []
+    session.scalars.return_value = scalar_result
+    repository = SettingsRepository(session)
+
+    assert await repository.list_standalone_work_items() == []
+    sql = str(session.scalars.await_args.args[0])
+    assert "settings_records.task_id IS NULL" in sql
+    assert "settings_records.deleted_at IS NULL" in sql
+    assert "settings_records.status IN" in sql
+
+
+@pytest.mark.asyncio
 async def test_add_form_flushes_without_commit():
     session = MagicMock()
     session.flush = AsyncMock()

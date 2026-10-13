@@ -144,3 +144,22 @@ async def test_get_max_version_number():
     result = await repository.get_max_version_number(uuid7())
     assert result == 4
     session.scalar.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_list_standalone_work_items_selects_active_draft_and_review_versions():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+    repository = URZAInstructionRepository(session)
+
+    assert await repository.list_standalone_work_items() == []
+    statement = str(
+        session.scalars.await_args.args[0].compile(
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "urza_instruction_versions.deleted_at IS NULL" in statement
+    assert "urza_instruction_versions.status IN" in statement

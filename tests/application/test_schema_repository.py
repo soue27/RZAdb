@@ -85,6 +85,21 @@ async def test_list_active_filters_deleted_and_orders_deterministically() -> Non
 
 
 @pytest.mark.asyncio
+async def test_list_standalone_work_items_filters_linked_and_inactive_records() -> None:
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+    repository = SchemaRepository(session)
+
+    assert await repository.list_standalone_work_items() == []
+    sql = _sql(session.scalars.await_args.args[0])
+    assert "schema_records.task_id IS NULL" in sql
+    assert "schema_records.deleted_at IS NULL" in sql
+    assert "schema_records.status IN" in sql
+
+
+@pytest.mark.asyncio
 async def test_get_by_form_and_existing_list_method_delegate_to_active_list() -> None:
     session = AsyncMock()
     repository = SchemaRepository(session)

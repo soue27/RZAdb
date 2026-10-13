@@ -343,6 +343,54 @@ def test_get_new_schema_form_requires_signed_file_and_preserves_task_id(system_u
         _roles_by_user.pop(user.id, None)
 
 
+def test_specialist_can_view_schemas_but_not_create(system_user_id):
+    user = _user(system_user_id, UserRole.SPECIALIST)
+    urza_id = uuid7()
+    record = _record(urza_id, DocumentStatus.DRAFT)
+    service = FakeSchemaService(urza_id, records=[record])
+    files = FakeFileService(SimpleNamespace(id=uuid7()))
+    _setup(user, urza_id, service, file_service=files)
+    client = TestClient(app)
+    try:
+        view = client.get(f"/objects/urza/{urza_id}/schemas")
+        form = client.get(f"/objects/urza/{urza_id}/schemas/new")
+        created = client.post(
+            f"/objects/urza/{urza_id}/schemas",
+            data=_post_data(),
+            files={"signed_form_file": ("signed.pdf", b"content", "application/pdf")},
+        )
+
+        assert view.status_code == 200
+        assert record.schema_name in view.text
+        assert "Добавить схему" not in view.text
+        assert "Новое изменение" not in view.text
+        assert 'href="/tasks"' not in view.text
+        assert form.status_code == 403
+        assert created.status_code == 403
+        assert service.calls == []
+        assert files.upload_calls == []
+    finally:
+        app.dependency_overrides.clear()
+        _roles_by_user.pop(user.id, None)
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.ENGINEER],
+)
+def test_existing_roles_keep_schema_creation_form_access(system_user_id, role):
+    user = _user(system_user_id, role)
+    urza_id = uuid7()
+    service = FakeSchemaService(urza_id)
+    _setup(user, urza_id, service)
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/schemas/new")
+        assert response.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        _roles_by_user.pop(user.id, None)
+
+
 def test_create_schema_direct_input_uploads_only_required_signed_file(system_user_id):
     user = _user(system_user_id)
     urza_id = uuid7()

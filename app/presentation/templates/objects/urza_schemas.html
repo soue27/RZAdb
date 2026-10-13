@@ -15,6 +15,7 @@
                 </a>
             {% endif %}
 
+            {% if can_create_schema %}
             <a
                 class="btn btn-primary"
                 href="/objects/urza/{{ urza_id }}/schemas/new"
@@ -25,6 +26,7 @@
                 <span class="material-icons align-middle me-1">add</span>
                 Добавить схему
             </a>
+            {% endif %}
         </div>
     </div>
 

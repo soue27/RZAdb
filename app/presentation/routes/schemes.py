@@ -15,9 +15,13 @@ from app.application.objects.exceptions import (
 from app.application.objects.service import ObjectService
 from app.application.schema.service import SchemaService
 from app.application.tasks.service import TaskService
+from app.domain.enums import UserRole
 from app.domain.schema import SchemaRecord
 from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
+from app.presentation.auth.dependencies import (
+    get_current_user,
+    require_non_specialist,
+)
 from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
@@ -96,6 +100,7 @@ async def _render_schemes(
             "error_message": error_message,
             "notice_message": notice_message,
             "can_issue_task": can_issue_task,
+            "can_create_schema": current_user.role is not UserRole.SPECIALIST,
         },
         status_code=response_status,
     )
@@ -238,7 +243,10 @@ async def get_urza_schemas(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.get("/urza/{urza_id}/schemas/new")
+@router.get(
+    "/urza/{urza_id}/schemas/new",
+    dependencies=[Depends(require_non_specialist)],
+)
 async def get_new_urza_schema_form(
     request: Request,
     urza_id: UUID,
@@ -272,7 +280,10 @@ async def get_new_urza_schema_form(
     )
 
 
-@router.post("/urza/{urza_id}/schemas")
+@router.post(
+    "/urza/{urza_id}/schemas",
+    dependencies=[Depends(require_non_specialist)],
+)
 async def create_urza_schema_record(
     request: Request,
     urza_id: UUID,

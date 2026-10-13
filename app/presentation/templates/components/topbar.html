@@ -20,6 +20,7 @@
         <div class="d-flex align-items-center gap-2 ms-auto">
 
             <!-- Tasks -->
+            {% if current_user and current_user.role.value != "specialist" %}
             <a
                 href="/tasks"
                 class="btn rzadb-btn-primary topbar-control
@@ -33,6 +34,7 @@
                     Задания
                 </span>
             </a>
+            {% endif %}
 
 
             <!-- Notifications -->

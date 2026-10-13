@@ -27,9 +27,12 @@ from app.application.objects.exceptions import (
 from app.application.objects.service import ObjectService
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
-from app.domain.enums import MaintenanceType
+from app.domain.enums import MaintenanceType, UserRole
 from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
+from app.presentation.auth.dependencies import (
+    get_current_user,
+    require_non_specialist,
+)
 from app.presentation.dependencies.services import (
     get_file_service,
     get_maintenance_service,
@@ -153,6 +156,7 @@ async def get_urza_maintenance(
         context={
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
+            "can_create_maintenance": current_user.role is not UserRole.SPECIALIST,
             "urza_id": urza_id,
         },
         current_user=current_user,
@@ -160,7 +164,10 @@ async def get_urza_maintenance(
     )
 
 
-@router.get("/urza/{urza_id}/maintenance/new")
+@router.get(
+    "/urza/{urza_id}/maintenance/new",
+    dependencies=[Depends(require_non_specialist)],
+)
 async def get_new_urza_maintenance_form(
     request: Request,
     urza_id: UUID,
@@ -207,7 +214,10 @@ async def get_new_urza_maintenance_form(
     )
 
 
-@router.post("/urza/{urza_id}/maintenance")
+@router.post(
+    "/urza/{urza_id}/maintenance",
+    dependencies=[Depends(require_non_specialist)],
+)
 async def create_urza_maintenance(
     request: Request,
     urza_id: UUID,
@@ -478,6 +488,7 @@ async def create_urza_maintenance(
         context={
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
+            "can_create_maintenance": current_user.role is not UserRole.SPECIALIST,
             "urza_id": urza_id,
         },
         current_user=current_user,
