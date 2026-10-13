@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, Date, Enum, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.enums import MaintenanceType
+from app.domain.enums import MaintenanceType, DocumentStatus
 from app.domain.file import File
 from app.domain.task import Task
 from app.domain.urza import URZA
@@ -71,6 +71,17 @@ class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     signed_form_file_id: Mapped[UUID] = mapped_column(
         ForeignKey("files.id"),
         nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+        default=DocumentStatus.DRAFT,
+        server_default=DocumentStatus.DRAFT.value,
     )
 
     task_id: Mapped[UUID | None] = mapped_column(

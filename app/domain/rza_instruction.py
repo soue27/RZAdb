@@ -1,12 +1,14 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, Text
+from sqlalchemy import Date, ForeignKey, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.file import File
 from app.domain.substation import Substation
 from app.domain.user import User
+from app.domain.enums import DocumentStatus
+from app.domain.task import Task
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
@@ -66,6 +68,22 @@ class RZAInstructionVersion(
 
     editable_file_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("files.id"),
+        nullable=True,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+        default=DocumentStatus.DRAFT,
+        server_default=DocumentStatus.DRAFT.value,
+    )
+
+    task_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("tasks.id"),
         nullable=True,
     )
 

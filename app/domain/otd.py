@@ -12,7 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.enums import OTDPurpose
+from app.domain.enums import OTDPurpose, DocumentStatus
 from app.domain.task import Task
 from app.domain.urza import URZA
 from app.domain.user import User
@@ -134,6 +134,17 @@ class OTDVersion(
             values_callable=lambda enum: [item.value for item in enum],
         ),
         nullable=False,
+    )
+
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(
+            DocumentStatus,
+            name="document_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        nullable=False,
+        default=DocumentStatus.DRAFT,
+        server_default=DocumentStatus.DRAFT.value,
     )
 
     task_id: Mapped[UUID | None] = mapped_column(
