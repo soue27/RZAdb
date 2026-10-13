@@ -141,3 +141,24 @@ class URZAInstructionRepository:
         result = await self.session.scalars(query)
 
         return list(result.all())
+
+    async def list_standalone_work_items(self) -> list[URZAInstructionVersion]:
+        query = (
+            select(URZAInstructionVersion)
+            .options(
+                selectinload(URZAInstructionVersion.urza_instruction),
+                selectinload(URZAInstructionVersion.creator),
+            )
+            .where(
+                URZAInstructionVersion.deleted_at.is_(None),
+                URZAInstructionVersion.status.in_(
+                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                ),
+            )
+            .order_by(
+                URZAInstructionVersion.created_at.desc(),
+                URZAInstructionVersion.id.desc(),
+            )
+        )
+        result = await self.session.scalars(query)
+        return list(result.all())

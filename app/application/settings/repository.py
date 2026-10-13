@@ -95,6 +95,27 @@ class SettingsRepository:
         )
         return await self.session.scalar(statement)
 
+    async def list_standalone_work_items(self) -> list[SettingsRecord]:
+        statement = (
+            select(SettingsRecord)
+            .options(
+                selectinload(SettingsRecord.settings_form).selectinload(
+                    SettingsForm.urza
+                ),
+                selectinload(SettingsRecord.creator),
+            )
+            .where(
+                SettingsRecord.task_id.is_(None),
+                SettingsRecord.deleted_at.is_(None),
+                SettingsRecord.status.in_(
+                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                ),
+            )
+            .order_by(SettingsRecord.created_at.desc(), SettingsRecord.id.desc())
+        )
+        result = await self.session.scalars(statement)
+        return list(result.all())
+
     async def add_form(self, settings_form: SettingsForm) -> SettingsForm:
         self.session.add(settings_form)
         await self.session.flush()

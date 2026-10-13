@@ -131,6 +131,27 @@ class SchemaRepository:
         )
         return await self.session.scalar(statement)
 
+    async def list_standalone_work_items(self) -> list[SchemaRecord]:
+        statement = (
+            select(SchemaRecord)
+            .options(
+                selectinload(SchemaRecord.schema_form).selectinload(
+                    SchemaForm.urza
+                ),
+                selectinload(SchemaRecord.creator),
+            )
+            .where(
+                SchemaRecord.task_id.is_(None),
+                SchemaRecord.deleted_at.is_(None),
+                SchemaRecord.status.in_(
+                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                ),
+            )
+            .order_by(SchemaRecord.created_at.desc(), SchemaRecord.id.desc())
+        )
+        result = await self.session.scalars(statement)
+        return list(result.all())
+
     async def add_form(
         self,
         schema_form: SchemaForm,
