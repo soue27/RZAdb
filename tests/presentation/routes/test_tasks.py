@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.work_items.service import TaskWorkItemSource, WorkItemService
 from app.domain.enums import TaskStatus, TaskWorkType, UserRole
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
@@ -14,6 +15,7 @@ from app.presentation.dependencies.services import (
     get_task_repository,
     get_task_service,
     get_tree_service,
+    get_work_item_service,
 )
 
 
@@ -29,6 +31,7 @@ def _task(user_id: UUID, status: TaskStatus = TaskStatus.COMPLETED):
         created_by=user_id,
         created_by_user=SimpleNamespace(full_name="Автор"),
         status=status,
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
         assigned_at=None,
         acceptance_deadline_at=None,
         deadline_at=datetime(2026, 10, 20, tzinfo=UTC),
@@ -88,6 +91,15 @@ class FakeAccessService:
     def __init__(self, denied_urzas=()):
         self.denied_urzas = set(denied_urzas)
         self.urza_repository = FakeURZARepository()
+        self.user_repository = SimpleNamespace(get_by_id=self._get_user)
+
+    async def _get_user(self, user_id):
+        return SimpleNamespace(
+            id=user_id,
+            role=UserRole.ENGINEER,
+            active=True,
+            deleted_at=None,
+        )
 
     async def can_access_urza(self, user_id, urza_id):
         return urza_id not in self.denied_urzas
@@ -202,6 +214,9 @@ def _client(user, repository, access_service, task_service):
     app.dependency_overrides[get_access_service] = lambda: access_service
     app.dependency_overrides[get_task_service] = lambda: task_service
     app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [TaskWorkItemSource(repository, access_service, task_service)]
+    )
     return TestClient(app)
 
 
@@ -227,6 +242,57 @@ def test_task_routes_are_registered_in_openapi():
     assert "post" in paths["/tasks/{task_id}/accept"]
     assert "post" in paths["/tasks/{task_id}/reject"]
     assert "post" in paths["/tasks/{task_id}/complete"]
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "data"),
+    [
+        ("get", "/tasks", None),
+        ("get", "/tasks/create", None),
+        ("get", "/tasks/00000000-0000-0000-0000-000000000001", None),
+        ("post", "/tasks/create", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/accept", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/complete", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/reject", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/submit-for-review", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/close", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/return-for-revision", {}),
+        ("post", "/tasks/00000000-0000-0000-0000-000000000001/reassign", {}),
+    ],
+)
+def test_specialist_is_forbidden_from_all_task_routes(
+    system_user_id, method, path, data
+):
+    repository = FakeTaskRepository([])
+    access_service = FakeAccessService()
+    service = FakeTaskService()
+    client = _client(
+        _user(system_user_id, UserRole.SPECIALIST),
+        repository,
+        access_service,
+        service,
+    )
+
+    response = getattr(client, method)(path, data=data) if data is not None else getattr(client, method)(path)
+
+    assert response.status_code == 403
+    assert repository.tasks == []
+    assert service.calls == []
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.ENGINEER],
+)
+def test_existing_roles_keep_task_list_access(system_user_id, role):
+    client = _client(
+        _user(system_user_id, role),
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    response = client.get("/tasks")
+    assert response.status_code == 200
 
 
 def test_task_create_form_shows_urza_work_type_and_available_engineers(
@@ -388,7 +454,7 @@ def test_task_create_post_rejects_engineer_outside_available_assignees(
     assert all(call[0] != "create_task" for call in service.calls)
 
 
-def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
+def test_task_list_shows_accessible_tasks_and_opens_details_for_actions(system_user_id):
     user = _user(system_user_id)
     visible = _task(user.id)
     hidden = _task(user.id)
@@ -400,6 +466,7 @@ def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
 
     with _client(user, repository, access, service) as client:
         response = client.get("/tasks")
+        detail_response = client.get(f"/tasks/{visible.id}")
 
     assert response.status_code == 200
     assert "Проверить схему" in response.text
@@ -407,10 +474,31 @@ def test_task_list_shows_active_accessible_tasks_and_actions(system_user_id):
     assert "Инженер" in response.text
     assert "Выполнено" in response.text
     assert response.text.count("Проверить схему") == 1
-    assert "Отправить на согласование" in response.text
+    assert "Отправить на согласование" not in response.text
+    assert "Отправить на согласование" in detail_response.text
     assert 'id="object-content"' in response.text
     assert 'hx-target="#object-content"' in response.text
     assert "УРЗА из дерева" in response.text
+
+
+def test_task_list_uses_unified_work_items_table():
+    user = _user(uuid7())
+    repository = FakeTaskRepository([_task(user.id)])
+    access = FakeAccessService()
+    service = FakeTaskService()
+
+    with _client(user, repository, access, service) as client:
+        response = client.get("/tasks")
+
+    assert response.status_code == 200
+    assert "Текущая работа" in response.text
+    assert "Задание · Схема" in response.text
+    assert "Автор" in response.text
+    assert "Исполнитель" in response.text
+    assert "/tasks/" in response.text
+    assert "Отправить на согласование" not in response.text
+    assert "text-bg-info" not in response.text
+    assert "class=\"btn btn-sm btn-outline-primary\">Открыть</a>" in response.text
 
 
 def test_task_detail_displays_history_and_review_actions(system_user_id):

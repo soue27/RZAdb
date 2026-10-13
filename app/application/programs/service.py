@@ -546,3 +546,27 @@ class ProgramService:
             visible_programs.append(program)
 
         return visible_programs
+
+    async def list_standalone_work_items(
+        self,
+        user_id: UUID,
+    ) -> list[Program]:
+        user = await self.user_repository.get_by_id(user_id)
+        if user is None or not user.active or user.deleted_at is not None:
+            return []
+
+        visible_programs = []
+        for program in await self.repository.list_standalone_work_items():
+            if program.status is DocumentStatus.DRAFT and program.created_by != user_id:
+                continue
+            if not await self.access_service.can_access_urza(user_id, program.urza_id):
+                continue
+            actions = await self.get_available_actions(user_id, program)
+            if program.status is DocumentStatus.UNDER_REVIEW and "approve" not in actions:
+                continue
+            if program.status is DocumentStatus.DRAFT and not actions.intersection(
+                {"edit", "submit"}
+            ):
+                continue
+            visible_programs.append(program)
+        return visible_programs

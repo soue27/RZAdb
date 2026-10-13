@@ -82,6 +82,22 @@ async def test_get_by_task_id():
 
 
 @pytest.mark.asyncio
+async def test_list_standalone_work_items_filters_linked_and_inactive_programs():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+    repository = ProgramRepository(session)
+
+    assert await repository.list_standalone_work_items() == []
+    sql = str(session.scalars.await_args.args[0])
+    assert "programs.task_id IS NULL" in sql
+    assert "programs.deleted_at IS NULL" in sql
+    assert "programs.status IN" in sql
+
+
+@pytest.mark.asyncio
 async def test_add():
     session = MagicMock()
     session.flush = AsyncMock()

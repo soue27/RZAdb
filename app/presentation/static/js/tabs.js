@@ -17,3 +17,20 @@ document.addEventListener("click", (event) => {
 
     tab.classList.add("active");
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get("tab");
+
+    if (!requestedTab) {
+        return;
+    }
+
+    const tab = document.querySelector(
+        `[data-rzadb-tabs] [data-rzadb-tab][data-tab="${requestedTab}"]`
+    );
+
+    if (tab && !tab.disabled) {
+        tab.click();
+    }
+});

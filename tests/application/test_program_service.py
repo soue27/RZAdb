@@ -15,6 +15,44 @@ from app.domain.enums import (
 from app.domain.program import Program
 
 
+@pytest.mark.asyncio
+async def test_list_standalone_work_items_includes_only_author_drafts(
+    service,
+    repository,
+    user_repository,
+    access_service,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    user = SimpleNamespace(
+        id=user_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    user_repository.get_by_id.return_value = user
+    access_service.can_access_urza.return_value = True
+    own_draft = SimpleNamespace(
+        id=uuid7(),
+        created_by=user_id,
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+    )
+    other_draft = SimpleNamespace(
+        id=uuid7(),
+        created_by=uuid7(),
+        urza_id=urza_id,
+        status=DocumentStatus.DRAFT,
+    )
+    repository.list_standalone_work_items = AsyncMock(
+        return_value=[own_draft, other_draft]
+    )
+
+    result = await service.list_standalone_work_items(user_id)
+
+    assert result == [own_draft]
+
+
 @pytest.fixture
 def repository():
     repository = MagicMock()

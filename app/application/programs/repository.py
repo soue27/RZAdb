@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.program import Program
 from app.domain.enums import DocumentStatus
+from app.domain.program import Program
 
 
 class ProgramRepository:
@@ -92,5 +92,24 @@ class ProgramRepository:
             .order_by(Program.updated_at.desc())
         )
 
+        result = await self.session.scalars(query)
+        return list(result.all())
+
+    async def list_standalone_work_items(self) -> list[Program]:
+        query = (
+            select(Program)
+            .options(
+                selectinload(Program.urza),
+                selectinload(Program.creator),
+            )
+            .where(
+                Program.task_id.is_(None),
+                Program.status.in_(
+                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                ),
+                Program.deleted_at.is_(None),
+            )
+            .order_by(Program.created_at.desc(), Program.id.desc())
+        )
         result = await self.session.scalars(query)
         return list(result.all())

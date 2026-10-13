@@ -8,9 +8,9 @@ from fastapi.templating import Jinja2Templates
 
 from app.application.access.service import AccessService
 from app.application.tasks.repository import TaskRepository
-from app.application.programs.service import ProgramService
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
+from app.application.work_items.service import WorkItemService
 from app.domain.enums import (
     MaintenanceType,
     TaskStatus,
@@ -19,16 +19,23 @@ from app.domain.enums import (
 )
 from app.domain.task import Task
 from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
+from app.presentation.auth.dependencies import (
+    get_current_user,
+    require_non_specialist,
+)
 from app.presentation.dependencies.services import (
     get_access_service,
     get_task_repository,
     get_task_service,
     get_tree_service,
-    get_program_service,
+    get_work_item_service,
 )
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+router = APIRouter(
+    prefix="/tasks",
+    tags=["tasks"],
+    dependencies=[Depends(require_non_specialist)],
+)
 
 templates = Jinja2Templates(
     directory="app/presentation/templates",
@@ -502,46 +509,13 @@ async def create_task(
 async def get_tasks(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
-    repository: Annotated[TaskRepository, Depends(get_task_repository)],
-    access_service: Annotated[AccessService, Depends(get_access_service)],
-    task_service: Annotated[TaskService, Depends(get_task_service)],
-    tree_service: Annotated[TreeService, Depends(get_tree_service)],
-    program_service: Annotated[
-        ProgramService,
-        Depends(get_program_service),
+    work_item_service: Annotated[
+        WorkItemService,
+        Depends(get_work_item_service),
     ],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
-    visible_tasks = []
-    actions_by_task = {}
-
-    for task in await repository.list_active():
-        if not await access_service.can_access_urza(
-                current_user.id,
-                task.urza_id,
-        ):
-            continue
-
-        # Инженер видит только задания, назначенные ему.
-        if (
-                current_user.role is UserRole.ENGINEER
-                and task.assigned_to != current_user.id
-        ):
-            continue
-
-        visible_tasks.append(task)
-
-        actions_by_task[task.id] = (
-            await task_service.get_available_actions(
-                task=task,
-                actor_id=current_user.id,
-            )
-        )
-
-    standalone_programs = (
-        await program_service.list_standalone_under_review(
-            current_user.id,
-        )
-    )
+    work_items = await work_item_service.list_for_user(current_user.id)
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -553,12 +527,7 @@ async def get_tasks(
         context={
             "current_user": current_user,
             "tree": tree,
-            "tasks": visible_tasks,
-            "actions_by_task": actions_by_task,
-            "status_labels": TASK_STATUS_LABELS,
-            "status_badges": TASK_STATUS_BADGES,
-            "work_type_labels": WORK_TYPE_LABELS,
-            "standalone_programs": standalone_programs,
+            "work_items": work_items,
         },
     )
 
