@@ -24,6 +24,7 @@ from app.application.objects.exceptions import (
 from app.application.objects.service import ObjectService
 from app.application.tasks.service import TaskService
 from app.application.urza_instructions.service import URZAInstructionService
+from app.domain.enums import UserRole
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -99,6 +100,14 @@ async def _render_instruction(
             user.id,
             instruction_version,
         )
+        # A user may have access to several URZA objects. History selection
+        # must still remain within the instruction currently being rendered.
+        if (
+            selected_version is not None
+            and instruction is not None
+            and selected_version.urza_instruction_id != instruction.id
+        ):
+            selected_version = None
 
     if selected_version is None:
         selected_version = versions[0] if versions else current_version
@@ -193,6 +202,17 @@ async def get_new_instruction_form(
         urza_id,
     )
 
+    if current_user.role not in {
+        UserRole.MANAGER,
+        UserRole.ENGINEER,
+        UserRole.ADMIN,
+        UserRole.SUPERADMIN,
+    }:
+        raise HTTPException(
+            status_code=403,
+            detail="Создавать инструкцию с текущей ролью запрещено.",
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="objects/urza_instruction_form.html",
@@ -232,6 +252,18 @@ async def get_new_instruction_version_form(
         raise HTTPException(
             status_code=404,
             detail="Инструкция РЗА не найдена.",
+        )
+
+    versions = await service.get_versions(current_user.id, urza_id)
+    actions = (
+        await service.get_available_actions(current_user.id, versions[0])
+        if versions
+        else set()
+    )
+    if "new_version" not in actions:
+        raise HTTPException(
+            status_code=403,
+            detail="Создание новой версии инструкции запрещено.",
         )
 
     return templates.TemplateResponse(

@@ -4,6 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.application.access.service import AccessService
+from app.application.otd.service import OTDService
 from app.application.programs.service import ProgramService
 from app.application.schema.service import SchemaService
 from app.application.settings.service import SettingsService
@@ -44,11 +45,18 @@ _ACTION_LABELS = {
     "approve": "Утвердить",
     "return": "Вернуть на доработку",
     "new_version": "Создать новую версию",
+    "new_record": "Новое изменение",
 }
 
 
 def _action_labels(actions: set[str]) -> tuple[str, ...]:
     return tuple(_ACTION_LABELS[action] for action in sorted(actions))
+
+
+def _document_work_item_status(status: DocumentStatus) -> tuple[str, str]:
+    if status is DocumentStatus.APPROVED:
+        return _TASK_STATUS_LABELS["closed"], _TASK_STATUS_BADGES["closed"]
+    return status.label, status.badge_class
 
 
 @dataclass(frozen=True)
@@ -160,6 +168,62 @@ class ProgramWorkItemSource:
         return items
 
 
+class OTDWorkItemSource:
+    def __init__(self, service: OTDService) -> None:
+        self.service = service
+
+    async def list_for_user(
+        self,
+        user_id: UUID,
+        prior_items: tuple[WorkItem, ...] = (),
+    ) -> list[WorkItem]:
+        items = []
+        for version in await self.service.repository.list_standalone_work_items():
+            otd = version.otd
+            urza = otd.urza if otd is not None else None
+            if (
+                otd is None
+                or urza is None
+                or urza.deleted_at is not None
+                or not await self.service.access_service.can_access_urza(
+                    user_id, otd.urza_id
+                )
+            ):
+                continue
+            actions = await self.service.get_available_actions(user_id, version)
+            if version.status is DocumentStatus.DRAFT and version.created_by != user_id:
+                continue
+            if version.status is DocumentStatus.DRAFT and "submit" not in actions:
+                continue
+            if (
+                version.status is DocumentStatus.UNDER_REVIEW
+                and version.created_by != user_id
+                and "approve" not in actions
+            ):
+                continue
+            status, status_class = _document_work_item_status(version.status)
+            items.append(
+                WorkItem(
+                    item_type="Самостоятельное ОТД",
+                    title=f"ОТД · версия {version.version_number}",
+                    status=status,
+                    status_class=status_class,
+                    created_at=version.created_at,
+                    author=(
+                        version.created_by_user.full_name
+                        if version.created_by_user
+                        else "—"
+                    ),
+                    assignee="—",
+                    parent=urza.dispatch_name,
+                    parent_id=otd.urza_id,
+                    url=f"/objects/urza/{otd.urza_id}?tab=otd",
+                    actions=_action_labels(actions),
+                )
+            )
+        return items
+
+
 class SettingsWorkItemSource:
     def __init__(self, service: SettingsService) -> None:
         self.service = service
@@ -172,6 +236,17 @@ class SettingsWorkItemSource:
         items = []
         for record in await self.service.repository.list_standalone_work_items():
             form = record.settings_form
+            urza = form.urza if form is not None else None
+            if (
+                form is None
+                or form.deleted_at is not None
+                or urza is None
+                or urza.deleted_at is not None
+                or not await self.service.access_service.can_access_urza(
+                    user_id, form.urza_id
+                )
+            ):
+                continue
             if record.task_id is not None:
                 continue
             actions = await self.service.get_available_actions(user_id, record)
@@ -179,6 +254,7 @@ class SettingsWorkItemSource:
                 continue
             if (
                 record.status is DocumentStatus.UNDER_REVIEW
+                and record.created_by != user_id
                 and "approve" not in actions
             ):
                 continue
@@ -186,18 +262,19 @@ class SettingsWorkItemSource:
                 {"edit", "submit"}
             ):
                 continue
+            status, status_class = _document_work_item_status(record.status)
             items.append(
                 WorkItem(
                     item_type="Самостоятельные уставки",
                     title=record.parameter_name,
-                    status=record.status.label,
-                    status_class=record.status.badge_class,
+                    status=status,
+                    status_class=status_class,
                     created_at=record.created_at,
                     author=record.creator.full_name if record.creator else "—",
                     assignee="—",
                     parent=form.urza.dispatch_name,
                     parent_id=form.urza_id,
-                    url=f"/objects/urza/{form.urza_id}/settings",
+                    url=f"/objects/urza/{form.urza_id}?tab=settings",
                     actions=_action_labels(actions),
                 )
             )
@@ -216,6 +293,17 @@ class SchemaWorkItemSource:
         items = []
         for record in await self.service.repository.list_standalone_work_items():
             form = record.schema_form
+            urza = form.urza if form is not None else None
+            if (
+                form is None
+                or form.deleted_at is not None
+                or urza is None
+                or urza.deleted_at is not None
+                or not await self.service.access_service.can_access_urza(
+                    user_id, form.urza_id
+                )
+            ):
+                continue
             if record.task_id is not None:
                 continue
             actions = await self.service.get_available_actions(user_id, record)
@@ -223,6 +311,7 @@ class SchemaWorkItemSource:
                 continue
             if (
                 record.status is DocumentStatus.UNDER_REVIEW
+                and record.created_by != user_id
                 and "approve" not in actions
             ):
                 continue
@@ -230,18 +319,19 @@ class SchemaWorkItemSource:
                 {"edit", "submit"}
             ):
                 continue
+            status, status_class = _document_work_item_status(record.status)
             items.append(
                 WorkItem(
                     item_type="Самостоятельная схема",
                     title=f"{record.schema_number} · {record.schema_name}",
-                    status=record.status.label,
-                    status_class=record.status.badge_class,
+                    status=status,
+                    status_class=status_class,
                     created_at=record.created_at,
                     author=record.creator.full_name if record.creator else "—",
                     assignee="—",
                     parent=form.urza.dispatch_name,
                     parent_id=form.urza_id,
-                    url=f"/objects/urza/{form.urza_id}/schemas",
+                    url=f"/objects/urza/{form.urza_id}?tab=schemas",
                     actions=_action_labels(actions),
                 )
             )
@@ -276,11 +366,6 @@ class InstructionWorkItemSource:
             actions = await self.service.get_available_actions(user_id, version)
             if version.status is DocumentStatus.DRAFT and version.created_by != user_id:
                 continue
-            if (
-                version.status is DocumentStatus.UNDER_REVIEW
-                and "approve" not in actions
-            ):
-                continue
             if version.status is DocumentStatus.DRAFT and "submit" not in actions:
                 continue
             urza = await self.service.urza_repository.get_by_id(instruction.urza_id)
@@ -297,7 +382,7 @@ class InstructionWorkItemSource:
                     assignee="—",
                     parent=urza.dispatch_name,
                     parent_id=instruction.urza_id,
-                    url=f"/objects/urza/{instruction.urza_id}/instruction",
+                    url=f"/objects/urza/{instruction.urza_id}?tab=instruction",
                     actions=_action_labels(actions),
                 )
             )

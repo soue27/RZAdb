@@ -6,7 +6,10 @@ import pytest
 
 from app.application.work_items.service import (
     InstructionWorkItemSource,
+    OTDWorkItemSource,
     ProgramWorkItemSource,
+    SchemaWorkItemSource,
+    SettingsWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
     WorkItemService,
@@ -99,6 +102,46 @@ async def test_task_source_keeps_assignment_and_access_filters():
 
 
 @pytest.mark.asyncio
+async def test_closed_maintenance_task_remains_in_work_items():
+    user_id = uuid4()
+    task = SimpleNamespace(
+        id=uuid4(),
+        urza_id=uuid4(),
+        urza=SimpleNamespace(dispatch_name="УРЗА-1"),
+        work_type=TaskWorkType.MAINTENANCE,
+        description="Плановое ТО",
+        assigned_to=user_id,
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        status=TaskStatus.CLOSED,
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        deleted_at=None,
+    )
+
+    class Repository:
+        async def list_active(self):
+            return [task]
+
+    class Access:
+        user_repository = SimpleNamespace(get_by_id=_active_engineer)
+
+        async def can_access_urza(self, *_):
+            return True
+
+    class TaskActions:
+        async def get_available_actions(self, **_):
+            return set()
+
+    result = await TaskWorkItemSource(
+        Repository(), Access(), TaskActions()
+    ).list_for_user(user_id)
+
+    assert len(result) == 1
+    assert result[0].status == "Закрыто"
+    assert result[0].url == f"/tasks/{task.id}"
+
+
+@pytest.mark.asyncio
 async def test_instruction_version_used_by_task_is_not_added_twice():
     user_id = uuid4()
     urza_id = uuid4()
@@ -166,6 +209,240 @@ async def test_program_work_item_uses_urza_route_with_programs_tab():
     assert result[0].url == f"/objects/urza/{urza_id}?tab=programs"
 
 
+@pytest.mark.parametrize(
+    ("source_type", "record_factory", "tab", "title"),
+    [
+        (
+            SettingsWorkItemSource,
+            lambda user_id, form: SimpleNamespace(
+                settings_form=form,
+                task_id=None,
+                deleted_at=None,
+                created_by=user_id,
+                created_at=datetime(2026, 10, 2, tzinfo=UTC),
+                creator=SimpleNamespace(full_name="Инженер"),
+                parameter_name="Ток срабатывания",
+                status=DocumentStatus.APPROVED,
+            ),
+            "settings",
+            "Ток срабатывания",
+        ),
+        (
+            SchemaWorkItemSource,
+            lambda user_id, form: SimpleNamespace(
+                schema_form=form,
+                task_id=None,
+                deleted_at=None,
+                created_by=user_id,
+                created_at=datetime(2026, 10, 2, tzinfo=UTC),
+                creator=SimpleNamespace(full_name="Инженер"),
+                schema_number="СХ-1",
+                schema_name="Основная схема",
+                status=DocumentStatus.APPROVED,
+            ),
+            "schemas",
+            "СХ-1 · Основная схема",
+        ),
+    ],
+)
+@pytest.mark.parametrize("is_author", [True, False])
+@pytest.mark.asyncio
+async def test_approved_standalone_records_remain_in_work_items(
+    source_type, record_factory, tab, title, is_author
+):
+    user_id = uuid4()
+    author_id = user_id if is_author else uuid4()
+    urza_id = uuid4()
+    urza = SimpleNamespace(dispatch_name="УРЗА-1", deleted_at=None)
+    form = SimpleNamespace(urza_id=urza_id, urza=urza, deleted_at=None)
+    records = [record_factory(author_id, form), record_factory(author_id, form)]
+
+    class Repository:
+        async def list_standalone_work_items(self):
+            return records
+
+    class Access:
+        async def can_access_urza(self, actor_id, accessible_urza_id):
+            return actor_id == user_id and accessible_urza_id == urza_id
+
+    class Service:
+        repository = Repository()
+        access_service = Access()
+
+        async def get_available_actions(self, *_):
+            return set()
+
+    result = await source_type(Service()).list_for_user(user_id)
+
+    assert len(result) == 2
+    assert all(item.title == title for item in result)
+    assert all(item.status == "Закрыто" for item in result)
+    assert all(item.status_class == "text-bg-success" for item in result)
+    assert all(item.url == f"/objects/urza/{urza_id}?tab={tab}" for item in result)
+    assert all(item.author == "Инженер" for item in result)
+
+
+@pytest.mark.parametrize(
+    ("source_type", "record_attr"),
+    [(SettingsWorkItemSource, "settings_form"), (SchemaWorkItemSource, "schema_form")],
+)
+@pytest.mark.parametrize(
+    ("status", "is_author", "actions", "expected_count"),
+    [
+        (DocumentStatus.DRAFT, True, {"edit", "submit"}, 1),
+        (DocumentStatus.DRAFT, False, {"edit", "submit"}, 0),
+        (DocumentStatus.UNDER_REVIEW, True, set(), 1),
+        (DocumentStatus.UNDER_REVIEW, False, {"approve", "return"}, 1),
+        (DocumentStatus.UNDER_REVIEW, False, set(), 0),
+    ],
+)
+@pytest.mark.asyncio
+async def test_work_item_visibility_during_review_uses_author_and_reviewer_rights(
+    source_type, record_attr, status, is_author, actions, expected_count
+):
+    user_id = uuid4()
+    author_id = user_id if is_author else uuid4()
+    urza_id = uuid4()
+    urza = SimpleNamespace(dispatch_name="УРЗА-1", deleted_at=None)
+    form = SimpleNamespace(urza_id=urza_id, urza=urza, deleted_at=None)
+    record = SimpleNamespace(
+        task_id=None,
+        deleted_at=None,
+        created_by=author_id,
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        creator=SimpleNamespace(full_name="Автор"),
+        status=status,
+        parameter_name="Уставка",
+        schema_number="СХ-1",
+        schema_name="Схема",
+    )
+    setattr(record, record_attr, form)
+
+    class Repository:
+        async def list_standalone_work_items(self):
+            return [record]
+
+    class Access:
+        async def can_access_urza(self, *_):
+            return True
+
+    class Service:
+        repository = Repository()
+        access_service = Access()
+
+        async def get_available_actions(self, *_):
+            return actions
+
+    result = await source_type(Service()).list_for_user(user_id)
+
+    assert len(result) == expected_count
+    if status is DocumentStatus.UNDER_REVIEW and expected_count:
+        assert result[0].status == "На согласовании"
+        if not is_author:
+            assert result[0].actions == ("Утвердить", "Вернуть на доработку")
+
+
+@pytest.mark.parametrize(
+    ("source_type", "record_attr"),
+    [(SettingsWorkItemSource, "settings_form"), (SchemaWorkItemSource, "schema_form")],
+)
+@pytest.mark.parametrize(
+    ("accessible", "deleted_form", "deleted_urza"),
+    [(False, False, False), (True, True, False), (True, False, True)],
+)
+@pytest.mark.asyncio
+async def test_work_item_sources_exclude_inaccessible_or_deleted_urza(
+    source_type, record_attr, accessible, deleted_form, deleted_urza
+):
+    user_id = uuid4()
+    urza_id = uuid4()
+    deletion_time = datetime(2026, 10, 3, tzinfo=UTC)
+    urza = SimpleNamespace(
+        dispatch_name="УРЗА-1",
+        deleted_at=deletion_time if deleted_urza else None,
+    )
+    form = SimpleNamespace(
+        urza_id=urza_id,
+        urza=urza,
+        deleted_at=deletion_time if deleted_form else None,
+    )
+    record = SimpleNamespace(
+        task_id=None,
+        deleted_at=None,
+        created_by=user_id,
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        creator=SimpleNamespace(full_name="Автор"),
+        parameter_name="Уставка",
+        schema_number="СХ-1",
+        schema_name="Схема",
+        status=DocumentStatus.APPROVED,
+    )
+    setattr(record, record_attr, form)
+
+    class Repository:
+        async def list_standalone_work_items(self):
+            return [record]
+
+    class Access:
+        async def can_access_urza(self, *_):
+            return accessible
+
+    class Service:
+        repository = Repository()
+        access_service = Access()
+
+        async def get_available_actions(self, *_):
+            return set()
+
+    assert await source_type(Service()).list_for_user(user_id) == []
+
+
+@pytest.mark.parametrize(
+    ("source_type", "record_attr"),
+    [(SettingsWorkItemSource, "settings_form"), (SchemaWorkItemSource, "schema_form")],
+)
+@pytest.mark.asyncio
+async def test_work_item_sources_do_not_duplicate_task_results(
+    source_type, record_attr
+):
+    user_id = uuid4()
+    urza_id = uuid4()
+    form = SimpleNamespace(
+        urza_id=urza_id,
+        urza=SimpleNamespace(dispatch_name="УРЗА-1", deleted_at=None),
+        deleted_at=None,
+    )
+    record = SimpleNamespace(
+        task_id=uuid4(),
+        deleted_at=None,
+        created_by=user_id,
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        creator=SimpleNamespace(full_name="Автор"),
+        parameter_name="Уставка",
+        schema_number="СХ-1",
+        schema_name="Схема",
+        status=DocumentStatus.APPROVED,
+    )
+    setattr(record, record_attr, form)
+
+    class Repository:
+        async def list_standalone_work_items(self):
+            return [record]
+
+    class Access:
+        async def can_access_urza(self, *_):
+            return True
+
+    class Service:
+        repository = Repository()
+        access_service = Access()
+
+        async def get_available_actions(self, *_):
+            return set()
+
+    assert await source_type(Service()).list_for_user(user_id) == []
+
+
 async def _active_engineer(user_id):
     return SimpleNamespace(
         id=user_id,
@@ -173,3 +450,72 @@ async def _active_engineer(user_id):
         active=True,
         deleted_at=None,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "actions", "expected_status", "expected_actions"),
+    [
+        (
+            DocumentStatus.DRAFT,
+            {"submit"},
+            "Черновик",
+            {"Отправить на согласование"},
+        ),
+        (
+            DocumentStatus.UNDER_REVIEW,
+            {"approve", "return"},
+            "На согласовании",
+            {"Утвердить", "Вернуть на доработку"},
+        ),
+        (
+            DocumentStatus.APPROVED,
+            {"new_version"},
+            "Закрыто",
+            {"Создать новую версию"},
+        ),
+    ],
+)
+async def test_otd_work_items_show_standalone_versions_and_actions(
+    status, actions, expected_status, expected_actions
+):
+    user_id = uuid4()
+    urza_id = uuid4()
+    version = SimpleNamespace(
+        id=uuid4(),
+        version_number=2,
+        status=status,
+        deleted_at=None,
+        task_id=None,
+        created_by=user_id,
+        created_at=datetime(2026, 10, 14, tzinfo=UTC),
+        created_by_user=SimpleNamespace(full_name="Автор"),
+        otd=SimpleNamespace(
+            urza_id=urza_id,
+            deleted_at=None,
+            urza=SimpleNamespace(dispatch_name="УРЗА-1", deleted_at=None),
+        ),
+    )
+
+    class Repository:
+        async def list_standalone_work_items(self):
+            return [version]
+
+    class Access:
+        async def can_access_urza(self, *_):
+            return True
+
+    class Service:
+        repository = Repository()
+        access_service = Access()
+
+        async def get_available_actions(self, *_):
+            return actions
+
+    items = await OTDWorkItemSource(Service()).list_for_user(user_id)
+
+    assert len(items) == 1
+    assert items[0].status == expected_status
+    assert items[0].author == "Автор"
+    assert items[0].url == f"/objects/urza/{urza_id}?tab=otd"
+    assert set(items[0].actions) == expected_actions
