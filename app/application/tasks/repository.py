@@ -73,7 +73,10 @@ class TaskRepository:
         from app.domain.otd import OTDVersion
 
         result = await self.session.execute(
-            select(OTDVersion).where(OTDVersion.task_id == task_id)
+            select(OTDVersion).where(
+                OTDVersion.task_id == task_id,
+                OTDVersion.deleted_at.is_(None),
+            )
         )
 
         return result.scalar_one_or_none()
@@ -120,6 +123,9 @@ class TaskRepository:
     ) -> TORecord | None:
         """Находит запись ТО, созданную в рамках указанной задачи."""
         result = await self.session.execute(
-            select(TORecord).where(TORecord.task_id == task_id)
+            select(TORecord).where(
+                TORecord.task_id == task_id,
+                TORecord.deleted_at.is_(None),
+            )
         )
         return result.scalar_one_or_none()

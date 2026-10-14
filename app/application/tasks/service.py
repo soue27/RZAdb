@@ -31,6 +31,14 @@ class TaskService:
         self.urza_instruction_repository = urza_instruction_repository
 
 
+    @staticmethod
+    def _ensure_task_is_active(task: Task) -> None:
+        """Запрещает изменять архивное задание."""
+        if task.deleted_at is not None:
+            raise ValueError("Нельзя изменять удалённое задание.")
+
+
+
     async def get_available_actions(
         self,
         *,
@@ -59,7 +67,18 @@ class TaskService:
             if task.assigned_to == actor_id:
                 actions = {"complete_task"}
 
-                if getattr(task, "work_type", None) is TaskWorkType.PROGRAM:
+                work_type = getattr(task, "work_type", None)
+                if work_type is TaskWorkType.PROGRAM or (
+                    getattr(task, "work_type", None) is TaskWorkType.MAINTENANCE
+                    and await self.task_repository.get_to_record_by_task_id(task.id)
+                    is None
+                ) or (
+                    work_type is TaskWorkType.OTD
+                    and await self.task_repository.get_otd_version_by_task_id(
+                        task.id
+                    )
+                    is None
+                ):
                     actions.add("create_result")
 
                 return actions
@@ -226,6 +245,7 @@ class TaskService:
         submitted_at: datetime | None = None,
         comment: str | None = None,
     ) -> Task:
+        self._ensure_task_is_active(task)
         """Назначенный исполнитель передаёт завершённую задачу на проверку."""
         validate_transition(task.status, TaskStatus.UNDER_REVIEW)
         if task.deleted_at is not None:
@@ -263,6 +283,7 @@ class TaskService:
         comment: str | None = None,
     ) -> Task:
         """Закрывает задачу после проверки результата MANAGER."""
+        self._ensure_task_is_active(task)
         validate_transition(task.status, TaskStatus.CLOSED)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
 
@@ -337,6 +358,7 @@ class TaskService:
             comment: str | None = None,
     ) -> Task:
         """Возвращает задачу исполнителю на доработку."""
+        self._ensure_task_is_active(task)
         validate_transition(task.status, TaskStatus.IN_PROGRESS)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
         validate_reason(comment)
@@ -368,6 +390,7 @@ class TaskService:
             assigned_at: datetime | None = None,
     ) -> Task:
         # Назначение возможно только из CREATED; переназначение обработаем отдельно.
+        self._ensure_task_is_active(task)
         validate_transition(
             task.status,
             TaskStatus.ASSIGNED,
@@ -406,6 +429,7 @@ class TaskService:
         accepted_at: datetime | None = None,
     ) -> Task:
         # Принять задачу может только назначенный ей инженер.
+        self._ensure_task_is_active(task)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Принять задачу может только назначенный инженер."
@@ -459,6 +483,7 @@ class TaskService:
     ) -> Task:
         """Завершает выполнение задачи после проверки результата работы."""
         # Завершить задачу может только назначенный ей инженер.
+        self._ensure_task_is_active(task)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Завершить задачу может только назначенный инженер."
@@ -536,6 +561,11 @@ class TaskService:
             if to_record.maintenance_type != task.maintenance_type:
                 raise ValueError(
                     "Вид ТО в результате не соответствует виду ТО в задаче."
+                )
+
+            if to_record.signed_form_file_id is None:
+                raise ValueError(
+                    "Для завершения задачи по ТО необходим скан подписанной формы."
                 )
 
             # Для большинства видов ТО скан протокола обязателен.
@@ -628,6 +658,7 @@ class TaskService:
         rejected_at: datetime | None = None,
     ) -> Task:
         # Отклонить задачу может только назначенный инженер.
+        self._ensure_task_is_active(task)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Отклонить задачу может только назначенный инженер."
@@ -671,6 +702,7 @@ class TaskService:
         assigned_at: datetime | None = None,
     ) -> Task:
         # Переназначение допустимо только для уже назначенной задачи.
+        self._ensure_task_is_active(task)
         if task.status != TaskStatus.ASSIGNED:
             raise ValueError(
                 "Переназначить можно только назначенную задачу."

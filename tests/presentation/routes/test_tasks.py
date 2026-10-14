@@ -1,13 +1,18 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
-from app.application.work_items.service import TaskWorkItemSource, WorkItemService
-from app.domain.enums import TaskStatus, TaskWorkType, UserRole
+from app.application.work_items.service import (
+    SchemaWorkItemSource,
+    TaskWorkItemSource,
+    WorkItemService,
+)
+from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -499,6 +504,55 @@ def test_task_list_uses_unified_work_items_table():
     assert "Отправить на согласование" not in response.text
     assert "text-bg-info" not in response.text
     assert "class=\"btn btn-sm btn-outline-primary\">Открыть</a>" in response.text
+
+
+def test_tasks_list_includes_schema_new_record_action_without_error(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    schema_form = SimpleNamespace(
+        id=uuid7(),
+        urza_id=urza_id,
+        urza=SimpleNamespace(dispatch_name="УРЗА-1", deleted_at=None),
+        deleted_at=None,
+    )
+    record = SimpleNamespace(
+        id=uuid7(),
+        schema_form_id=schema_form.id,
+        schema_form=schema_form,
+        task_id=None,
+        status=DocumentStatus.APPROVED,
+        deleted_at=None,
+        schema_number="С-1",
+        schema_name="Схема защиты",
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        creator=SimpleNamespace(full_name="Автор"),
+    )
+    schema_service = SimpleNamespace(
+        repository=SimpleNamespace(
+            list_standalone_work_items=AsyncMock(return_value=[record]),
+        ),
+        access_service=FakeAccessService(),
+        get_available_actions=AsyncMock(return_value={"new_record"}),
+    )
+
+    with _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    ) as client:
+        app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+            [SchemaWorkItemSource(schema_service)]
+        )
+        response = client.get("/tasks")
+
+    assert response.status_code == 200
+    assert "Схема защиты" in response.text
+    assert "Открыть" in response.text
+    schema_service.get_available_actions.assert_awaited_once_with(
+        user.id,
+        record,
+    )
 
 
 def test_task_detail_displays_history_and_review_actions(system_user_id):

@@ -528,6 +528,24 @@ async def test_available_review_actions_are_hidden_for_non_reviewer(
 
 
 @pytest.mark.asyncio
+async def test_assigned_engineer_can_open_maintenance_result_form(service):
+    engineer_id = uuid7()
+    task = SimpleNamespace(
+        id=uuid7(),
+        urza_id=uuid7(),
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+        work_type=TaskWorkType.MAINTENANCE,
+        deleted_at=None,
+    )
+
+    assert await service.get_available_actions(
+        task=task,
+        actor_id=engineer_id,
+    ) == {"complete_task", "create_result"}
+
+
+@pytest.mark.asyncio
 async def test_non_maintenance_task_cannot_have_maintenance_type(
     service: TaskService, system_user_id
 ) -> None:
@@ -1542,6 +1560,41 @@ async def test_complete_maintenance_task_requires_to_record(system_user_id) -> N
 
 
 @pytest.mark.asyncio
+async def test_complete_maintenance_task_requires_signed_form(system_user_id) -> None:
+    engineer_id = uuid4()
+    task = Task(
+        id=uuid4(),
+        urza_id=uuid4(),
+        work_type=TaskWorkType.MAINTENANCE,
+        maintenance_type=MaintenanceType.K,
+        created_by=engineer_id,
+        assigned_to=engineer_id,
+        status=TaskStatus.IN_PROGRESS,
+        updated_by=system_user_id,
+    )
+    repository = FakeTaskRepository()
+    repository.tasks.append(task)
+    repository.to_records.append(
+        TORecord(
+            urza_id=task.urza_id,
+            maintenance_date=datetime.now().date(),
+            maintenance_type=MaintenanceType.K,
+            created_by=engineer_id,
+            scan_protocol_id=uuid4(),
+            signed_form_file_id=None,
+            task_id=task.id,
+            updated_by=system_user_id,
+        )
+    )
+
+    with pytest.raises(ValueError, match="скан подписанной формы"):
+        await make_task_service(repository, FakeAccessService()).complete_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+
+@pytest.mark.asyncio
 async def test_complete_maintenance_task_requires_protocol(system_user_id) -> None:
     engineer_id = uuid4()
 
@@ -2459,3 +2512,64 @@ async def test_close_instruction_task_with_approved_new_version(system_user_id) 
     assert repository.history[-1].event_type == "review_approved"
     assert repository.history[-1].old_status is TaskStatus.UNDER_REVIEW
     assert repository.history[-1].new_status is TaskStatus.CLOSED
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "assign_task",
+        "accept_task",
+        "complete_task",
+        "reject_task",
+        "reassign_task",
+        "submit_for_review",
+        "close_task",
+        "return_for_revision",
+    ],
+)
+async def test_archived_task_cannot_be_modified(
+    service: TaskService,
+    method_name: str,
+) -> None:
+    task = Task(
+        id=uuid7(),
+        urza_id=uuid7(),
+        work_type=TaskWorkType.PROGRAM,
+        created_by=uuid7(),
+        assigned_to=uuid7(),
+        status={
+            "assign_task": TaskStatus.CREATED,
+            "accept_task": TaskStatus.ASSIGNED,
+            "complete_task": TaskStatus.IN_PROGRESS,
+            "reject_task": TaskStatus.ASSIGNED,
+            "reassign_task": TaskStatus.ASSIGNED,
+            "submit_for_review": TaskStatus.COMPLETED,
+            "close_task": TaskStatus.UNDER_REVIEW,
+            "return_for_revision": TaskStatus.UNDER_REVIEW,
+        }[method_name],
+    )
+    task.deleted_at = datetime.now()
+
+    original_status = task.status
+    original_assignee = task.assigned_to
+
+    method = getattr(service, method_name)
+    kwargs = {
+        "task": task,
+        "actor_id": task.assigned_to,
+    }
+
+    if method_name in {"assign_task", "reassign_task"}:
+        kwargs["assigned_to"] = uuid7()
+    if method_name == "reject_task":
+        kwargs["reason"] = "Тестовая причина"
+    if method_name == "return_for_revision":
+        kwargs["comment"] = "Тестовый комментарий"
+
+    with pytest.raises(ValueError, match="удалённое задание"):
+        await method(**kwargs)
+
+    assert task.status is original_status
+    assert task.assigned_to == original_assignee

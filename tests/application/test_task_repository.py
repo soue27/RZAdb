@@ -47,6 +47,21 @@ async def test_get_schema_record_by_task_id_does_not_hide_duplicate_active_rows(
 
 
 @pytest.mark.asyncio
+async def test_get_to_record_by_task_id_filters_archived_results() -> None:
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    session.execute.return_value = result
+    task_id = uuid7()
+
+    assert await TaskRepository(session).get_to_record_by_task_id(task_id) is None
+    statement = session.execute.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "to_records.task_id" in sql
+    assert "to_records.deleted_at IS NULL" in sql
+
+
+@pytest.mark.asyncio
 async def test_list_active_tasks_filters_deleted_and_orders_newest_first() -> None:
     session = AsyncMock()
     result = MagicMock()

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/_form_fields.html" import required_marker %}
 
 {% block title %}Выдать задание — RZAdb{% endblock %}
 
@@ -38,7 +39,7 @@
 
                 {% if engineers %}
                     <div class="mb-3">
-                        <label for="task-assignee" class="form-label">Выберите инженера</label>
+                        <label for="task-assignee" class="form-label">Выберите инженера {{ required_marker() }}</label>
                         <select id="task-assignee" class="form-select" name="engineer_id" required>
                             {% for engineer in engineers %}
                                 <option value="{{ engineer.id }}" {% if engineer_id == engineer.id|string %}selected{% endif %}>
@@ -56,6 +57,7 @@
                     <div class="mb-3">
                         <label for="maintenance-type" class="form-label">
                             Вид технического обслуживания
+                            {{ required_marker() }}
                         </label>
 
                         <select
@@ -78,7 +80,7 @@
                     </div>
                 {% endif %}
                 <div class="mb-3">
-                    <label for="task-deadline" class="form-label">Срок выполнения</label>
+                    <label for="task-deadline" class="form-label">Срок выполнения {{ required_marker() }}</label>
                     <input
                         id="task-deadline"
                         type="date"
