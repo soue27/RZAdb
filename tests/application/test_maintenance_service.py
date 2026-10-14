@@ -1,11 +1,12 @@
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
 
 from app.application.maintenance.service import TORecordService
-from app.domain.enums import MaintenanceType
+from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.maintenance import TORecord
 
 
@@ -22,10 +23,18 @@ def access_service():
 
 
 @pytest.fixture
-def service(repository, access_service):
+def task_repository():
+    repository = MagicMock()
+    repository.get_by_id = AsyncMock()
+    return repository
+
+
+@pytest.fixture
+def service(repository, access_service, task_repository):
     return TORecordService(
         repository=repository,
         access_service=access_service,
+        task_repository=task_repository,
     )
 
 
@@ -225,6 +234,27 @@ async def test_create_requires_protocol_for_regular_maintenance(
 
 
 @pytest.mark.asyncio
+async def test_create_requires_signed_form_for_every_maintenance_type(
+    service,
+    repository,
+    access_service,
+):
+    access_service.can_access_urza.return_value = True
+    repository.add = AsyncMock()
+
+    with pytest.raises(ValueError, match="подписанной формы"):
+        await service.create(
+            user_id=uuid7(),
+            urza_id=uuid7(),
+            maintenance_date=date(2026, 9, 17),
+            maintenance_type=MaintenanceType.TK,
+            signed_form_file_id=None,
+        )
+
+    repository.add.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_create_allows_maintenance_without_protocol_for_tk(
     service,
     repository,
@@ -293,6 +323,7 @@ async def test_create_saves_protocol_and_task(
     service,
     repository,
     access_service,
+    task_repository,
 ):
     user_id = uuid7()
     urza_id = uuid7()
@@ -302,6 +333,15 @@ async def test_create_saves_protocol_and_task(
     task_id = uuid7()
 
     access_service.can_access_urza.return_value = True
+    task_repository.get_by_id.return_value = SimpleNamespace(
+        id=task_id,
+        deleted_at=None,
+        work_type=TaskWorkType.MAINTENANCE,
+        urza_id=urza_id,
+        assigned_to=user_id,
+        status=TaskStatus.IN_PROGRESS,
+    )
+    repository.get_by_task_id = AsyncMock(return_value=None)
     repository.add = AsyncMock()
 
     result = await service.create(
@@ -325,6 +365,40 @@ async def test_create_saves_protocol_and_task(
     assert result.updated_by == user_id
 
     repository.add.assert_awaited_once_with(result)
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_task_not_assigned_to_user(
+    service,
+    repository,
+    access_service,
+    task_repository,
+):
+    user_id = uuid7()
+    urza_id = uuid7()
+    task_id = uuid7()
+    access_service.can_access_urza.return_value = True
+    task_repository.get_by_id.return_value = SimpleNamespace(
+        id=task_id,
+        deleted_at=None,
+        work_type=TaskWorkType.MAINTENANCE,
+        urza_id=urza_id,
+        assigned_to=uuid7(),
+        status=TaskStatus.IN_PROGRESS,
+    )
+
+    with pytest.raises(PermissionError, match="назначенный исполнитель"):
+        await service.create(
+            user_id=user_id,
+            urza_id=urza_id,
+            maintenance_date=date(2026, 9, 17),
+            maintenance_type=MaintenanceType.K,
+            signed_form_file_id=uuid7(),
+            scan_protocol_id=uuid7(),
+            task_id=task_id,
+        )
+
+    repository.add.assert_not_called()
 
 
 @pytest.mark.asyncio

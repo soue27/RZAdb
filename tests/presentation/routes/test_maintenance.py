@@ -87,6 +87,9 @@ class FakeMaintenanceService:
         self.create_error = create_error
         self.calls = []
 
+    async def validate_task_for_result(self, user_id, urza_id, task_id):
+        self.calls.append(("validate_task_for_result", task_id))
+
     async def get_by_urza(self, *, user_id, urza_id):
         self.calls.append(
             (
@@ -389,7 +392,8 @@ def test_get_new_maintenance_form_preserves_task_id(system_user_id):
     urza_id = uuid7()
     task_id = uuid7()
 
-    _setup(user)
+    maintenance_service = FakeMaintenanceService()
+    _setup(user, maintenance_service=maintenance_service)
 
     try:
         response = TestClient(app).get(
@@ -398,6 +402,7 @@ def test_get_new_maintenance_form_preserves_task_id(system_user_id):
         )
 
         assert response.status_code == 200
+        assert ("validate_task_for_result", task_id) in maintenance_service.calls
 
         assert 'name="maintenance_date"' in response.text
         assert 'name="maintenance_type"' in response.text
@@ -810,5 +815,47 @@ def test_create_maintenance_archives_uploaded_files_after_service_error(
             signed.id,
             scan.id,
         }
+    finally:
+        _cleanup(user)
+
+
+def test_create_maintenance_archives_prior_upload_when_later_upload_fails(
+    system_user_id,
+):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    signed = SimpleNamespace(id=uuid7())
+
+    class FailingSecondUpload(FakeFileService):
+        async def upload(self, **kwargs):
+            if self.upload_calls:
+                raise RuntimeError("storage unavailable")
+            return await super().upload(**kwargs)
+
+    files = FailingSecondUpload(signed)
+    maintenance_service = FakeMaintenanceService()
+    _setup(
+        user,
+        maintenance_service=maintenance_service,
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/maintenance",
+            data=_post_data(maintenance_type=MaintenanceType.K.value),
+            files={
+                "signed_form_file": ("signed.pdf", b"signed", "application/pdf"),
+                "scan_protocol_file": (
+                    "protocol.pdf",
+                    b"protocol",
+                    "application/pdf",
+                ),
+            },
+        )
+
+        assert response.status_code == 500
+        assert [call["file_id"] for call in files.archive_calls] == [signed.id]
+        assert not maintenance_service.calls
     finally:
         _cleanup(user)

@@ -180,6 +180,10 @@ async def get_new_urza_maintenance_form(
         TreeService,
         Depends(get_tree_service),
     ],
+    maintenance_service: Annotated[
+        TORecordService,
+        Depends(get_maintenance_service),
+    ],
     task_id: UUID | None = None,
 ):
     try:
@@ -198,6 +202,24 @@ async def get_new_urza_maintenance_form(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Объект не найден.",
         ) from exc
+
+    if task_id is not None:
+        try:
+            await maintenance_service.validate_task_for_result(
+                current_user.id,
+                urza_id,
+                task_id,
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(exc),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
     return await _render_maintenance_template(
         request=request,

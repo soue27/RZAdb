@@ -1,3 +1,4 @@
+{% from "components/_form_fields.html" import required_marker %}
 <div id="urza-tab-content">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -50,7 +51,7 @@
                     for="maintenance-date"
                     class="form-label"
                 >
-                    Дата ТО
+                    Дата ТО {{ required_marker() }}
                 </label>
 
                 <input
@@ -69,7 +70,7 @@
                     for="maintenance-type"
                     class="form-label"
                 >
-                    Вид ТО
+                    Вид ТО {{ required_marker() }}
                 </label>
 
                 <select
@@ -205,6 +206,13 @@
                     class="form-label"
                 >
                     Скан протокола
+                    <span
+                        id="scan-protocol-required-indicator"
+                        class="text-danger"
+                        title="Обязательное поле для выбранного вида ТО"
+                        aria-label="Обязательное поле для выбранного вида ТО"
+                        hidden
+                    >*</span>
                 </label>
 
                 <input
@@ -216,6 +224,7 @@
                 >
 
                 <div class="form-text">
+                    Обязателен для В, К, К1, Н, Т, ВП и ПП; для ТК, О и ОСМ не требуется.
                     PDF, JPG или PNG.
                 </div>
 
@@ -252,8 +261,7 @@
                     for="signed-form"
                     class="form-label"
                 >
-                    Подписанная форма ТО
-                    <span class="text-danger">*</span>
+                    Подписанная форма ТО {{ required_marker() }}
                 </label>
 
                 <input
@@ -274,7 +282,16 @@
             <!-- Кнопки -->
             <div class="col-12">
 
-                <div class="d-flex justify-content-end gap-2 pt-3">
+                <div class="d-flex flex-wrap justify-content-start gap-2 pt-3">
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        <span class="material-icons align-middle me-1">
+                            save
+                        </span>
+                        Сохранить запись
+                    </button>
 
                     <a
                         href="/objects/urza/{{ urza_id }}/maintenance"
@@ -285,16 +302,6 @@
                     >
                         Отмена
                     </a>
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
-                    >
-                        <span class="material-icons align-middle me-1">
-                            save
-                        </span>
-                        Сохранить запись
-                    </button>
 
                 </div>
 
@@ -326,6 +333,9 @@
         const statusText =
             document.getElementById("protocol-status-text");
 
+        const protocolRequiredIndicator =
+            document.getElementById("scan-protocol-required-indicator");
+
         const protocolOptionalTypes =
             new Set(["ТК", "О", "ОСМ"]);
 
@@ -335,6 +345,8 @@
             if (!value) {
                 scanProtocol.disabled = true;
                 scanProtocol.required = false;
+                scanProtocol.setAttribute("aria-required", "false");
+                protocolRequiredIndicator.hidden = true;
 
                 editableProtocol.disabled = true;
 
@@ -350,6 +362,8 @@
             if (protocolOptionalTypes.has(value)) {
                 scanProtocol.disabled = true;
                 scanProtocol.required = false;
+                scanProtocol.setAttribute("aria-required", "false");
+                protocolRequiredIndicator.hidden = true;
                 scanProtocol.value = "";
 
                 editableProtocol.disabled = true;
@@ -367,6 +381,8 @@
 
             scanProtocol.disabled = false;
             scanProtocol.required = true;
+            scanProtocol.setAttribute("aria-required", "true");
+            protocolRequiredIndicator.hidden = false;
 
             editableProtocol.disabled = false;
 

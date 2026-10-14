@@ -15,9 +15,11 @@ class TORecordRepository:
         self,
         record_id: UUID,
     ) -> TORecord | None:
-        return await self.session.get(
-            TORecord,
-            record_id,
+        return await self.session.scalar(
+            select(TORecord).where(
+                TORecord.id == record_id,
+                TORecord.deleted_at.is_(None),
+            )
         )
 
     async def get_by_urza_id(
@@ -31,6 +33,7 @@ class TORecordRepository:
             )
             .where(
                 TORecord.urza_id == urza_id,
+                TORecord.deleted_at.is_(None),
             )
             .order_by(
                 TORecord.maintenance_date.desc(),
@@ -47,6 +50,7 @@ class TORecordRepository:
     ) -> TORecord | None:
         query = select(TORecord).where(
             TORecord.task_id == task_id,
+            TORecord.deleted_at.is_(None),
         )
 
         return await self.session.scalar(query)
