@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/_form_fields.html" import required_marker %}
 
 {% block title %}Вход — RZAdb{% endblock %}
 
@@ -33,7 +34,7 @@
                                 for="email"
                                 class="form-label"
                             >
-                                Email
+                                Email {{ required_marker() }}
                             </label>
 
                             <input
@@ -51,7 +52,7 @@
                                 for="password"
                                 class="form-label"
                             >
-                                Пароль
+                                Пароль {{ required_marker() }}
                             </label>
 
                             <input
