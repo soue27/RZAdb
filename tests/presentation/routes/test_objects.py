@@ -68,12 +68,34 @@ class FakeURZAService:
 
 
 class FakeOTDService:
+    def __init__(self):
+        self.create_calls = []
+
     async def get_details(self, *, user_id, urza_id, version_id=None):
         return SimpleNamespace(
             current_version=None,
             selected_version=None,
             versions=[],
         )
+
+    async def get_versions(self, user_id, urza_id):
+        return []
+
+    async def get_available_actions(self, user_id, version):
+        return set()
+
+    async def get_available_create_actions(self, user_id, urza_id):
+        return set()
+
+    async def get_by_urza(self, user_id, urza_id):
+        return None
+
+    async def validate_task_for_result(self, user_id, urza_id, task_id):
+        return None
+
+    async def create(self, **kwargs):
+        self.create_calls.append(kwargs)
+        return SimpleNamespace(id=uuid7())
 
 
 class FakeTreeService:
@@ -648,7 +670,10 @@ def test_instruction_get_and_forms(system_user_id):
     urza_id = uuid7()
     object_service = FakeObjectService(result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА"))
     fake_service = FakeURZAInstructionService()
-    fake_service.instruction = SimpleNamespace(id=uuid7(), urza_id=urza_id)
+    instruction_id = uuid7()
+    fake_service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    fake_service.version = make_instruction_version(DocumentStatus.APPROVED)
+    fake_service.version.urza_instruction_id = instruction_id
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(object_service)
     app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(fake_service)
@@ -657,9 +682,57 @@ def test_instruction_get_and_forms(system_user_id):
         listing = client.get(f"/objects/urza/{urza_id}/instruction")
         first_form = client.get(f"/objects/urza/{urza_id}/instruction/new")
         next_form = client.get(f"/objects/urza/{urza_id}/instruction/new-version")
-        assert listing.status_code == 200 and "ещё не создана" in listing.text
+        assert listing.status_code == 200 and "Версия 1" in listing.text
         assert first_form.status_code == 200 and "Подписанный скан" in first_form.text
         assert next_form.status_code == 200 and "Новая версия инструкции" in next_form.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_instruction_new_form_denies_roles_without_create_permission(system_user_id):
+    user = make_user(system_user_id)
+    user.role = UserRole.SPECIALIST
+    urza_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(FakeObjectService(
+        result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")))
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/instruction/new")
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_instruction_history_cannot_select_version_from_another_urza(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    instruction_id = uuid7()
+    local_version = make_instruction_version(DocumentStatus.DRAFT)
+    local_version.urza_instruction_id = instruction_id
+    foreign_version = make_instruction_version(DocumentStatus.APPROVED)
+    foreign_version.version_number = 99
+    foreign_version.urza_instruction_id = uuid7()
+    service = FakeURZAInstructionService()
+    service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    service.version = local_version
+    async def get_versions(*_):
+        return [local_version]
+    async def get_version_by_id(*_):
+        return foreign_version
+    service.get_versions = get_versions
+    service.get_version_by_id = get_version_by_id
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(FakeObjectService(
+        result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")))
+    app.dependency_overrides[get_urza_instruction_service] = override_urza_instruction_service(service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/instruction",
+            params={"instruction_version": str(foreign_version.id)},
+        )
+        assert response.status_code == 200
+        assert "Версия 1" in response.text
+        assert "Версия 99" not in response.text
     finally:
         app.dependency_overrides.clear()
 
@@ -731,8 +804,10 @@ def test_instruction_workflow_routes(system_user_id, action, method_name):
     user = make_user(system_user_id)
     urza_id = uuid7()
     fake_service = FakeURZAInstructionService()
-    fake_service.instruction = SimpleNamespace(urza_id=urza_id)
     fake_service.version = make_instruction_version()
+    fake_service.instruction = SimpleNamespace(
+        id=fake_service.version.urza_instruction_id, urza_id=urza_id
+    )
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(FakeObjectService(
         result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")))
@@ -798,12 +873,13 @@ def test_urza_route_returns_full_page_or_htmx_fragment(
 
     try:
         response = TestClient(app).get(
-            f"/objects/urza/{urza_id}",
+            f"/objects/urza/{urza_id}?tab=otd",
             headers=headers,
         )
 
         assert response.status_code == 200
         assert "УРЗА тестовая" in response.text
+        assert 'data-tab="otd"' in response.text
         if headers:
             assert "<!doctype html>" not in response.text.lower()
             assert 'id="object-content"' not in response.text
@@ -812,6 +888,49 @@ def test_urza_route_returns_full_page_or_htmx_fragment(
             assert "<!doctype html>" in response.text.lower()
             assert 'id="app-sidebar"' in response.text
             assert 'id="object-content"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_otd_first_version_form_and_submission(system_user_id):
+    user = make_user(system_user_id=system_user_id)
+    urza_id = uuid7()
+    service = FakeOTDService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza", id=urza_id, name="УРЗА тестовая"
+            )
+        )
+    )
+    app.dependency_overrides[get_otd_service] = lambda: service
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+
+    try:
+        client = TestClient(app)
+        form_response = client.get(f"/objects/urza/{urza_id}/otd/new")
+
+        assert form_response.status_code == 200
+        assert "Первая версия ОТД" in form_response.text
+        assert 'name="effective_date"' in form_response.text
+        assert 'name="urza_purpose"' in form_response.text
+        assert 'type="file"' not in form_response.text
+
+        response = client.post(
+            f"/objects/urza/{urza_id}/otd",
+            data={
+                "effective_date": "2026-10-14",
+                "urza_service_life": "12",
+                "urza_purpose": "rza",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 303, response.text
+        assert response.headers["location"] == f"/objects/urza/{urza_id}?tab=otd"
+        assert len(service.create_calls) == 1
+        assert service.create_calls[0]["urza_id"] == urza_id
     finally:
         app.dependency_overrides.clear()
 

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -89,6 +90,9 @@ async def test_create_creates_otd_and_first_version() -> None:
     urza_id = uuid7()
 
     access_service.can_access_urza.return_value = True
+    access_service.user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER, active=True, deleted_at=None
+    )
     repository.get_by_urza_id.return_value = None
 
     service = OTDService(
@@ -175,6 +179,9 @@ async def test_create_raises_value_error_when_otd_already_exists(
     )
 
     access_service.can_access_urza.return_value = True
+    access_service.user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER, active=True, deleted_at=None
+    )
     repository.get_by_urza_id.return_value = existing_otd
 
     service = OTDService(
@@ -298,8 +305,12 @@ async def test_create_version_increments_version_number(system_user_id) -> None:
     )
 
     access_service.can_access_urza.return_value = True
+    access_service.user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER, active=True, deleted_at=None
+    )
     repository.get_by_id.return_value = otd
     repository.get_current_version.return_value = current_version
+    repository.get_max_version_number.return_value = 3
 
     service = OTDService(
         repository=repository,

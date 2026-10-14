@@ -133,6 +133,35 @@ async def get_object(
                 urza_id=object_id,
                 version_id=otd_version,
             )
+            if otd_version is not None and (
+                otd is None or otd.selected_version is None
+            ):
+                raise ObjectNotFoundError
+
+            otd_versions = await otd_service.get_versions(
+                current_user.id,
+                object_id,
+            )
+            selected_otd_version = next(
+                (
+                    version
+                    for version in otd_versions
+                    if otd_version is not None and version.id == otd_version
+                ),
+                otd_versions[0] if otd_versions else None,
+            )
+            otd_actions = (
+                await otd_service.get_available_actions(
+                    current_user.id,
+                    selected_otd_version,
+                )
+                if selected_otd_version is not None
+                else set()
+            )
+            otd_create_actions = await otd_service.get_available_create_actions(
+                current_user.id,
+                object_id,
+            )
 
             settings_form, settings_records = await settings_service.get_details(
                 user_id=current_user.id,
@@ -147,6 +176,8 @@ async def get_object(
             context = {
                 "urza": urza,
                 "otd": otd,
+                "otd_actions": otd_actions,
+                "otd_create_actions": otd_create_actions,
                 "settings_form": settings_form,
                 "settings_records": settings_records,
                 "current_user": current_user,

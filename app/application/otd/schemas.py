@@ -3,12 +3,13 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.domain.enums import OTDPurpose
+from app.domain.enums import DocumentStatus, OTDPurpose
 
 
 class OTDVersionDetails(BaseModel):
     id: UUID
     version_number: int
+    status: DocumentStatus
     created_at: datetime
     created_by_full_name: str | None
     effective_date: date

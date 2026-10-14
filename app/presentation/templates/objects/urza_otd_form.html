@@ -1,0 +1,87 @@
+{% from "components/_form_fields.html" import required_marker %}
+
+<div id="urza-tab-content">
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+
+    <div class="rzadb-otd-version-title mb-3">
+        {{ "Первая версия ОТД" if not has_otd else "Новая версия ОТД" }}
+    </div>
+
+    <form
+        method="post"
+        action="/objects/urza/{{ urza_id }}/otd"
+        hx-post="/objects/urza/{{ urza_id }}/otd"
+        hx-target="#urza-tab-content"
+        hx-swap="outerHTML"
+    >
+        {% if task_id %}
+            <input type="hidden" name="task_id" value="{{ task_id }}">
+        {% endif %}
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="otd-effective-date">Дата действия {{ required_marker() }}</label>
+                <input class="form-control" id="otd-effective-date" name="effective_date" type="date" required value="{{ form_values.get('effective_date', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="otd-service-life">Срок службы УРЗА, лет {{ required_marker() }}</label>
+                <input class="form-control" id="otd-service-life" name="urza_service_life" type="number" required value="{{ form_values.get('urza_service_life', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="otd-purpose">Назначение УРЗА {{ required_marker() }}</label>
+                <select class="form-select" id="otd-purpose" name="urza_purpose" required>
+                    {% for purpose in purposes %}
+                        <option value="{{ purpose.value }}" {% if form_values.get('urza_purpose') == purpose.value %}selected{% endif %}>{{ purpose.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="panel-type">Тип панели / шкафа</label>
+                <input class="form-control" id="panel-type" name="panel_cabinet_type" value="{{ form_values.get('panel_cabinet_type', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="panel-serial">Заводской номер панели / шкафа</label>
+                <input class="form-control" id="panel-serial" name="panel_cabinet_serial" value="{{ form_values.get('panel_cabinet_serial', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="panel-year">Год изготовления панели / шкафа</label>
+                <input class="form-control" id="panel-year" name="panel_cabinet_manufacture_year" type="number" value="{{ form_values.get('panel_cabinet_manufacture_year', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="terminal-type">Тип терминала</label>
+                <input class="form-control" id="terminal-type" name="terminal_type" value="{{ form_values.get('terminal_type', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="terminal-serial">Заводской номер терминала</label>
+                <input class="form-control" id="terminal-serial" name="terminal_serial" value="{{ form_values.get('terminal_serial', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="terminal-year">Год изготовления терминала</label>
+                <input class="form-control" id="terminal-year" name="terminal_manufacture_year" type="number" value="{{ form_values.get('terminal_manufacture_year', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="software-version">Версия ПО</label>
+                <input class="form-control" id="software-version" name="software_version" value="{{ form_values.get('software_version', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="ct-ratio">Коэффициент ТТ</label>
+                <input class="form-control" id="ct-ratio" name="ct_ratio" value="{{ form_values.get('ct_ratio', '') }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="vt-ratio">Коэффициент ТН</label>
+                <input class="form-control" id="vt-ratio" name="vt_ratio" value="{{ form_values.get('vt_ratio', '') }}">
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="scheme-designation">Обозначение на схеме</label>
+                <input class="form-control" id="scheme-designation" name="urza_scheme_designation" value="{{ form_values.get('urza_scheme_designation', '') }}">
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            <button class="btn btn-primary" type="submit">Сохранить ОТД</button>
+            <a class="btn btn-outline-secondary" href="/objects/urza/{{ urza_id }}?tab=otd">Отмена</a>
+        </div>
+    </form>
+</div>

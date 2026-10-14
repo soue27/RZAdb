@@ -51,6 +51,7 @@ from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
 from app.application.work_items.service import (
     InstructionWorkItemSource,
+    OTDWorkItemSource,
     ProgramWorkItemSource,
     SchemaWorkItemSource,
     SettingsWorkItemSource,
@@ -220,6 +221,7 @@ def get_otd_service(
     return OTDService(
         repository=OTDRepository(session),
         access_service=access_service,
+        task_repository=TaskRepository(session),
     )
 
 
@@ -240,6 +242,7 @@ def get_maintenance_service(
     return TORecordService(
         repository=TORecordRepository(session),
         access_service=access_service,
+        task_repository=TaskRepository(session),
     )
 
 
@@ -323,9 +326,15 @@ def get_work_item_service(
         user_repository=UserRepository(session),
         urza_repository=URZARepository(session),
     )
+    otd_service = OTDService(
+        repository=OTDRepository(session),
+        access_service=access_service,
+        task_repository=task_repository,
+    )
     return WorkItemService(
         sources=[
             TaskWorkItemSource(task_repository, access_service, task_service),
+            OTDWorkItemSource(otd_service),
             ProgramWorkItemSource(program_service),
             SettingsWorkItemSource(settings_service),
             SchemaWorkItemSource(schema_service),

@@ -1,0 +1,3 @@
+{% macro required_marker(condition=true, marker_id=none) -%}
+    {% if condition %}<span class="text-danger"{% if marker_id %} id="{{ marker_id }}"{% endif %} title="Обязательное поле" aria-label="Обязательное поле">*</span>{% endif %}
+{%- endmacro %}

@@ -200,7 +200,7 @@
                     class="nav-link active"
                     data-rzadb-tab
                     data-tab="otd"
-                    hx-get="/objects/urza/{{ urza.id }}"
+                    hx-get="/objects/urza/{{ urza.id }}?tab=otd"
                     hx-select="#urza-tab-content"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
@@ -284,6 +284,17 @@
         <div id="urza-tab-content">
 
             <div class="d-flex justify-content-end mb-3">
+                {% if otd_create_actions %}
+                    <a
+                        href="/objects/urza/{{ urza.id }}?tab=otd"
+                        hx-get="/objects/urza/{{ urza.id }}/otd/new"
+                        hx-target="#urza-tab-content"
+                        hx-swap="outerHTML"
+                        class="btn btn-outline-secondary me-2"
+                    >
+                        {{ "Создать ОТД" if "create" in otd_create_actions else "Новая версия ОТД" }}
+                    </a>
+                {% endif %}
                 {% if can_issue_task %}
                     <a
                         href="/tasks/create?urza_id={{ urza.id }}&work_type=otd"
@@ -306,11 +317,15 @@
                         Версия {{ displayed_version.version_number }}
                     </div>
 
+                    <span class="badge {{ displayed_version.status.badge_class }}">
+                        {{ displayed_version.status.label }}
+                    </span>
+
                     {% if is_current_version %}
 
                         <div class="rzadb-otd-version-date">
                             Действует с
-                            {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
+                            {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
                         </div>
 
                     {% else %}
@@ -321,11 +336,11 @@
 
                         <div class="rzadb-otd-version-date">
                             Действовала с
-                            {{ displayed_version.created_at.strftime("%d.%m.%Y") }}
+                            {{ displayed_version.effective_date.strftime("%d.%m.%Y") }}
                             по
                             {% for version in otd.versions %}
                                 {% if version.id == displayed_version.id and not loop.first %}
-                                    {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
+                                    {{ otd.versions[loop.index0 - 1].effective_date.strftime("%d.%m.%Y") }}
                                 {% endif %}
                             {% endfor %}
                         </div>
@@ -333,6 +348,26 @@
                     {% endif %}
 
                 </div>
+
+                {% if otd_actions %}
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        {% if "submit" in otd_actions %}
+                            <form method="post" action="/objects/urza/{{ urza.id }}/otd/{{ displayed_version.id }}/submit">
+                                <button type="submit" class="btn btn-primary">Отправить на согласование</button>
+                            </form>
+                        {% endif %}
+                        {% if "approve" in otd_actions %}
+                            <form method="post" action="/objects/urza/{{ urza.id }}/otd/{{ displayed_version.id }}/approve">
+                                <button type="submit" class="btn btn-success">Утвердить</button>
+                            </form>
+                        {% endif %}
+                        {% if "return" in otd_actions %}
+                            <form method="post" action="/objects/urza/{{ urza.id }}/otd/{{ displayed_version.id }}/return">
+                                <button type="submit" class="btn btn-outline-warning">Вернуть на доработку</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endif %}
 
                 <!-- Данные выбранной версии -->
                 <div class="rzadb-property-list">
@@ -489,16 +524,16 @@
 
                                                 <div class="small text-secondary">
                                                     Действует с
-                                                    {{ version.created_at.strftime("%d.%m.%Y") }}
+                                                    {{ version.effective_date.strftime("%d.%m.%Y") }}
                                                 </div>
 
                                             {% else %}
 
                                                 <div class="small text-secondary">
                                                     Действовала с
-                                                    {{ version.created_at.strftime("%d.%m.%Y") }}
+                                                    {{ version.effective_date.strftime("%d.%m.%Y") }}
                                                     по
-                                                    {{ otd.versions[loop.index0 - 1].created_at.strftime("%d.%m.%Y") }}
+                                                    {{ otd.versions[loop.index0 - 1].effective_date.strftime("%d.%m.%Y") }}
                                                 </div>
 
                                             {% endif %}

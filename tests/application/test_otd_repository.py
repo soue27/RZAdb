@@ -20,14 +20,17 @@ async def test_get_by_id_returns_otd(system_user_id) -> None:
         updated_by=system_user_id,
     )
 
-    session.get.return_value = otd
+    session.scalar.return_value = otd
 
     repository = OTDRepository(session)
 
     result = await repository.get_by_id(otd.id)
 
     assert result is otd
-    session.get.assert_awaited_once_with(OTD, otd.id)
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "otds.id" in sql
+    assert "otds.deleted_at IS NULL" in sql
 
 
 @pytest.mark.asyncio
@@ -204,3 +207,18 @@ async def test_get_versions_returns_versions_in_descending_order(
     assert result == versions
     assert [version.version_number for version in result] == [3, 2, 1]
     session.scalars.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_list_standalone_work_items_excludes_task_linked_versions():
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+
+    assert await OTDRepository(session).list_standalone_work_items() == []
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "otd_versions.task_id IS NULL" in sql
+    assert "otd_versions.deleted_at IS NULL" in sql
+    assert "otds.deleted_at IS NULL" in sql
