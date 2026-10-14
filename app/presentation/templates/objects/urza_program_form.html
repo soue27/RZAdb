@@ -1,7 +1,8 @@
 
+{% from "components/_form_fields.html" import required_marker %}
 <div id="urza-tab-content">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center mb-3">
         <div class="rzadb-otd-version-title">
             {% if is_edit|default(false) %}
                 Редактирование программы
@@ -10,15 +11,6 @@
             {% endif %}
         </div>
 
-        <button
-            type="button"
-            class="btn btn-outline-secondary"
-            hx-get="/objects/urza/{{ urza_id }}/programs"
-            hx-target="#urza-tab-content"
-            hx-swap="outerHTML"
-        >
-            Отмена
-        </button>
     </div>
 
     {% set editing = is_edit|default(false) %}
@@ -51,6 +43,7 @@
         <div class="mb-3">
             <label class="form-label" for="program-type">
                 Тип программы
+                {{ required_marker() }}
             </label>
 
             <select
@@ -75,6 +68,7 @@
         <div class="mb-3">
             <label class="form-label" for="program-number">
                 № программы
+                {{ required_marker() }}
             </label>
 
             <input
@@ -91,6 +85,7 @@
         <div class="mb-3">
             <label class="form-label" for="scan-file">
                 Скан программы
+                {{ required_marker(not editing) }}
             </label>
 
             {% if editing %}
@@ -173,16 +168,25 @@
             >
         </div>
 
-        <button
-            type="submit"
-            class="btn btn-primary"
-        >
-            {% if editing %}
-                Сохранить изменения
-            {% else %}
-                Сохранить программу
-            {% endif %}
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                {% if editing %}
+                    Сохранить изменения
+                {% else %}
+                    Сохранить программу
+                {% endif %}
+            </button>
+            <button
+                type="button"
+                class="btn btn-outline-secondary"
+                hx-get="/objects/urza/{{ urza_id }}/programs"
+                hx-target="#urza-tab-content"
+                hx-swap="outerHTML"
+            >Отмена</button>
+        </div>
     </form>
 
 </div>

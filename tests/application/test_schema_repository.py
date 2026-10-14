@@ -96,7 +96,7 @@ async def test_list_standalone_work_items_filters_linked_and_inactive_records() 
     sql = _sql(session.scalars.await_args.args[0])
     assert "schema_records.task_id IS NULL" in sql
     assert "schema_records.deleted_at IS NULL" in sql
-    assert "schema_records.status IN" in sql
+    assert "schema_records.status IN ('draft', 'under_review', 'approved')" in sql
 
 
 @pytest.mark.asyncio

@@ -144,7 +144,11 @@ class SchemaRepository:
                 SchemaRecord.task_id.is_(None),
                 SchemaRecord.deleted_at.is_(None),
                 SchemaRecord.status.in_(
-                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                    (
+                        DocumentStatus.DRAFT,
+                        DocumentStatus.UNDER_REVIEW,
+                        DocumentStatus.APPROVED,
+                    )
                 ),
             )
             .order_by(SchemaRecord.created_at.desc(), SchemaRecord.id.desc())

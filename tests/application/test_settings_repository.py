@@ -121,10 +121,14 @@ async def test_list_standalone_work_items_filters_linked_and_inactive_records():
     repository = SettingsRepository(session)
 
     assert await repository.list_standalone_work_items() == []
-    sql = str(session.scalars.await_args.args[0])
+    sql = str(
+        session.scalars.await_args.args[0].compile(
+            compile_kwargs={"literal_binds": True}
+        )
+    )
     assert "settings_records.task_id IS NULL" in sql
     assert "settings_records.deleted_at IS NULL" in sql
-    assert "settings_records.status IN" in sql
+    assert "settings_records.status IN ('draft', 'under_review', 'approved')" in sql
 
 
 @pytest.mark.asyncio

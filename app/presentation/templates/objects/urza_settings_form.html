@@ -1,19 +1,15 @@
 {% from "objects/_file_actions.html" import file_actions %}
+{% from "components/_form_fields.html" import required_marker %}
 
 <div id="urza-tab-content">
     {% if error_message %}
         <div class="alert alert-danger" role="alert">{{ error_message }}</div>
     {% endif %}
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center mb-3">
         <div class="rzadb-otd-version-title">
             {% if is_edit %}Изменение черновика уставок{% else %}Внести изменение уставок{% endif %}
         </div>
-        <button type="button" class="btn btn-outline-secondary"
-                hx-get="/objects/urza/{{ urza_id }}/settings"
-                hx-target="#urza-tab-content" hx-swap="outerHTML">
-            Отмена
-        </button>
     </div>
 
     <form method="post" enctype="multipart/form-data"
@@ -21,27 +17,27 @@
           hx-post="{% if is_edit %}/objects/urza/{{ urza_id }}/settings/{{ record.id }}{% else %}/objects/urza/{{ urza_id }}/settings{% endif %}"
           hx-target="#urza-tab-content" hx-swap="outerHTML">
         <div class="mb-3">
-            <label class="form-label" for="change-date">Дата изменения</label>
+            <label class="form-label" for="change-date">Дата изменения {{ required_marker() }}</label>
             <input id="change-date" name="change_date" type="date" class="form-control" required
                    value="{{ form_values.get('change_date', record.change_date.isoformat() if is_edit else '') }}">
         </div>
         <div class="mb-3">
-            <label class="form-label" for="parameter-name">Параметр</label>
+            <label class="form-label" for="parameter-name">Параметр {{ required_marker() }}</label>
             <input id="parameter-name" name="parameter_name" type="text" class="form-control" required
                    value="{{ form_values.get('parameter_name', record.parameter_name if is_edit else '') }}">
         </div>
         <div class="mb-3">
-            <label class="form-label" for="initial-setting">Было</label>
+            <label class="form-label" for="initial-setting">Было {{ required_marker() }}</label>
             <input id="initial-setting" name="initial_setting" type="text" class="form-control" required
                    value="{{ form_values.get('initial_setting', record.initial_setting if is_edit else '') }}">
         </div>
         <div class="mb-3">
-            <label class="form-label" for="new-setting">Стало</label>
+            <label class="form-label" for="new-setting">Стало {{ required_marker() }}</label>
             <input id="new-setting" name="new_setting" type="text" class="form-control" required
                    value="{{ form_values.get('new_setting', record.new_setting if is_edit else '') }}">
         </div>
         <div class="mb-3">
-            <label class="form-label" for="change-reason">Причина изменения</label>
+            <label class="form-label" for="change-reason">Причина изменения {{ required_marker() }}</label>
             <textarea id="change-reason" name="change_reason" class="form-control" rows="3" required>{{ form_values.get('change_reason', record.change_reason if is_edit else '') }}</textarea>
         </div>
 
@@ -54,6 +50,7 @@
         <div class="mb-3">
             <label class="form-label" for="signed-form-file">
                 {% if is_edit %}Заменить подписанный формуляр{% else %}Подписанный формуляр{% endif %}
+                {{ required_marker(not is_edit) }}
             </label>
             <input id="signed-form-file" name="signed_form_file" type="file" class="form-control"
                    {% if not is_edit %}required{% endif %}>
@@ -61,8 +58,15 @@
                 <div class="form-text">Если новый файл не выбран, текущий подписанный формуляр останется прикреплён.</div>
             {% endif %}
         </div>
-        <button type="submit" class="btn btn-primary">
-            {% if is_edit %}Сохранить изменения{% else %}Сохранить запись{% endif %}
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">
+                {% if is_edit %}Сохранить изменения{% else %}Сохранить запись{% endif %}
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    hx-get="/objects/urza/{{ urza_id }}/settings"
+                    hx-target="#urza-tab-content" hx-swap="outerHTML">
+                Отмена
+            </button>
+        </div>
     </form>
 </div>

@@ -1,4 +1,5 @@
 {% from "objects/_file_actions.html" import file_actions %}
+{% from "components/_form_fields.html" import required_marker %}
 
 <div id="urza-tab-content">
 
@@ -148,8 +149,12 @@
                                         hx-swap="outerHTML"
                                     >
                                         {% if program.task_id %}
+                                            <label class="form-label" for="program-return-comment-{{ program.id }}">
+                                                Причина возврата {{ required_marker() }}
+                                            </label>
                                             <input
                                                 type="text"
+                                                id="program-return-comment-{{ program.id }}"
                                                 name="comment"
                                                 class="form-control form-control-sm"
                                                 placeholder="Причина возврата на доработку"

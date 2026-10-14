@@ -1,18 +1,12 @@
 {% from "objects/_file_actions.html" import file_actions %}
+{% from "components/_form_fields.html" import required_marker %}
 {% set form_action = "/objects/urza/" ~ urza_id ~ "/schemas/" ~ record.id if record else "/objects/urza/" ~ urza_id ~ "/schemas" %}
 
 <div id="urza-tab-content">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center mb-3">
         <div class="rzadb-otd-version-title">
             {{ "Изменение черновика схемы" if is_edit else "Добавление схемы" }}
         </div>
-        <a
-            class="btn btn-outline-secondary"
-            href="/objects/urza/{{ urza_id }}/schemas"
-            hx-get="/objects/urza/{{ urza_id }}/schemas"
-            hx-target="#urza-tab-content"
-            hx-swap="outerHTML"
-        >Отмена</a>
     </div>
 
     {% if error_message %}
@@ -39,7 +33,7 @@
         {% endif %}
 
         <div class="mb-3">
-            <label for="schema_number" class="form-label">№ схемы <span class="text-danger">*</span></label>
+            <label for="schema_number" class="form-label">№ схемы {{ required_marker() }}</label>
             <input
                 type="text"
                 class="form-control"
@@ -51,7 +45,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="schema_name" class="form-label">Наименование <span class="text-danger">*</span></label>
+            <label for="schema_name" class="form-label">Наименование {{ required_marker() }}</label>
             <input
                 type="text"
                 class="form-control"
@@ -63,7 +57,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="change_description" class="form-label">Описание изменения <span class="text-danger">*</span></label>
+            <label for="change_description" class="form-label">Описание изменения {{ required_marker() }}</label>
             <textarea
                 class="form-control"
                 id="change_description"
@@ -74,7 +68,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="change_justification" class="form-label">Обоснование изменения <span class="text-danger">*</span></label>
+            <label for="change_justification" class="form-label">Обоснование изменения {{ required_marker() }}</label>
             <textarea
                 class="form-control"
                 id="change_justification"
@@ -85,7 +79,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="upload_date" class="form-label">Дата изменения <span class="text-danger">*</span></label>
+            <label for="upload_date" class="form-label">Дата изменения {{ required_marker() }}</label>
             <input
                 type="date"
                 class="form-control"
@@ -103,6 +97,17 @@
             </div>
         {% endif %}
         <div class="mb-3">
+            <div class="form-label">
+                Скан схемы или редактируемый файл
+                {{ required_marker(task_id is not none) }}
+            </div>
+            <div class="form-text mb-2">
+                {% if task_id %}
+                    Для результата задания выберите хотя бы один из двух файлов.
+                {% else %}
+                    Оба файла необязательны для самостоятельной записи.
+                {% endif %}
+            </div>
             <label for="scan_file" class="form-label">{{ "Заменить скан схемы" if record else "Скан схемы" }}</label>
             <input type="file" class="form-control" id="scan_file" name="scan_file">
         </div>
@@ -128,7 +133,7 @@
         <div class="mb-3">
             <label for="signed_form_file" class="form-label">
                 {{ "Заменить подписанный формуляр" if record else "Подписанный формуляр" }}
-                <span class="text-danger">*</span>
+                {{ required_marker(not record) }}
             </label>
             <input
                 type="file"
@@ -157,3 +162,21 @@
         </div>
     </form>
 </div>
+
+<script>
+    (() => {
+        const form = document.querySelector('#urza-tab-content form');
+        const scanFile = document.getElementById('scan_file');
+        const editableFile = document.getElementById('editable_file');
+        const taskResult = form.querySelector('[name="task_id"]') !== null;
+
+        function updateAlternativeFiles() {
+            scanFile.required = taskResult && editableFile.files.length === 0;
+            editableFile.required = taskResult && scanFile.files.length === 0;
+        }
+
+        scanFile.addEventListener('change', updateAlternativeFiles);
+        editableFile.addEventListener('change', updateAlternativeFiles);
+        updateAlternativeFiles();
+    })();
+</script>

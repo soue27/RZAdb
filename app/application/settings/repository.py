@@ -108,7 +108,11 @@ class SettingsRepository:
                 SettingsRecord.task_id.is_(None),
                 SettingsRecord.deleted_at.is_(None),
                 SettingsRecord.status.in_(
-                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                    (
+                        DocumentStatus.DRAFT,
+                        DocumentStatus.UNDER_REVIEW,
+                        DocumentStatus.APPROVED,
+                    )
                 ),
             )
             .order_by(SettingsRecord.created_at.desc(), SettingsRecord.id.desc())

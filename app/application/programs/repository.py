@@ -104,8 +104,11 @@ class ProgramRepository:
             )
             .where(
                 Program.task_id.is_(None),
-                Program.status.in_(
-                    (DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW)
+                Program.status.in_((
+                                    DocumentStatus.DRAFT,
+                                    DocumentStatus.UNDER_REVIEW,
+                                    DocumentStatus.APPROVED,
+                                )
                 ),
                 Program.deleted_at.is_(None),
             )
