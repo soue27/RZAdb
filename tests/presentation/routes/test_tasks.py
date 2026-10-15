@@ -13,6 +13,7 @@ from app.application.work_items.service import (
     WorkItemService,
 )
 from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
+from app.application.objects.exceptions import ObjectAccessDeniedError
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -21,6 +22,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
     get_work_item_service,
+    get_object_service,
 )
 
 
@@ -130,12 +132,12 @@ class FakeTaskService:
         self.engineers = engineers or []
         self.created_task = None
 
-    async def can_issue_task(self, *, actor_id, urza_id):
-        self.calls.append(("can_issue_task", actor_id, urza_id))
+    async def can_issue_task(self, *, actor_id, urza_id=None, substation_id=None):
+        self.calls.append(("can_issue_task", actor_id, urza_id or substation_id))
         return self.can_issue
 
-    async def get_available_assignees(self, *, actor_id, urza_id):
-        self.calls.append(("get_available_assignees", actor_id, urza_id))
+    async def get_available_assignees(self, *, actor_id, urza_id=None, substation_id=None):
+        self.calls.append(("get_available_assignees", actor_id, urza_id or substation_id))
         return self.engineers
 
     async def create_task(self, **kwargs):
@@ -223,6 +225,71 @@ def _client(user, repository, access_service, task_service):
         [TaskWorkItemSource(repository, access_service, task_service)]
     )
     return TestClient(app)
+
+
+class ScopedObjectService:
+    def __init__(self, allowed_substation_id):
+        self.allowed_substation_id = allowed_substation_id
+
+    async def get_object(self, *, user_id, object_type, object_id):
+        if object_type != "substation" or object_id != self.allowed_substation_id:
+            raise ObjectAccessDeniedError
+        return SimpleNamespace(id=object_id, dispatch_name="ПС-1")
+
+
+def test_substation_task_form_checks_object_access_and_renders_parent():
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    engineer = SimpleNamespace(id=uuid7(), full_name="Инженер")
+    service = FakeTaskService(engineers=[engineer])
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_object_service] = lambda: ScopedObjectService(substation_id)
+    app.dependency_overrides[get_task_service] = lambda: service
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/tasks/substation/create?substation_id={substation_id}&work_type=instruction"
+        )
+        assert response.status_code == 200
+        assert "ПС-1" in response.text
+        assert "Тип работы: Инструкция РЗА подстанции" in response.text
+        assert ("get_available_assignees", user.id, substation_id) in service.calls
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_task_post_links_parent_and_returns_to_origin_tab():
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    engineer = SimpleNamespace(id=uuid7(), full_name="Инженер")
+    service = FakeTaskService(engineers=[engineer])
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_object_service] = lambda: ScopedObjectService(substation_id)
+    app.dependency_overrides[get_task_service] = lambda: service
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).post(
+            "/tasks/substation/create",
+            data={
+                "substation_id": str(substation_id),
+                "work_type": "schemes",
+                "engineer_id": str(engineer.id),
+                "deadline_at": "2026-11-01",
+                "description": "Обновить схему",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == (
+            f"/objects/substation/{substation_id}?tab=selectivity-schemes"
+        )
+        create_call = next(call[1] for call in service.calls if call[0] == "create_task")
+        assert create_call["substation_id"] == substation_id
+        assert create_call.get("urza_id") is None
+        assert create_call["work_type"] is TaskWorkType.SCHEMES
+        assert any(call[0] == "assign_task" for call in service.calls)
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture(autouse=True)

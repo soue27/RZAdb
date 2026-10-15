@@ -10,6 +10,8 @@ from app.domain.schema import SchemaRecord
 from app.domain.settings_record import SettingsRecord
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
+from app.domain.rza_instruction import RZAInstructionVersion
+from app.domain.selectivity_scheme import SelectivitySchemeVersion
 
 
 class TaskRepository:
@@ -33,6 +35,7 @@ class TaskRepository:
             select(Task)
             .options(
                 selectinload(Task.urza),
+                selectinload(Task.substation),
                 selectinload(Task.created_by_user),
                 selectinload(Task.assigned_to_user),
             )
@@ -45,6 +48,7 @@ class TaskRepository:
             select(Task)
             .options(
                 selectinload(Task.urza),
+                selectinload(Task.substation),
                 selectinload(Task.created_by_user),
                 selectinload(Task.assigned_to_user),
             )
@@ -126,6 +130,28 @@ class TaskRepository:
             select(TORecord).where(
                 TORecord.task_id == task_id,
                 TORecord.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_substation_instruction_version_by_task_id(
+        self, task_id: UUID
+    ) -> RZAInstructionVersion | None:
+        result = await self.session.execute(
+            select(RZAInstructionVersion).where(
+                RZAInstructionVersion.task_id == task_id,
+                RZAInstructionVersion.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_selectivity_version_by_task_id(
+        self, task_id: UUID
+    ) -> SelectivitySchemeVersion | None:
+        result = await self.session.execute(
+            select(SelectivitySchemeVersion).where(
+                SelectivitySchemeVersion.task_id == task_id,
+                SelectivitySchemeVersion.deleted_at.is_(None),
             )
         )
         return result.scalar_one_or_none()

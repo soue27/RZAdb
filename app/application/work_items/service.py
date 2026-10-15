@@ -6,8 +6,10 @@ from uuid import UUID
 from app.application.access.service import AccessService
 from app.application.otd.service import OTDService
 from app.application.programs.service import ProgramService
+from app.application.rza_instructions.service import RZAInstructionService
 from app.application.schema.service import SchemaService
 from app.application.settings.service import SettingsService
+from app.application.selectivity_schemes.service import SelectivitySchemeService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.urza_instructions.service import URZAInstructionService
@@ -104,7 +106,14 @@ class TaskWorkItemSource:
 
         items = []
         for task in await self.repository.list_active():
-            if not await self.access_service.can_access_urza(user_id, task.urza_id):
+            has_access = (
+                await self.access_service.can_access_urza(user_id, task.urza_id)
+                if task.urza_id is not None
+                else await self.access_service.can_access_substation(
+                    user_id, task.substation_id
+                )
+            )
+            if not has_access:
                 continue
             if user.role is UserRole.ENGINEER and task.assigned_to != user_id:
                 continue
@@ -129,8 +138,12 @@ class TaskWorkItemSource:
                         if task.assigned_to_user
                         else "Не назначен"
                     ),
-                    parent=task.urza.dispatch_name,
-                    parent_id=task.urza_id,
+                    parent=(
+                        task.urza.dispatch_name
+                        if task.urza is not None
+                        else task.substation.dispatch_name
+                    ),
+                    parent_id=task.urza_id or task.substation_id,
                     url=f"/tasks/{task.id}",
                     actions=_action_labels(actions),
                 )
@@ -383,6 +396,94 @@ class InstructionWorkItemSource:
                     parent=urza.dispatch_name,
                     parent_id=instruction.urza_id,
                     url=f"/objects/urza/{instruction.urza_id}?tab=instruction",
+                    actions=_action_labels(actions),
+                )
+            )
+        return items
+
+
+class RZAInstructionWorkItemSource:
+    def __init__(self, service: RZAInstructionService) -> None:
+        self.service = service
+
+    async def list_for_user(
+        self, user_id: UUID, prior_items: tuple[WorkItem, ...] = ()
+    ) -> list[WorkItem]:
+        items = []
+        for version in await self.service.repository.list_standalone_work_items():
+            instruction = version.rza_instruction
+            substation = instruction.substation if instruction else None
+            if substation is None or substation.deleted_at is not None:
+                continue
+            if not await self.service.access_service.can_access_substation(
+                user_id, substation.id
+            ):
+                continue
+            actions = await self.service.get_available_actions(user_id, version)
+            if version.status is DocumentStatus.DRAFT and (
+                version.created_by != user_id or "submit" not in actions
+            ):
+                continue
+            if version.status is DocumentStatus.UNDER_REVIEW and (
+                version.created_by != user_id and not actions
+            ):
+                continue
+            items.append(
+                WorkItem(
+                    item_type="Самостоятельная инструкция РЗА ПС",
+                    title=f"Инструкция РЗА ПС · версия {version.version_number}",
+                    status=version.status.label,
+                    status_class=version.status.badge_class,
+                    created_at=version.created_at,
+                    author=version.creator.full_name if version.creator else "—",
+                    assignee="—",
+                    parent=substation.dispatch_name,
+                    parent_id=substation.id,
+                    url=f"/objects/substation/{substation.id}?tab=instructions",
+                    actions=_action_labels(actions),
+                )
+            )
+        return items
+
+
+class SelectivitySchemeWorkItemSource:
+    def __init__(self, service: SelectivitySchemeService) -> None:
+        self.service = service
+
+    async def list_for_user(
+        self, user_id: UUID, prior_items: tuple[WorkItem, ...] = ()
+    ) -> list[WorkItem]:
+        items = []
+        for version in await self.service.repository.list_standalone_work_items():
+            scheme = version.selectivity_scheme
+            substation = scheme.substation if scheme else None
+            if substation is None or substation.deleted_at is not None:
+                continue
+            if not await self.service.access_service.can_access_substation(
+                user_id, substation.id
+            ):
+                continue
+            actions = await self.service.get_available_actions(user_id, version)
+            if version.status is DocumentStatus.DRAFT and (
+                version.created_by != user_id or "submit" not in actions
+            ):
+                continue
+            if version.status is DocumentStatus.UNDER_REVIEW and (
+                version.created_by != user_id and not actions
+            ):
+                continue
+            items.append(
+                WorkItem(
+                    item_type="Самостоятельная схема селективности",
+                    title=f"{version.number} · {version.name}",
+                    status=version.status.label,
+                    status_class=version.status.badge_class,
+                    created_at=version.created_at,
+                    author=version.creator.full_name if version.creator else "—",
+                    assignee="—",
+                    parent=substation.dispatch_name,
+                    parent_id=substation.id,
+                    url=f"/objects/substation/{substation.id}?tab=selectivity-schemes",
                     actions=_action_labels(actions),
                 )
             )

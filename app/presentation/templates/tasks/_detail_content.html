@@ -24,17 +24,15 @@
                 </span>
             </div>
 
-            <a
-                class="btn btn-outline-primary"
-                href="/objects/urza/{{ task.urza_id }}"
-            >
-                {{ task.urza.dispatch_name }}
+            <a class="btn btn-outline-primary"
+               href="{% if task.urza_id %}/objects/urza/{{ task.urza_id }}{% else %}/objects/substation/{{ task.substation_id }}?tab={% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}{% endif %}">
+                {{ task.urza.dispatch_name if task.urza else task.substation.dispatch_name }}
             </a>
         </div>
 
         <dl class="row mb-0">
             <dt class="col-sm-3">Объект</dt>
-            <dd class="col-sm-9">{{ task.urza.dispatch_name }}</dd>
+            <dd class="col-sm-9">{{ task.urza.dispatch_name if task.urza else task.substation.dispatch_name }}</dd>
 
             <dt class="col-sm-3">Исполнитель</dt>
             <dd class="col-sm-9">
@@ -175,7 +173,7 @@
                 {% if "create_result" in actions %}
                     <a
                         class="btn btn-primary"
-                        href="{% if task.work_type.value == 'MAINTENANCE' %}/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}{% elif task.work_type.value == 'OTD' %}/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}{% else %}/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}{% endif %}"
+                        href="{% if task.substation_id %}/objects/substation/{{ task.substation_id }}/{% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}/new?new_version=true&task_id={{ task.id }}{% elif task.work_type.value == 'MAINTENANCE' %}/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}{% elif task.work_type.value == 'OTD' %}/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}{% else %}/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}{% endif %}"
                     >
                         Выполнить задание
                     </a>

@@ -182,10 +182,14 @@ async def _get_accessible_task(
             detail="Задание не найдено.",
         )
 
-    if not await access_service.can_access_urza(
-        current_user.id,
-        task.urza_id,
-    ):
+    has_access = (
+        await access_service.can_access_urza(current_user.id, task.urza_id)
+        if task.urza_id is not None
+        else await access_service.can_access_substation(
+            current_user.id, task.substation_id
+        )
+    )
+    if not has_access:
         raise HTTPException(
             status_code=403,
             detail="Доступ к заданию запрещён.",
@@ -569,6 +573,7 @@ async def get_task_detail(
         available_assignees = await task_service.get_available_assignees(
             actor_id=current_user.id,
             urza_id=task.urza_id,
+            substation_id=task.substation_id,
         )
 
     tree = await tree_service.get_tree(
@@ -988,6 +993,7 @@ async def reassign_task(
         if not await task_service.can_issue_task(
             actor_id=current_user.id,
             urza_id=task.urza_id,
+            substation_id=task.substation_id,
         ):
             raise PermissionError(
                 "Пользователь не может переназначать это задание."
@@ -996,6 +1002,7 @@ async def reassign_task(
         engineers = await task_service.get_available_assignees(
             actor_id=current_user.id,
             urza_id=task.urza_id,
+            substation_id=task.substation_id,
         )
 
         parsed_engineer_id = UUID(engineer_id)

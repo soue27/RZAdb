@@ -123,9 +123,13 @@ class FakeAccessService:
         self.user_repository = FakeUserRepository()
         self.urza_repository = FakeURZARepository()
         self.access = {}
+        self.substation_access = {}
 
     async def can_access_urza(self, user_id, urza_id):
         return self.access.get((user_id, urza_id), True)
+
+    async def can_access_substation(self, user_id, substation_id):
+        return self.substation_access.get((user_id, substation_id), True)
 
 
 class FakeURZAInstructionRepository:
@@ -2573,3 +2577,44 @@ async def test_archived_task_cannot_be_modified(
 
     assert task.status is original_status
     assert task.assigned_to == original_assignee
+
+
+@pytest.mark.asyncio
+async def test_create_substation_instruction_task_and_reject_unsupported_type(
+    service, repository, system_user_id
+):
+    task = await service.create_task(
+        substation_id=uuid4(),
+        work_type=TaskWorkType.INSTRUCTION,
+        created_by=system_user_id,
+    )
+    assert task.urza_id is None
+    assert task.substation_id is not None
+    assert task.work_type is TaskWorkType.INSTRUCTION
+
+    with pytest.raises(ValueError, match="только инструкции и схемы"):
+        await service.create_task(
+            substation_id=uuid4(),
+            work_type=TaskWorkType.OTD,
+            created_by=system_user_id,
+        )
+
+
+@pytest.mark.asyncio
+async def test_substation_task_creation_checks_role_and_access(
+    service, access_service, system_user_id
+):
+    engineer_id = uuid4()
+    access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id, role=UserRole.ENGINEER, active=True, deleted_at=None
+    )
+    substation_id = uuid4()
+    access_service.substation_access[(engineer_id, substation_id)] = True
+    assert not await service.can_issue_task(
+        actor_id=engineer_id, substation_id=substation_id
+    )
+
+    access_service.substation_access[(system_user_id, substation_id)] = False
+    assert not await service.can_issue_task(
+        actor_id=system_user_id, substation_id=substation_id
+    )

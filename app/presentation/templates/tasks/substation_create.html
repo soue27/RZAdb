@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "components/_form_fields.html" import required_marker %}
+
+{% block title %}Выдать задание — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <a href="/objects/substation/{{ substation_id }}?tab={% if work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}" class="text-decoration-none">← Назад к подстанции</a>
+    <h1 class="h4 mt-3 mb-4">Выдать задание</h1>
+    <section class="rzadb-surface-soft rounded-3 p-4 mb-4">
+        <h2 class="h5">{{ substation.dispatch_name }}</h2>
+        <p class="mb-0">Тип работы: {{ work_type_label }}</p>
+    </section>
+    <section class="rzadb-surface-soft rounded-3 p-4">
+        {% if error_message %}<div class="alert alert-danger">{{ error_message }}</div>{% endif %}
+        <form action="/tasks/substation/create" method="post">
+            <input type="hidden" name="substation_id" value="{{ substation_id }}">
+            <input type="hidden" name="work_type" value="{{ work_type.value }}">
+            <div class="mb-3">
+                <label class="form-label" for="engineer">Исполнитель {{ required_marker() }}</label>
+                <select id="engineer" class="form-select" name="engineer_id" required>
+                    <option value="">Выберите инженера</option>
+                    {% for engineer in engineers %}<option value="{{ engineer.id }}" {% if engineer_id == engineer.id|string %}selected{% endif %}>{{ engineer.full_name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="mb-3"><label class="form-label" for="deadline">Срок выполнения {{ required_marker() }}</label><input id="deadline" class="form-control" type="date" name="deadline_at" value="{{ deadline_at }}" required></div>
+            <div class="mb-3"><label class="form-label" for="description">Описание</label><textarea id="description" class="form-control" name="description">{{ description }}</textarea></div>
+            {% if engineers %}<button class="btn btn-primary" type="submit">Выдать задание</button>{% else %}<p class="text-body-secondary">Нет доступных исполнителей.</p>{% endif %}
+        </form>
+    </section>
+</div>
+{% endblock %}

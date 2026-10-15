@@ -58,6 +58,7 @@ class TaskService:
             if await self.can_issue_task(
                 actor_id=actor_id,
                 urza_id=task.urza_id,
+                substation_id=getattr(task, "substation_id", None),
             ):
                 actions.add("reassign_task")
 
@@ -80,6 +81,14 @@ class TaskService:
                     is None
                 ):
                     actions.add("create_result")
+                if getattr(task, "substation_id", None) is not None:
+                    result = (
+                        await self.task_repository.get_substation_instruction_version_by_task_id(task.id)
+                        if work_type is TaskWorkType.INSTRUCTION
+                        else await self.task_repository.get_selectivity_version_by_task_id(task.id)
+                    )
+                    if result is None:
+                        actions.add("create_result")
 
                 return actions
 
@@ -117,7 +126,14 @@ class TaskService:
             raise PermissionError("Проверяющий пользователь неактивен.")
         if actor.role is not UserRole.MANAGER:
             raise PermissionError("Проверять задачу может только MANAGER.")
-        if not await self.access_service.can_access_urza(actor_id, task.urza_id):
+        has_access = (
+            await self.access_service.can_access_urza(actor_id, task.urza_id)
+            if task.urza_id is not None
+            else await self.access_service.can_access_substation(
+                actor_id, getattr(task, "substation_id", None)
+            )
+        )
+        if not has_access:
             raise PermissionError(
                 "У MANAGER нет доступа к URZA, связанной с задачей."
             )
@@ -126,8 +142,11 @@ class TaskService:
         self,
         *,
         actor_id: UUID,
-        urza_id: UUID,
+        urza_id: UUID | None = None,
+        substation_id: UUID | None = None,
     ) -> bool:
+        if (urza_id is None) == (substation_id is None):
+            return False
         actor = await self.access_service.user_repository.get_by_id(actor_id)
 
         if actor is None:
@@ -142,31 +161,40 @@ class TaskService:
         }:
             return False
 
-        return await self.access_service.can_access_urza(
-            actor_id,
-            urza_id,
-        )
+        if substation_id is not None:
+            return await self.access_service.can_access_substation(
+                actor_id, substation_id
+            )
+        return await self.access_service.can_access_urza(actor_id, urza_id)
 
     async def get_available_assignees(
             self,
             *,
             actor_id: UUID,
-            urza_id: UUID,
+            urza_id: UUID | None = None,
+            substation_id: UUID | None = None,
     ) -> list[User]:
         if not await self.can_issue_task(
                 actor_id=actor_id,
                 urza_id=urza_id,
+                substation_id=substation_id,
         ):
             raise PermissionError(
                 "Пользователь не может выдавать задания для этого URZA."
             )
 
-        urza = await self.access_service.urza_repository.get_by_id(urza_id)
-
-        if urza is None:
-            raise ValueError("URZA не найден.")
-
-        enterprise_id = urza.connection.substation.enterprise_id
+        if substation_id is not None:
+            substation = await self.access_service.substation_repository.get_by_id(
+                substation_id
+            )
+            if substation is None:
+                raise ValueError("Подстанция не найдена.")
+            enterprise_id = substation.enterprise_id
+        else:
+            urza = await self.access_service.urza_repository.get_by_id(urza_id)
+            if urza is None:
+                raise ValueError("URZA не найден.")
+            enterprise_id = urza.connection.substation.enterprise_id
 
         return await (
             self.access_service.user_repository
@@ -176,7 +204,8 @@ class TaskService:
     async def create_task(
         self,
         *,
-        urza_id: UUID,
+        urza_id: UUID | None = None,
+        substation_id: UUID | None = None,
         work_type: TaskWorkType,
         created_by: UUID,
         maintenance_type: MaintenanceType | None = None,
@@ -188,6 +217,7 @@ class TaskService:
         if not await self.can_issue_task(
                 actor_id=created_by,
                 urza_id=urza_id,
+                substation_id=substation_id,
         ):
             raise PermissionError(
                 "Пользователь не может выдавать задания для этого URZA."
@@ -204,8 +234,14 @@ class TaskService:
                 "maintenance_type указывается только для задания на ТО."
             )
 
+        if substation_id is not None and work_type not in {
+            TaskWorkType.INSTRUCTION, TaskWorkType.SCHEMES
+        }:
+            raise ValueError("Для подстанции доступны только инструкции и схемы.")
+
         task = Task(
             urza_id=urza_id,
+            substation_id=substation_id,
             work_type=work_type,
             maintenance_type=maintenance_type,
             description=description,
@@ -288,46 +324,47 @@ class TaskService:
         await self._check_reviewer_access(task=task, actor_id=actor_id)
 
         if task.work_type is TaskWorkType.SCHEMES:
-            schema_record = await self.task_repository.get_schema_record_by_task_id(
-                task.id
-            )
-            if (
-                schema_record is None
-                or schema_record.deleted_at is not None
-                or schema_record.status is not DocumentStatus.APPROVED
-            ):
-                raise ValueError(
-                    "Закрыть задачу по схемам можно только при наличии "
-                    "активного утверждённого результата."
+            if getattr(task, "substation_id", None) is not None:
+                scheme_version = await self.task_repository.get_selectivity_version_by_task_id(task.id)
+                if scheme_version is None or scheme_version.status is not DocumentStatus.APPROVED:
+                    raise ValueError("Закрыть задачу можно после утверждения схемы селективности.")
+            else:
+                schema_record = await self.task_repository.get_schema_record_by_task_id(
+                    task.id
                 )
+                if (
+                    schema_record is None
+                    or schema_record.deleted_at is not None
+                    or schema_record.status is not DocumentStatus.APPROVED
+                ):
+                    raise ValueError(
+                        "Закрыть задачу по схемам можно только при наличии "
+                        "активного утверждённого результата."
+                    )
 
         if task.work_type is TaskWorkType.INSTRUCTION:
-            instruction = (
-                await self.urza_instruction_repository.get_by_urza_id(
-                    task.urza_id,
-                )
-            )
-
-            if instruction is None:
-                raise ValueError(
-                    "Закрыть задачу по инструкции можно только при наличии инструкции."
-                )
-
-            instruction_version = (
-                await self.urza_instruction_repository.get_latest_working_version(
+            if getattr(task, "substation_id", None) is not None:
+                instruction_version = await self.task_repository.get_substation_instruction_version_by_task_id(task.id)
+                if instruction_version is None or instruction_version.status is not DocumentStatus.APPROVED:
+                    raise ValueError("Закрыть задачу можно после утверждения инструкции РЗА.")
+            else:
+                instruction = await self.urza_instruction_repository.get_by_urza_id(task.urza_id)
+                if instruction is None:
+                    raise ValueError(
+                        "Закрыть задачу по инструкции можно только при наличии инструкции."
+                    )
+                instruction_version = await self.urza_instruction_repository.get_latest_working_version(
                     instruction.id,
                 )
-            )
-
-            if (
+                if (
                     instruction_version is None
                     or instruction_version.created_at <= task.created_at
                     or instruction_version.status is not DocumentStatus.APPROVED
-            ):
-                raise ValueError(
-                    "Закрыть задачу по инструкции можно только при наличии "
-                    "активной утверждённой новой версии инструкции."
-                )
+                ):
+                    raise ValueError(
+                        "Закрыть задачу по инструкции можно только при наличии "
+                        "активной утверждённой новой версии инструкции."
+                    )
 
         review_time = closed_at or datetime.now().astimezone()
         old_status = task.status
@@ -510,30 +547,26 @@ class TaskService:
         # Для схем результатом выполнения является SchemaRecord,
         # созданный в рамках этой задачи.
         if task.work_type == TaskWorkType.SCHEMES:
-            schema_record = (
-                await self.task_repository.get_schema_record_by_task_id(task.id)
-            )
-
-            if schema_record is None:
-                raise ValueError(
-                    "Для завершения задачи по схемам необходимо сохранить результат схем."
-                )
-
-            # Подписанный формуляр обязателен для завершения работы по схемам.
-            if schema_record.signed_form_file_id is None:
-                raise ValueError(
-                    "Для завершения задачи по схемам необходим подписанный формуляр."
-                )
-
-            # Должен быть хотя бы один рабочий вариант схемы:
-            # скан или редактируемый файл.
-            if (
+            if getattr(task, "substation_id", None) is not None:
+                if await self.task_repository.get_selectivity_version_by_task_id(task.id) is None:
+                    raise ValueError("Сохраните результат схемы селективности для этой задачи.")
+            else:
+                schema_record = await self.task_repository.get_schema_record_by_task_id(task.id)
+                if schema_record is None:
+                    raise ValueError(
+                        "Для завершения задачи по схемам необходимо сохранить результат схем."
+                    )
+                if schema_record.signed_form_file_id is None:
+                    raise ValueError(
+                        "Для завершения задачи по схемам необходим подписанный формуляр."
+                    )
+                if (
                     schema_record.scan_file_id is None
                     and schema_record.editable_file_id is None
-            ):
-                raise ValueError(
-                    "Для завершения задачи по схемам необходим скан или редактируемый файл."
-                )
+                ):
+                    raise ValueError(
+                        "Для завершения задачи по схемам необходим скан или редактируемый файл."
+                    )
 
         # Для уставок результатом выполнения является SettingsRecord,
         # созданный в рамках этой задачи.
@@ -597,32 +630,24 @@ class TaskService:
         # Для инструкции результатом выполнения является новая версия
         # инструкции, созданная после выдачи задачи.
         if task.work_type == TaskWorkType.INSTRUCTION:
-            instruction = (
-                await self.urza_instruction_repository.get_by_urza_id(
-                    task.urza_id,
-                )
-            )
-
-            if instruction is None:
-                raise ValueError(
-                    "Для данного URZA не создана инструкция."
-                )
-
-            instruction_version = (
-                await self.urza_instruction_repository.get_latest_working_version(
+            if getattr(task, "substation_id", None) is not None:
+                if await self.task_repository.get_substation_instruction_version_by_task_id(task.id) is None:
+                    raise ValueError("Создайте версию инструкции РЗА для этой задачи.")
+            else:
+                instruction = await self.urza_instruction_repository.get_by_urza_id(task.urza_id)
+                if instruction is None:
+                    raise ValueError("Для данного URZA не создана инструкция.")
+                instruction_version = await self.urza_instruction_repository.get_latest_working_version(
                     instruction.id,
                 )
-            )
-
-            if instruction_version is None:
-                raise ValueError(
-                    "Для завершения задачи необходимо создать версию инструкции."
-                )
-
-            if instruction_version.created_at <= task.created_at:
-                raise ValueError(
-                    "Для завершения задачи необходимо создать новую версию инструкции."
-                )
+                if instruction_version is None:
+                    raise ValueError(
+                        "Для завершения задачи необходимо создать версию инструкции."
+                    )
+                if instruction_version.created_at <= task.created_at:
+                    raise ValueError(
+                        "Для завершения задачи необходимо создать новую версию инструкции."
+                    )
 
         completion_time = completed_at or datetime.now().astimezone()
 

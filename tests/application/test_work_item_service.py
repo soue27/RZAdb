@@ -8,8 +8,10 @@ from app.application.work_items.service import (
     InstructionWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
+    RZAInstructionWorkItemSource,
     SchemaWorkItemSource,
     SettingsWorkItemSource,
+    SelectivitySchemeWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
     WorkItemService,
@@ -99,6 +101,58 @@ async def test_task_source_keeps_assignment_and_access_filters():
     assert [item.title for item in result] == ["Задание исполнителя"]
     assert result[0].status == "В работе"
     assert result[0].actions == ("Завершить",)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_kind", ["instruction", "scheme"])
+async def test_substation_document_sources_include_accessible_latest_standalone(source_kind):
+    user_id = uuid4()
+    substation = SimpleNamespace(id=uuid4(), dispatch_name="ПС-1", deleted_at=None)
+    document = SimpleNamespace(
+        id=uuid4(), version_number=2, created_at=datetime(2026, 10, 10, tzinfo=UTC),
+        created_by=user_id, creator=SimpleNamespace(full_name="Инженер"),
+        status=DocumentStatus.DRAFT,
+    )
+    if source_kind == "instruction":
+        document.rza_instruction = SimpleNamespace(substation=substation)
+        document.rza_instruction_id = uuid4()
+        service = SimpleNamespace(
+            repository=SimpleNamespace(list_standalone_work_items=lambda: _items(document)),
+            access_service=SimpleNamespace(can_access_substation=_can_access),
+            get_available_actions=_draft_actions,
+        )
+        source = RZAInstructionWorkItemSource(service)
+    else:
+        document.selectivity_scheme = SimpleNamespace(substation=substation)
+        document.selectivity_scheme_id = uuid4()
+        document.number = "С-1"
+        document.name = "Схема ПС-1"
+        service = SimpleNamespace(
+            repository=SimpleNamespace(list_standalone_work_items=lambda: _items(document)),
+            access_service=SimpleNamespace(can_access_substation=_can_access),
+            get_available_actions=_draft_actions,
+        )
+        source = SelectivitySchemeWorkItemSource(service)
+
+    result = await source.list_for_user(user_id)
+
+    assert len(result) == 1
+    assert result[0].parent == "ПС-1"
+    assert result[0].parent_id == substation.id
+    assert result[0].author == "Инженер"
+    assert result[0].actions == ("Отправить на согласование",)
+
+
+async def _items(item):
+    return [item]
+
+
+async def _can_access(_user_id, _substation_id):
+    return True
+
+
+async def _draft_actions(_user_id, _version):
+    return {"submit"}
 
 
 @pytest.mark.asyncio

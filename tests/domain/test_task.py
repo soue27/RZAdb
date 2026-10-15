@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.task import Task
 
@@ -25,3 +27,19 @@ def test_task_model(system_user_id) -> None:
     assert task.deadline_at is None
     assert task.completed_at is None
     assert task.closed_at is None
+
+
+def test_task_model_supports_substation_parent_and_constraints(system_user_id) -> None:
+    task = Task(
+        substation_id=uuid4(),
+        work_type=TaskWorkType.INSTRUCTION,
+        status=TaskStatus.CREATED,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    assert task.urza_id is None
+    assert task.substation_id is not None
+    constraints = {constraint.name for constraint in Task.__table__.constraints}
+    assert "ck_tasks_exactly_one_parent" in constraints
+    assert "ck_tasks_substation_work_type" in constraints
+    assert "ix_tasks_substation_id" in {index.name for index in Task.__table__.indexes}

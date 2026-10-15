@@ -1,11 +1,12 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Text
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
 from app.domain.urza import URZA
+from app.domain.substation import Substation
 from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
@@ -18,9 +19,27 @@ from app.infrastructure.database.mixins import (
 class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "tasks"
 
+    __table_args__ = (
+        CheckConstraint(
+            "(urza_id IS NOT NULL AND substation_id IS NULL) OR "
+            "(urza_id IS NULL AND substation_id IS NOT NULL)",
+            name="ck_tasks_exactly_one_parent",
+        ),
+        CheckConstraint(
+            "substation_id IS NULL OR work_type IN ('instruction', 'schemes')",
+            name="ck_tasks_substation_work_type",
+        ),
+        Index("ix_tasks_substation_id", "substation_id"),
+    )
+
     urza_id: Mapped[UUID] = mapped_column(
         ForeignKey("urzas.id"),
-        nullable=False,
+        nullable=True,
+    )
+
+    substation_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("substations.id", name="fk_tasks_substation_id_substations"),
+        nullable=True,
     )
 
     work_type: Mapped[TaskWorkType] = mapped_column(
@@ -87,7 +106,8 @@ class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
 
-    urza: Mapped[URZA] = relationship()
+    urza: Mapped[URZA | None] = relationship()
+    substation: Mapped[Substation | None] = relationship()
 
     created_by_user: Mapped[User] = relationship(
         foreign_keys=lambda: [Task.created_by],
