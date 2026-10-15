@@ -39,3 +39,18 @@ class UserRepository:
         result = await self.session.scalars(query)
 
         return list(result.all())
+
+    async def get_active_inspection_assignees_by_enterprise(
+        self, enterprise_id: UUID
+    ) -> list[User]:
+        result = await self.session.scalars(
+            select(User)
+            .where(
+                User.enterprise_id == enterprise_id,
+                User.role.in_([UserRole.ENGINEER, UserRole.MANAGER]),
+                User.active.is_(True),
+                User.deleted_at.is_(None),
+            )
+            .order_by(User.full_name)
+        )
+        return list(result.all())

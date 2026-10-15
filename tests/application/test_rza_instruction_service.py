@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,6 +10,8 @@ from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
 )
+from app.domain.enums import UserRole
+from app.domain.enums import DocumentStatus
 
 
 @pytest.fixture
@@ -20,6 +23,12 @@ def repository():
 def access_service():
     service = MagicMock()
     service.can_access_substation = AsyncMock()
+    service.user_repository.get_by_id = AsyncMock(
+        return_value=SimpleNamespace(
+            role=UserRole.ENGINEER, active=True, deleted_at=None,
+            enterprise_id=None,
+        )
+    )
     return service
 
 
@@ -281,6 +290,7 @@ async def test_get_versions_returns_version_details(
     version_2.change_description = "Изменение 2"
     version_2.change_justification = "Основание 2"
     version_2.created_by = user_id
+    version_2.status = None
     version_2.created_at = datetime(2026, 9, 20, 12, 0, 0)
     version_2.creator = MagicMock()
     version_2.creator.full_name = "Иванов Иван Иванович"
@@ -298,6 +308,7 @@ async def test_get_versions_returns_version_details(
     version_1.change_description = "Первичная версия"
     version_1.change_justification = "Создание инструкции"
     version_1.created_by = user_id
+    version_1.status = None
     version_1.created_at = datetime(2026, 1, 1, 10, 0, 0)
     version_1.creator = MagicMock()
     version_1.creator.full_name = "Петров Пётр Петрович"
@@ -543,3 +554,28 @@ async def test_create_version_denies_access(
     )
     repository.get_current_version.assert_not_called()
     repository.add_version.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_submit_instruction_version_checks_author_and_updates_status(
+    service, repository, access_service
+):
+    user_id, substation_id, instruction_id = uuid7(), uuid7(), uuid7()
+    version = SimpleNamespace(
+        id=uuid7(), rza_instruction_id=instruction_id, deleted_at=None,
+        created_by=user_id, status=DocumentStatus.DRAFT, updated_by=None,
+    )
+    instruction = SimpleNamespace(id=instruction_id, substation_id=substation_id)
+    repository.get_version_by_id = AsyncMock(return_value=version)
+    repository.get_by_id = AsyncMock(return_value=instruction)
+    repository.save = AsyncMock(side_effect=lambda item: item)
+    access_service.can_access_substation.return_value = True
+    access_service.user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER, active=True, deleted_at=None,
+    )
+
+    result = await service.submit_for_review(user_id, substation_id, version.id)
+
+    assert result.status is DocumentStatus.UNDER_REVIEW
+    assert result.updated_by == user_id
+    repository.save.assert_awaited_once_with(version)

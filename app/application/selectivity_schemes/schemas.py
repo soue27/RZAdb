@@ -2,6 +2,7 @@ from datetime import date
 from uuid import UUID
 
 from pydantic import BaseModel
+from app.domain.enums import DocumentStatus
 
 
 class SelectivitySchemeDetails(BaseModel):
@@ -35,3 +36,4 @@ class SelectivitySchemeVersionListItem(BaseModel):
     scan_file_name: str | None
     editable_file_id: UUID | None
     editable_file_name: str | None
+    status: DocumentStatus = DocumentStatus.DRAFT

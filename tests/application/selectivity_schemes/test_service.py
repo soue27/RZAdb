@@ -1,4 +1,5 @@
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,6 +12,7 @@ from app.domain.selectivity_scheme import (
     SelectivityScheme,
     SelectivitySchemeVersion,
 )
+from app.domain.enums import DocumentStatus, UserRole
 
 
 @pytest.fixture
@@ -22,6 +24,12 @@ def repository():
 def access_service():
     service = MagicMock()
     service.can_access_substation = AsyncMock()
+    service.user_repository.get_by_id = AsyncMock(
+        return_value=SimpleNamespace(
+            role=UserRole.ENGINEER, active=True, deleted_at=None,
+            enterprise_id=None,
+        )
+    )
     return service
 
 
@@ -551,10 +559,12 @@ async def test_get_version_list_returns_dtos(
     scan_file_1.display_name = "Схема v1.pdf"
 
     version_2.creator = creator
+    version_2.status = None
     version_2.scan_file = scan_file_2
     version_2.editable_file = editable_file_2
 
     version_1.creator = creator
+    version_1.status = None
     version_1.scan_file = scan_file_1
     version_1.editable_file = None
 
@@ -588,3 +598,28 @@ async def test_get_version_list_returns_dtos(
     assert result[1].creator_name == "Иванов Иван Иванович"
     assert result[1].scan_file_name == "Схема v1.pdf"
     assert result[1].editable_file_name is None
+
+
+@pytest.mark.asyncio
+async def test_submit_scheme_version_checks_author_and_updates_status(
+    service, repository, access_service
+):
+    user_id, substation_id, scheme_id = uuid7(), uuid7(), uuid7()
+    version = SimpleNamespace(
+        id=uuid7(), selectivity_scheme_id=scheme_id, deleted_at=None,
+        created_by=user_id, status=DocumentStatus.DRAFT, updated_by=None,
+    )
+    scheme = SimpleNamespace(id=scheme_id, substation_id=substation_id)
+    repository.get_version_by_id = AsyncMock(return_value=version)
+    repository.get_by_id = AsyncMock(return_value=scheme)
+    repository.save = AsyncMock(side_effect=lambda item: item)
+    access_service.can_access_substation.return_value = True
+    access_service.user_repository.get_by_id.return_value = SimpleNamespace(
+        role=UserRole.ENGINEER, active=True, deleted_at=None,
+    )
+
+    result = await service.submit_for_review(user_id, substation_id, version.id)
+
+    assert result.status is DocumentStatus.UNDER_REVIEW
+    assert result.updated_by == user_id
+    repository.save.assert_awaited_once_with(version)

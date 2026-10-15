@@ -1,6 +1,24 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
+{% if can_issue_task %}
+    <a class="btn btn-sm btn-outline-primary mb-3" href="/tasks/substation/create?substation_id={{ substation_id }}&work_type=instruction">Выдать задание</a>
+{% endif %}
+
 {% if selected_version %}
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        {% if selected_version.status is defined %}<span class="badge {{ selected_version.status.badge_class }}">{{ selected_version.status.label }}</span>{% endif %}
+        {% if "submit" in document_actions %}
+            <form method="post" action="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/submit" hx-post="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/submit"><button class="btn btn-sm btn-primary">Отправить на согласование</button></form>
+        {% endif %}
+        {% if "approve" in document_actions %}
+            <form method="post" action="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/approve" hx-post="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/approve"><button class="btn btn-sm btn-success">Утвердить</button></form>
+            <form method="post" action="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/return" hx-post="/objects/substation/{{ substation_id }}/instructions/versions/{{ selected_version.id }}/return"><button class="btn btn-sm btn-outline-warning">Вернуть на доработку</button></form>
+        {% endif %}
+        {% if "new_version" in document_actions %}
+            <a class="btn btn-sm btn-outline-primary" href="/objects/substation/{{ substation_id }}/instructions/new?new_version=true" hx-get="/objects/substation/{{ substation_id }}/instructions/new?new_version=true" hx-target="#substation-tab-content">Новая версия</a>
+        {% endif %}
+    </div>
 
     <!-- Заголовок версии -->
     <div class="mb-3">
@@ -176,4 +194,8 @@
         Инструкция по РЗА ещё не создана.
     </div>
 
+{% endif %}
+
+{% if not instruction and can_create_document %}
+    <a class="btn btn-primary mt-3" href="/objects/substation/{{ substation_id }}/instructions/new" hx-get="/objects/substation/{{ substation_id }}/instructions/new" hx-target="#substation-tab-content">Добавить инструкцию</a>
 {% endif %}

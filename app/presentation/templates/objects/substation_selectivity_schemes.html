@@ -1,6 +1,14 @@
 {% from "objects/_file_actions.html" import file_actions %}
 
 <div>
+    {% if can_issue_task %}
+        <a class="btn btn-sm btn-outline-primary mb-3" href="/tasks/substation/create?substation_id={{ substation_id }}&work_type=schemes">Выдать задание</a>
+    {% endif %}
+    {% if can_create_document and not versions %}
+        <a class="btn btn-primary mb-3" href="/objects/substation/{{ substation_id }}/selectivity-schemes/new" hx-get="/objects/substation/{{ substation_id }}/selectivity-schemes/new" hx-target="#substation-tab-content">Создать схему</a>
+    {% elif "new_version" in document_actions %}
+        <a class="btn btn-outline-primary mb-3" href="/objects/substation/{{ substation_id }}/selectivity-schemes/new?new_version=true" hx-get="/objects/substation/{{ substation_id }}/selectivity-schemes/new?new_version=true" hx-target="#substation-tab-content">Новая версия</a>
+    {% endif %}
     {% if versions %}
         <div class="table-responsive">
             <table class="table table-sm align-middle rzadb-selectivity-schemes-table">
@@ -20,6 +28,7 @@
                         <tr>
                             <td class="text-nowrap">
                                 {{ version.version_number }}
+                                {% if loop.first and version.status is defined %}<span class="badge {{ version.status.badge_class }} ms-1">{{ version.status.label }}</span>{% endif %}
                             </td>
 
                             <td class="text-nowrap">
@@ -77,6 +86,15 @@
     {% else %}
         <div class="text-body-secondary py-4 text-center">
             Схема селективности отсутствует.
+        </div>
+    {% endif %}
+    {% if versions and "submit" in document_actions %}
+        <form method="post" action="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/submit" hx-post="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/submit"><button class="btn btn-primary">Отправить на согласование</button></form>
+    {% endif %}
+    {% if versions and "approve" in document_actions %}
+        <div class="d-flex gap-2 mt-2">
+            <form method="post" action="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/approve" hx-post="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/approve"><button class="btn btn-success">Утвердить</button></form>
+            <form method="post" action="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/return" hx-post="/objects/substation/{{ substation_id }}/selectivity-schemes/versions/{{ versions[0].version_id }}/return"><button class="btn btn-outline-warning">Вернуть на доработку</button></form>
         </div>
     {% endif %}
 </div>

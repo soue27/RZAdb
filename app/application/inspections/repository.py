@@ -1,6 +1,8 @@
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
@@ -22,6 +24,44 @@ class InspectionTaskRepository:
 
     async def get_by_id(self, task_id: UUID) -> InspectionTask | None:
         return await self.session.get(InspectionTask, task_id)
+
+    async def get_active_by_id(self, task_id: UUID) -> InspectionTask | None:
+        result = await self.session.execute(
+            select(InspectionTask)
+            .options(
+                selectinload(InspectionTask.substation),
+                selectinload(InspectionTask.created_by_user),
+                selectinload(InspectionTask.assigned_to_user),
+                selectinload(InspectionTask.inspection),
+            )
+            .where(InspectionTask.id == task_id, InspectionTask.deleted_at.is_(None))
+        )
+        return result.scalar_one_or_none()
+
+    async def list_by_substation(self, substation_id: UUID) -> list[InspectionTask]:
+        result = await self.session.scalars(
+            select(InspectionTask)
+            .options(
+                selectinload(InspectionTask.created_by_user),
+                selectinload(InspectionTask.assigned_to_user),
+                selectinload(InspectionTask.inspection),
+            )
+            .where(
+                InspectionTask.substation_id == substation_id,
+                InspectionTask.deleted_at.is_(None),
+            )
+            .order_by(InspectionTask.created_at.desc())
+        )
+        return list(result.all())
+
+    async def get_history(self, task_id: UUID) -> list[InspectionHistory]:
+        result = await self.session.scalars(
+            select(InspectionHistory)
+            .options(selectinload(InspectionHistory.actor))
+            .where(InspectionHistory.inspection_task_id == task_id)
+            .order_by(InspectionHistory.created_at.desc())
+        )
+        return list(result.all())
 
     async def save(self, task: InspectionTask) -> InspectionTask:
         # flush сохраняет изменения в текущей транзакции; commit выполняет сервис.

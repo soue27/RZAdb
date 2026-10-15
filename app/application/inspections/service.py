@@ -57,6 +57,28 @@ class InspectionTaskService:
 
         return await self.repository.create(task)
 
+    async def create_and_assign(
+        self,
+        *,
+        substation_id: UUID,
+        actor_id: UUID,
+        assignee_id: UUID | None,
+    ) -> InspectionTask:
+        """Атомарно создаёт задачу и при необходимости назначает исполнителя."""
+
+        async with self.repository.session.begin_nested():
+            task = await self.create(
+                substation_id=substation_id,
+                actor_id=actor_id,
+            )
+            if assignee_id is not None:
+                await self.assign(
+                    task.id,
+                    actor_id=actor_id,
+                    assignee_id=assignee_id,
+                )
+        return task
+
     async def assign(
         self,
         task_id: UUID,
@@ -199,37 +221,9 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Завершает осмотр и сохраняет его результат."""
 
-        task = await self.repository.get_by_id(task_id)
-
-        if task is None:
-            raise ValueError("Задача осмотра не найдена.")
-
-        actor = await self.user_repository.get_by_id(actor_id)
-
-        if actor is None:
-            raise ValueError("Исполнитель не найден.")
-
-        # Выполнить осмотр может только назначенный исполнитель.
-        if task.assigned_to != actor_id:
-            raise ValueError(
-                "Завершить осмотр может только назначенный исполнитель."
-            )
-
-        if actor.role not in {
-            UserRole.ENGINEER,
-            UserRole.MANAGER,
-        }:
-            raise ValueError(
-                "Выполнить осмотр может только Engineer или Manager."
-            )
-
-        validate_transition(
-            task.status,
-            TaskStatus.COMPLETED,
+        task = await self.validate_completion(
+            task_id, actor_id=actor_id, remarks=remarks
         )
-
-        if not remarks or not remarks.strip():
-            raise ValueError("Необходимо указать замечания по результатам осмотра.")
 
         current_time = now or datetime.now().astimezone()
 
@@ -263,6 +257,49 @@ class InspectionTaskService:
         )
 
         await self.repository.add_history(history)
+
+        return task
+
+    async def validate_completion(
+        self,
+        task_id: UUID,
+        *,
+        actor_id: UUID,
+        remarks: str,
+    ) -> InspectionTask:
+        """Проверяет полномочия и переход перед загрузкой файлов результата."""
+
+        task = await self.repository.get_by_id(task_id)
+
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        actor = await self.user_repository.get_by_id(actor_id)
+
+        if actor is None:
+            raise ValueError("Исполнитель не найден.")
+
+        # Выполнить осмотр может только назначенный исполнитель.
+        if task.assigned_to != actor_id:
+            raise ValueError(
+                "Завершить осмотр может только назначенный исполнитель."
+            )
+
+        if actor.role not in {
+            UserRole.ENGINEER,
+            UserRole.MANAGER,
+        }:
+            raise ValueError(
+                "Выполнить осмотр может только Engineer или Manager."
+            )
+
+        validate_transition(
+            task.status,
+            TaskStatus.COMPLETED,
+        )
+
+        if not remarks or not remarks.strip():
+            raise ValueError("Необходимо указать замечания по результатам осмотра.")
 
         return task
 

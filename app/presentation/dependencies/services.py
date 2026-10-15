@@ -17,6 +17,8 @@ from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
+from app.application.inspections.repository import InspectionTaskRepository
+from app.application.inspections.service import InspectionTaskService
 from app.application.maintenance.repository import TORecordRepository
 from app.application.maintenance.service import TORecordService
 from app.application.objects.resolver import ObjectResolver
@@ -53,7 +55,9 @@ from app.application.work_items.service import (
     InstructionWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
+    RZAInstructionWorkItemSource,
     SchemaWorkItemSource,
+    SelectivitySchemeWorkItemSource,
     SettingsWorkItemSource,
     TaskWorkItemSource,
     WorkItemService,
@@ -182,6 +186,22 @@ def get_inspection_service(
     return InspectionService(
         repository=InspectionRepository(session),
     )
+
+
+def get_inspection_task_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> InspectionTaskService:
+    return InspectionTaskService(
+        repository=InspectionTaskRepository(session),
+        user_repository=UserRepository(session),
+        substation_repository=SubstationRepository(session),
+    )
+
+
+def get_inspection_task_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> InspectionTaskRepository:
+    return InspectionTaskRepository(session)
 
 
 def get_rza_instruction_service(
@@ -326,6 +346,14 @@ def get_work_item_service(
         user_repository=UserRepository(session),
         urza_repository=URZARepository(session),
     )
+    rza_instruction_service = RZAInstructionService(
+        repository=RZAInstructionRepository(session),
+        access_service=access_service,
+    )
+    selectivity_scheme_service = SelectivitySchemeService(
+        repository=SelectivitySchemeRepository(session),
+        access_service=access_service,
+    )
     otd_service = OTDService(
         repository=OTDRepository(session),
         access_service=access_service,
@@ -339,5 +367,7 @@ def get_work_item_service(
             SettingsWorkItemSource(settings_service),
             SchemaWorkItemSource(schema_service),
             InstructionWorkItemSource(instruction_service),
+            RZAInstructionWorkItemSource(rza_instruction_service),
+            SelectivitySchemeWorkItemSource(selectivity_scheme_service),
         ]
     )

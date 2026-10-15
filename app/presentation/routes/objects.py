@@ -20,6 +20,7 @@ from app.application.connections.service import (
     ConnectionService,
 )
 from app.application.inspections.inspection_service import InspectionService
+from app.application.inspections.service import InspectionTaskService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -42,6 +43,7 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
+    get_inspection_task_service,
     get_object_service,
     get_otd_service,
     get_rza_instruction_service,
@@ -270,9 +272,13 @@ async def get_substation_inspections(
         InspectionService,
         Depends(get_inspection_service),
     ],
+    inspection_task_service: Annotated[
+        InspectionTaskService,
+        Depends(get_inspection_task_service),
+    ],
 ):
     try:
-        await object_service.get_object(
+        substation = await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
@@ -293,6 +299,20 @@ async def get_substation_inspections(
     inspections = await inspection_service.get_by_substation_id(
         substation_id,
     )
+    inspection_tasks = await inspection_task_service.repository.list_by_substation(substation_id)
+    task_history = {
+        task.id: await inspection_task_service.repository.get_history(task.id)
+        for task in inspection_tasks
+    }
+    assignees = []
+    if current_user.role is UserRole.MANAGER:
+        substation_record = await inspection_task_service.substation_repository.get_by_id(
+            substation_id
+        )
+        if substation_record is not None:
+            assignees = await inspection_task_service.user_repository.get_active_inspection_assignees_by_enterprise(
+                substation_record.enterprise_id
+            )
 
 
     return templates.TemplateResponse(
@@ -300,6 +320,18 @@ async def get_substation_inspections(
         name="objects/substation_inspections.html",
         context={
             "inspections": inspections,
+            "inspection_tasks": inspection_tasks,
+            "inspection_task_history": task_history,
+            "inspection_assignees": assignees,
+            "substation_id": substation_id,
+            "current_user": current_user,
+            "can_manage_inspections": current_user.role is UserRole.MANAGER,
+            "inspection_status_labels": {
+                "created": "Создано", "assigned": "Назначено",
+                "in_progress": "В работе", "completed": "Выполнено",
+                "under_review": "На проверке", "closed": "Закрыто",
+                "rejected": "Отклонено",
+            },
         },
     )
 
@@ -602,6 +634,7 @@ async def get_substation_instructions(
         RZAInstructionService,
         Depends(get_rza_instruction_service),
     ],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
     instruction_version: UUID | None = Query(default=None),
 ):
     try:
@@ -654,6 +687,18 @@ async def get_substation_instructions(
             "versions": versions,
             "selected_version": selected_version,
             "substation_id": substation_id,
+            "current_user": current_user,
+            "document_actions": (
+                await rza_instruction_service.get_available_actions(
+                    current_user.id, selected_version
+                ) if selected_version is not None else set()
+            ),
+            "can_create_document": current_user.role in {
+                UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
+            },
+            "can_issue_task": await task_service.can_issue_task(
+                actor_id=current_user.id, substation_id=substation_id
+            ),
         },
     )
 
@@ -671,6 +716,7 @@ async def get_substation_selectivity_schemes(
         SelectivitySchemeService,
         Depends(get_selectivity_scheme_service),
     ],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
     try:
         await object_service.get_object(
@@ -693,11 +739,29 @@ async def get_substation_selectivity_schemes(
         user_id=current_user.id,
         substation_id=substation_id,
     )
+    scheme_versions = await selectivity_scheme_service.get_versions(
+        user_id=current_user.id,
+        substation_id=substation_id,
+    )
+    document_actions = (
+        await selectivity_scheme_service.get_available_actions(
+            current_user.id, scheme_versions[0]
+        ) if scheme_versions else set()
+    )
 
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_selectivity_schemes.html",
         context={
             "versions": versions,
+            "current_user": current_user,
+            "substation_id": substation_id,
+            "document_actions": document_actions,
+            "can_create_document": current_user.role in {
+                UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
+            },
+            "can_issue_task": await task_service.can_issue_task(
+                actor_id=current_user.id, substation_id=substation_id
+            ),
         },
     )

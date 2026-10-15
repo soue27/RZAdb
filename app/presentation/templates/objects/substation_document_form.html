@@ -1,0 +1,30 @@
+<div class="card">
+    <div class="card-body">
+        <h2 class="h5 mb-3">
+            {% if document_type == "instruction" %}Инструкция РЗА подстанции{% else %}Схема селективности{% endif %}
+            {% if new_version %} — новая версия{% else %} — создание{% endif %}
+        </h2>
+        {% if error_message %}<div class="alert alert-danger" role="alert">{{ error_message }}</div>{% endif %}
+        <form method="post" enctype="multipart/form-data"
+              action="/objects/substation/{{ substation_id }}/{% if document_type == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}"
+              hx-post="/objects/substation/{{ substation_id }}/{% if document_type == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}"
+              hx-target="#substation-tab-content" hx-swap="innerHTML">
+            <input type="hidden" name="new_version" value="{{ 'true' if new_version else 'false' }}">
+            {% if task_id %}<input type="hidden" name="task_id" value="{{ task_id }}">{% endif %}
+            <div class="mb-3">
+                <label class="form-label" for="effective_date">Дата вступления</label>
+                <input class="form-control" id="effective_date" name="effective_date" type="date" required value="{{ values.get('effective_date', '') }}">
+            </div>
+            {% if document_type == "scheme" %}
+                <div class="mb-3"><label class="form-label" for="number">Номер</label><input class="form-control" id="number" name="number" maxlength="255" required value="{{ values.get('number', '') }}"></div>
+                <div class="mb-3"><label class="form-label" for="name">Наименование</label><input class="form-control" id="name" name="name" maxlength="500" required value="{{ values.get('name', '') }}"></div>
+            {% endif %}
+            <div class="mb-3"><label class="form-label" for="change_description">Описание изменений</label><textarea class="form-control" id="change_description" name="change_description">{{ values.get('change_description', '') }}</textarea></div>
+            <div class="mb-3"><label class="form-label" for="change_justification">Обоснование изменений</label><textarea class="form-control" id="change_justification" name="change_justification">{{ values.get('change_justification', '') }}</textarea></div>
+            <div class="mb-3"><label class="form-label" for="scan_file">Скан документа</label><input class="form-control" id="scan_file" name="scan_file" type="file" required></div>
+            <div class="mb-3"><label class="form-label" for="editable_file">Редактируемый файл (необязательно)</label><input class="form-control" id="editable_file" name="editable_file" type="file"></div>
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <a class="btn btn-outline-secondary" href="/objects/substation/{{ substation_id }}?tab={% if document_type == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}">Отмена</a>
+        </form>
+    </div>
+</div>

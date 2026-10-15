@@ -19,8 +19,73 @@ from app.domain.enums import (
 )
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
+from app.domain.inspection_task import InspectionTask
 from app.domain.substation import Substation
 from app.domain.user import User
+
+
+@pytest.mark.asyncio
+async def test_create_and_assign_rolls_back_task_when_assignment_fails(
+    db_session, system_user_id, monkeypatch
+) -> None:
+    """Не оставляет созданную задачу, если назначение исполнителя не удалось."""
+
+    department = Enterprise(
+        id=uuid4(),
+        type=EnterpriseType.DEPARTMENT,
+        full_name="Отделение для проверки атомарности осмотра",
+        short_name="АТОМАРНОСТЬ ОСМОТРА",
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    manager = User(
+        id=uuid4(),
+        full_name="Руководитель теста атомарности",
+        role=UserRole.MANAGER,
+        email=f"{uuid4()}@example.com",
+        password_hash="test-hash",
+        enterprise_id=department.id,
+        access_category=AccessCategory.IV,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    substation = Substation(
+        id=uuid4(),
+        enterprise_id=department.id,
+        highest_voltage=HighestVoltage.KV_110,
+        dispatch_name="ПС для проверки атомарности осмотра",
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    db_session.add_all([department, manager, substation])
+    await db_session.flush()
+
+    repository = InspectionTaskRepository(db_session)
+    service = InspectionTaskService(
+        repository,
+        UserRepository(db_session),
+        SubstationRepository(db_session),
+    )
+
+    async def fail_assignment(*args, **kwargs):
+        raise ValueError("Назначение завершилось ошибкой")
+
+    monkeypatch.setattr(service, "assign", fail_assignment)
+
+    with pytest.raises(ValueError, match="Назначение завершилось ошибкой"):
+        await service.create_and_assign(
+            substation_id=substation.id,
+            actor_id=manager.id,
+            assignee_id=uuid4(),
+        )
+
+    saved_tasks = await db_session.scalars(
+        select(InspectionTask).where(
+            InspectionTask.substation_id == substation.id
+        )
+    )
+    assert saved_tasks.all() == []
 
 
 @pytest.mark.asyncio

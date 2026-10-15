@@ -12,6 +12,9 @@ from app.presentation.routes.maintenance import (
     router as maintenance_router,
 )
 from app.presentation.routes.objects import router as objects_router
+from app.presentation.routes.substation_documents import router as substation_documents_router
+from app.presentation.routes.substation_tasks import router as substation_tasks_router
+from app.presentation.routes.inspection_tasks import router as inspection_tasks_router
 from app.presentation.routes.otd import router as otd_router
 from app.presentation.routes.programs import router as programs_router
 from app.presentation.routes.schemes import router as schemes_router
@@ -48,6 +51,9 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(home_router)
     app.include_router(objects_router)
+    app.include_router(substation_documents_router)
+    app.include_router(substation_tasks_router)
+    app.include_router(inspection_tasks_router)
     app.include_router(otd_router)
     app.include_router(maintenance_router)
     app.include_router(programs_router)

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -103,3 +103,39 @@ class SelectivitySchemeRepository:
         self.session.add(version)
         await self.session.flush()
         return version
+
+    async def save(
+        self,
+        version: SelectivitySchemeVersion,
+    ) -> SelectivitySchemeVersion:
+        await self.session.flush()
+        await self.session.refresh(version)
+        return version
+
+    async def list_standalone_work_items(self) -> list[SelectivitySchemeVersion]:
+        latest = (
+            select(
+                SelectivitySchemeVersion.selectivity_scheme_id.label("scheme_id"),
+                func.max(SelectivitySchemeVersion.version_number).label("version_number"),
+            )
+            .where(SelectivitySchemeVersion.deleted_at.is_(None))
+            .group_by(SelectivitySchemeVersion.selectivity_scheme_id)
+            .subquery()
+        )
+        query = (
+            select(SelectivitySchemeVersion)
+            .options(
+                selectinload(SelectivitySchemeVersion.selectivity_scheme)
+                .selectinload(SelectivityScheme.substation),
+                selectinload(SelectivitySchemeVersion.creator),
+            )
+            .where(
+                SelectivitySchemeVersion.deleted_at.is_(None),
+                SelectivitySchemeVersion.task_id.is_(None),
+                SelectivitySchemeVersion.selectivity_scheme_id == latest.c.scheme_id,
+                SelectivitySchemeVersion.version_number == latest.c.version_number,
+            )
+            .order_by(SelectivitySchemeVersion.created_at.desc())
+        )
+        result = await self.session.scalars(query)
+        return list(result.all())

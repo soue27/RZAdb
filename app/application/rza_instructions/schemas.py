@@ -2,6 +2,7 @@ from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel
+from app.domain.enums import DocumentStatus
 
 
 class RZAInstructionDetails(BaseModel):
@@ -29,3 +30,4 @@ class RZAInstructionVersionDetails(BaseModel):
     scan_file_name: str | None
     editable_file_id: UUID | None
     editable_file_name: str | None
+    status: DocumentStatus = DocumentStatus.DRAFT
