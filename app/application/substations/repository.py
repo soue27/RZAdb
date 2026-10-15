@@ -18,6 +18,11 @@ class SubstationRepository:
     ) -> Substation | None:
         return await self.session.get(Substation, substation_id)
 
+    async def save(self, substation: Substation) -> Substation:
+        self.session.add(substation)
+        await self.session.flush()
+        return substation
+
     async def get_all_active(self) -> list[Substation]:
         """Возвращает все неудалённые подстанции."""
         result = await self.session.scalars(

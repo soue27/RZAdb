@@ -4,12 +4,15 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
+    Form,
     HTTPException,
     Query,
     Request,
     status,
 )
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
 
 from app.application.connections.service import ConnectionService
 from app.application.inspections.inspection_service import InspectionService
@@ -25,9 +28,11 @@ from app.application.selectivity_schemes.service import (
 )
 from app.application.settings.service import SettingsService
 from app.application.substations.service import SubstationService
+from app.application.substations.schemas import SubstationUpdate
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
 from app.application.urzas.service import URZAService
+from app.domain.enums import HighestVoltage, OperationalCurrentType, UserRole
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -52,6 +57,14 @@ router = APIRouter(
 templates = Jinja2Templates(
     directory="app/presentation/templates",
 )
+
+
+def can_edit_substation(user: User) -> bool:
+    return user.role in {
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.SUPERADMIN,
+    }
 
 
 @router.get("/{object_type}/{object_id}")
@@ -107,6 +120,7 @@ async def get_object(
                 name="objects/substation.html",
                 context={
                     "substation": substation,
+                    "can_edit": can_edit_substation(current_user),
                 },
             )
 
@@ -308,7 +322,114 @@ async def get_substation_details(
         name="objects/substation_details.html",
         context={
             "substation": substation,
+            "can_edit": can_edit_substation(current_user),
         },
+    )
+
+
+def _substation_form_context(substation, current_user, **kwargs):
+    return {
+        "substation": substation,
+        "current_user": current_user,
+        "can_edit": can_edit_substation(current_user),
+        "highest_voltages": list(HighestVoltage),
+        "current_types": list(OperationalCurrentType),
+        **kwargs,
+    }
+
+
+async def _check_substation_access(object_service, current_user, substation_id):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="substation",
+            object_id=substation_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+
+
+def _require_substation_edit_role(current_user: User) -> None:
+    if not can_edit_substation(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для редактирования.",
+        )
+
+
+@router.get("/substation/{substation_id}/edit")
+async def get_substation_edit_form(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[SubstationService, Depends(get_substation_service)],
+):
+    await _check_substation_access(object_service, current_user, substation_id)
+    _require_substation_edit_role(current_user)
+    substation = await substation_service.get_details(substation_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/substation_form.html",
+        context=_substation_form_context(substation, current_user),
+    )
+
+
+@router.post("/substation/{substation_id}/edit")
+async def post_substation_edit_form(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[SubstationService, Depends(get_substation_service)],
+    dispatch_name: Annotated[str, Form()] = "",
+    highest_voltage: Annotated[str, Form()] = "",
+    operational_current_type: Annotated[str, Form()] = "",
+    sap_code: Annotated[str, Form()] = "",
+    asureo_code: Annotated[str, Form()] = "",
+    address: Annotated[str, Form()] = "",
+    latitude: Annotated[str, Form()] = "",
+    longitude: Annotated[str, Form()] = "",
+):
+    await _check_substation_access(object_service, current_user, substation_id)
+    _require_substation_edit_role(current_user)
+
+    values = {
+        "dispatch_name": dispatch_name,
+        "highest_voltage": highest_voltage,
+        "operational_current_type": operational_current_type,
+        "sap_code": sap_code,
+        "asureo_code": asureo_code,
+        "address": address,
+        "latitude": latitude or None,
+        "longitude": longitude or None,
+    }
+    try:
+        update = SubstationUpdate.model_validate(values)
+    except ValidationError:
+        substation = await substation_service.get_details(substation_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/substation_form.html",
+            status_code=422,
+            context=_substation_form_context(
+                substation, current_user, form_values=values,
+                error_message="Проверьте введённые значения.",
+            ),
+        )
+
+    substation = await substation_service.update_details(substation_id, update)
+    if request.headers.get("HX-Request") != "true":
+        return RedirectResponse(
+            url=f"/objects/substation/{substation_id}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/substation_details_fragment.html",
+        context=_substation_form_context(substation, current_user),
     )
 
 

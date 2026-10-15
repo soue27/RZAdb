@@ -1,0 +1,37 @@
+<div id="substation-tab-content">
+    {% if error_message %}<div class="alert alert-danger" role="alert">{{ error_message }}</div>{% endif %}
+    {% set values = form_values or {} %}
+    <form method="post" action="/objects/substation/{{ substation.id }}/edit"
+          hx-post="/objects/substation/{{ substation.id }}/edit"
+          hx-on::before-swap="if (event.detail.xhr.status === 422) event.detail.shouldSwap = true"
+          hx-target="#substation-tab-content" hx-swap="outerHTML">
+        <div class="mb-3">
+            <label class="form-label" for="dispatch-name">Диспетчерское наименование</label>
+            <input id="dispatch-name" class="form-control" name="dispatch_name" maxlength="255" required
+                   value="{{ values.get('dispatch_name', substation.dispatch_name) }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="highest-voltage">Наивысшее напряжение</label>
+            <select id="highest-voltage" class="form-select" name="highest_voltage" required>
+                {% for voltage in highest_voltages %}<option value="{{ voltage.value }}" {% if values.get('highest_voltage', substation.highest_voltage.value) == voltage.value %}selected{% endif %}>{{ voltage.value }} кВ</option>{% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="current-type">Тип оперативного тока</label>
+            <select id="current-type" class="form-select" name="operational_current_type" required>
+                {% for current_type in current_types %}<option value="{{ current_type.value }}" {% if values.get('operational_current_type', substation.operational_current_type.value) == current_type.value %}selected{% endif %}>{{ current_type.label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="mb-3"><label class="form-label" for="sap-code">SAP</label><input id="sap-code" class="form-control" name="sap_code" maxlength="64" value="{{ values.get('sap_code', substation.sap_code or '') }}"></div>
+        <div class="mb-3"><label class="form-label" for="asureo-code">АСУЕО</label><input id="asureo-code" class="form-control" name="asureo_code" maxlength="64" value="{{ values.get('asureo_code', substation.asureo_code or '') }}"></div>
+        <div class="mb-3"><label class="form-label" for="address">Адрес</label><textarea id="address" class="form-control" name="address" maxlength="500" rows="2">{{ values.get('address', substation.address or '') }}</textarea></div>
+        <div class="row">
+            <div class="col-md-6 mb-3"><label class="form-label" for="latitude">Широта</label><input id="latitude" class="form-control" name="latitude" type="number" step="any" min="-90" max="90" value="{{ values.get('latitude', substation.latitude if substation.latitude is not none else '') }}"></div>
+            <div class="col-md-6 mb-3"><label class="form-label" for="longitude">Долгота</label><input id="longitude" class="form-control" name="longitude" type="number" step="any" min="-180" max="180" value="{{ values.get('longitude', substation.longitude if substation.longitude is not none else '') }}"></div>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline-secondary" hx-get="/objects/substation/{{ substation.id }}/details" hx-target="#substation-tab-content" hx-swap="innerHTML">Отмена</button>
+        </div>
+    </form>
+</div>

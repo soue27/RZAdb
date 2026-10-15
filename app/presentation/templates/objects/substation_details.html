@@ -1,5 +1,9 @@
 <dl class="rzadb-property-list">
     <div class="rzadb-property-row">
+        <dt class="rzadb-property-label">Диспетчерское наименование</dt>
+        <dd class="rzadb-property-value">{{ substation.dispatch_name }}</dd>
+    </div>
+    <div class="rzadb-property-row">
         <dt class="rzadb-property-label">Наивысшее напряжение</dt>
         <dd class="rzadb-property-value">
             {{ substation.highest_voltage.value }} кВ
@@ -45,3 +49,12 @@
         </dd>
     </div>
 </dl>
+{% if can_edit %}
+    <div class="mt-3">
+        <button type="button" class="btn btn-outline-primary"
+                hx-get="/objects/substation/{{ substation.id }}/edit"
+                hx-target="#substation-tab-content" hx-swap="innerHTML">
+            <span class="material-icons align-middle me-1">edit</span>Изменить
+        </button>
+    </div>
+{% endif %}

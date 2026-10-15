@@ -37,4 +37,22 @@ def test_substation_template_renders_details():
     assert "Осмотры" in html
     assert "Инструкции" in html
     assert "Схемы селективности" in html
-    assert "Изменить" in html
+    assert "Изменить" not in html
+    assert "Добавить присоединение" in html
+    assert "disabled" in html
+    assert "Функция находится в разработке" in html
+
+
+def test_substation_edit_button_is_rendered_only_when_allowed():
+    substation = SubstationDetails(
+        id=uuid7(), dispatch_name="ПС", highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        sap_code=None, asureo_code=None, address=None, latitude=None, longitude=None,
+    )
+    template = templates.get_template("objects/substation_details.html")
+    editable_html = template.render(substation=substation, can_edit=True)
+    read_only_html = template.render(substation=substation, can_edit=False)
+    assert "Изменить" in editable_html
+    assert "Изменить" not in read_only_html
+    assert editable_html.index("Координаты") < editable_html.index("Изменить")
+    assert editable_html.index("</dl>") < editable_html.index("Изменить")

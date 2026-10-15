@@ -45,7 +45,12 @@ from app.presentation.dependencies.services import (
 
 
 class FakeSubstationService:
+    def __init__(self):
+        self.updated = None
+
     async def get_details(self, substation_id: UUID) -> SubstationDetails:
+        if self.updated is not None:
+            return SubstationDetails(id=substation_id, **self.updated)
         return SubstationDetails(
             id=substation_id,
             dispatch_name="ПС Центральная",
@@ -57,6 +62,10 @@ class FakeSubstationService:
             longitude=Decimal("60.605700"),
             operational_current_type=OperationalCurrentType.PERMANENT,
         )
+
+    async def update_details(self, substation_id, data):
+        self.updated = data.model_dump()
+        return SubstationDetails(id=substation_id, **self.updated)
 
 
 class FakeURZAService:
@@ -530,6 +539,131 @@ def override_substation_service(service: FakeSubstationService):
     return dependency
 
 
+def test_substation_edit_is_role_protected_and_returns_htmx_details():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(object_type="substation", id=substation_id, name="ПС")),
+    )
+    substation_service = FakeSubstationService()
+    app.dependency_overrides[get_substation_service] = override_substation_service(substation_service)
+    try:
+        with TestClient(app) as client:
+            form = client.get(f"/objects/substation/{substation_id}/edit")
+            assert form.status_code == 200
+            assert 'value="ПС Центральная"' in form.text
+            assert "event.detail.xhr.status === 422" in form.text
+            saved = client.post(
+                f"/objects/substation/{substation_id}/edit",
+                headers={"HX-Request": "true"},
+                data={"dispatch_name": "Обновлённая", "highest_voltage": "110",
+                      "operational_current_type": "permanent", "sap_code": "", "asureo_code": "",
+                      "address": "", "latitude": "", "longitude": ""},
+            )
+            assert saved.status_code == 200
+            assert "Обновлённая" in saved.text
+            assert "hx-get=\"/objects/substation/" in saved.text
+            assert substation_service.updated["sap_code"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_edit_regular_post_redirects_to_full_card():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(object_type="substation", id=substation_id, name="ПС")),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    try:
+        response = TestClient(app).post(f"/objects/substation/{substation_id}/edit", data={
+            "dispatch_name": "ПС обновлённая", "highest_voltage": "110",
+            "operational_current_type": "permanent",
+        }, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"] == f"/objects/substation/{substation_id}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_edit_validation_preserves_entered_values():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(object_type="substation", id=substation_id, name="ПС")),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    try:
+        with TestClient(app) as client:
+            response = client.post(f"/objects/substation/{substation_id}/edit", headers={"HX-Request": "true"}, data={
+                "dispatch_name": "Введённое имя", "highest_voltage": "110",
+                "operational_current_type": "invalid", "sap_code": "значение",
+            })
+        assert response.status_code == 422
+        assert "Проверьте введённые значения" in response.text
+        assert "Введённое имя" in response.text
+        assert "значение" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_edit_denied_without_object_access():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(error=ObjectAccessDeniedError()),
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/objects/substation/{uuid7()}/edit")
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
+def test_substation_edit_post_denied_for_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(object_type="substation", id=substation_id, name="ПС")),
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.post(f"/objects/substation/{substation_id}/edit", data={
+                "dispatch_name": "ПС", "highest_voltage": "110",
+                "operational_current_type": "permanent",
+            })
+            assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
+def test_substation_edit_form_get_denied_for_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(object_type="substation", id=substation_id, name="ПС")),
+    )
+    try:
+        response = TestClient(app).get(f"/objects/substation/{substation_id}/edit")
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
 def override_connection_service(service: FakeConnectionService):
     def dependency() -> FakeConnectionService:
         return service
@@ -934,8 +1068,19 @@ def test_otd_first_version_form_and_submission(system_user_id):
     finally:
         app.dependency_overrides.clear()
 
-def test_get_object_returns_selected_object(system_user_id) -> None:
-    user = make_user(system_user_id=system_user_id)
+@pytest.mark.parametrize(
+    "role,can_edit",
+    [
+        (UserRole.ADMIN, True),
+        (UserRole.MANAGER, True),
+        (UserRole.SUPERADMIN, True),
+        (UserRole.ENGINEER, False),
+        (UserRole.SPECIALIST, False),
+    ],
+)
+def test_get_object_returns_selected_object(role, can_edit) -> None:
+    user = make_user(system_user_id=uuid7())
+    user.role = role
     object_id = uuid7()
 
     selected_object = SelectedObject(
@@ -954,6 +1099,11 @@ def test_get_object_returns_selected_object(system_user_id) -> None:
     app.dependency_overrides[get_connection_service] = override_connection_service(
         FakeConnectionService()
     )
+    app.dependency_overrides[get_urza_service] = lambda: FakeURZAService(None)
+    app.dependency_overrides[get_otd_service] = lambda: FakeOTDService()
+    app.dependency_overrides[get_settings_service] = lambda: FakeSettingsService()
+    app.dependency_overrides[get_task_service] = lambda: FakeTaskService()
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
 
     try:
         client = TestClient(app)
@@ -968,6 +1118,27 @@ def test_get_object_returns_selected_object(system_user_id) -> None:
         assert "110 кВ" in response.text
         assert "SAP-001" in response.text
         assert "ASUREO-001" in response.text
+        assert ("Изменить" in response.text) is can_edit
+        assert "Добавить присоединение" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_details_htmx_reload_keeps_edit_button():
+    user = make_user(system_user_id=uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    try:
+        response = TestClient(app).get(f"/objects/substation/{substation_id}/details")
+        assert response.status_code == 200
+        assert "Изменить" in response.text
     finally:
         app.dependency_overrides.clear()
 

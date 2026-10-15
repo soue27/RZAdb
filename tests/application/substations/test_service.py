@@ -5,6 +5,7 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.substations.service import SubstationService
+from app.application.substations.schemas import SubstationUpdate
 from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
@@ -36,10 +37,15 @@ class FakeSubstationRepository:
     def __init__(self, substation=None):
         self.substation = substation
         self.received_id = None
+        self.saved = None
 
     async def get_by_id(self, substation_id):
         self.received_id = substation_id
         return self.substation
+
+    async def save(self, substation):
+        self.saved = substation
+        return substation
 
 
 @pytest.mark.asyncio
@@ -121,3 +127,28 @@ async def test_get_details_maps_substation_model():
     assert result.address is None
     assert result.latitude is None
     assert result.longitude is None
+
+
+@pytest.mark.asyncio
+async def test_update_details_updates_existing_substation():
+    entity = FakeSubstation(uuid7(), "старое", HighestVoltage.KV_110,
+        OperationalCurrentType.PERMANENT, None, None, None, None, None)
+    repository = FakeSubstationRepository(entity)
+    service = SubstationService(repository)
+    result = await service.update_details(entity.id, SubstationUpdate(
+        dispatch_name="новое", highest_voltage=HighestVoltage.KV_220,
+        operational_current_type=OperationalCurrentType.RECTIFIED,
+        sap_code=None, asureo_code=None, address=None, latitude=None, longitude=None,
+    ))
+    assert repository.saved is entity
+    assert result.dispatch_name == "новое"
+    assert result.highest_voltage == HighestVoltage.KV_220
+
+
+@pytest.mark.asyncio
+async def test_update_details_raises_for_missing_substation():
+    service = SubstationService(FakeSubstationRepository(None))
+    update = SubstationUpdate(dispatch_name="ПС", highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT)
+    with pytest.raises(ObjectNotFoundError):
+        await service.update_details(uuid7(), update)
