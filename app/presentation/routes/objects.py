@@ -10,11 +10,15 @@ from fastapi import (
     Request,
     status,
 )
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
-from app.application.connections.service import ConnectionService
+from app.application.connections.schemas import ConnectionCreate
+from app.application.connections.service import (
+    ConnectionNameConflictError,
+    ConnectionService,
+)
 from app.application.inspections.inspection_service import InspectionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -27,8 +31,8 @@ from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
 from app.application.settings.service import SettingsService
-from app.application.substations.service import SubstationService
 from app.application.substations.schemas import SubstationUpdate
+from app.application.substations.service import SubstationService
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
 from app.application.urzas.service import URZAService
@@ -57,6 +61,12 @@ router = APIRouter(
 templates = Jinja2Templates(
     directory="app/presentation/templates",
 )
+
+CONNECTION_CREATE_ROLES = {
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.SUPERADMIN,
+}
 
 
 def can_edit_substation(user: User) -> bool:
@@ -121,6 +131,7 @@ async def get_object(
                 context={
                     "substation": substation,
                     "can_edit": can_edit_substation(current_user),
+                    "can_create_connection": current_user.role in CONNECTION_CREATE_ROLES,
                 },
             )
 
@@ -131,11 +142,23 @@ async def get_object(
             if connection is None:
                 raise ObjectNotFoundError
 
+            if request.headers.get("HX-Request") == "true":
+                return templates.TemplateResponse(
+                    request=request,
+                    name="objects/connection.html",
+                    context={"connection": connection},
+                )
+
+            tree = await tree_service.get_tree(user_id=current_user.id)
             return templates.TemplateResponse(
                 request=request,
-                name="objects/connection.html",
+                name="objects/connection_page.html",
                 context={
                     "connection": connection,
+                    "current_user": current_user,
+                    "tree": tree,
+                    "page_title": connection.dispatch_name,
+                    "content_template": "objects/connection.html",
                 },
             )
 
@@ -349,6 +372,142 @@ async def _check_substation_access(object_service, current_user, substation_id):
         raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
     except ObjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+
+
+async def _get_accessible_substation(
+    object_service,
+    substation_service: SubstationService,
+    current_user: User,
+    substation_id: UUID,
+):
+    try:
+        substation = await substation_service.get_details(substation_id)
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Подстанция не найдена.") from exc
+    await _check_substation_access(object_service, current_user, substation_id)
+    return substation
+
+
+def _require_connection_create_role(current_user: User) -> None:
+    if current_user.role not in CONNECTION_CREATE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Создавать присоединения с текущей ролью запрещено.",
+        )
+
+
+async def _render_connection_form(
+    request: Request,
+    substation_id: UUID,
+    current_user: User,
+    tree_service: TreeService,
+    *,
+    form_values: dict | None = None,
+    error_message: str | None = None,
+):
+    context = {
+        "substation_id": substation_id,
+        "form_values": form_values or {},
+        "error_message": error_message,
+    }
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/connection_form.html",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT if error_message else status.HTTP_200_OK,
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/connection_page.html",
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT if error_message else status.HTTP_200_OK,
+        context={
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "page_title": "Добавление присоединения",
+            "content_template": "objects/connection_form.html",
+        },
+    )
+
+
+@router.get("/substation/{substation_id}/connections/new")
+async def get_new_connection_form(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[SubstationService, Depends(get_substation_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    await _get_accessible_substation(
+        object_service, substation_service, current_user, substation_id
+    )
+    _require_connection_create_role(current_user)
+    return await _render_connection_form(
+        request, substation_id, current_user, tree_service
+    )
+
+
+@router.post("/substation/{substation_id}/connections")
+async def post_new_connection(
+    request: Request,
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[SubstationService, Depends(get_substation_service)],
+    connection_service: Annotated[ConnectionService, Depends(get_connection_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    dispatch_name: Annotated[str, Form()] = "",
+    rdu_subordination: Annotated[str, Form()] = "",
+    sap_code: Annotated[str, Form()] = "",
+    asureo_code: Annotated[str, Form()] = "",
+):
+    await _get_accessible_substation(
+        object_service, substation_service, current_user, substation_id
+    )
+    _require_connection_create_role(current_user)
+
+    values = {
+        "dispatch_name": dispatch_name,
+        "rdu_subordination": rdu_subordination,
+        "sap_code": sap_code,
+        "asureo_code": asureo_code,
+    }
+    try:
+        data = ConnectionCreate.model_validate(values)
+    except ValidationError:
+        return await _render_connection_form(
+            request, substation_id, current_user, tree_service,
+            form_values=values,
+            error_message="Проверьте введённые значения.",
+        )
+
+    try:
+        connection = await connection_service.create(
+            substation_id=substation_id,
+            actor_id=current_user.id,
+            data=data,
+        )
+    except ConnectionNameConflictError as exc:
+        return await _render_connection_form(
+            request, substation_id, current_user, tree_service,
+            form_values=values,
+            error_message=str(exc),
+        )
+
+    destination = f"/objects/connection/{connection.id}"
+    if request.headers.get("HX-Request") == "true":
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"HX-Redirect": destination},
+        )
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 def _require_substation_edit_role(current_user: User) -> None:

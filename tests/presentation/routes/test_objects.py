@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
+from app.application.connections.service import ConnectionNameConflictError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -45,10 +46,13 @@ from app.presentation.dependencies.services import (
 
 
 class FakeSubstationService:
-    def __init__(self):
+    def __init__(self, *, missing=False):
         self.updated = None
+        self.missing = missing
 
     async def get_details(self, substation_id: UUID) -> SubstationDetails:
+        if self.missing:
+            raise ObjectNotFoundError
         if self.updated is not None:
             return SubstationDetails(id=substation_id, **self.updated)
         return SubstationDetails(
@@ -124,6 +128,30 @@ class FakeConnectionService:
         substation_id: UUID,
     ) -> list[ConnectionListItem]:
         return self.connections
+
+
+class FakeConnectionCreationService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.create_calls = []
+        self.connection = None
+
+    async def create(self, **kwargs):
+        self.create_calls.append(kwargs)
+        if self.error:
+            raise self.error
+        self.connection = SimpleNamespace(
+            id=uuid7(), dispatch_name=kwargs["data"].dispatch_name,
+            sap_code=kwargs["data"].sap_code,
+            asureo_code=kwargs["data"].asureo_code,
+            rdu_subordination=kwargs["data"].rdu_subordination,
+        )
+        return self.connection
+
+    async def get_by_id(self, connection_id):
+        if self.connection and self.connection.id == connection_id:
+            return self.connection
+        return None
 
 
 class FakeInspectionService:
@@ -515,6 +543,8 @@ class FakeObjectService:
             raise self.error
 
         assert self.result is not None
+        assert self.result.object_type == object_type
+        assert self.result.id == object_id
         return self.result
 
 
@@ -644,6 +674,252 @@ def test_substation_edit_post_denied_for_read_only_roles(role):
                 "operational_current_type": "permanent",
             })
             assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERADMIN])
+def test_new_connection_form_allows_creation_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/connections/new",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        assert "Добавление присоединения" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_new_connection_form_regular_get_returns_full_page():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/connections/new",
+        )
+        assert response.status_code == 200
+        assert "<!doctype html>" in response.text
+        assert 'id="object-content"' in response.text
+        assert 'name="dispatch_name"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
+def test_new_connection_form_denies_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/connections/new",
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
+def test_create_connection_post_denies_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(
+        FakeConnectionCreationService(),
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/connections",
+            data={"dispatch_name": "ВЛ", "rdu_subordination": "true"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_connection_denies_when_parent_access_is_missing():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(error=ObjectAccessDeniedError()),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(
+        FakeConnectionCreationService(),
+    )
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/connections",
+            data={"dispatch_name": "ВЛ", "rdu_subordination": "true"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_connection_returns_404_when_substation_is_missing():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_substation_service] = override_substation_service(
+        FakeSubstationService(missing=True),
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/connections/new",
+        )
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("headers,expected_status", [({"HX-Request": "true"}, 204), ({}, 303)])
+def test_create_connection_success_redirects_to_connection_card(headers, expected_status):
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    substation_id = uuid7()
+    service = FakeConnectionCreationService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(service)
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/connections",
+            headers=headers,
+            data={
+                "dispatch_name": " ВЛ 110 кВ ", "rdu_subordination": "false",
+                "sap_code": "", "asureo_code": "ASU-1",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == expected_status
+        connection = service.create_calls[0]["data"]
+        assert service.create_calls[0]["substation_id"] == substation_id
+        assert connection.dispatch_name == "ВЛ 110 кВ"
+        assert connection.rdu_subordination is False
+        assert connection.sap_code is None
+        assert connection.asureo_code == "ASU-1"
+        assert response.headers["HX-Redirect" if expected_status == 204 else "location"] == (
+            f"/objects/connection/{service.connection.id}"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("headers,full_page", [({}, True), ({"HX-Request": "true"}, False)])
+def test_connection_card_route_supports_full_page_and_htmx(headers, full_page):
+    user = make_user(uuid7())
+    connection_id = uuid7()
+    service = FakeConnectionCreationService()
+    service.connection = SimpleNamespace(
+        id=connection_id, dispatch_name="ВЛ 110 кВ", sap_code=None,
+        asureo_code=None, rdu_subordination=False,
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="connection", id=connection_id, name="ВЛ 110 кВ",
+        )),
+    )
+    app.dependency_overrides[get_connection_service] = override_connection_service(service)
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_urza_service] = lambda: FakeURZAService(None)
+    app.dependency_overrides[get_otd_service] = lambda: FakeOTDService()
+    app.dependency_overrides[get_settings_service] = lambda: FakeSettingsService()
+    app.dependency_overrides[get_task_service] = lambda: FakeTaskService()
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(
+            f"/objects/connection/{connection_id}", headers=headers,
+        )
+        assert response.status_code == 200
+        assert ("<!doctype html>" in response.text) is full_page
+        assert "ВЛ 110 кВ" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "service_error,message",
+    [(None, "Проверьте введённые значения."),
+     (ConnectionNameConflictError("Дубликат имени."), "Дубликат имени.")],
+)
+def test_create_connection_form_rerenders_errors_and_values(service_error, message):
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    service = FakeConnectionCreationService(error=service_error)
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="substation", id=substation_id, name="ПС",
+        )),
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(FakeSubstationService())
+    app.dependency_overrides[get_connection_service] = override_connection_service(service)
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/connections",
+            headers={"HX-Request": "true"},
+            data={
+                "dispatch_name": "Имя пользователя",
+                "rdu_subordination": "true" if service_error else "nope",
+                "sap_code": "SAP",
+            },
+        )
+        assert response.status_code == 422
+        assert message in response.text
+        assert "Имя пользователя" in response.text
+        assert "SAP" in response.text
+        assert "event.detail.xhr.status === 422" in response.text
     finally:
         app.dependency_overrides.clear()
 
@@ -1119,7 +1395,7 @@ def test_get_object_returns_selected_object(role, can_edit) -> None:
         assert "SAP-001" in response.text
         assert "ASUREO-001" in response.text
         assert ("Изменить" in response.text) is can_edit
-        assert "Добавить присоединение" in response.text
+        assert ("Добавить присоединение" in response.text) is can_edit
     finally:
         app.dependency_overrides.clear()
 

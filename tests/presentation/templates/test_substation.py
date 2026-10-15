@@ -24,7 +24,7 @@ def test_substation_template_renders_details():
 
     template = templates.get_template("objects/substation.html")
 
-    html = template.render(substation=substation)
+    html = template.render(substation=substation, can_create_connection=True)
 
     assert "ПС Центральная" in html
     assert "220 кВ" in html
@@ -39,8 +39,20 @@ def test_substation_template_renders_details():
     assert "Схемы селективности" in html
     assert "Изменить" not in html
     assert "Добавить присоединение" in html
-    assert "disabled" in html
-    assert "Функция находится в разработке" in html
+    assert f"/objects/substation/{substation.id}/connections/new" in html
+    assert 'hx-target="#object-content"' in html
+
+
+def test_connection_creation_button_hidden_for_other_roles():
+    substation = SubstationDetails(
+        id=uuid7(), dispatch_name="ПС", highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        sap_code=None, asureo_code=None, address=None, latitude=None, longitude=None,
+    )
+    html = templates.get_template("objects/substation.html").render(
+        substation=substation, can_create_connection=False,
+    )
+    assert "Добавить присоединение" not in html
 
 
 def test_substation_edit_button_is_rendered_only_when_allowed():

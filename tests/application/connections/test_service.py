@@ -1,7 +1,12 @@
 import pytest
+from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
-from app.application.connections.service import ConnectionService
+from app.application.connections.schemas import ConnectionCreate
+from app.application.connections.service import (
+    ConnectionNameConflictError,
+    ConnectionService,
+)
 
 
 class FakeConnection:
@@ -25,6 +30,25 @@ class FakeConnectionRepository:
         self.connections = connections
         self.received_ids = None
         self.received_id = None
+        self.name_exists = False
+        self.added = None
+        self.commit_calls = 0
+        self.rollback_calls = 0
+
+    async def exists_by_name(self, substation_id, dispatch_name):
+        self.received_name = (substation_id, dispatch_name)
+        return self.name_exists
+
+    async def add(self, connection):
+        connection.id = uuid7()
+        self.added = connection
+        return connection
+
+    async def commit(self):
+        self.commit_calls += 1
+
+    async def rollback(self):
+        self.rollback_calls += 1
 
     async def get_by_id(self, connection_id):
         self.received_id = connection_id
@@ -119,3 +143,81 @@ async def test_get_by_substation_id_returns_empty_list():
 
     assert result == []
     assert repository.received_ids == {substation_id}
+
+
+@pytest.mark.asyncio
+async def test_create_connection_sets_parent_and_audit_fields():
+    substation_id, actor_id = uuid7(), uuid7()
+    repository = FakeConnectionRepository([])
+    service = ConnectionService(repository)
+    result = await service.create(
+        substation_id=substation_id,
+        actor_id=actor_id,
+        data=ConnectionCreate(
+            dispatch_name="ВЛ 110 кВ", rdu_subordination=True,
+            sap_code=None, asureo_code=None,
+        ),
+    )
+    assert repository.received_name == (substation_id, "ВЛ 110 кВ")
+    assert repository.added.substation_id == substation_id
+    assert repository.added.created_by == actor_id
+    assert repository.added.updated_by == actor_id
+    assert result.id == repository.added.id
+    assert result.dispatch_name == "ВЛ 110 кВ"
+    assert repository.commit_calls == 0
+    assert repository.rollback_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_create_connection_rejects_duplicate_name_before_insert():
+    repository = FakeConnectionRepository([])
+    repository.name_exists = True
+    service = ConnectionService(repository)
+    with pytest.raises(ConnectionNameConflictError):
+        await service.create(
+            substation_id=uuid7(), actor_id=uuid7(),
+            data=ConnectionCreate(dispatch_name="ВЛ", rdu_subordination=False),
+        )
+    assert repository.added is None
+
+
+@pytest.mark.asyncio
+async def test_create_connection_translates_unique_race():
+    class RacingRepository(FakeConnectionRepository):
+        async def add(self, connection):
+            raise IntegrityError(
+                "INSERT", {}, type("UniqueViolation", (), {
+                    "constraint_name": "uq_connections_substation_dispatch_name",
+                })(),
+            )
+
+    repository = RacingRepository([])
+    service = ConnectionService(repository)
+    with pytest.raises(ConnectionNameConflictError):
+        await service.create(
+            substation_id=uuid7(), actor_id=uuid7(),
+            data=ConnectionCreate(dispatch_name="ВЛ", rdu_subordination=True),
+        )
+    assert repository.commit_calls == 0
+    assert repository.rollback_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_create_connection_propagates_unrelated_integrity_error():
+    class UnrelatedConstraintRepository(FakeConnectionRepository):
+        async def add(self, connection):
+            raise IntegrityError(
+                "INSERT", {}, type("UniqueViolation", (), {
+                    "constraint_name": "uq_connections_sap_code",
+                })(),
+            )
+
+    repository = UnrelatedConstraintRepository([])
+    service = ConnectionService(repository)
+    with pytest.raises(IntegrityError):
+        await service.create(
+            substation_id=uuid7(), actor_id=uuid7(),
+            data=ConnectionCreate(dispatch_name="ВЛ", rdu_subordination=True),
+        )
+    assert repository.commit_calls == 0
+    assert repository.rollback_calls == 0

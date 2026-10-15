@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.substation import Substation
@@ -19,6 +19,14 @@ class Connection(
     Base,
 ):
     __tablename__ = "connections"
+    __table_args__ = (
+        Index(
+            "uq_connections_substation_dispatch_name",
+            "substation_id",
+            text("btrim(dispatch_name)"),
+            unique=True,
+        ),
+    )
 
     substation_id: Mapped[UUID] = mapped_column(
         ForeignKey("substations.id"),

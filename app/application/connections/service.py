@@ -1,10 +1,20 @@
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
+
 from app.application.connections.repository import ConnectionRepository
 from app.application.connections.schemas import (
+    ConnectionCreate,
     ConnectionDetails,
     ConnectionListItem,
 )
+from app.domain.connection import Connection
+
+_NAME_INDEX = "uq_connections_substation_dispatch_name"
+
+
+class ConnectionNameConflictError(ValueError):
+    """Raised when the dispatch name is already reserved in a substation."""
 
 
 class ConnectionService:
@@ -12,6 +22,49 @@ class ConnectionService:
 
     def __init__(self, repository: ConnectionRepository) -> None:
         self.repository = repository
+
+    async def create(
+        self,
+        *,
+        substation_id: UUID,
+        actor_id: UUID,
+        data: ConnectionCreate,
+    ) -> ConnectionDetails:
+        if await self.repository.exists_by_name(
+            substation_id,
+            data.dispatch_name,
+        ):
+            raise ConnectionNameConflictError(
+                "Присоединение с таким диспетчерским наименованием уже существует."
+            )
+
+        connection = Connection(
+            substation_id=substation_id,
+            dispatch_name=data.dispatch_name,
+            rdu_subordination=data.rdu_subordination,
+            sap_code=data.sap_code,
+            asureo_code=data.asureo_code,
+            created_by=actor_id,
+            updated_by=actor_id,
+        )
+        try:
+            await self.repository.add(connection)
+        except IntegrityError as exc:
+            original = exc.orig
+            constraint_name = getattr(original, "constraint_name", None)
+            if constraint_name == _NAME_INDEX or _NAME_INDEX in str(original):
+                raise ConnectionNameConflictError(
+                    "Присоединение с таким диспетчерским наименованием уже существует."
+                ) from exc
+            raise
+
+        return ConnectionDetails(
+            id=connection.id,
+            dispatch_name=connection.dispatch_name,
+            sap_code=connection.sap_code,
+            asureo_code=connection.asureo_code,
+            rdu_subordination=connection.rdu_subordination,
+        )
 
     async def get_by_id(
         self,
