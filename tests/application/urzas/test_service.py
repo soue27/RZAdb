@@ -5,7 +5,7 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
-from app.application.urzas.schemas import URZADetails
+from app.application.urzas.schemas import URZACreate, URZADetails
 from app.application.urzas.service import URZAService
 from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus
 from app.domain.urza import URZA
@@ -80,4 +80,69 @@ async def test_get_details_raises_when_urza_not_found() -> None:
     with pytest.raises(ObjectNotFoundError):
         await service.get_details(urza_id)
 
+    repository.get_by_id.assert_awaited_once_with(urza_id)
+
+
+
+@pytest.mark.asyncio
+async def test_create_urza_sets_fields_and_audit_users(system_user_id) -> None:
+    repository = AsyncMock()
+    service = URZAService(repository)
+
+    connection_id = uuid7()
+    urza_id = uuid7()
+
+    connection = MagicMock()
+    connection.id = connection_id
+    connection.dispatch_name = "ВЛ 110 кВ"
+
+    substation = MagicMock()
+    substation.id = uuid7()
+    substation.dispatch_name = "ПС Центральная"
+
+    connection.substation = substation
+
+    repository.exists_by_name.return_value = False
+
+    data = URZACreate(
+        dispatch_name="РЗА-2",
+        rdu_subordination=True,
+        inventory_number="INV-002",
+        commissioning_date=date(2026, 1, 1),
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.II,
+        room_category=RoomCategory.I,
+        complexity=False,
+    )
+
+    async def add_urza(urza: URZA) -> URZA:
+        urza.id = urza_id
+        urza.connection = connection
+        return urza
+
+    async def get_urza(requested_id):
+        urza = repository.add.await_args.args[0]
+        return urza if urza.id == requested_id else None
+
+    repository.add.side_effect = add_urza
+    repository.get_by_id.side_effect = get_urza
+
+    result = await service.create(
+        connection_id=connection_id,
+        actor_id=system_user_id,
+        data=data,
+    )
+
+    created = repository.add.await_args.args[0]
+
+    assert created.connection_id == connection_id
+    assert created.dispatch_name == "РЗА-2"
+    assert created.inventory_number == "INV-002"
+    assert created.created_by == system_user_id
+    assert created.updated_by == system_user_id
+    assert result.id == urza_id
+    assert result.dispatch_name == "РЗА-2"
+
+    repository.add.assert_awaited_once()
     repository.get_by_id.assert_awaited_once_with(urza_id)

@@ -1,0 +1,233 @@
+
+<div class="object-card">
+    <div class="mb-4">
+        <div class="text-body-secondary small mb-1">
+            Добавление устройства
+        </div>
+        <h2 class="h4 mb-0">Новое УРЗА</h2>
+    </div>
+
+    {% if error_message %}
+    <div class="alert alert-danger" role="alert">
+        {{ error_message }}
+    </div>
+    {% endif %}
+
+    <form
+        method="post"
+        action="/objects/connection/{{ connection_id }}/urzas"
+        hx-post="/objects/connection/{{ connection_id }}/urzas"
+        hx-target="#object-content"
+        hx-swap="innerHTML"
+        hx-on::before-swap="
+            if (event.detail.xhr.status === 422) {
+                event.detail.shouldSwap = true;
+            }
+        "
+    >
+        <div class="row g-3">
+            <div class="col-12">
+                <label for="dispatch_name" class="form-label">
+                    Диспетчерское наименование *
+                </label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="dispatch_name"
+                    name="dispatch_name"
+                    maxlength="255"
+                    required
+                    value="{{ form_values.get('dispatch_name', '') }}"
+                >
+            </div>
+
+            <div class="col-md-6">
+                <label for="commissioning_date" class="form-label">
+                    Дата ввода в эксплуатацию *
+                </label>
+                <input
+                    type="date"
+                    class="form-control"
+                    id="commissioning_date"
+                    name="commissioning_date"
+                    required
+                    value="{{ form_values.get('commissioning_date', '') }}"
+                >
+            </div>
+
+            <div class="col-md-6">
+                <label for="inventory_number" class="form-label">
+                    Инвентарный номер
+                </label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="inventory_number"
+                    name="inventory_number"
+                    maxlength="64"
+                    value="{{ form_values.get('inventory_number', '') }}"
+                >
+            </div>
+
+            <div class="col-md-6">
+                <label for="status" class="form-label">
+                    Статус *
+                </label>
+                <select
+                    class="form-select"
+                    id="status"
+                    name="status"
+                    required
+                >
+                    <option value="">Выберите статус</option>
+                    {% for item in urza_statuses %}
+                    <option
+                        value="{{ item.value }}"
+                        {{ 'selected' if form_values.get('status', '') == item.value else '' }}
+                    >
+                        {{ item.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label for="element_base" class="form-label">
+                    Элементная база *
+                </label>
+                <select
+                    class="form-select"
+                    id="element_base"
+                    name="element_base"
+                    required
+                >
+                    <option value="">Выберите элементную базу</option>
+                    {% for item in element_bases %}
+                    <option
+                        value="{{ item.value }}"
+                        {{ 'selected' if form_values.get('element_base', '') == item.value else '' }}
+                    >
+                        {{ item.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label for="category" class="form-label">
+                    Категория УРЗА *
+                </label>
+                <select
+                    class="form-select"
+                    id="category"
+                    name="category"
+                    required
+                >
+                    <option value="">Выберите категорию</option>
+                    {% for item in urza_categories %}
+                    <option
+                        value="{{ item.value }}"
+                        {{ 'selected' if form_values.get('category', '') == item.value else '' }}
+                    >
+                        {{ item.value }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label for="room_category" class="form-label">
+                    Категория помещения *
+                </label>
+                <select
+                    class="form-select"
+                    id="room_category"
+                    name="room_category"
+                    required
+                >
+                    <option value="">Выберите категорию помещения</option>
+                    {% for item in room_categories %}
+                    <option
+                        value="{{ item.value }}"
+                        {{ 'selected' if form_values.get('room_category', '') == item.value else '' }}
+                    >
+                        {{ item.value }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label for="rdu_subordination" class="form-label">
+                    Подчинённость РДУ *
+                </label>
+                <select
+                    class="form-select"
+                    id="rdu_subordination"
+                    name="rdu_subordination"
+                    required
+                >
+                    <option value="">Выберите значение</option>
+                    <option
+                        value="true"
+                        {{ 'selected' if form_values.get('rdu_subordination') == true else '' }}
+                    >
+                        Да
+                    </option>
+                    <option
+                        value="false"
+                        {{ 'selected' if form_values.get('rdu_subordination') == false else '' }}
+                    >
+                        Нет
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label for="complexity" class="form-label">
+                    Сложная *
+                </label>
+                <select
+                    class="form-select"
+                    id="complexity"
+                    name="complexity"
+                    required
+                >
+                    <option value="">Выберите значение</option>
+                    <option
+                        value="true"
+                        {{ 'selected' if form_values.get('complexity') == true else '' }}
+                    >
+                        Да
+                    </option>
+                    <option
+                        value="false"
+                        {{ 'selected' if form_values.get('complexity') == false else '' }}
+                    >
+                        Нет
+                    </option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-text mt-3">
+            * — обязательные поля.
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">
+                Создать УРЗА
+            </button>
+
+            <a
+                class="btn btn-outline-secondary"
+                href="/objects/connection/{{ connection_id }}"
+                hx-get="/objects/connection/{{ connection_id }}"
+                hx-target="#object-content"
+                hx-swap="innerHTML"
+            >
+                Отмена
+            </a>
+        </div>
+    </form>
+</div>

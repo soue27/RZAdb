@@ -3,6 +3,7 @@ from uuid6 import uuid7
 
 from app.application.urzas.schemas import (
     URZAConnectionInfo,
+    URZACreate,
     URZADetails,
     URZASubstationInfo,
 )
@@ -78,3 +79,19 @@ def test_urza_details_contains_connection_and_substation() -> None:
     assert details.connection.dispatch_name == "ВЛ 110 кВ"
     assert details.substation.id == substation_id
     assert details.substation.dispatch_name == "ПС Центральная"
+
+
+def test_urza_create_converts_empty_inventory_number_to_none() -> None:
+    data = URZACreate(
+        dispatch_name="РЗА-3",
+        rdu_subordination=True,
+        inventory_number="   ",
+        commissioning_date="2026-01-01",
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.II,
+        room_category=RoomCategory.I,
+        complexity=False,
+    )
+
+    assert data.inventory_number is None

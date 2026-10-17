@@ -1,12 +1,18 @@
 from datetime import UTC, date, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from uuid6 import uuid7
 
 from app.application.inspections.service import InspectionTaskService
-from app.domain.enums import AccessCategory, HighestVoltage, TaskStatus, UserRole
+from app.application.urzas.service import URZAService
+from app.domain.enums import AccessCategory, HighestVoltage, TaskStatus, UserRole, URZAStatus, ElementBase, \
+    URZACategory, RoomCategory
 from app.domain.substation import Substation
+from app.domain.urza import URZA
 from app.domain.user import User
+from app.application.urzas.schemas import URZACreate, URZADetails
 
 
 class FakeInspectionTaskRepository:

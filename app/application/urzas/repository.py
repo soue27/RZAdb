@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -79,3 +79,25 @@ class URZARepository:
         )
 
         return list(result)
+
+    async def add(self, urza: URZA) -> URZA:
+        async with self.session.begin_nested():
+            self.session.add(urza)
+            await self.session.flush()
+        return urza
+
+    async def exists_by_name(
+            self,
+            connection_id: UUID,
+            dispatch_name: str,
+    ) -> bool:
+        result = await self.session.scalar(
+            select(URZA.id)
+            .where(
+                URZA.connection_id == connection_id,
+                func.btrim(URZA.dispatch_name) == dispatch_name.strip(),
+                URZA.deleted_at.is_(None),
+            )
+            .limit(1)
+        )
+        return result is not None
