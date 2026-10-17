@@ -339,16 +339,25 @@ class RZAInstructionService:
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return set()
-        instruction = await self.repository.get_by_id(version.rza_instruction_id)
-        if instruction is None or not await self.access_service.can_access_substation(
-            user_id, instruction.substation_id
+        version_record = await self.repository.get_version_by_id(version.id)
+        if version_record is None or version_record.deleted_at is not None:
+            return set()
+        instruction = await self.repository.get_by_id(
+            version_record.rza_instruction_id
+        )
+        if (
+            instruction is None
+            or instruction.deleted_at is not None
+            or not await self.access_service.can_access_substation(
+                user_id, instruction.substation_id
+            )
         ):
             return set()
-        if version.status is DocumentStatus.DRAFT:
-            return {"submit", "new_version"} if version.created_by == user_id and user.role in {
+        if version_record.status is DocumentStatus.DRAFT:
+            return {"submit", "new_version"} if version_record.created_by == user_id and user.role in {
                 UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN
             } else set()
-        if version.status is DocumentStatus.UNDER_REVIEW:
+        if version_record.status is DocumentStatus.UNDER_REVIEW:
             try:
                 await self._check_reviewer(user_id, instruction.substation_id)
             except (PermissionError, ValueError):

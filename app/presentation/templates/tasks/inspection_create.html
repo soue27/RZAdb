@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Выдать задание на осмотр — RZAdb{% endblock %}
+
+{% block body %}
+<div id="object-content" class="container-fluid px-4 py-4 h-100">
+    <div class="mb-3">
+        <a href="/objects/substation/{{ substation_id }}?tab=inspections" class="text-decoration-none">← Назад к подстанции</a>
+    </div>
+    <h1 class="h4 mb-4">Выдать задание на осмотр</h1>
+    <section class="rzadb-surface-soft rounded-3 p-4">
+        <h2 class="h5">{{ substation.dispatch_name }}</h2>
+        {% if error_message %}<div class="alert alert-danger" role="alert">{{ error_message }}</div>{% endif %}
+        <form method="post" action="/objects/substation/{{ substation_id }}/inspection-tasks">
+            <div class="mb-3">
+                <label class="form-label" for="inspection-assignee">Исполнитель</label>
+                <select class="form-select" id="inspection-assignee" name="assignee_id">
+                    <option value="">Создать без назначения</option>
+                    {% for person in inspection_assignees %}
+                        <option value="{{ person.id }}" {% if assignee_id == person.id|string %}selected{% endif %}>{{ person.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Выдать задание</button>
+                <a class="btn btn-outline-secondary" href="/objects/substation/{{ substation_id }}?tab=inspections">Отмена</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

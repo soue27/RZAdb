@@ -2,64 +2,14 @@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h5 mb-0">Задачи осмотра</h2>
+        <h2 class="h5 mb-0">Осмотры</h2>
         {% if can_manage_inspections %}
-            <form method="post" action="/objects/substation/{{ substation_id }}/inspection-tasks" hx-post="/objects/substation/{{ substation_id }}/inspection-tasks">
-                <div class="input-group">
-                    <select class="form-select" name="assignee_id">
-                        <option value="">Создать без назначения</option>
-                        {% for person in inspection_assignees %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}
-                    </select>
-                    <button class="btn btn-primary" type="submit">Создать задачу</button>
-                </div>
-            </form>
+            <a class="btn btn-outline-primary" href="/objects/substation/{{ substation_id }}/inspection-tasks/new">
+                <span class="material-icons align-middle me-1">assignment</span>
+                Выдать задание
+            </a>
         {% endif %}
     </div>
-    {% if inspection_tasks %}
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead><tr><th>Создано</th><th>Статус</th><th>Исполнитель</th><th>Срок</th><th>Действия / история</th></tr></thead>
-                <tbody>
-                {% for task in inspection_tasks %}
-                    <tr>
-                        <td>{{ task.created_at.strftime("%d.%m.%Y") }}</td>
-                        <td>{{ inspection_status_labels[task.status.value] }}</td>
-                        <td>{{ task.assigned_to_user.full_name if task.assigned_to_user else "Не назначен" }}</td>
-                        <td>{{ task.deadline_at.strftime("%d.%m.%Y") if task.deadline_at else "—" }}</td>
-                        <td>
-                            <div class="d-flex flex-column gap-2">
-                                {% if task.status.value == "created" and can_manage_inspections %}
-                                    <form method="post" action="/objects/substation/inspection-tasks/{{ task.id }}/assign" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/assign" class="input-group input-group-sm">
-                                        <select class="form-select" name="assignee_id" required><option value="">Исполнитель</option>{% for person in inspection_assignees %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}</select><button class="btn btn-outline-primary">Назначить</button>
-                                    </form>
-                                {% elif task.status.value == "assigned" and task.assigned_to == current_user.id %}
-                                    <form method="post" action="/objects/substation/inspection-tasks/{{ task.id }}/accept" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/accept"><button class="btn btn-sm btn-primary">Принять</button></form>
-                                {% elif task.status.value == "in_progress" and task.assigned_to == current_user.id %}
-                                    <form method="post" enctype="multipart/form-data" action="/objects/substation/inspection-tasks/{{ task.id }}/complete" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/complete" class="d-flex flex-column gap-2">
-                                        <input class="form-control form-control-sm" type="date" name="inspection_date" required>
-                                        <textarea class="form-control form-control-sm" name="remarks" placeholder="Замечания по результатам" required></textarea>
-                                        <input class="form-control form-control-sm" type="file" name="scan_file" aria-label="Скан результата">
-                                        <input class="form-control form-control-sm" type="file" name="editable_file" aria-label="Редактируемый файл">
-                                        <button class="btn btn-sm btn-success">Завершить осмотр</button>
-                                    </form>
-                                {% elif task.status.value == "completed" and task.assigned_to == current_user.id %}
-                                    <form method="post" action="/objects/substation/inspection-tasks/{{ task.id }}/send-to-review" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/send-to-review"><button class="btn btn-sm btn-outline-primary">Передать на проверку</button></form>
-                                {% elif task.status.value == "under_review" and can_manage_inspections %}
-                                    <div class="d-flex gap-2">
-                                        <form method="post" action="/objects/substation/inspection-tasks/{{ task.id }}/review" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/review"><input type="hidden" name="approve" value="true"><button class="btn btn-sm btn-success">Утвердить</button></form>
-                                        <form method="post" action="/objects/substation/inspection-tasks/{{ task.id }}/review" hx-post="/objects/substation/inspection-tasks/{{ task.id }}/review" class="d-flex gap-1"><input type="hidden" name="approve" value="false"><input class="form-control form-control-sm" name="reason" placeholder="Причина возврата" required><button class="btn btn-sm btn-outline-warning">Вернуть</button></form>
-                                    </div>
-                                {% endif %}
-                                <details><summary class="small text-secondary">История</summary><ul class="small mb-0 mt-1">{% for event in inspection_task_history[task.id] %}<li>{{ event.created_at.strftime("%d.%m.%Y %H:%M") }} · {{ event.event_type }}{% if event.actor %} · {{ event.actor.full_name }}{% endif %}{% if event.comment %} · {{ event.comment }}{% endif %}</li>{% endfor %}</ul></details>
-                            </div>
-                        </td>
-                    </tr>
-                    {% if task.inspection %}<tr><td colspan="5" class="bg-body-tertiary"><strong>Результат:</strong> {{ task.inspection.inspection_date.strftime("%d.%m.%Y") }} · {{ task.inspection.remarks }}{% if task.inspection.scan_file_id %} {{ file_actions(task.inspection.scan_file_id) }}{% endif %}</td></tr>{% endif %}
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}<p class="text-body-secondary">Задач осмотра нет.</p>{% endif %}
 </section>
 
 <div>

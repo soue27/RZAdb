@@ -37,6 +37,7 @@
                 type="button"
                 class="nav-link active"
                 data-rzadb-tab
+                data-tab="details"
                 hx-get="/objects/substation/{{ substation.id }}/details"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
@@ -50,6 +51,7 @@
                 type="button"
                 class="nav-link"
                 data-rzadb-tab
+                data-tab="inspections"
                 hx-get="/objects/substation/{{ substation.id }}/inspections"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
@@ -63,6 +65,7 @@
                 type="button"
                 class="nav-link"
                 data-rzadb-tab
+                data-tab="instructions"
                 hx-get="/objects/substation/{{ substation.id }}/instructions"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
@@ -76,6 +79,7 @@
                 type="button"
                 class="nav-link"
                 data-rzadb-tab
+                data-tab="selectivity-schemes"
                 hx-get="/objects/substation/{{ substation.id }}/selectivity-schemes"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"

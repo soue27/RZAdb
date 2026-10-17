@@ -6,9 +6,11 @@ from uuid6 import uuid7
 
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.repository import InspectionTaskRepository
+from app.application.selectivity_schemes.repository import SelectivitySchemeRepository
 from app.domain.enterprise import Enterprise
 from app.domain.enums import (
     AccessCategory,
+    DocumentStatus,
     EnterpriseType,
     HighestVoltage,
     OperationalCurrentType,
@@ -19,6 +21,10 @@ from app.domain.file import File
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
+from app.domain.selectivity_scheme import (
+    SelectivityScheme,
+    SelectivitySchemeVersion,
+)
 from app.domain.substation import Substation
 from app.domain.user import User
 
@@ -262,3 +268,53 @@ async def test_inspection_repository_get_by_substation_id(
     assert inspections[1].editable_file is not None
     assert inspections[1].editable_file.id == editable_file.id
     assert inspections[1].editable_file.display_name == "Редактируемый документ"
+
+
+@pytest.mark.asyncio
+async def test_selectivity_scheme_version_is_persisted_and_read_back(
+    db_session, system_user_id
+) -> None:
+    department = Enterprise(
+        id=uuid4(), type=EnterpriseType.DEPARTMENT,
+        full_name="Тестовое ПО схем", short_name="ПО схем",
+        created_by=system_user_id, updated_by=system_user_id,
+    )
+    substation = Substation(
+        id=uuid4(), enterprise_id=department.id,
+        highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        dispatch_name=f"ПС Схема {uuid4()}",
+        created_by=system_user_id, updated_by=system_user_id,
+    )
+    scan_file = File(
+        id=uuid4(), s3_key=f"test/{uuid4()}.pdf", original_name="scheme.pdf",
+        display_name="Скан схемы", extension=".pdf", size=10,
+        mime_type="application/pdf", uploaded_at=datetime.now(UTC),
+        created_by=system_user_id, updated_by=system_user_id,
+    )
+    db_session.add_all([department, substation, scan_file])
+    await db_session.flush()
+
+    repository = SelectivitySchemeRepository(db_session)
+    scheme = SelectivityScheme(
+        id=uuid4(), substation_id=substation.id,
+        created_by=system_user_id, updated_by=system_user_id,
+    )
+    await repository.add_scheme(scheme)
+    version = SelectivitySchemeVersion(
+        id=uuid4(), selectivity_scheme_id=scheme.id, version_number=1,
+        number="С-110-1", name="Основная схема",
+        effective_date=datetime(2026, 10, 17, tzinfo=UTC).date(),
+        status=DocumentStatus.DRAFT, scan_file_id=scan_file.id,
+        created_by=system_user_id, updated_by=system_user_id,
+    )
+    await repository.add_version(version)
+
+    persisted_scheme = await repository.get_by_substation_id(substation.id)
+    persisted_versions = await repository.get_versions(scheme.id)
+    assert persisted_scheme is not None
+    assert len(persisted_versions) == 1
+    assert persisted_versions[0].id == version.id
+    assert persisted_versions[0].number == "С-110-1"
+    assert persisted_versions[0].name == "Основная схема"
+    assert persisted_versions[0].scan_file_id == scan_file.id

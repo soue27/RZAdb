@@ -1394,7 +1394,7 @@ def test_get_object_returns_selected_object(role, can_edit) -> None:
         assert "110 кВ" in response.text
         assert "SAP-001" in response.text
         assert "ASUREO-001" in response.text
-        assert ("Изменить" in response.text) is can_edit
+        assert (f'hx-get="/objects/substation/{object_id}/edit"' in response.text) is can_edit
         assert ("Добавить присоединение" in response.text) is can_edit
     finally:
         app.dependency_overrides.clear()

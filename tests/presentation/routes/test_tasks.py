@@ -7,22 +7,23 @@ import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.objects.exceptions import ObjectAccessDeniedError
 from app.application.work_items.service import (
     SchemaWorkItemSource,
     TaskWorkItemSource,
     WorkItemService,
 )
 from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
-from app.application.objects.exceptions import ObjectAccessDeniedError
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_access_service,
+    get_inspection_task_repository,
+    get_object_service,
     get_task_repository,
     get_task_service,
     get_tree_service,
     get_work_item_service,
-    get_object_service,
 )
 
 
@@ -70,6 +71,14 @@ class FakeTaskRepository:
         return self.history.get(task_id, [])
 
 
+class FakeInspectionTaskRepository:
+    def __init__(self, tasks=()):
+        self.tasks = list(tasks)
+
+    async def list_active(self):
+        return self.tasks
+
+
 class FakeTreeService:
     async def get_tree(self, *, user_id):
         urza = SimpleNamespace(id=uuid7(), dispatch_name="УРЗА из дерева")
@@ -95,8 +104,9 @@ class FakeTreeService:
 
 
 class FakeAccessService:
-    def __init__(self, denied_urzas=()):
+    def __init__(self, denied_urzas=(), denied_substations=()):
         self.denied_urzas = set(denied_urzas)
+        self.denied_substations = set(denied_substations)
         self.urza_repository = FakeURZARepository()
         self.user_repository = SimpleNamespace(get_by_id=self._get_user)
 
@@ -110,6 +120,9 @@ class FakeAccessService:
 
     async def can_access_urza(self, user_id, urza_id):
         return urza_id not in self.denied_urzas
+
+    async def can_access_substation(self, user_id, substation_id):
+        return substation_id not in self.denied_substations
 
     async def get_accessible_enterprise_roots(self, user_id):
         return []
@@ -221,6 +234,9 @@ def _client(user, repository, access_service, task_service):
     app.dependency_overrides[get_access_service] = lambda: access_service
     app.dependency_overrides[get_task_service] = lambda: task_service
     app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    app.dependency_overrides[get_inspection_task_repository] = (
+        lambda: FakeInspectionTaskRepository()
+    )
     app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
         [TaskWorkItemSource(repository, access_service, task_service)]
     )
@@ -254,6 +270,42 @@ def test_substation_task_form_checks_object_access_and_renders_parent():
         assert "ПС-1" in response.text
         assert "Тип работы: Инструкция РЗА подстанции" in response.text
         assert ("get_available_assignees", user.id, substation_id) in service.calls
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_tasks_list_shows_only_accessible_assigned_inspection_tasks():
+    user = _user(uuid7(), role=UserRole.ENGINEER)
+    visible_substation_id, denied_substation_id = uuid7(), uuid7()
+
+    def inspection_task(substation_id, assignee_id):
+        return SimpleNamespace(
+            id=uuid7(),
+            substation_id=substation_id,
+            substation=SimpleNamespace(dispatch_name=f"ПС-{substation_id.hex[:4]}"),
+            created_by_user=SimpleNamespace(full_name="Руководитель"),
+            assigned_to_user=SimpleNamespace(full_name="Инженер"),
+            assigned_to=assignee_id,
+            created_at=datetime(2026, 10, 1, tzinfo=UTC),
+            status=TaskStatus.ASSIGNED,
+        )
+
+    visible = inspection_task(visible_substation_id, user.id)
+    denied = inspection_task(denied_substation_id, user.id)
+    unassigned = inspection_task(visible_substation_id, None)
+    repository = FakeTaskRepository([])
+    access = FakeAccessService(denied_substations={denied_substation_id})
+    client = _client(user, repository, access, FakeTaskService())
+    app.dependency_overrides[get_inspection_task_repository] = (
+        lambda: FakeInspectionTaskRepository([visible, denied, unassigned])
+    )
+    try:
+        response = client.get("/tasks")
+        assert response.status_code == 200
+        assert f"ПС-{visible_substation_id.hex[:4]}" in response.text
+        assert f"/objects/substation/inspection-tasks/{denied.id}" not in response.text
+        assert response.text.count(f"/objects/substation/inspection-tasks/{visible.id}") == 2
+        assert f"/objects/substation/inspection-tasks/{unassigned.id}" not in response.text
     finally:
         app.dependency_overrides.clear()
 

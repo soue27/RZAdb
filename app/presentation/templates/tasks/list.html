@@ -13,7 +13,7 @@
     </div>
 
 
-    {% if work_items %}
+    {% if work_items or inspection_tasks %}
         <div class="table-responsive rzadb-surface-soft rounded-3">
             <table class="table table-hover align-middle mb-0">
                 <thead>
@@ -48,6 +48,28 @@
                             </td>
                             <td>
                                 <a href="{{ item.url }}" class="btn btn-sm btn-outline-primary">Открыть</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% for task in inspection_tasks %}
+                        <tr>
+                            <td>
+                                <a href="/objects/substation/inspection-tasks/{{ task.id }}" class="fw-medium text-decoration-none">
+                                    Осмотр ПС · {{ task.substation.dispatch_name }}
+                                </a>
+                            </td>
+                            <td>Задача осмотра</td>
+                            <td>{{ task.substation.dispatch_name }}</td>
+                            <td>{{ task.created_by_user.full_name if task.created_by_user else "—" }}</td>
+                            <td>{{ task.assigned_to_user.full_name if task.assigned_to_user else "Не назначен" }}</td>
+                            <td>{{ task.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+                            <td>
+                                <span class="badge {{ status_badges[task.status] }}">
+                                    {{ inspection_status_labels[task.status] }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="/objects/substation/inspection-tasks/{{ task.id }}" class="btn btn-sm btn-outline-primary">Открыть</a>
                             </td>
                         </tr>
                     {% endfor %}

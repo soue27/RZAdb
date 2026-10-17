@@ -43,6 +43,8 @@ def test_substation_template_renders_details():
     assert "Добавить присоединение" in html
     assert f"/objects/substation/{substation.id}/connections/new" in html
     assert 'hx-target="#object-content"' in html
+    for tab_name in ("details", "inspections", "instructions", "selectivity-schemes"):
+        assert f'data-tab="{tab_name}"' in html
 
 
 def test_connection_creation_button_hidden_for_other_roles():

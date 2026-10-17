@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.access.service import AccessService
+from app.application.inspections.repository import InspectionTaskRepository
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
@@ -25,6 +26,7 @@ from app.presentation.auth.dependencies import (
 )
 from app.presentation.dependencies.services import (
     get_access_service,
+    get_inspection_task_repository,
     get_task_repository,
     get_task_service,
     get_tree_service,
@@ -85,6 +87,16 @@ HISTORY_EVENT_LABELS = {
     "review_rejected": "Возвращено на доработку",
     "rejected": "Отказ от задания",
     "reassigned": "Задание переназначено",
+}
+
+INSPECTION_STATUS_LABELS = {
+    TaskStatus.CREATED: "Создано",
+    TaskStatus.ASSIGNED: "Назначено",
+    TaskStatus.IN_PROGRESS: "В работе",
+    TaskStatus.COMPLETED: "Выполнено",
+    TaskStatus.UNDER_REVIEW: "На проверке",
+    TaskStatus.CLOSED: "Закрыто",
+    TaskStatus.REJECTED: "Отклонено",
 }
 
 
@@ -518,8 +530,25 @@ async def get_tasks(
         Depends(get_work_item_service),
     ],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    inspection_repository: Annotated[
+        InspectionTaskRepository,
+        Depends(get_inspection_task_repository),
+    ],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
 ):
     work_items = await work_item_service.list_for_user(current_user.id)
+    inspection_tasks = []
+    for task in await inspection_repository.list_active():
+        if not await access_service.can_access_substation(
+            current_user.id, task.substation_id
+        ):
+            continue
+        if (
+            current_user.role is UserRole.ENGINEER
+            and task.assigned_to != current_user.id
+        ):
+            continue
+        inspection_tasks.append(task)
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -532,6 +561,9 @@ async def get_tasks(
             "current_user": current_user,
             "tree": tree,
             "work_items": work_items,
+            "inspection_tasks": inspection_tasks,
+            "inspection_status_labels": INSPECTION_STATUS_LABELS,
+            "status_badges": TASK_STATUS_BADGES,
         },
     )
 

@@ -63,6 +63,20 @@ def test_inspection_template_links_each_present_file_role() -> None:
     assert_no_file_actions(empty_html)
 
 
+def test_inspections_tab_keeps_results_and_does_not_render_task_list() -> None:
+    html = templates.get_template("objects/substation_inspections.html").render(
+        inspections=[],
+        substation_id=uuid4(),
+        can_manage_inspections=True,
+    )
+    assert "Осмотры" in html
+    assert "Выдать задание" in html
+    assert "/inspection-tasks/new" in html
+    assert "Задачи осмотра" not in html
+    assert "Назначить" not in html
+    assert "Передать на проверку" not in html
+
+
 def test_instruction_template_links_current_version_files() -> None:
     scan_id, editable_id = uuid4(), uuid4()
 

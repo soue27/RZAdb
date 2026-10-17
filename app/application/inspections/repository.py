@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.inspection import Inspection
@@ -37,6 +37,19 @@ class InspectionTaskRepository:
             .where(InspectionTask.id == task_id, InspectionTask.deleted_at.is_(None))
         )
         return result.scalar_one_or_none()
+
+    async def list_active(self) -> list[InspectionTask]:
+        result = await self.session.scalars(
+            select(InspectionTask)
+            .options(
+                selectinload(InspectionTask.substation),
+                selectinload(InspectionTask.created_by_user),
+                selectinload(InspectionTask.assigned_to_user),
+            )
+            .where(InspectionTask.deleted_at.is_(None))
+            .order_by(InspectionTask.created_at.desc())
+        )
+        return list(result.all())
 
     async def list_by_substation(self, substation_id: UUID) -> list[InspectionTask]:
         result = await self.session.scalars(

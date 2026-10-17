@@ -1,17 +1,17 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
 
+from app.application.rza_instructions.schemas import RZAInstructionVersionDetails
 from app.application.rza_instructions.service import RZAInstructionService
+from app.domain.enums import DocumentStatus, UserRole
 from app.domain.rza_instruction import (
     RZAInstruction,
     RZAInstructionVersion,
 )
-from app.domain.enums import UserRole
-from app.domain.enums import DocumentStatus
 
 
 @pytest.fixture
@@ -93,6 +93,52 @@ async def test_get_by_substation_denies_access(
         )
 
     repository.get_by_substation_id.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_available_actions_resolves_parent_from_persisted_version(
+    service, repository, access_service
+):
+    user_id = uuid7()
+    instruction_id = uuid7()
+    substation_id = uuid7()
+    version_id = uuid7()
+    version_record = SimpleNamespace(
+        id=version_id,
+        rza_instruction_id=instruction_id,
+        status=DocumentStatus.DRAFT,
+        created_by=user_id,
+        deleted_at=None,
+    )
+    instruction = SimpleNamespace(
+        id=instruction_id, substation_id=substation_id, deleted_at=None
+    )
+    version_details = RZAInstructionVersionDetails(
+        id=version_id,
+        version_number=1,
+        effective_date=date(2026, 10, 15),
+        change_description=None,
+        change_justification=None,
+        created_at=datetime(2026, 10, 15, tzinfo=UTC),
+        created_by_full_name="Инженер",
+        scan_file_id=uuid7(),
+        scan_file_name="scan.pdf",
+        editable_file_id=None,
+        editable_file_name=None,
+        status=DocumentStatus.DRAFT,
+    )
+    repository.get_version_by_id = AsyncMock(return_value=version_record)
+    repository.get_by_id = AsyncMock(return_value=instruction)
+    access_service.can_access_substation.return_value = True
+
+    actions = await service.get_available_actions(user_id, version_details)
+
+    assert actions == {"submit", "new_version"}
+    repository.get_version_by_id.assert_awaited_once_with(version_id)
+    repository.get_by_id.assert_awaited_once_with(instruction_id)
+    access_service.can_access_substation.assert_awaited_once_with(
+        user_id, substation_id
+    )
 
 
 @pytest.mark.asyncio

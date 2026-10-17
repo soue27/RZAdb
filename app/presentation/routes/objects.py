@@ -20,7 +20,6 @@ from app.application.connections.service import (
     ConnectionService,
 )
 from app.application.inspections.inspection_service import InspectionService
-from app.application.inspections.service import InspectionTaskService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -43,7 +42,6 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
     get_inspection_service,
-    get_inspection_task_service,
     get_object_service,
     get_otd_service,
     get_rza_instruction_service,
@@ -126,14 +124,28 @@ async def get_object(
 
         if object_type == "substation":
             substation = await substation_service.get_details(object_id)
+            context = {
+                "substation": substation,
+                "can_edit": can_edit_substation(current_user),
+                "can_create_connection": current_user.role in CONNECTION_CREATE_ROLES,
+            }
+            if request.headers.get("HX-Request") == "true":
+                return templates.TemplateResponse(
+                    request=request,
+                    name="objects/substation.html",
+                    context=context,
+                )
 
+            tree = await tree_service.get_tree(user_id=current_user.id)
             return templates.TemplateResponse(
                 request=request,
-                name="objects/substation.html",
+                name="objects/substation_page.html",
                 context={
-                    "substation": substation,
-                    "can_edit": can_edit_substation(current_user),
-                    "can_create_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                    **context,
+                    "current_user": current_user,
+                    "tree": tree,
+                    "page_title": substation.dispatch_name,
+                    "content_template": "objects/substation.html",
                 },
             )
 
@@ -272,13 +284,9 @@ async def get_substation_inspections(
         InspectionService,
         Depends(get_inspection_service),
     ],
-    inspection_task_service: Annotated[
-        InspectionTaskService,
-        Depends(get_inspection_task_service),
-    ],
 ):
     try:
-        substation = await object_service.get_object(
+        await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
@@ -299,39 +307,14 @@ async def get_substation_inspections(
     inspections = await inspection_service.get_by_substation_id(
         substation_id,
     )
-    inspection_tasks = await inspection_task_service.repository.list_by_substation(substation_id)
-    task_history = {
-        task.id: await inspection_task_service.repository.get_history(task.id)
-        for task in inspection_tasks
-    }
-    assignees = []
-    if current_user.role is UserRole.MANAGER:
-        substation_record = await inspection_task_service.substation_repository.get_by_id(
-            substation_id
-        )
-        if substation_record is not None:
-            assignees = await inspection_task_service.user_repository.get_active_inspection_assignees_by_enterprise(
-                substation_record.enterprise_id
-            )
-
-
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_inspections.html",
         context={
             "inspections": inspections,
-            "inspection_tasks": inspection_tasks,
-            "inspection_task_history": task_history,
-            "inspection_assignees": assignees,
             "substation_id": substation_id,
             "current_user": current_user,
             "can_manage_inspections": current_user.role is UserRole.MANAGER,
-            "inspection_status_labels": {
-                "created": "Создано", "assigned": "Назначено",
-                "in_progress": "В работе", "completed": "Выполнено",
-                "under_review": "На проверке", "closed": "Закрыто",
-                "rejected": "Отклонено",
-            },
         },
     )
 
