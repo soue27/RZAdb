@@ -17,6 +17,7 @@ class ConnectionDetails(BaseModel):
     sap_code: str | None
     asureo_code: str | None
     rdu_subordination: bool
+    substation_id: UUID
 
 
 class ConnectionCreate(BaseModel):
@@ -33,3 +34,7 @@ class ConnectionCreate(BaseModel):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+
+class ConnectionUpdate(ConnectionCreate):
+    """Данные для обновления присоединения."""

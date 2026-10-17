@@ -2,11 +2,12 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
-from app.application.connections.schemas import ConnectionCreate
+from app.application.connections.schemas import ConnectionCreate, ConnectionUpdate
 from app.application.connections.service import (
     ConnectionNameConflictError,
     ConnectionService,
 )
+from app.application.objects.exceptions import ObjectNotFoundError
 
 
 class FakeConnection:
@@ -17,12 +18,16 @@ class FakeConnection:
         sap_code,
         asureo_code,
         rdu_subordination,
+        substation_id=None,
+        updated_by=None,
     ):
         self.id = connection_id
         self.dispatch_name = dispatch_name
         self.sap_code = sap_code
         self.asureo_code = asureo_code
         self.rdu_subordination = rdu_subordination
+        self.substation_id = substation_id
+        self.updated_by = updated_by
 
 
 class FakeConnectionRepository:
@@ -34,9 +39,18 @@ class FakeConnectionRepository:
         self.added = None
         self.commit_calls = 0
         self.rollback_calls = 0
+        self.received_exclude_id = None
+        self.updated = None
 
-    async def exists_by_name(self, substation_id, dispatch_name):
+    async def exists_by_name(
+            self,
+            substation_id,
+            dispatch_name,
+            *,
+            exclude_connection_id=None,
+    ):
         self.received_name = (substation_id, dispatch_name)
+        self.received_exclude_id = exclude_connection_id
         return self.name_exists
 
     async def add(self, connection):
@@ -63,10 +77,15 @@ class FakeConnectionRepository:
         self.received_ids = substation_ids
         return self.connections
 
+    async def update(self, connection):
+        self.updated = connection
+        return connection
+
 
 @pytest.mark.asyncio
 async def test_get_by_id_returns_connection_dto():
     connection_id = uuid7()
+    substation_id = uuid7()
 
     connection = FakeConnection(
         connection_id=connection_id,
@@ -74,6 +93,7 @@ async def test_get_by_id_returns_connection_dto():
         sap_code="SAP-001",
         asureo_code="ASUREO-001",
         rdu_subordination=True,
+        substation_id=substation_id,
     )
 
     repository = FakeConnectionRepository([connection])
@@ -221,3 +241,99 @@ async def test_create_connection_propagates_unrelated_integrity_error():
         )
     assert repository.commit_calls == 0
     assert repository.rollback_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_update_connection_updates_fields_and_audit():
+    connection_id = uuid7()
+    substation_id = uuid7()
+    actor_id = uuid7()
+
+    connection = FakeConnection(
+        connection_id=connection_id,
+        dispatch_name="ВЛ 110 кВ",
+        sap_code="SAP-OLD",
+        asureo_code="ASU-OLD",
+        rdu_subordination=False,
+        substation_id=substation_id,
+    )
+    repository = FakeConnectionRepository([connection])
+    service = ConnectionService(repository)
+
+    result = await service.update(
+        connection_id=connection_id,
+        actor_id=actor_id,
+        data=ConnectionUpdate(
+            dispatch_name="ВЛ 110 кВ Северная",
+            sap_code="SAP-NEW",
+            asureo_code="ASU-NEW",
+            rdu_subordination=True,
+        ),
+    )
+
+    assert repository.received_id == connection_id
+    assert repository.received_name == (
+        substation_id,
+        "ВЛ 110 кВ Северная",
+    )
+    assert repository.received_exclude_id == connection_id
+    assert repository.updated is connection
+    assert connection.dispatch_name == "ВЛ 110 кВ Северная"
+    assert connection.sap_code == "SAP-NEW"
+    assert connection.asureo_code == "ASU-NEW"
+    assert connection.rdu_subordination is True
+    assert connection.updated_by == actor_id
+    assert result.id == connection_id
+    assert result.dispatch_name == "ВЛ 110 кВ Северная"
+    assert repository.commit_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_update_connection_rejects_duplicate_name():
+    connection_id = uuid7()
+    substation_id = uuid7()
+
+    connection = FakeConnection(
+        connection_id=connection_id,
+        dispatch_name="ВЛ 110 кВ",
+        sap_code=None,
+        asureo_code=None,
+        rdu_subordination=False,
+        substation_id=substation_id,
+    )
+    repository = FakeConnectionRepository([connection])
+    repository.name_exists = True
+    service = ConnectionService(repository)
+
+    with pytest.raises(ConnectionNameConflictError):
+        await service.update(
+            connection_id=connection_id,
+            actor_id=uuid7(),
+            data=ConnectionUpdate(
+                dispatch_name="ВЛ 220 кВ",
+                rdu_subordination=True,
+            ),
+        )
+
+    assert repository.received_exclude_id == connection_id
+    assert repository.updated is None
+
+
+@pytest.mark.asyncio
+async def test_update_connection_raises_not_found():
+    connection_id = uuid7()
+    repository = FakeConnectionRepository([])
+    service = ConnectionService(repository)
+
+    with pytest.raises(ObjectNotFoundError):
+        await service.update(
+            connection_id=connection_id,
+            actor_id=uuid7(),
+            data=ConnectionUpdate(
+                dispatch_name="ВЛ 110 кВ",
+                rdu_subordination=True,
+            ),
+        )
+
+    assert repository.received_id == connection_id
+    assert repository.updated is None

@@ -1,14 +1,14 @@
 <div class="object-card">
     <div class="d-flex align-items-center mb-3">
-        <h2 class="h5 mb-0">Добавление присоединения</h2>
+        <h2 class="h5 mb-0">{{ form_title | default("Добавление присоединения") }}</h2>
     </div>
     {% if error_message %}<div class="alert alert-danger" role="alert">{{ error_message }}</div>{% endif %}
     {% set values = form_values or {} %}
     <form method="post"
-          action="/objects/substation/{{ substation_id }}/connections"
-          hx-post="/objects/substation/{{ substation_id }}/connections"
-          hx-on::before-swap="if (event.detail.xhr.status === 422) event.detail.shouldSwap = true"
-          hx-target="#object-content" hx-swap="innerHTML">
+      action="{{ form_action | default('/objects/substation/' ~ substation_id ~ '/connections') }}"
+      hx-post="{{ form_action | default('/objects/substation/' ~ substation_id ~ '/connections') }}"
+      hx-on::before-swap="if (event.detail.xhr.status === 422) event.detail.shouldSwap = true"
+      hx-target="#object-content" hx-swap="innerHTML">
         <div class="mb-3">
             <label class="form-label" for="connection-dispatch-name">Диспетчерское наименование</label>
             <input id="connection-dispatch-name" name="dispatch_name" type="text"
@@ -34,9 +34,11 @@
                    maxlength="64" value="{{ values.get('asureo_code', '') }}">
         </div>
         <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Создать присоединение</button>
+            <button type="submit" class="btn btn-primary">
+                {{ submit_label | default("Создать присоединение") }}
+            </button>
             <button type="button" class="btn btn-outline-secondary"
-                    hx-get="/objects/substation/{{ substation_id }}"
+                    hx-get="{{ cancel_url | default('/objects/substation/' ~ substation_id) }}"
                     hx-target="#object-content" hx-swap="innerHTML">Отмена</button>
         </div>
     </form>

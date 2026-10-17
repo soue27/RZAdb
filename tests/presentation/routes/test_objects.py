@@ -79,6 +79,22 @@ class FakeURZAService:
     async def get_details(self, urza_id):
         return self.details
 
+class FakeURZACreationService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.create_calls = []
+        self.urza = None
+
+    async def create(self, **kwargs):
+        self.create_calls.append(kwargs)
+        if self.error:
+            raise self.error
+
+        self.urza = SimpleNamespace(
+            id=uuid7(),
+            dispatch_name=kwargs["data"].dispatch_name,
+        )
+        return self.urza
 
 class FakeOTDService:
     def __init__(self):
@@ -135,6 +151,7 @@ class FakeConnectionCreationService:
         self.error = error
         self.create_calls = []
         self.connection = None
+        self.update_calls = []
 
     async def create(self, **kwargs):
         self.create_calls.append(kwargs)
@@ -145,6 +162,7 @@ class FakeConnectionCreationService:
             sap_code=kwargs["data"].sap_code,
             asureo_code=kwargs["data"].asureo_code,
             rdu_subordination=kwargs["data"].rdu_subordination,
+            substation_id=kwargs["substation_id"],
         )
         return self.connection
 
@@ -152,6 +170,28 @@ class FakeConnectionCreationService:
         if self.connection and self.connection.id == connection_id:
             return self.connection
         return None
+
+    async def update(self, *, connection_id, actor_id, data):
+        self.update_calls.append(
+            {
+                "connection_id": connection_id,
+                "actor_id": actor_id,
+                "data": data,
+            }
+        )
+
+        if self.error:
+            raise self.error
+
+        if self.connection is None or self.connection.id != connection_id:
+            return None
+
+        self.connection.dispatch_name = data.dispatch_name
+        self.connection.rdu_subordination = data.rdu_subordination
+        self.connection.sap_code = data.sap_code
+        self.connection.asureo_code = data.asureo_code
+
+        return self.connection
 
 
 class FakeInspectionService:
@@ -853,9 +893,28 @@ def test_create_connection_success_redirects_to_connection_card(headers, expecte
         app.dependency_overrides.clear()
 
 
-@pytest.mark.parametrize("headers,full_page", [({}, True), ({"HX-Request": "true"}, False)])
-def test_connection_card_route_supports_full_page_and_htmx(headers, full_page):
+@pytest.mark.parametrize(
+    "headers,full_page",
+    [({}, True), ({"HX-Request": "true"}, False)],
+)
+@pytest.mark.parametrize(
+    "role,can_create_urza",
+    [
+        (UserRole.ADMIN, True),
+        (UserRole.MANAGER, True),
+        (UserRole.SUPERADMIN, True),
+        (UserRole.ENGINEER, False),
+        (UserRole.SPECIALIST, False),
+    ],
+)
+def test_connection_card_route_supports_full_page_and_htmx(
+    headers,
+    full_page,
+    role,
+    can_create_urza,
+):
     user = make_user(uuid7())
+    user.role = role
     connection_id = uuid7()
     service = FakeConnectionCreationService()
     service.connection = SimpleNamespace(
@@ -882,8 +941,243 @@ def test_connection_card_route_supports_full_page_and_htmx(headers, full_page):
         assert response.status_code == 200
         assert ("<!doctype html>" in response.text) is full_page
         assert "ВЛ 110 кВ" in response.text
+        assert ("Добавить УРЗА" in response.text) is can_create_urza
+        assert (
+                       f'href="/objects/connection/{connection_id}/edit"' in response.text
+               ) is can_create_urza
     finally:
         app.dependency_overrides.clear()
+
+
+
+@pytest.mark.parametrize(
+    "headers,expected_status",
+    [({}, 303), ({"HX-Request": "true"}, 204)],
+)
+def test_edit_connection_success_redirects_to_connection_card(
+    headers,
+    expected_status,
+):
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    connection_id = uuid7()
+    substation_id = uuid7()
+
+    service = FakeConnectionCreationService()
+    service.connection = SimpleNamespace(
+        id=connection_id,
+        substation_id=substation_id,
+        dispatch_name="Старое имя",
+        rdu_subordination=False,
+        sap_code="SAP-OLD",
+        asureo_code="ASU-OLD",
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="Старое имя",
+            )
+        )
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(service)
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/connection/{connection_id}",
+                headers=headers,
+                data={
+                    "dispatch_name": "ВЛ 110 кВ",
+                    "rdu_subordination": "true",
+                    "sap_code": "SAP-NEW",
+                    "asureo_code": "ASU-NEW",
+                },
+                follow_redirects=False,
+            )
+
+        assert response.status_code == expected_status
+        assert service.connection.dispatch_name == "ВЛ 110 кВ"
+        assert service.connection.rdu_subordination is True
+        assert service.connection.sap_code == "SAP-NEW"
+        assert service.connection.asureo_code == "ASU-NEW"
+
+        call = service.update_calls[0]
+        assert call["connection_id"] == connection_id
+        assert call["actor_id"] == user.id
+        assert call["data"].dispatch_name == "ВЛ 110 кВ"
+
+        redirect_header = "HX-Redirect" if expected_status == 204 else "location"
+        assert response.headers[redirect_header] == (
+            f"/objects/connection/{connection_id}"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+@pytest.mark.parametrize(
+    "headers,full_page",
+    [({}, True), ({"HX-Request": "true"}, False)],
+)
+def test_edit_connection_form_shows_current_values(headers, full_page):
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    connection_id = uuid7()
+    substation_id = uuid7()
+
+    service = FakeConnectionCreationService()
+    service.connection = SimpleNamespace(
+        id=connection_id,
+        substation_id=substation_id,
+        dispatch_name="ВЛ 110 кВ",
+        rdu_subordination=True,
+        sap_code="SAP-123",
+        asureo_code="ASU-456",
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="ВЛ 110 кВ",
+            )
+        )
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(service)
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                f"/objects/connection/{connection_id}/edit",
+                headers=headers,
+            )
+
+        assert response.status_code == 200
+        assert ("<!doctype html>" in response.text) is full_page
+        assert "Редактирование присоединения" in response.text
+        assert f'action="/objects/connection/{connection_id}"' in response.text
+        assert 'value="ВЛ 110 кВ"' in response.text
+        assert 'value="SAP-123"' in response.text
+        assert 'value="ASU-456"' in response.text
+        assert "Сохранить изменения" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_edit_connection_name_conflict_rerenders_form_with_values():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    connection_id = uuid7()
+    substation_id = uuid7()
+
+    service = FakeConnectionCreationService(
+        error=ConnectionNameConflictError("Присоединение с таким именем уже существует.")
+    )
+    service.connection = SimpleNamespace(
+        id=connection_id,
+        substation_id=substation_id,
+        dispatch_name="Старое имя",
+        rdu_subordination=False,
+        sap_code="SAP-OLD",
+        asureo_code="ASU-OLD",
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="Старое имя",
+            )
+        )
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(service)
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/connection/{connection_id}",
+                headers={"HX-Request": "true"},
+                data={
+                    "dispatch_name": "Новое имя",
+                    "rdu_subordination": "true",
+                    "sap_code": "SAP-NEW",
+                    "asureo_code": "ASU-NEW",
+                },
+            )
+
+        assert response.status_code == 422
+        assert "Присоединение с таким именем уже существует." in response.text
+        assert "Новое имя" in response.text
+        assert "SAP-NEW" in response.text
+        assert "ASU-NEW" in response.text
+        assert len(service.update_calls) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
+def test_edit_connection_post_denies_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    connection_id = uuid7()
+
+    service = FakeConnectionCreationService()
+    service.connection = SimpleNamespace(
+        id=connection_id,
+        substation_id=uuid7(),
+        dispatch_name="ВЛ 110 кВ",
+        rdu_subordination=False,
+        sap_code=None,
+        asureo_code=None,
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="ВЛ 110 кВ",
+            )
+        )
+    )
+    app.dependency_overrides[get_connection_service] = (
+        override_connection_service(service)
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/connection/{connection_id}",
+                data={
+                    "dispatch_name": "Новое имя",
+                    "rdu_subordination": "true",
+                },
+            )
+
+        assert response.status_code == 403
+        assert service.update_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
 
 
 @pytest.mark.parametrize(
@@ -920,6 +1214,126 @@ def test_create_connection_form_rerenders_errors_and_values(service_error, messa
         assert "Имя пользователя" in response.text
         assert "SAP" in response.text
         assert "event.detail.xhr.status === 422" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERADMIN],
+)
+def test_new_urza_form_allows_creation_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    connection_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="ВЛ 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/connection/{connection_id}/urzas/new",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert "Новое УРЗА" in response.text
+        assert 'name="dispatch_name"' in response.text
+        assert "обязательные поля" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.SPECIALIST],
+)
+def test_new_urza_form_denies_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    connection_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="ВЛ 110 кВ",
+            ),
+        )
+    )
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/connection/{connection_id}/urzas/new",
+        )
+
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_urza_success_redirects_to_urza_card():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    connection_id = uuid7()
+    service = FakeURZACreationService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name="ВЛ 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/connection/{connection_id}/urzas",
+            headers={"HX-Request": "true"},
+            data={
+                "dispatch_name": "  МП РЗА 110 кВ  ",
+                "rdu_subordination": "true",
+                "inventory_number": "",
+                "commissioning_date": "2026-10-01",
+                "status": "in_operation",
+                "element_base": "microprocessor",
+                "category": "II",
+                "room_category": "I",
+                "complexity": "false",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 204
+        assert response.headers["HX-Redirect"] == (
+            f"/objects/urza/{service.urza.id}"
+        )
+
+        assert len(service.create_calls) == 1
+        call = service.create_calls[0]
+        assert call["connection_id"] == connection_id
+        assert call["actor_id"] == user.id
+
+        data = call["data"]
+        assert data.dispatch_name == "МП РЗА 110 кВ"
+        assert data.inventory_number is None
+        assert data.rdu_subordination is True
+        assert data.complexity is False
     finally:
         app.dependency_overrides.clear()
 

@@ -19,18 +19,21 @@ class ConnectionRepository:
         return await self.session.get(Connection, connection_id)
 
     async def exists_by_name(
-        self,
-        substation_id: UUID,
-        dispatch_name: str,
+            self,
+            substation_id: UUID,
+            dispatch_name: str,
+            *,
+            exclude_connection_id: UUID | None = None,
     ) -> bool:
-        result = await self.session.scalar(
-            select(Connection.id)
-            .where(
-                Connection.substation_id == substation_id,
-                func.btrim(Connection.dispatch_name) == dispatch_name,
-            )
-            .limit(1)
+        query = select(Connection.id).where(
+            Connection.substation_id == substation_id,
+            func.btrim(Connection.dispatch_name) == dispatch_name.strip(),
         )
+
+        if exclude_connection_id is not None:
+            query = query.where(Connection.id != exclude_connection_id)
+
+        result = await self.session.scalar(query.limit(1))
         return result is not None
 
     async def add(self, connection: Connection) -> Connection:
@@ -68,3 +71,7 @@ class ConnectionRepository:
         )
 
         return list(result)
+
+    async def update(self, connection: Connection) -> Connection:
+        await self.session.flush()
+        return connection

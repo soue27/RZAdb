@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
-from app.application.connections.schemas import ConnectionCreate
+from app.application.connections.schemas import ConnectionCreate, ConnectionUpdate
 from app.application.connections.service import (
     ConnectionNameConflictError,
     ConnectionService,
@@ -35,8 +35,20 @@ from app.application.substations.schemas import SubstationUpdate
 from app.application.substations.service import SubstationService
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
-from app.application.urzas.service import URZAService
-from app.domain.enums import HighestVoltage, OperationalCurrentType, UserRole
+from app.application.urzas.schemas import URZACreate
+from app.application.urzas.service import (
+    URZANameConflictError,
+    URZAService,
+)
+from app.domain.enums import (
+    ElementBase,
+    HighestVoltage,
+    OperationalCurrentType,
+    RoomCategory,
+    URZACategory,
+    URZAStatus,
+    UserRole,
+)
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -160,7 +172,11 @@ async def get_object(
                 return templates.TemplateResponse(
                     request=request,
                     name="objects/connection.html",
-                    context={"connection": connection},
+                    context={
+                        "connection": connection,
+                        "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
+                        "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                    },
                 )
 
             tree = await tree_service.get_tree(user_id=current_user.id)
@@ -173,6 +189,8 @@ async def get_object(
                     "tree": tree,
                     "page_title": connection.dispatch_name,
                     "content_template": "objects/connection.html",
+                    "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
+                    "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
                 },
             )
 
@@ -234,6 +252,8 @@ async def get_object(
                 "current_user": current_user,
                 "active_tab": tab,
                 "can_issue_task": can_issue_task,
+                "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
+                "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
             }
 
             if request.headers.get("HX-Request") == "true":
@@ -389,6 +409,29 @@ async def _check_substation_access(object_service, current_user, substation_id):
         raise HTTPException(status_code=404, detail="Объект не найден.") from exc
 
 
+async def _check_connection_access(
+    object_service: ObjectService,
+    current_user: User,
+    connection_id: UUID,
+) -> None:
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="connection",
+            object_id=connection_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Присоединение не найдено.",
+        ) from exc
+
+
 async def _get_accessible_substation(
     object_service,
     substation_service: SubstationService,
@@ -411,6 +454,7 @@ def _require_connection_create_role(current_user: User) -> None:
         )
 
 
+
 async def _render_connection_form(
     request: Request,
     substation_id: UUID,
@@ -419,17 +463,30 @@ async def _render_connection_form(
     *,
     form_values: dict | None = None,
     error_message: str | None = None,
+    form_title: str = "Добавление присоединения",
+    form_action: str | None = None,
+    submit_label: str = "Создать присоединение",
+    cancel_url: str | None = None,
 ):
     context = {
         "substation_id": substation_id,
         "form_values": form_values or {},
         "error_message": error_message,
+        "form_title": form_title,
+        "form_action": form_action
+        or f"/objects/substation/{substation_id}/connections",
+        "submit_label": submit_label,
+        "cancel_url": cancel_url or f"/objects/substation/{substation_id}",
     }
     if request.headers.get("HX-Request") == "true":
         return templates.TemplateResponse(
             request=request,
             name="objects/connection_form.html",
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT if error_message else status.HTTP_200_OK,
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_CONTENT
+                if error_message
+                else status.HTTP_200_OK
+            ),
             context=context,
         )
 
@@ -437,13 +494,65 @@ async def _render_connection_form(
     return templates.TemplateResponse(
         request=request,
         name="objects/connection_page.html",
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT if error_message else status.HTTP_200_OK,
+        status_code=(
+            status.HTTP_422_UNPROCESSABLE_CONTENT
+            if error_message
+            else status.HTTP_200_OK
+        ),
         context={
             **context,
             "current_user": current_user,
             "tree": tree,
-            "page_title": "Добавление присоединения",
+            "page_title": form_title,
             "content_template": "objects/connection_form.html",
+        },
+    )
+
+
+
+async def _render_urza_form(
+    request: Request,
+    connection_id: UUID,
+    current_user: User,
+    tree_service: TreeService,
+    *,
+    form_values: dict | None = None,
+    error_message: str | None = None,
+):
+    context = {
+        "connection_id": connection_id,
+        "form_values": form_values or {},
+        "error_message": error_message,
+        "urza_statuses": list(URZAStatus),
+        "element_bases": list(ElementBase),
+        "urza_categories": list(URZACategory),
+        "room_categories": list(RoomCategory),
+    }
+    response_status = (
+        status.HTTP_422_UNPROCESSABLE_CONTENT
+        if error_message
+        else status.HTTP_200_OK
+    )
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/urza_form.html",
+            status_code=response_status,
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/connection_page.html",
+        status_code=response_status,
+        context={
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "page_title": "Добавление УРЗА",
+            "content_template": "objects/urza_form.html",
         },
     )
 
@@ -519,6 +628,226 @@ async def post_new_connection(
             status_code=status.HTTP_204_NO_CONTENT,
             headers={"HX-Redirect": destination},
         )
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+
+@router.get("/connection/{connection_id}/edit")
+async def get_edit_connection_form(
+    request: Request,
+    connection_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    connection_service: Annotated[ConnectionService, Depends(get_connection_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    await _check_connection_access(object_service, current_user, connection_id)
+    _require_connection_create_role(current_user)
+
+    connection = await connection_service.get_by_id(connection_id)
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Присоединение не найдено.",
+        )
+
+    return await _render_connection_form(
+        request,
+        substation_id=connection.substation_id,
+        current_user=current_user,
+        tree_service=tree_service,
+        form_values={
+            "dispatch_name": connection.dispatch_name,
+            "rdu_subordination": connection.rdu_subordination,
+            "sap_code": connection.sap_code or "",
+            "asureo_code": connection.asureo_code or "",
+        },
+        form_title="Редактирование присоединения",
+        form_action=f"/objects/connection/{connection_id}",
+        submit_label="Сохранить изменения",
+        cancel_url=f"/objects/connection/{connection_id}",
+    )
+
+
+
+@router.post("/connection/{connection_id}")
+async def post_edit_connection(
+    request: Request,
+    connection_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    connection_service: Annotated[ConnectionService, Depends(get_connection_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    dispatch_name: Annotated[str, Form()] = "",
+    rdu_subordination: Annotated[str, Form()] = "",
+    sap_code: Annotated[str, Form()] = "",
+    asureo_code: Annotated[str, Form()] = "",
+):
+    await _check_connection_access(object_service, current_user, connection_id)
+    _require_connection_create_role(current_user)
+
+    values = {
+        "dispatch_name": dispatch_name,
+        "rdu_subordination": rdu_subordination,
+        "sap_code": sap_code,
+        "asureo_code": asureo_code,
+    }
+
+    connection = await connection_service.get_by_id(connection_id)
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Присоединение не найдено.",
+        )
+
+    form_kwargs = {
+        "form_values": values,
+        "form_title": "Редактирование присоединения",
+        "form_action": f"/objects/connection/{connection_id}",
+        "submit_label": "Сохранить изменения",
+        "cancel_url": f"/objects/connection/{connection_id}",
+    }
+
+    try:
+        data = ConnectionUpdate.model_validate(values)
+    except ValidationError:
+        return await _render_connection_form(
+            request,
+            substation_id=connection.substation_id,
+            current_user=current_user,
+            tree_service=tree_service,
+            error_message="Проверьте введённые значения.",
+            **form_kwargs,
+        )
+
+    try:
+        await connection_service.update(
+            connection_id=connection_id,
+            actor_id=current_user.id,
+            data=data,
+        )
+    except ConnectionNameConflictError as exc:
+        return await _render_connection_form(
+            request,
+            substation_id=connection.substation_id,
+            current_user=current_user,
+            tree_service=tree_service,
+            error_message=str(exc),
+            **form_kwargs,
+        )
+
+    destination = f"/objects/connection/{connection_id}"
+    if request.headers.get("HX-Request") == "true":
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"HX-Redirect": destination},
+        )
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+
+@router.get("/connection/{connection_id}/urzas/new")
+async def get_new_urza_form(
+    request: Request,
+    connection_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    await _check_connection_access(
+        object_service,
+        current_user,
+        connection_id,
+    )
+    _require_connection_create_role(current_user)
+
+    return await _render_urza_form(
+        request,
+        connection_id,
+        current_user,
+        tree_service,
+    )
+
+
+@router.post("/connection/{connection_id}/urzas")
+async def post_new_urza(
+    request: Request,
+    connection_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    urza_service: Annotated[URZAService, Depends(get_urza_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    dispatch_name: Annotated[str, Form()] = "",
+    rdu_subordination: Annotated[str, Form()] = "",
+    inventory_number: Annotated[str, Form()] = "",
+    commissioning_date: Annotated[str, Form()] = "",
+    urza_status: Annotated[str, Form(alias="status")] = "",
+    element_base: Annotated[str, Form()] = "",
+    category: Annotated[str, Form()] = "",
+    room_category: Annotated[str, Form()] = "",
+    complexity: Annotated[str, Form()] = "",
+):
+    await _check_connection_access(
+        object_service,
+        current_user,
+        connection_id,
+    )
+    _require_connection_create_role(current_user)
+
+    values = {
+        "dispatch_name": dispatch_name,
+        "rdu_subordination": rdu_subordination == "true",
+        "inventory_number": inventory_number,
+        "commissioning_date": commissioning_date,
+        "status": urza_status,
+        "element_base": element_base,
+        "category": category,
+        "room_category": room_category,
+        "complexity": complexity == "true",
+    }
+
+    try:
+        data = URZACreate.model_validate(values)
+    except ValidationError:
+        return await _render_urza_form(
+            request,
+            connection_id,
+            current_user,
+            tree_service,
+            form_values=values,
+            error_message="Проверьте введённые значения.",
+        )
+
+    try:
+        urza = await urza_service.create(
+            connection_id=connection_id,
+            actor_id=current_user.id,
+            data=data,
+        )
+    except URZANameConflictError as exc:
+        return await _render_urza_form(
+            request,
+            connection_id,
+            current_user,
+            tree_service,
+            form_values=values,
+            error_message=str(exc),
+        )
+
+    destination = f"/objects/urza/{urza.id}"
+
+    if request.headers.get("HX-Request") == "true":
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"HX-Redirect": destination},
+        )
+
     return RedirectResponse(
         url=destination,
         status_code=status.HTTP_303_SEE_OTHER,
