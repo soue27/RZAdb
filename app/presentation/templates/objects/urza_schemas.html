@@ -75,19 +75,22 @@
                                 <div class="d-flex flex-column gap-2">
                                     {% if record.scan_file_id %}
                                         <div>
-                                            <div class="small text-secondary">Скан схемы</div>
+                                            <div class="small text-secondary rzadb-document-label">
+                                                Скан схемы</div>
                                             {{ file_actions(record.scan_file_id) }}
                                         </div>
                                     {% endif %}
                                     {% if record.editable_file_id %}
                                         <div>
-                                            <div class="small text-secondary">Редактируемый файл</div>
+                                            <div class="small text-secondary rzadb-document-label">
+                                                Редактируемый файл</div>
                                             {{ file_actions(record.editable_file_id) }}
                                         </div>
                                     {% endif %}
                                     {% if record.signed_form_file_id %}
                                         <div>
-                                            <div class="small text-secondary">Подписанный формуляр</div>
+                                            <div class="small text-secondary rzadb-document-label">
+                                                Подписанный формуляр</div>
                                             {{ file_actions(record.signed_form_file_id) }}
                                         </div>
                                     {% endif %}

@@ -945,7 +945,7 @@ body {
 }
 
 /* =========================================================
-   СХЕМЫ
+   СХЕМЫ УРЗА
    ========================================================= */
 
 .rzadb-schemas-table {
@@ -955,80 +955,81 @@ body {
     font-size: 0.875rem;
 }
 
-/* Заголовки */
 .rzadb-schemas-table thead th {
     padding: 0.45rem 0.6rem;
     text-align: center;
+    vertical-align: middle;
     font-weight: 600;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
     border-bottom: 2px solid #dee2e6;
 }
 
-/* Ячейки */
 .rzadb-schemas-table tbody td {
     padding: 0.4rem 0.6rem;
-    text-align: center;
+    text-align: left;
     vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
     border-top: 1px solid #dee2e6;
 }
 
-/* Вертикальные разделители */
 .rzadb-schemas-table th + th,
 .rzadb-schemas-table td + td {
     border-left: 1px solid #dee2e6;
 }
 
-/* Подсветка строки при наведении */
 .rzadb-schemas-table tbody tr:hover {
     background-color: rgba(0, 0, 0, 0.025);
 }
 
-/* № схемы */
+/* Дата изменения */
 .rzadb-schemas-table th:nth-child(1),
 .rzadb-schemas-table td:nth-child(1) {
-    width: 110px;
-    white-space: nowrap;
+    width: 9%;
+    text-align: center;
 }
 
-/* Наименование */
+/* Номер схемы — узкий столбец */
 .rzadb-schemas-table th:nth-child(2),
 .rzadb-schemas-table td:nth-child(2) {
-    width: 260px;
-    text-align: left;
+    width: 6%;
+    text-align: center;
+    overflow-wrap: anywhere;
 }
 
-/* Описание изменения */
+/* Три одинаковых по ширине текстовых столбца */
 .rzadb-schemas-table th:nth-child(3),
-.rzadb-schemas-table td:nth-child(3) {
-    width: 340px;
-    max-width: 340px;
-    text-align: left;
-    white-space: normal;
-    overflow-wrap: break-word;
-}
-
-/* Обоснование изменения */
+.rzadb-schemas-table td:nth-child(3),
 .rzadb-schemas-table th:nth-child(4),
-.rzadb-schemas-table td:nth-child(4) {
-    width: 340px;
-    max-width: 340px;
-    text-align: left;
-    white-space: normal;
-    overflow-wrap: break-word;
-}
-
-/* Дата загрузки */
+.rzadb-schemas-table td:nth-child(4),
 .rzadb-schemas-table th:nth-child(5),
 .rzadb-schemas-table td:nth-child(5) {
-    width: 110px;
-    white-space: nowrap;
+    width: 16%;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
-/* Кто добавил */
+/* Статус */
 .rzadb-schemas-table th:nth-child(6),
 .rzadb-schemas-table td:nth-child(6) {
-    width: 120px;
-    white-space: nowrap;
+    width: 9%;
+    text-align: center;
+}
+
+/* Файлы */
+.rzadb-schemas-table th:nth-child(7),
+.rzadb-schemas-table td:nth-child(7) {
+    width: 14%;
+    text-align: left;
+}
+
+/* Действия */
+.rzadb-schemas-table th:nth-child(8),
+.rzadb-schemas-table td:nth-child(8) {
+    width: 14%;
+    text-align: center;
 }
 
 .rzadb-maintenance-table {
@@ -1041,15 +1042,19 @@ body {
 .rzadb-maintenance-table thead th {
     padding: 0.45rem 0.6rem;
     text-align: center;
+    vertical-align: middle;
     font-weight: 600;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
     border-bottom: 2px solid #dee2e6;
 }
 
 .rzadb-maintenance-table tbody td {
     padding: 0.4rem 0.6rem;
-    text-align: center;
+    text-align: left;
     vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
     border-top: 1px solid #dee2e6;
 }
 
@@ -1065,45 +1070,50 @@ body {
 /* Дата ТО */
 .rzadb-maintenance-table th:nth-child(1),
 .rzadb-maintenance-table td:nth-child(1) {
-    width: 100px;
+    width: 9%;
+    text-align: center;
     white-space: nowrap;
 }
 
 /* Вид ТО */
 .rzadb-maintenance-table th:nth-child(2),
 .rzadb-maintenance-table td:nth-child(2) {
-    width: 80px;
-    white-space: nowrap;
+    width: 7%;
+    text-align: center;
 }
 
 /* Выявленные отклонения */
 .rzadb-maintenance-table th:nth-child(3),
 .rzadb-maintenance-table td:nth-child(3) {
-    width: 300px;
-    text-align: left;
+    width: 20%;
 }
 
 /* Принятые меры */
 .rzadb-maintenance-table th:nth-child(4),
 .rzadb-maintenance-table td:nth-child(4) {
-    width: 360px;
-    text-align: left;
+    width: 22%;
 }
 
 /* Исторические данные */
 .rzadb-maintenance-table th:nth-child(5),
 .rzadb-maintenance-table td:nth-child(5) {
-    width: 150px;
-    max-width: 150px;
-    white-space: normal;
-    overflow-wrap: break-word;
+    width: 11%;
+    text-align: center;
 }
 
 /* Кто выполнил */
 .rzadb-maintenance-table th:nth-child(6),
 .rzadb-maintenance-table td:nth-child(6) {
-    width: 140px;
-    white-space: nowrap;
+    width: 13%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Документы ТО */
+.rzadb-maintenance-table th:nth-child(7),
+.rzadb-maintenance-table td:nth-child(7) {
+    width: 18%;
+    text-align: left;
 }
 
 .rzadb-programs-table {
@@ -1303,4 +1313,22 @@ body {
 .rzadb-selectivity-schemes-table td:nth-child(7) {
     width: auto;
     white-space: normal;
+}
+
+/* Название документа и кнопки просмотра/скачивания */
+.rzadb-document-file {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    min-width: 0;
+}
+
+.rzadb-document-label {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.rzadb-document-file .rzadb-file-actions {
+    gap: 0.3rem;
 }
