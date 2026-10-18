@@ -66,6 +66,21 @@ class TaskRepository:
         )
         return list(result.scalars().all())
 
+
+    async def list_reviewed_task_ids(self, actor_id: UUID) -> set[UUID]:
+        result = await self.session.scalars(
+            select(TaskHistory.task_id)
+            .where(
+                TaskHistory.actor_id == actor_id,
+                TaskHistory.event_type.in_(
+                    {"review_approved", "review_rejected"}
+                ),
+            )
+            .distinct()
+        )
+        return set(result.all())
+
+
     async def save(self, task: Task) -> Task:
         # flush фиксирует изменения в текущей транзакции, но commit остаётся за сервисом.
         await self.session.flush()

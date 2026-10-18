@@ -14,7 +14,7 @@ from app.application.work_items.service import (
     SelectivitySchemeWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
-    WorkItemService, _document_tab, _task_tab,
+    WorkItemService, _document_tab, _task_tab, _action_labels
 )
 from app.domain.enums import (
     DocumentStatus,
@@ -84,6 +84,8 @@ async def test_task_source_keeps_assignment_and_access_filters():
     class Repository:
         async def list_active(self):
             return [assigned, reassigned, denied]
+        async def list_reviewed_task_ids(self, actor_id):
+            return set()
 
     class Access:
         user_repository = SimpleNamespace(get_by_id=_active_engineer)
@@ -102,6 +104,73 @@ async def test_task_source_keeps_assignment_and_access_filters():
     assert result[0].status == "В работе"
     assert result[0].actions == ("Завершить",)
     assert result[0].tab == "work"
+
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("is_author", "is_assignee", "is_reviewer", "expected_count"),
+    [
+        (True, False, False, 1),   # Автор
+        (False, True, False, 1),   # Исполнитель
+        (False, False, True, 1),   # Согласующий
+        (False, False, False, 0),  # Не участник
+    ],
+)
+async def test_superadmin_sees_only_tasks_where_is_participant(
+    is_author, is_assignee, is_reviewer, expected_count
+):
+    user_id = uuid4()
+    task = SimpleNamespace(
+        id=uuid4(),
+        urza_id=uuid4(),
+        substation_id=None,
+        urza=SimpleNamespace(dispatch_name="УРЗА-1"),
+        work_type=TaskWorkType.SCHEMES,
+        description="Задание для проверки",
+        created_by=user_id if is_author else uuid4(),
+        assigned_to=user_id if is_assignee else uuid4(),
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        created_by_user=SimpleNamespace(full_name="Автор"),
+        status=TaskStatus.CLOSED if is_reviewer else TaskStatus.IN_PROGRESS,
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        deleted_at=None,
+    )
+
+    class Repository:
+        async def list_active(self):
+            return [task]
+
+        async def list_reviewed_task_ids(self, actor_id):
+            assert actor_id == user_id
+            return {task.id} if is_reviewer else set()
+
+    class Access:
+        user_repository = SimpleNamespace(get_by_id=_active_superadmin)
+
+        async def can_access_urza(self, *_):
+            return True
+
+    class TaskActions:
+        async def get_available_actions(self, **_):
+            return set()
+
+    source = TaskWorkItemSource(Repository(), Access(), TaskActions())
+    result = await source.list_for_user(user_id)
+
+    assert len(result) == expected_count
+
+
+
+async def _active_superadmin(user_id):
+    return SimpleNamespace(
+        id=user_id,
+        role=UserRole.SUPERADMIN,
+        active=True,
+        deleted_at=None,
+    )
+
 
 
 @pytest.mark.asyncio
@@ -176,6 +245,8 @@ async def test_closed_maintenance_task_remains_in_work_items():
     class Repository:
         async def list_active(self):
             return [task]
+        async def list_reviewed_task_ids(self, actor_id):
+            return set()
 
     class Access:
         user_repository = SimpleNamespace(get_by_id=_active_engineer)
@@ -603,3 +674,7 @@ def test_document_tab_matches_status(status, expected_tab):
 )
 def test_task_tab_matches_status(status, expected_tab):
     assert _task_tab(status) == expected_tab
+
+
+def test_action_labels_support_delete():
+    assert _action_labels({"delete"}) == ("Удалить",)

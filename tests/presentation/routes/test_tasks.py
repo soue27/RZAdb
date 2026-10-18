@@ -73,11 +73,15 @@ class FakeTaskRepository:
 
 
 class FakeInspectionTaskRepository:
-    def __init__(self, tasks=()):
+    def __init__(self, tasks=(), reviewed_task_ids=()):
         self.tasks = list(tasks)
+        self.reviewed_task_ids = set(reviewed_task_ids)
 
     async def list_active(self):
         return self.tasks
+
+    async def list_reviewed_task_ids(self, actor_id):
+        return self.reviewed_task_ids
 
 
 class FakeTreeService:
@@ -317,6 +321,57 @@ def test_tasks_list_shows_only_accessible_assigned_inspection_tasks():
         assert f"/objects/substation/inspection-tasks/{unassigned.id}" not in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+
+def test_superadmin_sees_only_related_inspection_tasks():
+    user = _user(uuid7(), role=UserRole.SUPERADMIN)
+    substation_id = uuid7()
+
+    def inspection_task(*, created_by, assigned_to=None):
+        task_id = uuid7()
+        return SimpleNamespace(
+            id=task_id,
+            substation_id=substation_id,
+            substation=SimpleNamespace(dispatch_name="ПС-ТЕСТ"),
+            created_by=created_by,
+            created_by_user=SimpleNamespace(full_name="Руководитель"),
+            assigned_to_user=SimpleNamespace(full_name="Инженер"),
+            assigned_to=assigned_to,
+            created_at=datetime(2026, 10, 1, tzinfo=UTC),
+            status=TaskStatus.ASSIGNED,
+        )
+
+    authored = inspection_task(created_by=user.id)
+    assigned = inspection_task(created_by=uuid7(), assigned_to=user.id)
+    reviewed = inspection_task(created_by=uuid7())
+    unrelated = inspection_task(created_by=uuid7(), assigned_to=uuid7())
+
+    repository = FakeTaskRepository([])
+    access = FakeAccessService()
+    client = _client(user, repository, access, FakeTaskService())
+
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository(
+            [authored, assigned, reviewed, unrelated],
+            reviewed_task_ids={reviewed.id},
+        )
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        assert response.status_code == 200
+        for task in (authored, assigned, reviewed):
+            assert f"/objects/substation/inspection-tasks/{task.id}" in response.text
+
+        assert (
+            f"/objects/substation/inspection-tasks/{unrelated.id}"
+            not in response.text
+        )
+    finally:
+        app.dependency_overrides.clear()
+
 
 
 def test_substation_task_post_links_parent_and_returns_to_origin_tab():

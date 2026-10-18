@@ -116,6 +116,48 @@ async def test_inspection_task_repository(db_session, system_user_id) -> None:
     assert saved_history.id == history.id
     assert saved_history.task_id if hasattr(saved_history, "task_id") else True
 
+
+    # list_reviewed_task_ids()
+    reviewer_id = manager.id
+    another_task = InspectionTask(
+        id=uuid4(),
+        substation_id=substation.id,
+        created_by=manager.id,
+        status=TaskStatus.UNDER_REVIEW,
+        deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
+    )
+    db_session.add(another_task)
+    await db_session.flush()
+
+    db_session.add_all([
+        InspectionHistory(
+            id=uuid4(),
+            inspection_task_id=task.id,
+            event_type="review_approved",
+            old_status=TaskStatus.UNDER_REVIEW,
+            new_status=TaskStatus.CLOSED,
+            actor_id=reviewer_id,
+            created_at=datetime.now(UTC),
+        ),
+        InspectionHistory(
+            id=uuid4(),
+            inspection_task_id=another_task.id,
+            event_type="review_rejected",
+            old_status=TaskStatus.UNDER_REVIEW,
+            new_status=TaskStatus.IN_PROGRESS,
+            actor_id=manager.id,
+            created_at=datetime.now(UTC),
+        ),
+    ])
+    await db_session.flush()
+
+    reviewed_ids = await repository.list_reviewed_task_ids(manager.id)
+
+    assert reviewed_ids == {task.id, another_task.id}
+    assert await repository.list_reviewed_task_ids(system_user_id) == set()
+
+
     # create_inspection()
     inspection = Inspection(
         id=uuid4(),

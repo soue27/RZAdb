@@ -98,3 +98,19 @@ class InspectionTaskRepository:
         await self.session.refresh(inspection)
         return inspection
 
+    async def list_reviewed_task_ids(
+            self,
+            actor_id: UUID,
+    ) -> set[UUID]:
+        result = await self.session.scalars(
+            select(InspectionHistory.inspection_task_id)
+            .where(
+                InspectionHistory.actor_id == actor_id,
+                InspectionHistory.event_type.in_(
+                    {"review_approved", "review_rejected"}
+                ),
+            )
+            .distinct()
+        )
+        return set(result.all())
+

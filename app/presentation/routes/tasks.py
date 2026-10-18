@@ -536,9 +536,16 @@ async def get_tasks(
     ],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ):
-
     work_items = await work_item_service.list_for_user(current_user.id)
     inspection_tasks = []
+
+    reviewed_inspection_ids = set()
+    if current_user.role is UserRole.SUPERADMIN:
+        reviewed_inspection_ids = (
+            await inspection_repository.list_reviewed_task_ids(
+                current_user.id,
+            )
+        )
 
     for task in await inspection_repository.list_active():
         if not await access_service.can_access_substation(
@@ -551,6 +558,14 @@ async def get_tasks(
             and task.assigned_to != current_user.id
         ):
             continue
+
+        if current_user.role is UserRole.SUPERADMIN:
+            is_author = task.created_by == current_user.id
+            is_assignee = task.assigned_to == current_user.id
+            is_reviewer = task.id in reviewed_inspection_ids
+
+            if not (is_author or is_assignee or is_reviewer):
+                continue
 
         inspection_tasks.append(task)
 

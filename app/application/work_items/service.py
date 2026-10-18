@@ -48,6 +48,7 @@ _ACTION_LABELS = {
     "return": "Вернуть на доработку",
     "new_version": "Создать новую версию",
     "new_record": "Новое изменение",
+    "delete": "Удалить",
 }
 
 
@@ -126,6 +127,9 @@ class TaskWorkItemSource:
             return []
 
         items = []
+        reviewed_task_ids = set()
+        if user.role is UserRole.SUPERADMIN:
+            reviewed_task_ids = await self.repository.list_reviewed_task_ids(user_id)
         for task in await self.repository.list_active():
             has_access = (
                 await self.access_service.can_access_urza(user_id, task.urza_id)
@@ -136,12 +140,22 @@ class TaskWorkItemSource:
             )
             if not has_access:
                 continue
-            if user.role is UserRole.ENGINEER and task.assigned_to != user_id:
-                continue
+
             actions = await self.task_service.get_available_actions(
                 task=task,
                 actor_id=user_id,
             )
+
+            if user.role is UserRole.ENGINEER and task.assigned_to != user_id:
+                continue
+
+            if user.role is UserRole.SUPERADMIN:
+                is_author = task.created_by == user_id
+                is_assignee = task.assigned_to == user_id
+                is_reviewer = task.id in reviewed_task_ids
+
+                if not (is_author or is_assignee or is_reviewer):
+                    continue
             item_type = task.work_type.label
             title = task.description or f"Задание: {item_type}"
             items.append(
@@ -191,6 +205,7 @@ class ProgramWorkItemSource:
                     title=f"Программа № {program.program_number}",
                     status=program.status.label,
                     status_class=program.status.badge_class,
+                    tab=_document_tab(program.status),
                     created_at=program.created_at,
                     author=program.creator.full_name if program.creator else "—",
                     assignee="—",
@@ -243,6 +258,7 @@ class OTDWorkItemSource:
                     title=f"ОТД · версия {version.version_number}",
                     status=status,
                     status_class=status_class,
+                    tab=_document_tab(version.status),
                     created_at=version.created_at,
                     author=(
                         version.created_by_user.full_name
@@ -304,6 +320,7 @@ class SettingsWorkItemSource:
                     title=record.parameter_name,
                     status=status,
                     status_class=status_class,
+                    tab=_document_tab(record.status),
                     created_at=record.created_at,
                     author=record.creator.full_name if record.creator else "—",
                     assignee="—",
@@ -362,6 +379,7 @@ class SchemaWorkItemSource:
                     status=status,
                     status_class=status_class,
                     created_at=record.created_at,
+                    tab=_document_tab(record.status),
                     author=record.creator.full_name if record.creator else "—",
                     assignee="—",
                     parent=form.urza.dispatch_name,
@@ -412,6 +430,7 @@ class InstructionWorkItemSource:
                     title=f"Инструкция, версия {version.version_number}",
                     status=version.status.label,
                     status_class=version.status.badge_class,
+                    tab=_document_tab(version.status),
                     created_at=version.created_at,
                     author=version.creator.full_name if version.creator else "—",
                     assignee="—",
@@ -456,6 +475,7 @@ class RZAInstructionWorkItemSource:
                     title=f"Инструкция РЗА ПС · версия {version.version_number}",
                     status=version.status.label,
                     status_class=version.status.badge_class,
+                    tab=_document_tab(version.status),
                     created_at=version.created_at,
                     author=version.creator.full_name if version.creator else "—",
                     assignee="—",
@@ -500,6 +520,7 @@ class SelectivitySchemeWorkItemSource:
                     title=f"{version.number} · {version.name}",
                     status=version.status.label,
                     status_class=version.status.badge_class,
+                    tab=_document_tab(version.status),
                     created_at=version.created_at,
                     author=version.creator.full_name if version.creator else "—",
                     assignee="—",
