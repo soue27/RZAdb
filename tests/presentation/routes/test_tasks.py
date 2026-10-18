@@ -12,6 +12,7 @@ from app.application.work_items.service import (
     SchemaWorkItemSource,
     TaskWorkItemSource,
     WorkItemService,
+    WorkItem,
 )
 from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
 from app.presentation.app import app
@@ -101,6 +102,14 @@ class FakeTreeService:
                 substations=[substation],
             )
         ]
+
+
+class FakeSourceForTest:
+    def __init__(self, items):
+        self.items = items
+
+    async def list_for_user(self, user_id, prior_items=()):
+        return self.items
 
 
 class FakeAccessService:
@@ -623,6 +632,71 @@ def test_task_list_uses_unified_work_items_table():
     assert "Отправить на согласование" not in response.text
     assert "text-bg-info" not in response.text
     assert "class=\"btn btn-sm btn-outline-primary\">Открыть</a>" in response.text
+
+
+def test_tasks_list_sorts_work_items_and_inspections_together():
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    older = datetime(2026, 10, 1, tzinfo=UTC)
+    middle = datetime(2026, 10, 2, tzinfo=UTC)
+    newer = datetime(2026, 10, 3, tzinfo=UTC)
+
+    document = WorkItem(
+        item_type="Самостоятельная схема",
+        title="Документ для проверки сортировки",
+        status="Закрыто",
+        status_class="text-bg-success",
+        created_at=middle,
+        author="Автор документа",
+        assignee="—",
+        parent="УРЗА-1",
+        parent_id=uuid7(),
+        url="/objects/urza/example?tab=schemas",
+        actions=(),
+        tab="completed",
+    )
+
+    inspection = SimpleNamespace(
+        id=uuid7(),
+        substation_id=substation_id,
+        substation=SimpleNamespace(dispatch_name="ПС для проверки сортировки"),
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        assigned_to=user.id,
+        created_at=newer,
+        status=TaskStatus.CLOSED,
+    )
+
+    task = _task(user.id, TaskStatus.CLOSED)
+    task.created_at = older
+    task.description = "Задание для проверки сортировки"
+
+    repository = FakeTaskRepository([task])
+    access = FakeAccessService()
+    client = _client(user, repository, access, FakeTaskService())
+
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [
+            FakeSourceForTest([document]),
+            TaskWorkItemSource(repository, access, FakeTaskService()),
+        ]
+    )
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository([inspection])
+    )
+
+    try:
+        response = client.get("/tasks")
+        assert response.status_code == 200
+
+        positions = [
+            response.text.index("ПС для проверки сортировки"),
+            response.text.index("Документ для проверки сортировки"),
+            response.text.index("Задание для проверки сортировки"),
+        ]
+        assert positions == sorted(positions)
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_tasks_list_includes_schema_new_record_action_without_error(system_user_id):

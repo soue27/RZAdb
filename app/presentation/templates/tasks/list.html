@@ -1,19 +1,10 @@
+
 {% extends "base.html" %}
 
 {% block title %}Задания — RZAdb{% endblock %}
 
-{% block body %}
-<div id="object-content" class="h-100">
-<div class="container-fluid px-4 py-4">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h1 class="h4 mb-1">Задания</h1>
-            <p class="text-body-secondary mb-0">Текущая работа по доступным объектам РЗА</p>
-        </div>
-    </div>
-
-
-    {% if work_items or inspection_tasks %}
+{% macro render_items(items) %}
+    {% if items %}
         <div class="table-responsive rzadb-surface-soft rounded-3">
             <table class="table table-hover align-middle mb-0">
                 <thead>
@@ -29,10 +20,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in work_items %}
+                    {% for item in items %}
                         <tr>
                             <td>
-                                <a href="{{ item.url }}" class="fw-medium text-decoration-none">
+                                <a href="{{ item.url }}"
+                                   class="fw-medium text-decoration-none">
                                     {{ item.title }}
                                 </a>
                             </td>
@@ -51,36 +43,97 @@
                             </td>
                         </tr>
                     {% endfor %}
-                    {% for task in inspection_tasks %}
-                        <tr>
-                            <td>
-                                <a href="/objects/substation/inspection-tasks/{{ task.id }}" class="fw-medium text-decoration-none">
-                                    Осмотр ПС · {{ task.substation.dispatch_name }}
-                                </a>
-                            </td>
-                            <td>Задача осмотра</td>
-                            <td>{{ task.substation.dispatch_name }}</td>
-                            <td>{{ task.created_by_user.full_name if task.created_by_user else "—" }}</td>
-                            <td>{{ task.assigned_to_user.full_name if task.assigned_to_user else "Не назначен" }}</td>
-                            <td>{{ task.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
-                            <td>
-                                <span class="badge {{ status_badges[task.status] }}">
-                                    {{ inspection_status_labels[task.status] }}
-                                </span>
-                            </td>
-                            <td>
-                                <a href="/objects/substation/inspection-tasks/{{ task.id }}" class="btn btn-sm btn-outline-primary">Открыть</a>
-                            </td>
-                        </tr>
-                    {% endfor %}
                 </tbody>
             </table>
         </div>
     {% else %}
         <div class="rzadb-surface-soft rounded-3 p-4 text-body-secondary">
-            Нет элементов, требующих внимания.
+            В этой категории пока нет элементов.
         </div>
     {% endif %}
-</div>
+{% endmacro %}
+
+{% block body %}
+<div id="object-content" class="h-100">
+    <div class="container-fluid px-4 py-4">
+        <div class="mb-4">
+            <h1 class="h4 mb-1">Задания</h1>
+            <p class="text-body-secondary mb-0">
+                Текущая работа по доступным объектам РЗА
+            </p>
+        </div>
+
+        {% set work_items = all_items | selectattr("tab", "equalto", "work") | list %}
+        {% set review_items = all_items | selectattr("tab", "equalto", "review") | list %}
+        {% set completed_items = all_items | selectattr("tab", "equalto", "completed") | list %}
+
+        <ul class="nav nav-tabs mb-3" id="tasks-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                        id="work-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#work-pane"
+                        type="button"
+                        role="tab"
+                        aria-controls="work-pane"
+                        aria-selected="true">
+                    В работе
+                    <span class="badge text-bg-secondary ms-1">{{ work_items | length }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="review-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#review-pane"
+                        type="button"
+                        role="tab"
+                        aria-controls="review-pane"
+                        aria-selected="false">
+                    На утверждении
+                    <span class="badge text-bg-secondary ms-1">{{ review_items | length }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="completed-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#completed-pane"
+                        type="button"
+                        role="tab"
+                        aria-controls="completed-pane"
+                        aria-selected="false">
+                    Завершённые
+                    <span class="badge text-bg-secondary ms-1">{{ completed_items | length }}</span>
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="tasks-tab-content">
+            <div class="tab-pane fade show active"
+                 id="work-pane"
+                 role="tabpanel"
+                 aria-labelledby="work-tab"
+                 tabindex="0">
+                {{ render_items(work_items) }}
+            </div>
+
+            <div class="tab-pane fade"
+                 id="review-pane"
+                 role="tabpanel"
+                 aria-labelledby="review-tab"
+                 tabindex="0">
+                {{ render_items(review_items) }}
+            </div>
+
+            <div class="tab-pane fade"
+                 id="completed-pane"
+                 role="tabpanel"
+                 aria-labelledby="completed-tab"
+                 tabindex="0">
+                {{ render_items(completed_items) }}
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

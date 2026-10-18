@@ -536,19 +536,72 @@ async def get_tasks(
     ],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ):
+
     work_items = await work_item_service.list_for_user(current_user.id)
     inspection_tasks = []
+
     for task in await inspection_repository.list_active():
         if not await access_service.can_access_substation(
             current_user.id, task.substation_id
         ):
             continue
+
         if (
             current_user.role is UserRole.ENGINEER
             and task.assigned_to != current_user.id
         ):
             continue
+
         inspection_tasks.append(task)
+
+    all_items = []
+
+    for item in work_items:
+        all_items.append({
+            "tab": item.tab,
+            "title": item.title,
+            "item_type": item.item_type,
+            "parent": item.parent,
+            "author": item.author,
+            "assignee": item.assignee,
+            "created_at": item.created_at,
+            "status": item.status,
+            "status_class": item.status_class,
+            "url": item.url,
+        })
+
+    for task in inspection_tasks:
+        if task.status is TaskStatus.UNDER_REVIEW:
+            tab = "review"
+        elif task.status is TaskStatus.CLOSED:
+            tab = "completed"
+        else:
+            tab = "work"
+
+        all_items.append({
+            "tab": tab,
+            "title": f"Осмотр ПС · {task.substation.dispatch_name}",
+            "item_type": "Задача осмотра",
+            "parent": task.substation.dispatch_name,
+            "author": (
+                task.created_by_user.full_name
+                if task.created_by_user else "—"
+            ),
+            "assignee": (
+                task.assigned_to_user.full_name
+                if task.assigned_to_user else "Не назначен"
+            ),
+            "created_at": task.created_at,
+            "status": INSPECTION_STATUS_LABELS[task.status],
+            "status_class": TASK_STATUS_BADGES[task.status],
+            "url": f"/objects/substation/inspection-tasks/{task.id}",
+        })
+
+    all_items.sort(
+        key=lambda item: item["created_at"],
+        reverse=True,
+    )
+
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -560,8 +613,7 @@ async def get_tasks(
         context={
             "current_user": current_user,
             "tree": tree,
-            "work_items": work_items,
-            "inspection_tasks": inspection_tasks,
+            "all_items": all_items,
             "inspection_status_labels": INSPECTION_STATUS_LABELS,
             "status_badges": TASK_STATUS_BADGES,
         },

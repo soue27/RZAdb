@@ -13,7 +13,7 @@ from app.application.selectivity_schemes.service import SelectivitySchemeService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.urza_instructions.service import URZAInstructionService
-from app.domain.enums import DocumentStatus, UserRole
+from app.domain.enums import DocumentStatus, TaskStatus, UserRole
 
 _TASK_STATUS_LABELS = {
     "created": "Создано",
@@ -61,6 +61,26 @@ def _document_work_item_status(status: DocumentStatus) -> tuple[str, str]:
     return status.label, status.badge_class
 
 
+def _task_tab(status: TaskStatus) -> str:
+    if status is TaskStatus.UNDER_REVIEW:
+        return "review"
+
+    if status is TaskStatus.CLOSED:
+        return "completed"
+
+    return "work"
+
+
+def _document_tab(status: DocumentStatus) -> str:
+    if status is DocumentStatus.UNDER_REVIEW:
+        return "review"
+
+    if status is DocumentStatus.APPROVED:
+        return "completed"
+
+    return "work"
+
+
 @dataclass(frozen=True)
 class WorkItem:
     item_type: str
@@ -74,6 +94,7 @@ class WorkItem:
     parent_id: UUID | None
     url: str
     actions: tuple[str, ...]
+    tab: str = "work"
 
 
 class WorkItemSource(Protocol):
@@ -129,6 +150,7 @@ class TaskWorkItemSource:
                     title=title,
                     status=_TASK_STATUS_LABELS[task.status.value],
                     status_class=_TASK_STATUS_BADGES[task.status.value],
+                    tab=_task_tab(task.status),
                     created_at=task.created_at,
                     author=(
                         task.created_by_user.full_name if task.created_by_user else "—"

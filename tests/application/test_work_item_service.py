@@ -14,7 +14,7 @@ from app.application.work_items.service import (
     SelectivitySchemeWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
-    WorkItemService,
+    WorkItemService, _document_tab, _task_tab,
 )
 from app.domain.enums import (
     DocumentStatus,
@@ -101,6 +101,7 @@ async def test_task_source_keeps_assignment_and_access_filters():
     assert [item.title for item in result] == ["Задание исполнителя"]
     assert result[0].status == "В работе"
     assert result[0].actions == ("Завершить",)
+    assert result[0].tab == "work"
 
 
 @pytest.mark.asyncio
@@ -193,6 +194,7 @@ async def test_closed_maintenance_task_remains_in_work_items():
     assert len(result) == 1
     assert result[0].status == "Закрыто"
     assert result[0].url == f"/tasks/{task.id}"
+    assert result[0].tab == "completed"
 
 
 @pytest.mark.asyncio
@@ -573,3 +575,31 @@ async def test_otd_work_items_show_standalone_versions_and_actions(
     assert items[0].author == "Автор"
     assert items[0].url == f"/objects/urza/{urza_id}?tab=otd"
     assert set(items[0].actions) == expected_actions
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_tab"),
+    [
+        (DocumentStatus.DRAFT, "work"),
+        (DocumentStatus.UNDER_REVIEW, "review"),
+        (DocumentStatus.APPROVED, "completed"),
+    ],
+)
+def test_document_tab_matches_status(status, expected_tab):
+    assert _document_tab(status) == expected_tab
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_tab"),
+    [
+        (TaskStatus.CREATED, "work"),
+        (TaskStatus.ASSIGNED, "work"),
+        (TaskStatus.IN_PROGRESS, "work"),
+        (TaskStatus.COMPLETED, "work"),
+        (TaskStatus.UNDER_REVIEW, "review"),
+        (TaskStatus.CLOSED, "completed"),
+        (TaskStatus.REJECTED, "work"),
+    ],
+)
+def test_task_tab_matches_status(status, expected_tab):
+    assert _task_tab(status) == expected_tab
