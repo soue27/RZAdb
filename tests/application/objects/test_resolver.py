@@ -1,8 +1,12 @@
 import pytest
 from uuid6 import uuid7
 
+from types import SimpleNamespace
+from app.application.enterprises.repository import EnterpriseRepository
+
 from app.application.objects.resolver import ObjectResolver
 from app.domain.connection import Connection
+from app.domain.enterprise import Enterprise
 from app.domain.substation import Substation
 from app.domain.urza import URZA
 
@@ -40,16 +44,31 @@ class FakeURZARepository:
         return None
 
 
+class FakeEnterpriseRepository:
+    def __init__(self, enterprise=None) -> None:
+        self.enterprise = enterprise
+
+    async def get_by_id(self, enterprise_id):
+        if (
+            self.enterprise is not None
+            and self.enterprise.id == enterprise_id
+        ):
+            return self.enterprise
+        return None
+
+
 def make_resolver(
     *,
     substation: Substation | None = None,
     connection: Connection | None = None,
     urza: URZA | None = None,
+    enterprise: Enterprise | None = None,
 ) -> ObjectResolver:
     return ObjectResolver(
         substation_repository=FakeSubstationRepository(substation),
         connection_repository=FakeConnectionRepository(connection),
         urza_repository=FakeURZARepository(urza),
+        enterprise_repository=FakeEnterpriseRepository(enterprise),
     )
 
 

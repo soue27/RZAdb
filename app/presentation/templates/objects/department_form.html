@@ -1,0 +1,54 @@
+
+<div class="object-card">
+    <div class="mb-4">
+        <div class="text-body-secondary small mb-1">
+            Производственное отделение
+        </div>
+        <h2 class="h4 mb-0">Редактирование отделения</h2>
+    </div>
+
+    {% if error_message %}
+    <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+
+    {% set values = form_values or {} %}
+
+    <form method="post"
+          action="/objects/department/{{ department.id }}/edit"
+          hx-post="/objects/department/{{ department.id }}/edit"
+          hx-on::before-swap="if (event.detail.xhr.status === 422) event.detail.shouldSwap = true"
+          hx-target="#object-content"
+          hx-swap="innerHTML">
+
+        <div class="mb-3">
+            <label class="form-label" for="full-name">Полное название</label>
+            <input id="full-name" class="form-control"
+                   name="full_name" maxlength="255" required
+                   value="{{ values.get('full_name', department.full_name) }}">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="short-name">Краткое название</label>
+            <input id="short-name" class="form-control"
+                   name="short_name" maxlength="255" required
+                   value="{{ values.get('short_name', department.short_name) }}">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="sap-code">SAP</label>
+            <input id="sap-code" class="form-control"
+                   name="sap_code" maxlength="64"
+                   value="{{ values.get('sap_code', department.sap_code or '') }}">
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline-secondary"
+                    hx-get="/objects/department/{{ department.id }}"
+                    hx-target="#object-content"
+                    hx-swap="innerHTML">
+                Отмена
+            </button>
+        </div>
+    </form>
+</div>

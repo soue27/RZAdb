@@ -67,3 +67,8 @@ class EnterpriseRepository:
         result = await self.session.scalar(query)
 
         return result is not None
+
+    async def save(self, enterprise: Enterprise) -> Enterprise:
+        self.session.add(enterprise)
+        await self.session.flush()
+        return enterprise

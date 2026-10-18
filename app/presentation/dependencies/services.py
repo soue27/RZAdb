@@ -31,6 +31,7 @@ from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.schema.repository import SchemaRepository
 from app.application.schema.service import SchemaService
+from app.application.enterprises.service import EnterpriseService
 from app.application.selectivity_schemes.repository import (
     SelectivitySchemeRepository,
 )
@@ -139,6 +140,7 @@ def get_object_resolver(
         substation_repository=SubstationRepository(session),
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
+        enterprise_repository=EnterpriseRepository(session),
     )
 
 
@@ -152,6 +154,7 @@ def get_object_service(
             substation_repository=SubstationRepository(session),
             connection_repository=ConnectionRepository(session),
             urza_repository=URZARepository(session),
+            enterprise_repository=EnterpriseRepository(session),
         ),
     )
 
@@ -161,6 +164,14 @@ def get_substation_service(
 ) -> SubstationService:
     return SubstationService(
         repository=SubstationRepository(session),
+    )
+
+
+def get_enterprise_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EnterpriseService:
+    return EnterpriseService(
+        repository=EnterpriseRepository(session),
     )
 
 

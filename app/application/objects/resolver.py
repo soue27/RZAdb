@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from app.application.connections.repository import ConnectionRepository
+from app.application.enterprises.repository import EnterpriseRepository
 from app.application.objects.schemas import SelectedObject
 from app.application.substations.repository import SubstationRepository
 from app.application.urzas.repository import URZARepository
@@ -12,16 +13,34 @@ class ObjectResolver:
         substation_repository: SubstationRepository,
         connection_repository: ConnectionRepository,
         urza_repository: URZARepository,
+        enterprise_repository: EnterpriseRepository,
     ) -> None:
         self.substation_repository = substation_repository
         self.connection_repository = connection_repository
         self.urza_repository = urza_repository
+        self.enterprise_repository = enterprise_repository
 
     async def resolve(
         self,
         object_type: str,
         object_id: UUID,
     ) -> SelectedObject | None:
+        if object_type == "department":
+            enterprise = await self.enterprise_repository.get_by_id(object_id)
+
+            if (
+                enterprise is None
+                or enterprise.deleted_at is not None
+                or enterprise.type.value != "department"
+            ):
+                return None
+
+            return SelectedObject(
+                object_type="department",
+                id=enterprise.id,
+                name=enterprise.full_name,
+            )
+
         if object_type == "substation":
             substation = await self.substation_repository.get_by_id(object_id)
 

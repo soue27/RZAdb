@@ -2,7 +2,12 @@ from uuid import UUID
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.substations.repository import SubstationRepository
-from app.application.substations.schemas import SubstationDetails, SubstationUpdate
+from app.application.substations.schemas import (
+    SubstationCreate,
+    SubstationDetails,
+    SubstationUpdate,
+)
+from app.domain.substation import Substation
 
 
 class SubstationService:
@@ -39,3 +44,18 @@ class SubstationService:
             longitude=substation.longitude,
             operational_current_type=substation.operational_current_type,
         )
+
+    async def create(
+            self,
+            enterprise_id: UUID,
+            actor_id: UUID,
+            data: SubstationCreate,
+    ) -> SubstationDetails:
+        substation = Substation(
+            enterprise_id=enterprise_id,
+            created_by=actor_id,
+            updated_by=actor_id,
+            **data.model_dump(),
+        )
+        await self.repository.save(substation)
+        return await self.get_details(substation.id)

@@ -39,6 +39,11 @@ class ObjectService:
                 user_id=user_id,
                 urza_id=object_id,
             )
+        elif object_type == "department":
+            has_access = await self.access_service.can_access_enterprise(
+                user_id=user_id,
+                enterprise_id=object_id,
+            )
         else:
             raise ObjectNotFoundError
 

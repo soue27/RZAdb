@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from uuid6 import uuid7
 
-from app.application.substations.schemas import SubstationDetails, SubstationUpdate
+from app.application.substations.schemas import SubstationDetails, SubstationUpdate, SubstationCreate
 from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
@@ -81,3 +81,27 @@ def test_substation_update_rejects_invalid_values(field, value) -> None:
     data[field] = value
     with pytest.raises(ValidationError):
         SubstationUpdate(**data)
+
+def test_substation_create_cleans_optional_fields() -> None:
+    result = SubstationCreate(
+        dispatch_name=" ПС Тестовая ",
+        highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        sap_code=" ",
+        asureo_code=" ASU001 ",
+        address=" ",
+    )
+
+    assert result.dispatch_name == "ПС Тестовая"
+    assert result.sap_code is None
+    assert result.asureo_code == "ASU001"
+    assert result.address is None
+
+
+def test_substation_create_rejects_empty_dispatch_name() -> None:
+    with pytest.raises(ValidationError):
+        SubstationCreate(
+            dispatch_name="  ",
+            highest_voltage=HighestVoltage.KV_110,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+        )

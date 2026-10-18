@@ -13,6 +13,7 @@ from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
+from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.objects.schemas import SelectedObject
 from app.application.substations.schemas import SubstationDetails
 from app.domain.enums import (
@@ -42,7 +43,38 @@ from app.presentation.dependencies.services import (
     get_tree_service,
     get_urza_instruction_service,
     get_urza_service,
+    get_enterprise_service
 )
+
+
+class FakeEnterpriseService:
+    def __init__(self):
+        self.updated = None
+
+    async def get_department(self, enterprise_id: UUID) -> EnterpriseDetails:
+        values = self.updated or {
+            "full_name": "Производственное отделение",
+            "short_name": "ПО-1",
+            "sap_code": "SAP-DEP-001",
+        }
+        return EnterpriseDetails(id=enterprise_id, **values)
+
+    async def update_department(self, enterprise_id, data, *, actor_id):
+        self.updated = data.model_dump()
+        return EnterpriseDetails(id=enterprise_id, **self.updated)
+
+
+class FakeDepartmentSubstationService:
+    def __init__(self):
+        self.create_calls = []
+
+    async def create(self, *, enterprise_id, actor_id, data):
+        self.create_calls.append({
+            "enterprise_id": enterprise_id,
+            "actor_id": actor_id,
+            "data": data,
+        })
+        return SimpleNamespace(id=uuid7())
 
 
 class FakeSubstationService:
@@ -604,6 +636,22 @@ def override_object_service(service: FakeObjectService):
 
 def override_substation_service(service: FakeSubstationService):
     def dependency() -> FakeSubstationService:
+        return service
+
+    return dependency
+
+
+def override_enterprise_service(service: FakeEnterpriseService):
+    def dependency():
+        return service
+
+    return dependency
+
+
+def override_department_substation_service(
+    service: FakeDepartmentSubstationService,
+):
+    def dependency():
         return service
 
     return dependency
@@ -3939,5 +3987,167 @@ def test_settings_delete_denies_roles_without_permission(system_user_id, role):
         )
         assert response.status_code == 403
         assert record.deleted_at is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.MANAGER, UserRole.ENGINEER])
+def test_department_edit_post_denied_for_non_superadmin(role):
+    user = make_user(uuid7())
+    user.role = role
+    enterprise_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="department",
+                id=enterprise_id,
+                name="Производственное отделение",
+            )
+        )
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/department/{enterprise_id}/edit",
+            data={
+                "full_name": "Новое название",
+                "short_name": "ПО-1",
+                "sap_code": "SAP-DEP-001",
+            },
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_department_edit_superadmin_updates_and_redirects():
+    user = make_user(uuid7())
+    user.role = UserRole.SUPERADMIN
+    enterprise_id = uuid7()
+    enterprise_service = FakeEnterpriseService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="department",
+                id=enterprise_id,
+                name="Производственное отделение",
+            )
+        )
+    )
+    app.dependency_overrides[get_enterprise_service] = override_enterprise_service(
+        enterprise_service
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/department/{enterprise_id}/edit",
+            data={
+                "full_name": "Новое производственное отделение",
+                "short_name": "ПО-2",
+                "sap_code": "SAP-DEP-002",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 303
+        assert response.headers["location"] == f"/objects/department/{enterprise_id}"
+        assert enterprise_service.updated == {
+            "full_name": "Новое производственное отделение",
+            "short_name": "ПО-2",
+            "sap_code": "SAP-DEP-002",
+        }
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERADMIN],
+)
+def test_department_substation_creation_allowed_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    enterprise_id = uuid7()
+    enterprise_service = FakeEnterpriseService()
+    substation_service = FakeDepartmentSubstationService()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="department",
+                id=enterprise_id,
+                name="Производственное отделение",
+            )
+        )
+    )
+    app.dependency_overrides[get_enterprise_service] = override_enterprise_service(
+        enterprise_service
+    )
+    app.dependency_overrides[get_substation_service] = (
+        override_department_substation_service(substation_service)
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/department/{enterprise_id}/substations",
+            data={
+                "dispatch_name": "ПС Центральная",
+                "highest_voltage": "110",
+                "operational_current_type": "permanent",
+                "sap_code": "SAP-001",
+                "asureo_code": "ASUREO-001",
+                "address": "Екатеринбург",
+                "latitude": "56.8389",
+                "longitude": "60.6057",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 303
+        assert len(substation_service.create_calls) == 1
+
+        call = substation_service.create_calls[0]
+        assert call["enterprise_id"] == enterprise_id
+        assert call["actor_id"] == user.id
+        assert call["data"].dispatch_name == "ПС Центральная"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.SPECIALIST],
+)
+def test_department_substation_creation_denied_for_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    enterprise_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="department",
+                id=enterprise_id,
+                name="Производственное отделение",
+            )
+        )
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/department/{enterprise_id}/substations",
+            data={
+                "dispatch_name": "ПС Центральная",
+                "highest_voltage": "110",
+                "operational_current_type": "permanent",
+            },
+        )
+        assert response.status_code == 403
     finally:
         app.dependency_overrides.clear()

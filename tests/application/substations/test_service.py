@@ -5,8 +5,9 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.substations.service import SubstationService
-from app.application.substations.schemas import SubstationUpdate
+from app.application.substations.schemas import SubstationCreate, SubstationUpdate, SubstationDetails
 from app.domain.enums import HighestVoltage, OperationalCurrentType
+from app.domain.substation import Substation
 
 
 class FakeSubstation:
@@ -21,6 +22,9 @@ class FakeSubstation:
         address,
         latitude,
         longitude,
+        enterprise_id=None,
+        created_by=None,
+        updated_by=None,
     ):
         self.id = substation_id
         self.dispatch_name = dispatch_name
@@ -31,6 +35,9 @@ class FakeSubstation:
         self.address = address
         self.latitude = latitude
         self.longitude = longitude
+        self.enterprise_id = enterprise_id
+        self.created_by = created_by
+        self.updated_by = updated_by
 
 
 class FakeSubstationRepository:
@@ -44,6 +51,8 @@ class FakeSubstationRepository:
         return self.substation
 
     async def save(self, substation):
+        if substation.id is None:
+            substation.id = uuid7()
         self.saved = substation
         return substation
 
@@ -152,3 +161,58 @@ async def test_update_details_raises_for_missing_substation():
         operational_current_type=OperationalCurrentType.PERMANENT)
     with pytest.raises(ObjectNotFoundError):
         await service.update_details(uuid7(), update)
+
+
+@pytest.mark.asyncio
+async def test_create_substation_sets_parent_and_audit_fields():
+    enterprise_id = uuid7()
+    actor_id = uuid7()
+
+    data = SubstationCreate(
+        dispatch_name="ПС Новая",
+        highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        sap_code="SAP001",
+        asureo_code="ASU001",
+        address="г. Пермь",
+        latitude=Decimal("58.010000"),
+        longitude=Decimal("56.250000"),
+    )
+
+    repository = FakeSubstationRepository()
+    service = SubstationService(repository)
+
+    async def get_details(substation_id):
+        entity = repository.saved
+        return SubstationDetails(
+            id=substation_id,
+            dispatch_name=entity.dispatch_name,
+            highest_voltage=entity.highest_voltage,
+            operational_current_type=entity.operational_current_type,
+            sap_code=entity.sap_code,
+            asureo_code=entity.asureo_code,
+            address=entity.address,
+            latitude=entity.latitude,
+            longitude=entity.longitude,
+        )
+
+    service.get_details = get_details
+
+    result = await service.create(
+        enterprise_id=enterprise_id,
+        actor_id=actor_id,
+        data=data,
+    )
+
+    saved = repository.saved
+    assert isinstance(saved, Substation)
+    assert saved.enterprise_id == enterprise_id
+    assert saved.created_by == actor_id
+    assert saved.updated_by == actor_id
+    assert saved.dispatch_name == "ПС Новая"
+    assert saved.highest_voltage == HighestVoltage.KV_110
+    assert saved.operational_current_type == OperationalCurrentType.PERMANENT
+    assert saved.sap_code == "SAP001"
+    assert saved.asureo_code == "ASU001"
+    assert result.id == saved.id
+    assert result.dispatch_name == "ПС Новая"

@@ -30,8 +30,10 @@ from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.application.enterprises.schemas import EnterpriseUpdate
+from app.application.enterprises.service import EnterpriseService
 from app.application.settings.service import SettingsService
-from app.application.substations.schemas import SubstationUpdate
+from app.application.substations.schemas import SubstationCreate, SubstationUpdate
 from app.application.substations.service import SubstationService
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
@@ -63,6 +65,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
     get_urza_service,
+    get_enterprise_service,
 )
 
 router = APIRouter(
@@ -87,6 +90,22 @@ def can_edit_substation(user: User) -> bool:
         UserRole.MANAGER,
         UserRole.SUPERADMIN,
     }
+
+
+def _require_department_edit_role(current_user: User) -> None:
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Редактировать производственное отделение может только супер-администратор.",
+        )
+
+
+def _require_substation_create_role(current_user: User) -> None:
+    if current_user.role not in CONNECTION_CREATE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Создавать подстанции с текущей ролью запрещено.",
+        )
 
 
 @router.get("/{object_type}/{object_id}")
@@ -124,6 +143,10 @@ async def get_object(
         TreeService,
         Depends(get_tree_service),
     ],
+    enterprise_service: Annotated[
+        EnterpriseService,
+        Depends(get_enterprise_service),
+    ],
     otd_version: UUID | None = Query(default=None),
     tab: str | None = Query(default=None),
 ):
@@ -158,6 +181,38 @@ async def get_object(
                     "tree": tree,
                     "page_title": substation.dispatch_name,
                     "content_template": "objects/substation.html",
+                },
+            )
+
+        if object_type == "department":
+            department = await enterprise_service.get_department(object_id)
+            context = {
+                "department": department,
+                "can_edit_department": (
+                    current_user.role == UserRole.SUPERADMIN
+                ),
+                "can_create_substation": (
+                    current_user.role in CONNECTION_CREATE_ROLES
+                ),
+            }
+
+            if request.headers.get("HX-Request") == "true":
+                return templates.TemplateResponse(
+                    request=request,
+                    name="objects/department.html",
+                    context=context,
+                )
+
+            tree = await tree_service.get_tree(user_id=current_user.id)
+            return templates.TemplateResponse(
+                request=request,
+                name="objects/department_page.html",
+                context={
+                    **context,
+                    "current_user": current_user,
+                    "tree": tree,
+                    "page_title": department.full_name,
+                    "content_template": "objects/department.html",
                 },
             )
 
@@ -407,6 +462,50 @@ async def _check_substation_access(object_service, current_user, substation_id):
         raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
     except ObjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+
+
+async def _check_department_access(
+    object_service: ObjectService,
+    current_user: User,
+    enterprise_id: UUID,
+) -> None:
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="department",
+            object_id=enterprise_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+
+
+def _department_form_context(department, **kwargs):
+    return {
+        "department": department,
+        **kwargs,
+    }
+
+
+def _department_substation_form_context(
+    enterprise_id: UUID,
+    department_name: str,
+    **kwargs,
+):
+    return {
+        "enterprise_id": enterprise_id,
+        "department_name": department_name,
+        "highest_voltages": list(HighestVoltage),
+        "current_types": list(OperationalCurrentType),
+        **kwargs,
+    }
 
 
 async def _check_connection_access(
@@ -860,6 +959,239 @@ def _require_substation_edit_role(current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для редактирования.",
         )
+
+
+@router.get("/department/{enterprise_id}/substations/new")
+async def get_new_department_substation_form(
+    request: Request,
+    enterprise_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    await _check_department_access(object_service, current_user, enterprise_id)
+    _require_substation_create_role(current_user)
+
+    department = await enterprise_service.get_department(enterprise_id)
+    context = _department_substation_form_context(
+        enterprise_id=enterprise_id,
+        department_name=department.full_name,
+    )
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/substation_create_form.html",
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/department_page.html",
+        context={
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "page_title": "Добавление подстанции",
+            "content_template": "objects/substation_create_form.html",
+        },
+    )
+
+
+@router.post("/department/{enterprise_id}/substations")
+async def post_new_department_substation(
+    request: Request,
+    enterprise_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
+    substation_service: Annotated[SubstationService, Depends(get_substation_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    dispatch_name: Annotated[str, Form()] = "",
+    highest_voltage: Annotated[str, Form()] = "",
+    operational_current_type: Annotated[str, Form()] = "",
+    sap_code: Annotated[str, Form()] = "",
+    asureo_code: Annotated[str, Form()] = "",
+    address: Annotated[str, Form()] = "",
+    latitude: Annotated[str, Form()] = "",
+    longitude: Annotated[str, Form()] = "",
+):
+    await _check_department_access(object_service, current_user, enterprise_id)
+    _require_substation_create_role(current_user)
+
+    department = await enterprise_service.get_department(enterprise_id)
+
+    values = {
+        "dispatch_name": dispatch_name,
+        "highest_voltage": highest_voltage,
+        "operational_current_type": operational_current_type,
+        "sap_code": sap_code,
+        "asureo_code": asureo_code,
+        "address": address,
+        "latitude": latitude or None,
+        "longitude": longitude or None,
+    }
+
+    context = _department_substation_form_context(
+        enterprise_id=enterprise_id,
+        department_name=department.full_name,
+        form_values=values,
+    )
+
+    try:
+        data = SubstationCreate.model_validate(values)
+    except ValidationError:
+        context["error_message"] = "Проверьте введённые значения."
+
+        if request.headers.get("HX-Request") == "true":
+            return templates.TemplateResponse(
+                request=request,
+                name="objects/substation_create_form.html",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                context=context,
+            )
+
+        tree = await tree_service.get_tree(user_id=current_user.id)
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/department_page.html",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            context={
+                **context,
+                "current_user": current_user,
+                "tree": tree,
+                "page_title": "Добавление подстанции",
+                "content_template": "objects/substation_create_form.html",
+            },
+        )
+
+    substation = await substation_service.create(
+        enterprise_id=enterprise_id,
+        actor_id=current_user.id,
+        data=data,
+    )
+
+    destination = f"/objects/substation/{substation.id}"
+    if request.headers.get("HX-Request") == "true":
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"HX-Redirect": destination},
+        )
+
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/department/{enterprise_id}/edit")
+async def get_department_edit_form(
+    request: Request,
+    enterprise_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    await _check_department_access(object_service, current_user, enterprise_id)
+    _require_department_edit_role(current_user)
+
+    department = await enterprise_service.get_department(enterprise_id)
+    context = _department_form_context(department)
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/department_form.html",
+            context=context,
+        )
+
+    tree = await tree_service.get_tree(user_id=current_user.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="objects/department_page.html",
+        context={
+            **context,
+            "current_user": current_user,
+            "tree": tree,
+            "page_title": "Редактирование отделения",
+            "content_template": "objects/department_form.html",
+        },
+    )
+
+
+@router.post("/department/{enterprise_id}/edit")
+async def post_department_edit_form(
+    request: Request,
+    enterprise_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    full_name: Annotated[str, Form()] = "",
+    short_name: Annotated[str, Form()] = "",
+    sap_code: Annotated[str, Form()] = "",
+):
+    await _check_department_access(object_service, current_user, enterprise_id)
+    _require_department_edit_role(current_user)
+
+    department = await enterprise_service.get_department(enterprise_id)
+    values = {
+        "full_name": full_name,
+        "short_name": short_name,
+        "sap_code": sap_code or None,
+    }
+
+    try:
+        data = EnterpriseUpdate.model_validate(values)
+    except ValidationError:
+        context = _department_form_context(
+            department,
+            form_values=values,
+            error_message="Проверьте введённые значения.",
+        )
+
+        if request.headers.get("HX-Request") == "true":
+            return templates.TemplateResponse(
+                request=request,
+                name="objects/department_form.html",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                context=context,
+            )
+
+        tree = await tree_service.get_tree(user_id=current_user.id)
+        return templates.TemplateResponse(
+            request=request,
+            name="objects/department_page.html",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            context={
+                **context,
+                "current_user": current_user,
+                "tree": tree,
+                "page_title": "Редактирование отделения",
+                "content_template": "objects/department_form.html",
+            },
+        )
+
+    await enterprise_service.update_department(
+        enterprise_id=enterprise_id,
+        data=data,
+        actor_id=current_user.id,
+    )
+
+    destination = f"/objects/department/{enterprise_id}"
+    if request.headers.get("HX-Request") == "true":
+        return Response(
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"HX-Redirect": destination},
+        )
+
+    return RedirectResponse(
+        url=destination,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("/substation/{substation_id}/edit")

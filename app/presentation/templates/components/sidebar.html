@@ -69,18 +69,41 @@
         {% set is_open = selected_urza_id is not none and (enterprise_contains_urza(node, selected_urza_id)|trim == "true") %}
         <div class="tree-node">
 
-            {% if has_children %}
-                <button
-                    type="button"
-                    class="tree-toggle"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#tree-enterprise-{{ node.id }}"
-                    aria-expanded="{{ 'true' if is_open else 'false' }}"
-                >
-                    <span class="material-icons tree-chevron">
-                        chevron_right
-                    </span>
+            <div class="tree-row">
+                {% if has_children %}
+                    <button
+                        type="button"
+                        class="tree-expand-button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#tree-enterprise-{{ node.id }}"
+                        aria-expanded="{{ 'true' if is_open else 'false' }}"
+                        aria-label="Развернуть {{ node.full_name }}"
+                    >
+                        <span class="material-icons tree-chevron">
+                            chevron_right
+                        </span>
+                    </button>
+                {% else %}
+                    <span class="tree-expand-spacer"></span>
+                {% endif %}
 
+                {% if node.type == "department" %}
+                    <button
+                        type="button"
+                        class="tree-item tree-item-select"
+                        data-object-type="department"
+                        data-object-id="{{ node.id }}"
+                        hx-get="/objects/department/{{ node.id }}"
+                        hx-target="#object-content"
+                        hx-swap="innerHTML"
+                    >
+                {% else %}
+                    <button
+                        type="button"
+                        class="tree-item"
+                        {% if not has_children %}disabled{% endif %}
+                    >
+                {% endif %}
                     <span class="material-icons tree-icon">
                         {% if node.type == "holding" %}
                             corporate_fare
@@ -91,11 +114,11 @@
                         {% endif %}
                     </span>
 
-                    <span class="tree-label">
-                        {{ node.full_name }}
-                    </span>
+                    <span class="tree-label">{{ node.full_name }}</span>
                 </button>
+            </div>
 
+            {% if has_children %}
                 <div
                     id="tree-enterprise-{{ node.id }}"
                     class="collapse tree-children{% if is_open %} show{% endif %}"
@@ -108,30 +131,7 @@
                         {{ substation_node(substation) }}
                     {% endfor %}
                 </div>
-
-            {% else %}
-                <button
-                    type="button"
-                    class="tree-item"
-                >
-                    <span class="tree-icon-spacer"></span>
-
-                    <span class="material-icons tree-icon">
-                        {% if node.type == "holding" %}
-                            corporate_fare
-                        {% elif node.type == "branch" %}
-                            apartment
-                        {% else %}
-                            business
-                        {% endif %}
-                    </span>
-
-                    <span class="tree-label">
-                        {{ node.full_name }}
-                    </span>
-                </button>
             {% endif %}
-
         </div>
     {% endmacro %}
 

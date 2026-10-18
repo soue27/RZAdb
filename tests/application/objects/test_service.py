@@ -18,10 +18,12 @@ class FakeAccessService:
         substation_access: bool = False,
         connection_access: bool = False,
         urza_access: bool = False,
+        enterprise_access: bool = False
     ) -> None:
         self.substation_access = substation_access
         self.connection_access = connection_access
         self.urza_access = urza_access
+        self.enterprise_access = enterprise_access
 
     async def can_access_substation(
         self,
@@ -43,6 +45,13 @@ class FakeAccessService:
         urza_id: UUID,
     ) -> bool:
         return self.urza_access
+
+    async def can_access_enterprise(
+            self,
+            user_id: UUID,
+            enterprise_id: UUID,
+    ) -> bool:
+        return self.enterprise_access
 
 
 class FakeObjectResolver:
