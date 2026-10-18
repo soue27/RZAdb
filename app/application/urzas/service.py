@@ -80,3 +80,40 @@ class URZAService:
         await self.repository.add(urza)
 
         return await self.get_details(urza.id)
+
+
+    async def update(
+        self,
+        *,
+        urza_id: UUID,
+        actor_id: UUID,
+        data: URZACreate,
+    ) -> URZADetails:
+        urza = await self.repository.get_by_id(urza_id)
+
+        if urza is None:
+            raise ObjectNotFoundError
+
+        if await self.repository.exists_by_name(
+            urza.connection_id,
+            data.dispatch_name,
+            exclude_id=urza_id,
+        ):
+            raise URZANameConflictError(
+                "УРЗА с таким диспетчерским наименованием уже существует."
+            )
+
+        urza.dispatch_name = data.dispatch_name
+        urza.rdu_subordination = data.rdu_subordination
+        urza.inventory_number = data.inventory_number
+        urza.commissioning_date = data.commissioning_date
+        urza.status = data.status
+        urza.element_base = data.element_base
+        urza.category = data.category
+        urza.room_category = data.room_category
+        urza.complexity = data.complexity
+        urza.updated_by = actor_id
+
+        await self.repository.update(urza)
+
+        return await self.get_details(urza_id)

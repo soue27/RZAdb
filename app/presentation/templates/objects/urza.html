@@ -18,12 +18,17 @@
 
         <div class="d-flex gap-2 flex-shrink-0">
 
+            {% if can_edit_urza %}
             <button
                 type="button"
                 class="btn btn-outline-primary"
+                hx-get="/objects/urza/{{ urza.id }}/edit"
+                hx-target="#object-content"
+                hx-swap="innerHTML"
             >
                 Изменить
             </button>
+            {% endif %}
 
             <button
                 type="button"

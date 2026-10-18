@@ -86,18 +86,25 @@ class URZARepository:
             await self.session.flush()
         return urza
 
+    async def update(self, urza: URZA) -> URZA:
+        await self.session.flush()
+        return urza
+
     async def exists_by_name(
-            self,
-            connection_id: UUID,
-            dispatch_name: str,
+        self,
+        connection_id: UUID,
+        dispatch_name: str,
+        *,
+        exclude_id: UUID | None = None,
     ) -> bool:
-        result = await self.session.scalar(
-            select(URZA.id)
-            .where(
-                URZA.connection_id == connection_id,
-                func.btrim(URZA.dispatch_name) == dispatch_name.strip(),
-                URZA.deleted_at.is_(None),
-            )
-            .limit(1)
+        query = select(URZA.id).where(
+            URZA.connection_id == connection_id,
+            func.btrim(URZA.dispatch_name) == dispatch_name.strip(),
+            URZA.deleted_at.is_(None),
         )
+
+        if exclude_id is not None:
+            query = query.where(URZA.id != exclude_id)
+
+        result = await self.session.scalar(query.limit(1))
         return result is not None

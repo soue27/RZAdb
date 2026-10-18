@@ -6,7 +6,7 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.urzas.schemas import URZACreate, URZADetails
-from app.application.urzas.service import URZAService
+from app.application.urzas.service import URZAService, URZANameConflictError
 from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus
 from app.domain.urza import URZA
 
@@ -146,3 +146,134 @@ async def test_create_urza_sets_fields_and_audit_users(system_user_id) -> None:
 
     repository.add.assert_awaited_once()
     repository.get_by_id.assert_awaited_once_with(urza_id)
+
+
+
+@pytest.mark.asyncio
+async def test_update_urza_updates_fields_and_audit_user(system_user_id) -> None:
+    repository = AsyncMock()
+    service = URZAService(repository)
+
+    urza_id = uuid7()
+    connection = MagicMock()
+    connection.id = uuid7()
+    connection.dispatch_name = "ВЛ 110 кВ"
+
+    substation = MagicMock()
+    substation.id = uuid7()
+    substation.dispatch_name = "ПС Центральная"
+    connection.substation = substation
+
+    urza = URZA(
+        id=urza_id,
+        connection_id=connection.id,
+        dispatch_name="РЗА-1",
+        rdu_subordination=False,
+        inventory_number="OLD-001",
+        commissioning_date=date(2020, 1, 1),
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.II,
+        room_category=RoomCategory.I,
+        complexity=False,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    urza.connection = connection
+    repository.get_by_id.return_value = urza
+    repository.exists_by_name.return_value = False
+
+    data = URZACreate(
+        dispatch_name="РЗА-2",
+        rdu_subordination=True,
+        inventory_number="NEW-002",
+        commissioning_date=date(2026, 1, 1),
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.III,
+        room_category=RoomCategory.II,
+        complexity=True,
+    )
+
+    result = await service.update(
+        urza_id=urza_id,
+        actor_id=system_user_id,
+        data=data,
+    )
+
+    assert urza.dispatch_name == "РЗА-2"
+    assert urza.rdu_subordination is True
+    assert urza.inventory_number == "NEW-002"
+    assert urza.commissioning_date == date(2026, 1, 1)
+    assert urza.category is URZACategory.III
+    assert urza.room_category is RoomCategory.II
+    assert urza.complexity is True
+    assert urza.connection_id == connection.id
+    assert urza.updated_by == system_user_id
+    assert result.dispatch_name == "РЗА-2"
+
+    repository.exists_by_name.assert_awaited_once_with(
+        connection.id,
+        "РЗА-2",
+        exclude_id=urza_id,
+    )
+    repository.update.assert_awaited_once_with(urza)
+
+
+@pytest.mark.asyncio
+async def test_update_urza_raises_on_name_conflict(system_user_id) -> None:
+    repository = AsyncMock()
+    service = URZAService(repository)
+
+    urza = MagicMock()
+    urza.id = uuid7()
+    urza.connection_id = uuid7()
+    repository.get_by_id.return_value = urza
+    repository.exists_by_name.return_value = True
+
+    data = URZACreate(
+        dispatch_name="РЗА-2",
+        rdu_subordination=True,
+        inventory_number=None,
+        commissioning_date=date(2026, 1, 1),
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.II,
+        room_category=RoomCategory.I,
+        complexity=False,
+    )
+
+    with pytest.raises(URZANameConflictError):
+        await service.update(
+            urza_id=urza.id,
+            actor_id=system_user_id,
+            data=data,
+        )
+
+    repository.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_urza_raises_when_not_found(system_user_id) -> None:
+    repository = AsyncMock()
+    repository.get_by_id.return_value = None
+    service = URZAService(repository)
+
+    with pytest.raises(ObjectNotFoundError):
+        await service.update(
+            urza_id=uuid7(),
+            actor_id=system_user_id,
+            data=URZACreate(
+                dispatch_name="РЗА-2",
+                rdu_subordination=True,
+                inventory_number=None,
+                commissioning_date=date(2026, 1, 1),
+                status=URZAStatus.IN_OPERATION,
+                element_base=ElementBase.MICROPROCESSOR,
+                category=URZACategory.II,
+                room_category=RoomCategory.I,
+                complexity=False,
+            ),
+        )
+
+    repository.update.assert_not_awaited()

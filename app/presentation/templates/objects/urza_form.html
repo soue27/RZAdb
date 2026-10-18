@@ -1,11 +1,12 @@
 
-<div class="object-card">
-    <div class="mb-4">
-        <div class="text-body-secondary small mb-1">
-            Добавление устройства
-        </div>
-        <h2 class="h4 mb-0">Новое УРЗА</h2>
+<div class="mb-4">
+    <div class="text-body-secondary small mb-1">
+        {{ 'Редактирование устройства' if is_edit else 'Добавление устройства' }}
     </div>
+    <h2 class="h4 mb-0">
+        {{ 'Редактирование УРЗА' if is_edit else 'Новое УРЗА' }}
+    </h2>
+</div>
 
     {% if error_message %}
     <div class="alert alert-danger" role="alert">
@@ -15,8 +16,8 @@
 
     <form
         method="post"
-        action="/objects/connection/{{ connection_id }}/urzas"
-        hx-post="/objects/connection/{{ connection_id }}/urzas"
+        action="{{ '/objects/urza/' ~ urza_id ~ '/edit' if is_edit else '/objects/connection/' ~ connection_id ~ '/urzas' }}"
+        hx-post="{{ '/objects/urza/' ~ urza_id ~ '/edit' if is_edit else '/objects/connection/' ~ connection_id ~ '/urzas' }}"
         hx-target="#object-content"
         hx-swap="innerHTML"
         hx-on::before-swap="
@@ -216,13 +217,13 @@
 
         <div class="d-flex flex-wrap gap-2 mt-4">
             <button type="submit" class="btn btn-primary">
-                Создать УРЗА
+                {{ 'Сохранить изменения' if is_edit else 'Создать УРЗА' }}
             </button>
 
             <a
                 class="btn btn-outline-secondary"
-                href="/objects/connection/{{ connection_id }}"
-                hx-get="/objects/connection/{{ connection_id }}"
+                href="{{ '/objects/urza/' ~ urza_id if is_edit else '/objects/connection/' ~ connection_id }}"
+                hx-get="{{ '/objects/urza/' ~ urza_id if is_edit else '/objects/connection/' ~ connection_id }}"
                 hx-target="#object-content"
                 hx-swap="innerHTML"
             >

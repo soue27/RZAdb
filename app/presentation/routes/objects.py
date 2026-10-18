@@ -19,6 +19,8 @@ from app.application.connections.service import (
     ConnectionNameConflictError,
     ConnectionService,
 )
+from app.application.enterprises.schemas import EnterpriseUpdate
+from app.application.enterprises.service import EnterpriseService
 from app.application.inspections.inspection_service import InspectionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -30,8 +32,6 @@ from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
-from app.application.enterprises.schemas import EnterpriseUpdate
-from app.application.enterprises.service import EnterpriseService
 from app.application.settings.service import SettingsService
 from app.application.substations.schemas import SubstationCreate, SubstationUpdate
 from app.application.substations.service import SubstationService
@@ -55,6 +55,7 @@ from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_enterprise_service,
     get_inspection_service,
     get_object_service,
     get_otd_service,
@@ -65,7 +66,6 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
     get_urza_service,
-    get_enterprise_service,
 )
 
 router = APIRouter(
@@ -309,6 +309,10 @@ async def get_object(
                 "can_issue_task": can_issue_task,
                 "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
                 "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                "can_edit_urza": current_user.role in {
+                    UserRole.SUPERADMIN,
+                    UserRole.ADMIN,
+                    UserRole.MANAGER,},
             }
 
             if request.headers.get("HX-Request") == "true":

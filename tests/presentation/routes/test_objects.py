@@ -9,13 +9,14 @@ from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.connections.service import ConnectionNameConflictError
+from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
-from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.objects.schemas import SelectedObject
 from app.application.substations.schemas import SubstationDetails
+from app.application.urzas.service import URZANameConflictError
 from app.domain.enums import (
     AccessCategory,
     DocumentStatus,
@@ -32,6 +33,7 @@ from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_enterprise_service,
     get_file_service,
     get_inspection_service,
     get_object_service,
@@ -43,7 +45,6 @@ from app.presentation.dependencies.services import (
     get_tree_service,
     get_urza_instruction_service,
     get_urza_service,
-    get_enterprise_service
 )
 
 
@@ -104,12 +105,24 @@ class FakeSubstationService:
         return SubstationDetails(id=substation_id, **self.updated)
 
 
+
 class FakeURZAService:
-    def __init__(self, details):
+    def __init__(self, details, *, error=None):
         self.details = details
+        self.error = error
+        self.update_calls = []
 
     async def get_details(self, urza_id):
+        if self.details is None:
+            raise ObjectNotFoundError
         return self.details
+
+    async def update(self, **kwargs):
+        self.update_calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return self.details
+
 
 class FakeURZACreationService:
     def __init__(self, *, error=None):
@@ -594,6 +607,31 @@ def make_user(system_user_id) -> User:
         created_by=system_user_id,
         updated_by=system_user_id,
     )
+
+
+
+def make_urza_details(urza_id, connection_id):
+    return SimpleNamespace(
+        id=urza_id,
+        dispatch_name="МП РЗА 110 кВ",
+        rdu_subordination=True,
+        inventory_number="INV-001",
+        commissioning_date=date(2025, 1, 15),
+        status=SimpleNamespace(value="in_operation"),
+        element_base=SimpleNamespace(value="microprocessor"),
+        category=SimpleNamespace(value="II"),
+        room_category=SimpleNamespace(value="I"),
+        complexity=False,
+        connection=SimpleNamespace(
+            id=connection_id,
+            dispatch_name="ВЛ 110 кВ",
+        ),
+        substation=SimpleNamespace(
+            id=uuid7(),
+            dispatch_name="ПС Центральная",
+        ),
+    )
+
 
 
 class FakeObjectService:
@@ -1384,6 +1422,243 @@ def test_create_urza_success_redirects_to_urza_card():
         assert data.complexity is False
     finally:
         app.dependency_overrides.clear()
+
+
+
+def test_urza_edit_success_redirects_to_urza_card():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    urza_id = uuid7()
+    connection_id = uuid7()
+    service = FakeURZAService(make_urza_details(urza_id, connection_id))
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="МП РЗА 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: service
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/{urza_id}/edit",
+                headers={"HX-Request": "true"},
+                data={
+                    "dispatch_name": "МП РЗА 110 кВ обновлённое",
+                    "rdu_subordination": "true",
+                    "inventory_number": "INV-002",
+                    "commissioning_date": "2025-01-15",
+                    "status": "in_operation",
+                    "element_base": "microprocessor",
+                    "category": "II",
+                    "room_category": "I",
+                    "complexity": "false",
+                },
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 204
+        assert response.headers["HX-Redirect"] == f"/objects/urza/{urza_id}"
+        assert len(service.update_calls) == 1
+
+        call = service.update_calls[0]
+        assert call["urza_id"] == urza_id
+        assert call["actor_id"] == user.id
+        assert call["data"].dispatch_name == "МП РЗА 110 кВ обновлённое"
+        assert call["data"].inventory_number == "INV-002"
+        assert call["data"].rdu_subordination is True
+        assert call["data"].complexity is False
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_urza_edit_name_conflict_returns_422():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    urza_id = uuid7()
+    connection_id = uuid7()
+    service = FakeURZAService(
+        make_urza_details(urza_id, connection_id),
+        error=URZANameConflictError(
+            "УРЗА с таким диспетчерским наименованием уже существует."
+        ),
+    )
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="МП РЗА 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: service
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/{urza_id}/edit",
+                headers={"HX-Request": "true"},
+                data={
+                    "dispatch_name": "Дублирующее наименование",
+                    "rdu_subordination": "true",
+                    "inventory_number": "",
+                    "commissioning_date": "2025-01-15",
+                    "status": "in_operation",
+                    "element_base": "microprocessor",
+                    "category": "II",
+                    "room_category": "I",
+                    "complexity": "false",
+                },
+            )
+
+        assert response.status_code == 422
+        assert "уже существует" in response.text
+        assert len(service.update_calls) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.SPECIALIST],
+)
+def test_urza_edit_post_denied_for_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    urza_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/{urza_id}/edit",
+                data={
+                    "dispatch_name": "Новое имя",
+                    "rdu_subordination": "true",
+                    "inventory_number": "",
+                    "commissioning_date": "2025-01-15",
+                    "status": "in_operation",
+                    "element_base": "microprocessor",
+                    "category": "II",
+                    "room_category": "I",
+                    "complexity": "false",
+                },
+            )
+
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_urza_edit_invalid_data_returns_422():
+    user = make_user(uuid7())
+    user.role = UserRole.ADMIN
+    urza_id = uuid7()
+    connection_id = uuid7()
+    service = FakeURZAService(make_urza_details(urza_id, connection_id))
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="МП РЗА 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: service
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/{urza_id}/edit",
+                data={
+                    "dispatch_name": "",
+                    "rdu_subordination": "true",
+                    "inventory_number": "",
+                    "commissioning_date": "2025-01-15",
+                    "status": "in_operation",
+                    "element_base": "microprocessor",
+                    "category": "II",
+                    "room_category": "I",
+                    "complexity": "false",
+                },
+            )
+
+        assert response.status_code == 422
+        assert len(service.update_calls) == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERADMIN],
+)
+def test_urza_edit_form_get_allowed_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    urza_id = uuid7()
+    connection_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="urza",
+                id=urza_id,
+                name="МП РЗА 110 кВ",
+            ),
+        )
+    )
+    app.dependency_overrides[get_urza_service] = lambda: FakeURZAService(
+        make_urza_details(urza_id, connection_id)
+    )
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/objects/urza/{urza_id}/edit")
+
+        assert response.status_code == 200
+        assert "Редактирование УРЗА" in response.text
+        assert "МП РЗА 110 кВ" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.SPECIALIST],
+)
+def test_urza_edit_form_get_denied_for_read_only_roles(role):
+    user = make_user(uuid7())
+    user.role = role
+    urza_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/objects/urza/{urza_id}/edit")
+
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
 
 
 @pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.SPECIALIST])
