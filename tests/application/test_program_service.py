@@ -53,6 +53,42 @@ async def test_list_standalone_work_items_includes_only_author_drafts(
     assert result == [own_draft]
 
 
+
+@pytest.mark.asyncio
+async def test_list_standalone_work_items_shows_review_program_to_engineer_without_approve(
+    service,
+    repository,
+    user_repository,
+    access_service,
+):
+    user_id = uuid7()
+    user = SimpleNamespace(
+        id=user_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    program = SimpleNamespace(
+        id=uuid7(),
+        created_by=uuid7(),
+        urza_id=uuid7(),
+        status=DocumentStatus.UNDER_REVIEW,
+    )
+
+    user_repository.get_by_id.return_value = user
+    access_service.can_access_urza.return_value = True
+    repository.list_standalone_work_items = AsyncMock(
+        return_value=[program]
+    )
+    service.get_available_actions = AsyncMock(return_value=set())
+
+    result = await service.list_standalone_work_items(user_id)
+
+    assert result == [program]
+    service.get_available_actions.assert_awaited_once_with(user_id, program)
+
+
+
 @pytest.fixture
 def repository():
     repository = MagicMock()

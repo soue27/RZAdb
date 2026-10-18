@@ -562,8 +562,7 @@ class ProgramService:
             if not await self.access_service.can_access_urza(user_id, program.urza_id):
                 continue
             actions = await self.get_available_actions(user_id, program)
-            if program.status is DocumentStatus.UNDER_REVIEW and "approve" not in actions:
-                continue
+
             if program.status is DocumentStatus.DRAFT and not actions.intersection(
                 {"edit", "submit"}
             ):
