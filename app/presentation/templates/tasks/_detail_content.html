@@ -24,8 +24,10 @@
                 </span>
             </div>
 
-            <a class="btn btn-outline-primary"
-               href="{% if task.urza_id %}/objects/urza/{{ task.urza_id }}{% else %}/objects/substation/{{ task.substation_id }}?tab={% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}{% endif %}">
+            <a
+                class="btn btn-outline-primary"
+                href="{% if task.urza_id %}/objects/urza/{{ task.urza_id }}?tab={% if task.work_type.value == 'otd' %}otd{% elif task.work_type.value == 'settings' %}settings{% elif task.work_type.value == 'schemes' %}schemas{% elif task.work_type.value == 'maintenance' %}maintenance{% elif task.work_type.value == 'program' %}programs{% elif task.work_type.value == 'instruction' %}instruction{% endif %}{% else %}/objects/substation/{{ task.substation_id }}?tab={% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}{% endif %}"
+            >
                 {{ task.urza.dispatch_name if task.urza else task.substation.dispatch_name }}
             </a>
         </div>
