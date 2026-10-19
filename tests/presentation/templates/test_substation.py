@@ -118,7 +118,7 @@ def test_substation_instruction_actions_and_task_button_are_gated():
     assert "Выдать задание" in html
 
 
-def test_substation_details_fragment_does_not_duplicate_tab_container():
+def test_substation_details_fragment_preserves_tab_container():
     template = templates.get_template(
         "objects/substation_details_fragment.html",
     )
@@ -137,5 +137,5 @@ def test_substation_details_fragment_does_not_duplicate_tab_container():
         can_edit=False,
     )
 
-    assert html.count('id="substation-tab-content"') == 0
+    assert html.count('id="substation-tab-content"') == 1
     assert "ПС Центральная" in html
