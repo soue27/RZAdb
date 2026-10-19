@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -36,6 +37,7 @@ from app.presentation.dependencies.services import (
 )
 
 router = APIRouter(prefix="/objects/substation", tags=["inspection tasks"])
+logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="app/presentation/templates")
 
 
@@ -296,27 +298,70 @@ async def complete_inspection_task(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return response
 
-    scan = await _upload(files, current_user, scan_file)
-    editable = await _upload(files, current_user, editable_file)
+
+    uploaded_files = []
+
     try:
+        scan = await _upload(files, current_user, scan_file)
+        if scan is not None:
+            uploaded_files.append(scan)
+
+        editable = await _upload(files, current_user, editable_file)
+        if editable is not None:
+            uploaded_files.append(editable)
+
         await service.complete(
-            task_id, actor_id=current_user.id, inspection_date=inspection_date,
-            remarks=remarks, scan_file_id=scan.id if scan else None,
+            task_id,
+            actor_id=current_user.id,
+            inspection_date=inspection_date,
+            remarks=remarks,
+            scan_file_id=scan.id if scan else None,
             editable_file_id=editable.id if editable else None,
         )
     except ValueError as exc:
-        for uploaded in (scan, editable):
-            if uploaded is not None:
-                await files.archive(file_id=uploaded.id, user_id=current_user.id)
+        for uploaded in uploaded_files:
+            try:
+                await files.archive(
+                    file_id=uploaded.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "завершения осмотра: file_id=%s",
+                    uploaded.id,
+                )
+
         request.state.inspection_error_message = str(exc)
         request.state.inspection_form_values = {
-            "inspection_date": inspection_date.isoformat(), "remarks": remarks
+            "inspection_date": inspection_date.isoformat(),
+            "remarks": remarks,
         }
         response = await inspection_task_detail(
-            request, task_id, current_user, objects, repository, service, tree
+            request,
+            task_id,
+            current_user,
+            objects,
+            repository,
+            service,
+            tree,
         )
         response.status_code = status.HTTP_400_BAD_REQUEST
         return response
+
+
+    except Exception:
+        for uploaded in uploaded_files:
+            try:
+                await files.discard_upload(uploaded)
+            except Exception:
+                logger.exception(
+                    "Не удалось удалить загруженный файл после "
+                    "неожиданной ошибки: file_id=%s",
+                    uploaded.id,
+                )
+        raise
+
     return await _done(request, task.substation_id, task.id)
 
 

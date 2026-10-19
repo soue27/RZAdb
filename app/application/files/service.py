@@ -75,6 +75,10 @@ class FileService:
 
         return file
 
+    async def discard_upload(self, file: File) -> None:
+        """Удаляет объект, загруженный неудачной операцией."""
+        await self.storage.delete(key=file.s3_key)
+
     async def read(self, file: File) -> bytes:
         return await self.storage.download(key=file.s3_key)
 

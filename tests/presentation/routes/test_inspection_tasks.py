@@ -89,6 +89,7 @@ class FakeFileService:
     def __init__(self):
         self.upload_calls = []
         self.archive_calls = []
+        self.discard_calls = []
 
     async def upload(self, **kwargs):
         self.upload_calls.append(kwargs)
@@ -96,6 +97,9 @@ class FakeFileService:
 
     async def archive(self, **kwargs):
         self.archive_calls.append(kwargs)
+
+    async def discard_upload(self, file):
+        self.discard_calls.append(file)
 
 
 def _install(user, substation_id, service, repository=None, file_service=None):
@@ -480,5 +484,96 @@ def test_send_inspection_for_review_returns_400_when_service_rejects_transition(
             task_id,
             actor_id=user.id,
         )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_editable_upload_failure_discards_uploaded_scan():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    files = FakeFileService()
+
+    uploaded_scan = SimpleNamespace(id=uuid7(), s3_key="test/scan.pdf")
+    files.upload = AsyncMock(
+        side_effect=[
+            uploaded_scan,
+            RuntimeError("Ошибка загрузки редактируемого файла"),
+        ]
+    )
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=FakeInspectionRepository(task),
+        file_service=files,
+    )
+
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.post(
+                f"/objects/substation/inspection-tasks/{task_id}/complete",
+                data={
+                    "inspection_date": "2026-10-19",
+                    "remarks": "Осмотр выполнен",
+                },
+                files={
+                    "scan_file": ("scan.pdf", b"scan", "application/pdf"),
+                    "editable_file": (
+                        "report.docx",
+                        b"report",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                },
+            )
+
+        assert response.status_code == 500
+        assert files.discard_calls == [uploaded_scan]
+        assert files.archive_calls == []
+        assert service.calls == ["validate_completion"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_unexpected_completion_error_discards_uploaded_files():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(
+        substation_id,
+        complete_error=RuntimeError("Неожиданная ошибка"),
+    )
+    files = FakeFileService()
+    uploaded_scan = SimpleNamespace(id=uuid7(), s3_key="test/scan.pdf")
+
+    files.upload = AsyncMock(return_value=uploaded_scan)
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=FakeInspectionRepository(task),
+        file_service=files,
+    )
+
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.post(
+                f"/objects/substation/inspection-tasks/{task_id}/complete",
+                data={
+                    "inspection_date": "2026-10-19",
+                    "remarks": "Осмотр выполнен",
+                },
+                files={
+                    "scan_file": ("scan.pdf", b"scan", "application/pdf"),
+                },
+            )
+
+        assert response.status_code == 500
+        assert files.discard_calls == [uploaded_scan]
+        assert files.archive_calls == []
+        assert service.calls == ["validate_completion"]
     finally:
         app.dependency_overrides.clear()
