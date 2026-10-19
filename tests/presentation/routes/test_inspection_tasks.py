@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
@@ -244,5 +245,114 @@ def test_completion_failure_preserves_values_and_archives_uploaded_files():
         assert "Состояние уже изменилось" in response.text
         assert "Введённые замечания" in response.text
         assert len(files.archive_calls) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN],
+)
+def test_non_manager_cannot_open_inspection_task_form(role):
+    user = SimpleNamespace(id=uuid7(), role=role)
+    substation_id = uuid7()
+    service = FakeInspectionTaskService(substation_id)
+    _install(user, substation_id, service)
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/inspection-tasks/new"
+        )
+
+        assert response.status_code == 403
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN],
+)
+def test_non_manager_cannot_create_inspection_task(role):
+    user = SimpleNamespace(id=uuid7(), role=role)
+    substation_id = uuid7()
+    service = FakeInspectionTaskService(substation_id)
+    _install(user, substation_id, service)
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/inspection-tasks",
+            data={},
+        )
+
+        assert response.status_code == 403
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_user_without_substation_access_cannot_open_inspection_task():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    repository = FakeInspectionRepository(task)
+
+    # Разрешённая подстанция отличается от подстанции задания.
+    _install(
+        user,
+        uuid7(),
+        service,
+        repository=repository,
+    )
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/inspection-tasks/{task_id}"
+        )
+
+        assert response.status_code == 403
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_user_without_substation_access_cannot_complete_inspection_task():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    repository = FakeInspectionRepository(task)
+    files = FakeFileService()
+
+    # Пользователь не имеет доступа к подстанции задания.
+    _install(
+        user,
+        uuid7(),
+        service,
+        repository=repository,
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/complete",
+            data={
+                "inspection_date": "2026-10-15",
+                "remarks": "Проверено",
+            },
+            files={
+                "scan_file": (
+                    "scan.pdf",
+                    b"test file",
+                    "application/pdf",
+                )
+            },
+        )
+
+        assert response.status_code == 403
+        assert service.calls == []
+        assert files.upload_calls == []
     finally:
         app.dependency_overrides.clear()
