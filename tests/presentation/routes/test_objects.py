@@ -100,7 +100,7 @@ class FakeSubstationService:
             operational_current_type=OperationalCurrentType.PERMANENT,
         )
 
-    async def update_details(self, substation_id, data):
+    async def update_details(self, substation_id, actor_id, data):
         self.updated = data.model_dump()
         return SubstationDetails(id=substation_id, **self.updated)
 

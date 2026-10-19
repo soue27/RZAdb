@@ -140,11 +140,12 @@ async def test_get_details_maps_substation_model():
 
 @pytest.mark.asyncio
 async def test_update_details_updates_existing_substation():
+    actor_id = uuid7()
     entity = FakeSubstation(uuid7(), "старое", HighestVoltage.KV_110,
         OperationalCurrentType.PERMANENT, None, None, None, None, None)
     repository = FakeSubstationRepository(entity)
     service = SubstationService(repository)
-    result = await service.update_details(entity.id, SubstationUpdate(
+    result = await service.update_details(entity.id, actor_id, SubstationUpdate(
         dispatch_name="новое", highest_voltage=HighestVoltage.KV_220,
         operational_current_type=OperationalCurrentType.RECTIFIED,
         sap_code=None, asureo_code=None, address=None, latitude=None, longitude=None,
@@ -152,15 +153,21 @@ async def test_update_details_updates_existing_substation():
     assert repository.saved is entity
     assert result.dispatch_name == "новое"
     assert result.highest_voltage == HighestVoltage.KV_220
+    assert repository.saved.updated_by == actor_id
 
 
 @pytest.mark.asyncio
 async def test_update_details_raises_for_missing_substation():
+    actor_id = uuid7()
     service = SubstationService(FakeSubstationRepository(None))
-    update = SubstationUpdate(dispatch_name="ПС", highest_voltage=HighestVoltage.KV_110,
-        operational_current_type=OperationalCurrentType.PERMANENT)
+    update = SubstationUpdate(
+        dispatch_name="ПС",
+        highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+    )
+
     with pytest.raises(ObjectNotFoundError):
-        await service.update_details(uuid7(), update)
+        await service.update_details(uuid7(), actor_id, update)
 
 
 @pytest.mark.asyncio

@@ -1260,7 +1260,11 @@ async def post_substation_edit_form(
             ),
         )
 
-    substation = await substation_service.update_details(substation_id, update)
+    substation = await substation_service.update_details(
+        substation_id,
+        current_user.id,
+        update,
+    )
     if request.headers.get("HX-Request") != "true":
         return RedirectResponse(
             url=f"/objects/substation/{substation_id}",
