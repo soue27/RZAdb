@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -354,5 +355,130 @@ def test_user_without_substation_access_cannot_complete_inspection_task():
         assert response.status_code == 403
         assert service.calls == []
         assert files.upload_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_non_manager_cannot_assign_inspection_task():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7()),
+    )
+    service = FakeInspectionTaskService(substation_id)
+    repository = FakeInspectionRepository(task)
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=repository,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/assign",
+            data={"assignee_id": str(uuid7())},
+        )
+
+        assert response.status_code == 403
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_accept_inspection_task_returns_400_when_service_rejects_transition():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    service.accept = AsyncMock(
+        side_effect=ValueError("Принять задачу может только назначенный исполнитель.")
+    )
+    repository = FakeInspectionRepository(task)
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=repository,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/accept"
+        )
+
+        assert response.status_code == 400
+        assert "назначенный исполнитель" in response.text
+        service.accept.assert_awaited_once_with(
+            task_id,
+            actor_id=user.id,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_non_manager_cannot_review_inspection_task():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    service.review = AsyncMock()
+    repository = FakeInspectionRepository(task)
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=repository,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/review",
+            data={"approve": "true", "reason": ""},
+        )
+
+        assert response.status_code == 403
+        service.review.assert_not_awaited()
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_send_inspection_for_review_returns_400_when_service_rejects_transition():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    service = FakeInspectionTaskService(substation_id)
+    service.send_to_review = AsyncMock(
+        side_effect=ValueError("Недопустимый переход")
+    )
+    repository = FakeInspectionRepository(task)
+
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=repository,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/send-to-review"
+        )
+
+        assert response.status_code == 400
+        assert "Недопустимый переход" in response.text
+        service.send_to_review.assert_awaited_once_with(
+            task_id,
+            actor_id=user.id,
+        )
     finally:
         app.dependency_overrides.clear()

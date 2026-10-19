@@ -223,6 +223,11 @@ async def assign_inspection_task(
     assignee_id: Annotated[UUID, Form()],
 ):
     task = await _accessible_task(objects, repository, current_user, task_id)
+    if current_user.role is not UserRole.MANAGER:
+        raise HTTPException(
+            status_code=403,
+            detail="Назначать исполнителя может только MANAGER.",
+        )
     substation = task.substation
     assignees = await service.user_repository.get_active_inspection_assignees_by_enterprise(substation.enterprise_id)
     if assignee_id not in {user.id for user in assignees}:
@@ -341,6 +346,11 @@ async def review_inspection(
     approve: Annotated[bool, Form()], reason: Annotated[str, Form()] = "",
 ):
     task = await _accessible_task(objects, repository, current_user, task_id)
+    if current_user.role is not UserRole.MANAGER:
+        raise HTTPException(
+            status_code=403,
+            detail="Проверять результат осмотра может только MANAGER.",
+        )
     try:
         await service.review(task_id, actor_id=current_user.id, approve=approve, reason=reason or None)
     except ValueError as exc:
