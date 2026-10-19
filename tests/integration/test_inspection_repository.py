@@ -233,7 +233,16 @@ async def test_inspection_repository_get_by_substation_id(
         updated_by=system_user_id,
     )
 
-    db_session.add_all([first_task, second_task])
+    archived_task = InspectionTask(
+        id=uuid4(),
+        substation_id=substation.id,
+        created_by=manager.id,
+        status=TaskStatus.COMPLETED,
+        deadline_at=datetime.now(UTC),
+        updated_by=system_user_id,
+    )
+
+    db_session.add_all([first_task, second_task, archived_task])
     await db_session.flush()
 
     scan_file = File(
@@ -288,8 +297,19 @@ async def test_inspection_repository_get_by_substation_id(
         created_by=manager.id,
         updated_by=system_user_id,
     )
-
-    db_session.add_all([first_inspection, second_inspection])
+    archived_inspection = Inspection(
+        id=uuid4(),
+        substation_id=substation.id,
+        inspection_task_id=archived_task.id,
+        inspection_date=datetime(2026, 7, 1, tzinfo=UTC).date(),
+        remarks="Архивный осмотр.",
+        created_by=manager.id,
+        updated_by=system_user_id,
+        deleted_at=datetime.now(UTC),
+    )
+    db_session.add_all(
+        [first_inspection, second_inspection, archived_inspection]
+    )
     await db_session.flush()
 
     repository = InspectionRepository(db_session)
@@ -299,6 +319,7 @@ async def test_inspection_repository_get_by_substation_id(
     )
 
     assert len(inspections) == 2
+    assert all(item.id != archived_inspection.id for item in inspections)
     assert inspections[0].id == second_inspection.id
     assert inspections[1].id == first_inspection.id
     assert inspections[0].inspection_date.isoformat() == "2026-09-01"

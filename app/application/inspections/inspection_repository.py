@@ -30,7 +30,10 @@ class InspectionRepository:
                 selectinload(Inspection.scan_file),
                 selectinload(Inspection.editable_file),
             )
-            .where(Inspection.substation_id == substation_id)
+            .where(
+                Inspection.substation_id == substation_id,
+                Inspection.deleted_at.is_(None),
+            )
             .order_by(Inspection.inspection_date.desc())
         )
 
