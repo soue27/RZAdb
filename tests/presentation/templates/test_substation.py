@@ -116,3 +116,26 @@ def test_substation_instruction_actions_and_task_button_are_gated():
     context["can_issue_task"] = True
     html = template.render(**context)
     assert "Выдать задание" in html
+
+
+def test_substation_details_fragment_does_not_duplicate_tab_container():
+    template = templates.get_template(
+        "objects/substation_details_fragment.html",
+    )
+    html = template.render(
+        substation=SimpleNamespace(
+            id=uuid7(),
+            dispatch_name="ПС Центральная",
+            highest_voltage=HighestVoltage.KV_110,
+            operational_current_type=OperationalCurrentType.PERMANENT,
+            sap_code=None,
+            asureo_code=None,
+            address=None,
+            latitude=None,
+            longitude=None,
+        ),
+        can_edit=False,
+    )
+
+    assert html.count('id="substation-tab-content"') == 0
+    assert "ПС Центральная" in html
