@@ -163,6 +163,7 @@ async def get_object(
                 "substation": substation,
                 "can_edit": can_edit_substation(current_user),
                 "can_create_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                "selected_substation_id": object_id,
             }
             if request.headers.get("HX-Request") == "true":
                 return templates.TemplateResponse(

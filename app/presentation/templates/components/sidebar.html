@@ -61,12 +61,35 @@
         {%- endfor -%}
     {%- endmacro %}
 
+    {% macro enterprise_contains_substation(node, selected_substation_id) -%}
+        {%- for substation in node.substations -%}
+            {%- if substation.id|string == selected_substation_id|string -%}
+                {{- "true" -}}
+            {%- endif -%}
+        {%- endfor -%}
+        {%- for child in node.children -%}
+            {%- if enterprise_contains_substation(child, selected_substation_id)|trim == "true" -%}
+                {{- "true" -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endmacro %}
+
+    {% macro substation_contains_selected(substation, selected_substation_id) -%}
+        {%- if selected_substation_id is not none and substation.id|string == selected_substation_id|string -%}
+            {{- "true" -}}
+        {%- endif -%}
+    {%- endmacro %}
+
+
     <!-- Tree -->
 
     {% macro enterprise_node(node) %}
         {% set selected_urza_id = urza.id if urza is defined and urza else none %}
+        {% set selected_substation_id = selected_substation_id if selected_substation_id is defined else none %}
         {% set has_children = node.children or node.substations %}
-        {% set is_open = selected_urza_id is not none and (enterprise_contains_urza(node, selected_urza_id)|trim == "true") %}
+        {% set contains_selected_urza = selected_urza_id is not none and (enterprise_contains_urza(node, selected_urza_id)|trim == "true") %}
+        {% set contains_selected_substation = selected_substation_id is not none and (enterprise_contains_substation(node, selected_substation_id)|trim == "true") %}
+        {% set is_open = contains_selected_urza or contains_selected_substation %}
         <div class="tree-node">
 
             <div class="tree-row">
@@ -162,7 +185,7 @@
 
                 <button
                     type="button"
-                    class="tree-item tree-item-select"
+                    class="tree-item tree-item-select{% if selected_substation_id is defined and selected_substation_id is not none and selected_substation_id|string == substation.id|string %} active{% endif %}"
                     data-object-type="substation"
                     data-object-id="{{ substation.id }}"
                     hx-get="/objects/substation/{{ substation.id }}"
