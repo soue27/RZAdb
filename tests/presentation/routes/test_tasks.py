@@ -108,6 +108,36 @@ class FakeTreeService:
         ]
 
 
+
+class FakeEmptyTreeService:
+    async def get_tree(self, *, user_id):
+        return []
+
+
+def _work_item(
+    *,
+    title: str,
+    tab: str = "review",
+    can_approve: bool = False,
+) -> WorkItem:
+    return WorkItem(
+        item_type="Тестовый документ",
+        title=title,
+        status="На согласовании",
+        status_class="text-bg-warning",
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        author="Автор",
+        assignee="Исполнитель",
+        parent="ПС-Тест",
+        parent_id=uuid7(),
+        url=f"/test-items/{title}",
+        actions=("approve", "return") if can_approve else (),
+        tab=tab,
+        can_approve=can_approve,
+    )
+
+
+
 class FakeSourceForTest:
     def __init__(self, items):
         self.items = items
@@ -1020,3 +1050,207 @@ def test_htmx_task_action_returns_updated_task_fragment(system_user_id):
     assert "Закрыто" in response.text
     assert "История задания" in response.text
     assert "<!doctype html>" not in response.text.lower()
+
+
+from html.parser import HTMLParser
+
+
+class _PaneTextParser(HTMLParser):
+    _VOID_TAGS = {
+        "area", "base", "br", "col", "embed", "hr", "img",
+        "input", "link", "meta", "param", "source", "track", "wbr",
+    }
+
+    def __init__(self, pane_id: str) -> None:
+        super().__init__()
+        self.pane_id = pane_id
+        self.depth = 0
+        self.parts: list[str] = []
+        self.finished = False
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if self.finished:
+            return
+
+        if self.depth == 0:
+            if dict(attrs).get("id") == self.pane_id:
+                self.depth = 1
+            return
+
+        if tag not in self._VOID_TAGS:
+            self.depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.finished or self.depth == 0 or tag in self._VOID_TAGS:
+            return
+
+        self.depth -= 1
+        if self.depth == 0:
+            self.finished = True
+
+    def handle_data(self, data: str) -> None:
+        if self.depth > 0:
+            self.parts.append(data)
+
+
+def _pane_text(html: str, pane_id: str) -> str:
+    parser = _PaneTextParser(pane_id)
+    parser.feed(html)
+    return "".join(parser.parts)
+
+
+def test_manager_sees_approval_tab_when_queue_is_empty(system_user_id):
+    """MANAGER видит вкладку согласования даже при пустой очереди."""
+    user = _user(system_user_id, UserRole.MANAGER)
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([])]
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        assert response.status_code == 200
+        assert 'id="approval-tab"' in response.text
+        assert 'id="approval-pane"' in response.text
+        assert "Согласовать" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_engineer_does_not_see_approval_tab(system_user_id):
+    """ENGINEER не видит вкладку согласования."""
+    user = _user(system_user_id, UserRole.ENGINEER)
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([])]
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        assert response.status_code == 200
+        assert 'id="approval-tab"' not in response.text
+        assert 'id="approval-pane"' not in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_manager_without_accessible_tree_does_not_see_approval_tab(
+    system_user_id,
+):
+    """MANAGER без доступного дерева не видит вкладку согласования."""
+    user = _user(system_user_id, UserRole.MANAGER)
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_tree_service] = lambda: FakeEmptyTreeService()
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([])]
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        assert response.status_code == 200
+        assert 'id="approval-tab"' not in response.text
+        assert 'id="approval-pane"' not in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_approval_tab_contains_only_items_with_approval_actions(
+    system_user_id,
+):
+    """Вкладка согласования содержит только элементы с соответствующими правами."""
+    user = _user(system_user_id, UserRole.MANAGER)
+    approvable = _work_item(
+        title="Документ-доступен-для-согласования",
+        can_approve=True,
+    )
+    not_approvable = _work_item(
+        title="Документ-без-действий-согласования",
+        can_approve=False,
+    )
+
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([approvable, not_approvable])]
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        review_text = _pane_text(response.text, "review-pane")
+        approval_text = _pane_text(response.text, "approval-pane")
+
+        assert approvable.title in review_text
+        assert not_approvable.title in review_text
+
+        assert approvable.title in approval_text
+        assert not_approvable.title not in approval_text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_under_review_item_remains_in_review_tab_without_approval_rights(
+    system_user_id,
+):
+    """
+    UNDER_REVIEW означает ожидание решения, а не право пользователя
+    самостоятельно принять это решение.
+    """
+    user = _user(system_user_id, UserRole.MANAGER)
+    item = _work_item(
+        title="Ожидает-решения-другого-сотрудника",
+        tab="review",
+        can_approve=False,
+    )
+
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([item])]
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        review_text = _pane_text(response.text, "review-pane")
+        approval_text = _pane_text(response.text, "approval-pane")
+
+        assert item.title in review_text
+        assert item.title not in approval_text
+
+        # Руководитель с доступным деревом видит вкладку,
+        # даже если в очереди нет доступных ему действий.
+        assert 'id="approval-tab"' in response.text
+        assert 'id="approval-pane"' in response.text
+    finally:
+        app.dependency_overrides.clear()

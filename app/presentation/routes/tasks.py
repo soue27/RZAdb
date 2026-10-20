@@ -583,6 +583,7 @@ async def get_tasks(
             "status": item.status,
             "status_class": item.status_class,
             "url": item.url,
+            "can_approve": item.can_approve,
         })
 
     for task in inspection_tasks:
@@ -631,6 +632,10 @@ async def get_tasks(
             "all_items": all_items,
             "inspection_status_labels": INSPECTION_STATUS_LABELS,
             "status_badges": TASK_STATUS_BADGES,
+            "can_approve_items": (
+                    current_user.role is UserRole.MANAGER
+                    and bool(tree)
+            ),
         },
     )
 

@@ -67,7 +67,7 @@
         {% set review_items = all_items | selectattr("tab", "equalto", "review") | list %}
         {% set completed_items = all_items | selectattr("tab", "equalto", "completed") | list %}
         {% set approval_items = all_items | selectattr("can_approve") | list %}
-        {% set show_approval_tab = approval_items | length > 0 %}
+        {% set show_approval_tab = can_approve_items %}
 
         <ul class="nav nav-tabs mb-3" id="tasks-tabs" role="tablist">
             <li class="nav-item" role="presentation">
