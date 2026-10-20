@@ -49,6 +49,21 @@
         {% include "components/sidebar.html" %}
 
         <main class="app-content flex-grow-1">
+            <div
+                id="htmx-error-message"
+                class="alert alert-danger alert-dismissible fade show d-none"
+                role="alert"
+                aria-live="assertive"
+            >
+                <span id="htmx-error-text"></span>
+                <button
+                    type="button"
+                    class="btn-close"
+                    aria-label="Закрыть"
+                    onclick="document.getElementById('htmx-error-message').classList.add('d-none')"
+                ></button>
+            </div>
+
             {% block body %}{% endblock %}
         </main>
 
