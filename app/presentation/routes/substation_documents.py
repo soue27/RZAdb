@@ -1,33 +1,46 @@
+import logging
 from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
-from app.application.objects.exceptions import ObjectAccessDeniedError, ObjectNotFoundError
+from app.application.objects.exceptions import (
+    ObjectAccessDeniedError,
+    ObjectNotFoundError,
+)
 from app.application.objects.service import ObjectService
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import SelectivitySchemeService
-from app.application.tree.service import TreeService
 from app.application.tasks.repository import TaskRepository
-from app.domain.enums import TaskStatus, TaskWorkType
+from app.application.tree.service import TreeService
+from app.domain.enums import TaskStatus, TaskWorkType, UserRole
 from app.domain.user import User
-from app.domain.enums import UserRole
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
     get_rza_instruction_service,
     get_selectivity_scheme_service,
-    get_tree_service,
     get_task_repository,
+    get_tree_service,
 )
 
 router = APIRouter(prefix="/objects/substation", tags=["substation documents"])
 templates = Jinja2Templates(directory="app/presentation/templates")
+logger = logging.getLogger(__name__)
 
 
 async def _check_access(objects: ObjectService, user: User, substation_id: UUID) -> None:
@@ -206,14 +219,17 @@ async def _create_document(
             task_id=task_id,
         )
 
+
     uploaded = []
     try:
         scan = await _upload(file_service, current_user, scan_file)
-        uploaded.append(scan.id)
+        uploaded.append(scan)
+
         editable = None
         if editable_file and editable_file.filename:
             editable = await _upload(file_service, current_user, editable_file)
-            uploaded.append(editable.id)
+            uploaded.append(editable)
+
         if kind == "instruction":
             if new_version:
                 instruction = await instruction_service.get_by_substation(
@@ -221,9 +237,12 @@ async def _create_document(
                 )
                 if instruction is None:
                     raise ValueError("Инструкция РЗА не найдена.")
+
                 await instruction_service.create_version(
-                    user_id=current_user.id, instruction_id=instruction.id,
-                    effective_date=parsed_date, scan_file_id=scan.id,
+                    user_id=current_user.id,
+                    instruction_id=instruction.id,
+                    effective_date=parsed_date,
+                    scan_file_id=scan.id,
                     editable_file_id=editable.id if editable else None,
                     change_description=change_description,
                     change_justification=change_justification,
@@ -231,51 +250,90 @@ async def _create_document(
                 )
             else:
                 await instruction_service.create(
-                    user_id=current_user.id, substation_id=substation_id,
-                    effective_date=parsed_date, scan_file_id=scan.id,
+                    user_id=current_user.id,
+                    substation_id=substation_id,
+                    effective_date=parsed_date,
+                    scan_file_id=scan.id,
                     editable_file_id=editable.id if editable else None,
                     change_description=change_description,
                     change_justification=change_justification,
                     task_id=task_id,
                 )
         elif new_version:
-            scheme = await scheme_service.get_by_substation(current_user.id, substation_id)
+            scheme = await scheme_service.get_by_substation(
+                current_user.id, substation_id
+            )
             if scheme is None:
                 raise ValueError("Схема селективности не найдена.")
+
             await scheme_service.create_version(
-                user_id=current_user.id, scheme_id=scheme.id,
-                number=number or "", name=name or "", effective_date=parsed_date,
-                scan_file_id=scan.id, editable_file_id=editable.id if editable else None,
+                user_id=current_user.id,
+                scheme_id=scheme.id,
+                number=number or "",
+                name=name or "",
+                effective_date=parsed_date,
+                scan_file_id=scan.id,
+                editable_file_id=editable.id if editable else None,
                 change_description=change_description,
                 change_justification=change_justification,
                 task_id=task_id,
             )
         else:
             await scheme_service.create(
-                user_id=current_user.id, substation_id=substation_id,
-                number=number or "", name=name or "", effective_date=parsed_date,
-                scan_file_id=scan.id, editable_file_id=editable.id if editable else None,
+                user_id=current_user.id,
+                substation_id=substation_id,
+                number=number or "",
+                name=name or "",
+                effective_date=parsed_date,
+                scan_file_id=scan.id,
+                editable_file_id=editable.id if editable else None,
                 change_description=change_description,
                 change_justification=change_justification,
                 task_id=task_id,
             )
+
     except (ValueError, PermissionError) as exc:
-        for file_id in uploaded:
-            await file_service.archive(file_id=file_id, user_id=current_user.id)
+        for uploaded_file in uploaded:
+            await file_service.archive(
+                file_id=uploaded_file.id,
+                user_id=current_user.id,
+            )
+
         return await _render_form(
-            request, substation_id=substation_id, kind=kind,
-            current_user=current_user, tree_service=tree, new_version=new_version,
-            values=values, error=str(exc),
+            request,
+            substation_id=substation_id,
+            kind=kind,
+            current_user=current_user,
+            tree_service=tree,
+            new_version=new_version,
+            values=values,
+            error=str(exc),
             task_id=task_id,
         )
 
+    except Exception:
+        for uploaded_file in uploaded:
+            try:
+                await file_service.discard_upload(uploaded_file)
+            except Exception:
+                logger.exception(
+                    "Не удалось очистить файл после ошибки создания документа: "
+                    "file_id=%s",
+                    uploaded_file.id,
+                )
+        raise
+
+
     destination = (
         f"/tasks/{task_id}" if task_id is not None else
-        f"/objects/substation/{substation_id}?tab={'instructions' if kind == 'instruction' else 'selectivity-schemes'}"
+        f"/objects/substation/{substation_id}?tab="
+        f"{'instructions' if kind == 'instruction' else 'selectivity-schemes'}"
     )
     if request.headers.get("HX-Request") == "true":
         return Response(status_code=204, headers={"HX-Redirect": destination})
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
 
 
 @router.post("/{substation_id}/instructions")

@@ -25,18 +25,27 @@ class _Objects:
 
 
 class _Files:
+    def __init__(self):
+        self.discarded = []
+        self.archived = []
+
     async def upload(self, **kwargs):
-        return SimpleNamespace(id=uuid7())
+        return SimpleNamespace(id=uuid7(), s3_key="test.pdf")
 
     async def archive(self, **kwargs):
-        return None
+        self.archived.append(kwargs)
 
+    async def discard_upload(self, file):
+        self.discarded.append(file)
 
 class _SchemeService:
-    def __init__(self):
+    def __init__(self, error=None):
         self.create_kwargs = None
+        self.error = error
 
     async def create(self, **kwargs):
+        if self.error is not None:
+            raise self.error
         self.create_kwargs = kwargs
         return SimpleNamespace(id=uuid7())
 
@@ -110,6 +119,47 @@ def test_selectivity_scheme_form_post_saves_values_and_returns_to_tab(is_htmx):
         app.dependency_overrides.clear()
 
 
+
+def test_selectivity_scheme_htmx_validation_error_returns_form_fragment():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_object_service] = lambda: _Objects()
+    app.dependency_overrides[get_file_service] = lambda: _Files()
+    app.dependency_overrides[get_selectivity_scheme_service] = (
+        lambda: _SchemeService()
+    )
+    app.dependency_overrides[get_rza_instruction_service] = (
+        lambda: SimpleNamespace()
+    )
+    app.dependency_overrides[get_task_repository] = (
+        lambda: SimpleNamespace()
+    )
+    app.dependency_overrides[get_tree_service] = lambda: _Tree()
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/selectivity-schemes",
+            headers={"HX-Request": "true"},
+            data={
+                "effective_date": "",
+                "number": "С-110-1",
+                "name": "Схема ПС",
+                "new_version": "false",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 200
+        assert "Укажите дату вступления." in response.text
+        assert 'id="substation-tab-content"' not in response.text
+        assert 'name="effective_date"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+
 def test_substation_instruction_tab_renders_version_details_without_dto_attribute_error():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id = uuid7()
@@ -132,5 +182,40 @@ def test_substation_instruction_tab_renders_version_details_without_dto_attribut
         assert "Версия 2" in response.text
         assert "Уточнена схема" in response.text
         assert service.actions_version is version
+    finally:
+        app.dependency_overrides.clear()
+
+
+
+def test_selectivity_scheme_unexpected_error_discards_uploaded_file():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id = uuid7()
+    files = _Files()
+    service = _SchemeService(error=RuntimeError("database failure"))
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_object_service] = lambda: _Objects()
+    app.dependency_overrides[get_file_service] = lambda: files
+    app.dependency_overrides[get_selectivity_scheme_service] = lambda: service
+    app.dependency_overrides[get_rza_instruction_service] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_task_repository] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_tree_service] = lambda: _Tree()
+
+    try:
+        with pytest.raises(RuntimeError, match="database failure"):
+            TestClient(app).post(
+                f"/objects/substation/{substation_id}/selectivity-schemes",
+                headers={"HX-Request": "true"},
+                data={
+                    "effective_date": "2026-10-17",
+                    "number": "С-110-1",
+                    "name": "Схема ПС",
+                    "new_version": "false",
+                },
+                files={"scan_file": ("scan.pdf", b"pdf", "application/pdf")},
+            )
+
+        assert len(files.discarded) == 1
+        assert files.archived == []
     finally:
         app.dependency_overrides.clear()

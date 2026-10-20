@@ -720,6 +720,7 @@ def test_substation_edit_is_role_protected_and_returns_htmx_details():
             )
             assert saved.status_code == 200
             assert "Обновлённая" in saved.text
+            assert saved.text.count('id="substation-tab-content"') == 1
             assert "hx-get=\"/objects/substation/" in saved.text
             assert substation_service.updated["sap_code"] is None
     finally:
