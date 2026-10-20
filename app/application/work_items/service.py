@@ -66,7 +66,7 @@ def _task_tab(status: TaskStatus) -> str:
     if status is TaskStatus.UNDER_REVIEW:
         return "review"
 
-    if status is TaskStatus.CLOSED:
+    if status in {TaskStatus.CLOSED, TaskStatus.REJECTED}:
         return "completed"
 
     return "work"
@@ -96,6 +96,7 @@ class WorkItem:
     url: str
     actions: tuple[str, ...]
     tab: str = "work"
+    can_approve: bool = False
 
 
 class WorkItemSource(Protocol):
@@ -165,6 +166,9 @@ class TaskWorkItemSource:
                     status=_TASK_STATUS_LABELS[task.status.value],
                     status_class=_TASK_STATUS_BADGES[task.status.value],
                     tab=_task_tab(task.status),
+                    can_approve=bool(
+                        actions.intersection({"close_task", "return_for_revision"})
+                    ),
                     created_at=task.created_at,
                     author=(
                         task.created_by_user.full_name if task.created_by_user else "—"

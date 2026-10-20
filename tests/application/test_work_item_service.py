@@ -669,7 +669,7 @@ def test_document_tab_matches_status(status, expected_tab):
         (TaskStatus.COMPLETED, "work"),
         (TaskStatus.UNDER_REVIEW, "review"),
         (TaskStatus.CLOSED, "completed"),
-        (TaskStatus.REJECTED, "work"),
+        (TaskStatus.REJECTED, "completed"),
     ],
 )
 def test_task_tab_matches_status(status, expected_tab):
