@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.rza_instructions.service import RZAInstructionService
 from app.domain.enums import UserRole
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
@@ -48,6 +49,22 @@ class _SchemeService:
             raise self.error
         self.create_kwargs = kwargs
         return SimpleNamespace(id=uuid7())
+
+
+class _TransitionService:
+    def __init__(self, error=None):
+        self.error = error
+        self.calls = []
+
+    async def submit_for_review(self, *args):
+        self.calls.append(("submit", args))
+        if self.error:
+            raise self.error
+
+    async def review(self, *args, **kwargs):
+        self.calls.append(("review", args, kwargs))
+        if self.error:
+            raise self.error
 
 
 class _Tree:
@@ -217,5 +234,133 @@ def test_selectivity_scheme_unexpected_error_discards_uploaded_file():
 
         assert len(files.discarded) == 1
         assert files.archived == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_scheme_transition_htmx_redirects_to_tab():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id = uuid7()
+    version_id = uuid7()
+    service = _TransitionService()
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_selectivity_scheme_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/selectivity-schemes/"
+            f"versions/{version_id}/submit",
+            headers={"HX-Request": "true"},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 204
+        assert response.headers["HX-Redirect"] == (
+            f"/objects/substation/{substation_id}?tab=selectivity-schemes"
+        )
+        assert service.calls == [("submit", (user.id, substation_id, version_id))]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_scheme_transition_returns_403_on_permission_error():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    version_id = uuid7()
+    service = _TransitionService(
+        error=PermissionError("Согласование запрещено.")
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_selectivity_scheme_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/selectivity-schemes/"
+            f"versions/{version_id}/approve",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Согласование запрещено."
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_scheme_transition_returns_404_for_unknown_action():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id = uuid7()
+    version_id = uuid7()
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_selectivity_scheme_service] = (
+        lambda: _TransitionService()
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/selectivity-schemes/"
+            f"versions/{version_id}/unknown",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Действие не найдено."
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_instruction_transition_htmx_redirects_to_tab():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id = uuid7()
+    version_id = uuid7()
+    service = object.__new__(RZAInstructionService)
+    transition = _TransitionService()
+    service.submit_for_review = transition.submit_for_review
+    service.review = transition.review
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_rza_instruction_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/instructions/"
+            f"versions/{version_id}/submit",
+            headers={"HX-Request": "true"},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 204
+        assert response.headers["HX-Redirect"] == (
+            f"/objects/substation/{substation_id}?tab=instructions"
+        )
+        assert transition.calls == [
+            ("submit", (user.id, substation_id, version_id))
+        ]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_substation_instruction_transition_returns_403_on_permission_error():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    version_id = uuid7()
+    service = _TransitionService(
+        error=PermissionError("Согласование запрещено.")
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_rza_instruction_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/instructions/"
+            f"versions/{version_id}/approve",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Согласование запрещено."
     finally:
         app.dependency_overrides.clear()
