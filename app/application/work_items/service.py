@@ -217,6 +217,10 @@ class ProgramWorkItemSource:
                     parent_id=program.urza_id,
                     url=f"/objects/urza/{program.urza_id}?tab=programs",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            program.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -274,6 +278,10 @@ class OTDWorkItemSource:
                     parent_id=otd.urza_id,
                     url=f"/objects/urza/{otd.urza_id}?tab=otd",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            version.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -332,6 +340,10 @@ class SettingsWorkItemSource:
                     parent_id=form.urza_id,
                     url=f"/objects/urza/{form.urza_id}?tab=settings",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            record.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -390,6 +402,10 @@ class SchemaWorkItemSource:
                     parent_id=form.urza_id,
                     url=f"/objects/urza/{form.urza_id}?tab=schemas",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            record.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -442,6 +458,10 @@ class InstructionWorkItemSource:
                     parent_id=instruction.urza_id,
                     url=f"/objects/urza/{instruction.urza_id}?tab=instruction",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            version.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -487,6 +507,10 @@ class RZAInstructionWorkItemSource:
                     parent_id=substation.id,
                     url=f"/objects/substation/{substation.id}?tab=instructions",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            version.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
@@ -532,6 +556,10 @@ class SelectivitySchemeWorkItemSource:
                     parent_id=substation.id,
                     url=f"/objects/substation/{substation.id}?tab=selectivity-schemes",
                     actions=_action_labels(actions),
+                    can_approve=(
+                            version.status is DocumentStatus.UNDER_REVIEW
+                            and bool(actions.intersection({"approve", "return"}))
+                    ),
                 )
             )
         return items
