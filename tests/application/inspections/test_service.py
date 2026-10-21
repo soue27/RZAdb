@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+from types import SimpleNamespace
 
 import pytest
 from uuid6 import uuid7
@@ -1118,3 +1119,178 @@ async def test_manager_cannot_review_own_inspection(system_user_id) -> None:
     )
 
     assert result.status == TaskStatus.CLOSED
+
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_true_for_manager_from_same_department(
+    service_dependencies,
+    system_user_id,
+):
+    service, repository, user_repository, substation_repository = (
+        service_dependencies
+    )
+
+    department_id = uuid4()
+    substation_id = uuid4()
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    manager.enterprise_id = department_id
+
+    task = SimpleNamespace(
+        id=uuid4(),
+        status=TaskStatus.UNDER_REVIEW,
+        assigned_to=uuid4(),
+        substation_id=substation_id,
+    )
+    substation = SimpleNamespace(
+        id=substation_id,
+        enterprise_id=department_id,
+    )
+
+    repository.tasks[task.id] = task
+    user_repository.users[manager.id] = manager
+    substation_repository.substations[substation_id] = substation
+
+    assert await service.can_review(
+        task.id,
+        actor_id=manager.id,
+    ) is True
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_false_for_own_inspection(
+    service_dependencies,
+    system_user_id,
+):
+    service, repository, user_repository, substation_repository = (
+        service_dependencies
+    )
+
+    department_id = uuid4()
+    substation_id = uuid4()
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    manager.enterprise_id = department_id
+
+    task = SimpleNamespace(
+        id=uuid4(),
+        status=TaskStatus.UNDER_REVIEW,
+        assigned_to=manager.id,
+        substation_id=substation_id,
+    )
+
+    repository.tasks[task.id] = task
+    user_repository.users[manager.id] = manager
+    substation_repository.substations[substation_id] = SimpleNamespace(
+        id=substation_id,
+        enterprise_id=department_id,
+    )
+
+    assert await service.can_review(
+        task.id,
+        actor_id=manager.id,
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_false_for_another_department(
+    service_dependencies,
+    system_user_id,
+):
+    service, repository, user_repository, substation_repository = (
+        service_dependencies
+    )
+
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    manager.enterprise_id = uuid4()
+    substation_id = uuid4()
+
+    task = SimpleNamespace(
+        id=uuid4(),
+        status=TaskStatus.UNDER_REVIEW,
+        assigned_to=uuid4(),
+        substation_id=substation_id,
+    )
+
+    repository.tasks[task.id] = task
+    user_repository.users[manager.id] = manager
+    substation_repository.substations[substation_id] = SimpleNamespace(
+        id=substation_id,
+        enterprise_id=uuid4(),
+    )
+
+    assert await service.can_review(
+        task.id,
+        actor_id=manager.id,
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_false_for_non_manager(
+    service_dependencies,
+    system_user_id,
+):
+    service, repository, user_repository, substation_repository = (
+        service_dependencies
+    )
+
+    engineer = make_user(UserRole.ENGINEER, system_user_id)
+    substation_id = uuid4()
+    task = SimpleNamespace(
+        id=uuid4(),
+        status=TaskStatus.UNDER_REVIEW,
+        assigned_to=uuid4(),
+        substation_id=substation_id,
+    )
+
+    repository.tasks[task.id] = task
+    user_repository.users[engineer.id] = engineer
+    substation_repository.substations[substation_id] = SimpleNamespace(
+        id=substation_id,
+        enterprise_id=engineer.enterprise_id,
+    )
+
+    assert await service.can_review(
+        task.id,
+        actor_id=engineer.id,
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_false_when_task_is_not_under_review(
+    service_dependencies,
+    system_user_id,
+):
+    service, repository, user_repository, substation_repository = (
+        service_dependencies
+    )
+
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    task = SimpleNamespace(
+        id=uuid4(),
+        status=TaskStatus.IN_PROGRESS,
+        assigned_to=uuid4(),
+        substation_id=uuid4(),
+    )
+
+    repository.tasks[task.id] = task
+    user_repository.users[manager.id] = manager
+
+    assert await service.can_review(
+        task.id,
+        actor_id=manager.id,
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_can_review_returns_false_when_task_does_not_exist(
+    service_dependencies,
+    system_user_id,
+):
+    service, _, user_repository, _ = service_dependencies
+    manager = make_user(UserRole.MANAGER, system_user_id)
+    user_repository.users[manager.id] = manager
+
+    assert await service.can_review(
+        uuid4(),
+        actor_id=manager.id,
+    ) is False

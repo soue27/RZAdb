@@ -420,7 +420,7 @@ async def test_approved_standalone_records_remain_in_work_items(
         (DocumentStatus.DRAFT, False, {"edit", "submit"}, 0),
         (DocumentStatus.UNDER_REVIEW, True, set(), 1),
         (DocumentStatus.UNDER_REVIEW, False, {"approve", "return"}, 1),
-        (DocumentStatus.UNDER_REVIEW, False, set(), 0),
+        (DocumentStatus.UNDER_REVIEW, False, set(), 1),
     ],
 )
 @pytest.mark.asyncio
@@ -463,10 +463,18 @@ async def test_work_item_visibility_during_review_uses_author_and_reviewer_right
     result = await source_type(Service()).list_for_user(user_id)
 
     assert len(result) == expected_count
+
     if status is DocumentStatus.UNDER_REVIEW and expected_count:
         assert result[0].status == "На согласовании"
-        if not is_author:
-            assert result[0].actions == ("Утвердить", "Вернуть на доработку")
+
+        if not is_author and actions.intersection({"approve", "return"}):
+            assert result[0].actions == (
+                "Утвердить",
+                "Вернуть на доработку",
+            )
+
+        if not actions.intersection({"approve", "return"}):
+            assert result[0].can_approve is False
 
 
 @pytest.mark.parametrize(

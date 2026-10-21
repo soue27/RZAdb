@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectAccessDeniedError
+from app.application.inspections.service import InspectionTaskService
 from app.application.work_items.service import (
     SchemaWorkItemSource,
     TaskWorkItemSource,
@@ -24,7 +25,7 @@ from app.presentation.dependencies.services import (
     get_task_repository,
     get_task_service,
     get_tree_service,
-    get_work_item_service,
+    get_work_item_service, get_inspection_task_service,
 )
 
 
@@ -82,6 +83,14 @@ class FakeInspectionTaskRepository:
 
     async def list_reviewed_task_ids(self, actor_id):
         return self.reviewed_task_ids
+
+
+class FakeInspectionTaskService:
+    def __init__(self, reviewable_task_ids=()):
+        self.reviewable_task_ids = set(reviewable_task_ids)
+
+    async def can_review(self, task_id, *, actor_id):
+        return task_id in self.reviewable_task_ids
 
 
 class FakeTreeService:
@@ -282,6 +291,9 @@ def _client(user, repository, access_service, task_service):
     )
     app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
         [TaskWorkItemSource(repository, access_service, task_service)]
+    )
+    app.dependency_overrides[get_inspection_task_service] = (
+        lambda: FakeInspectionTaskService()
     )
     return TestClient(app)
 
@@ -1101,6 +1113,64 @@ def _pane_text(html: str, pane_id: str) -> str:
     parser = _PaneTextParser(pane_id)
     parser.feed(html)
     return "".join(parser.parts)
+
+
+
+def test_reviewable_inspection_appears_in_both_review_tabs(system_user_id):
+    user = _user(system_user_id, UserRole.MANAGER)
+    substation_id = uuid7()
+
+    reviewable = SimpleNamespace(
+        id=uuid7(),
+        substation_id=substation_id,
+        substation=SimpleNamespace(dispatch_name="ПС-доступный-осмотр"),
+        created_by=uuid7(),
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        assigned_to=uuid7(),
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        status=TaskStatus.UNDER_REVIEW,
+    )
+
+    not_reviewable = SimpleNamespace(
+        id=uuid7(),
+        substation_id=substation_id,
+        substation=SimpleNamespace(dispatch_name="ПС-чужой-осмотр"),
+        created_by=uuid7(),
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        assigned_to=user.id,
+        assigned_to_user=SimpleNamespace(full_name="Менеджер"),
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        status=TaskStatus.UNDER_REVIEW,
+    )
+
+    repository = FakeTaskRepository([])
+    access = FakeAccessService()
+    client = _client(user, repository, access, FakeTaskService())
+
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository([reviewable, not_reviewable])
+    )
+    app.dependency_overrides[get_inspection_task_service] = lambda: (
+        FakeInspectionTaskService({reviewable.id})
+    )
+
+    try:
+        response = client.get("/tasks")
+
+        assert response.status_code == 200
+
+        review_text = _pane_text(response.text, "review-pane")
+        approval_text = _pane_text(response.text, "approval-pane")
+
+        assert "ПС-доступный-осмотр" in review_text
+        assert "ПС-доступный-осмотр" in approval_text
+
+        assert "ПС-чужой-осмотр" in review_text
+        assert "ПС-чужой-осмотр" not in approval_text
+    finally:
+        app.dependency_overrides.clear()
+
 
 
 def test_manager_sees_approval_tab_when_queue_is_empty(system_user_id):

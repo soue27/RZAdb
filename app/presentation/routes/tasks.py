@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.application.access.service import AccessService
 from app.application.inspections.repository import InspectionTaskRepository
+from app.application.inspections.service import InspectionTaskService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
@@ -27,6 +28,7 @@ from app.presentation.auth.dependencies import (
 from app.presentation.dependencies.services import (
     get_access_service,
     get_inspection_task_repository,
+    get_inspection_task_service,
     get_task_repository,
     get_task_service,
     get_tree_service,
@@ -533,6 +535,10 @@ async def get_tasks(
     inspection_repository: Annotated[
         InspectionTaskRepository,
         Depends(get_inspection_task_repository),
+        ],
+    inspection_service: Annotated[
+        InspectionTaskService,
+        Depends(get_inspection_task_service),
     ],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ):
@@ -594,6 +600,13 @@ async def get_tasks(
         else:
             tab = "work"
 
+        can_approve = (
+            await inspection_service.can_review(
+                task.id,
+                actor_id=current_user.id,
+            )
+        )
+
         all_items.append({
             "tab": tab,
             "title": f"Осмотр ПС · {task.substation.dispatch_name}",
@@ -611,6 +624,7 @@ async def get_tasks(
             "status": INSPECTION_STATUS_LABELS[task.status],
             "status_class": TASK_STATUS_BADGES[task.status],
             "url": f"/objects/substation/inspection-tasks/{task.id}",
+            "can_approve": can_approve,
         })
 
     all_items.sort(

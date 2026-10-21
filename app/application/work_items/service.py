@@ -253,12 +253,6 @@ class OTDWorkItemSource:
                 continue
             if version.status is DocumentStatus.DRAFT and "submit" not in actions:
                 continue
-            if (
-                version.status is DocumentStatus.UNDER_REVIEW
-                and version.created_by != user_id
-                and "approve" not in actions
-            ):
-                continue
             status, status_class = _document_work_item_status(version.status)
             items.append(
                 WorkItem(
@@ -315,11 +309,6 @@ class SettingsWorkItemSource:
             actions = await self.service.get_available_actions(user_id, record)
             if record.status is DocumentStatus.DRAFT and record.created_by != user_id:
                 continue
-            if (
-                record.status is DocumentStatus.UNDER_REVIEW
-                and record.created_by != user_id
-                and "approve" not in actions
-            ):
                 continue
             if record.status is DocumentStatus.DRAFT and not actions.intersection(
                 {"edit", "submit"}
@@ -376,12 +365,6 @@ class SchemaWorkItemSource:
                 continue
             actions = await self.service.get_available_actions(user_id, record)
             if record.status is DocumentStatus.DRAFT and record.created_by != user_id:
-                continue
-            if (
-                record.status is DocumentStatus.UNDER_REVIEW
-                and record.created_by != user_id
-                and "approve" not in actions
-            ):
                 continue
             if record.status is DocumentStatus.DRAFT and not actions.intersection(
                 {"edit", "submit"}
@@ -489,10 +472,6 @@ class RZAInstructionWorkItemSource:
                 version.created_by != user_id or "submit" not in actions
             ):
                 continue
-            if version.status is DocumentStatus.UNDER_REVIEW and (
-                version.created_by != user_id and not actions
-            ):
-                continue
             items.append(
                 WorkItem(
                     item_type="Самостоятельная инструкция РЗА ПС",
@@ -536,10 +515,6 @@ class SelectivitySchemeWorkItemSource:
             actions = await self.service.get_available_actions(user_id, version)
             if version.status is DocumentStatus.DRAFT and (
                 version.created_by != user_id or "submit" not in actions
-            ):
-                continue
-            if version.status is DocumentStatus.UNDER_REVIEW and (
-                version.created_by != user_id and not actions
             ):
                 continue
             items.append(

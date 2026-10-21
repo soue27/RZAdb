@@ -362,6 +362,33 @@ class InspectionTaskService:
 
         return task
 
+    async def can_review(
+            self,
+            task_id: UUID,
+            *,
+            actor_id: UUID,
+    ) -> bool:
+        """Проверяет, может ли пользователь согласовать осмотр."""
+
+        task = await self.repository.get_by_id(task_id)
+        if task is None or task.status is not TaskStatus.UNDER_REVIEW:
+            return False
+
+        actor = await self.user_repository.get_by_id(actor_id)
+        if actor is None or actor.role is not UserRole.MANAGER:
+            return False
+
+        if task.assigned_to == actor_id:
+            return False
+
+        substation = await self.substation_repository.get_by_id(
+            task.substation_id,
+        )
+        if substation is None:
+            return False
+
+        return actor.enterprise_id == substation.enterprise_id
+
     async def review(
             self,
             task_id: UUID,
