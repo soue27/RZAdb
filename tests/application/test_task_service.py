@@ -158,6 +158,37 @@ def make_task_service(
     )
 
 
+def configure_available_assignee(
+    service: TaskService,
+    *,
+    urza_id,
+    engineer_id,
+) -> None:
+    """Подготавливает URZA и доступного исполнителя для теста."""
+    enterprise_id = uuid7()
+
+    service.access_service.urza_repository.urzas[urza_id] = (
+        SimpleNamespace(
+            connection=SimpleNamespace(
+                substation=SimpleNamespace(
+                    enterprise_id=enterprise_id,
+                ),
+            ),
+        )
+    )
+
+    service.access_service.user_repository.engineers_by_enterprise[
+        enterprise_id
+    ] = [
+        SimpleNamespace(
+            id=engineer_id,
+            role=UserRole.ENGINEER,
+            active=True,
+            deleted_at=None,
+        ),
+    ]
+
+
 @pytest.fixture
 def repository() -> FakeTaskRepository:
     return FakeTaskRepository()
@@ -582,6 +613,8 @@ async def test_assign_task(
     created_at = datetime(2026, 9, 13, 10, 0)
     assigned_at = datetime(2026, 9, 14, 15, 30)
 
+
+
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
@@ -589,9 +622,17 @@ async def test_assign_task(
         now=created_at,
     )
 
+    assigned_to = uuid4()
+
     original_deadline = task.deadline_at
     assigned_to = uuid4()
-    actor_id = uuid4()
+    actor_id = system_user_id
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=assigned_to,
+    )
 
     await service.assign_task(
         task=task,
@@ -623,7 +664,8 @@ async def test_assign_task(
 
 @pytest.mark.asyncio
 async def test_assign_task_rejects_invalid_status(
-    service: TaskService, system_user_id
+    service: TaskService,
+    system_user_id,
 ) -> None:
     task = await service.create_task(
         urza_id=uuid4(),
@@ -632,10 +674,18 @@ async def test_assign_task_rejects_invalid_status(
         now=datetime(2026, 9, 13, 10, 0),
     )
 
+    assigned_to = uuid4()
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=assigned_to,
+    )
+
     await service.assign_task(
         task=task,
-        assigned_to=uuid4(),
-        actor_id=uuid4(),
+        assigned_to=assigned_to,
+        actor_id=system_user_id,
         assigned_at=datetime(2026, 9, 13, 12, 0),
     )
 
@@ -643,7 +693,7 @@ async def test_assign_task_rejects_invalid_status(
         await service.assign_task(
             task=task,
             assigned_to=uuid4(),
-            actor_id=uuid4(),
+            actor_id=system_user_id,
             assigned_at=datetime(2026, 9, 13, 13, 0),
         )
 
@@ -665,10 +715,16 @@ async def test_accept_task(
         now=created_at,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
         assigned_at=assigned_at,
     )
 
@@ -716,10 +772,16 @@ async def test_accept_task_only_by_assigned_engineer(
         now=datetime(2026, 9, 13, 10, 0),
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
         assigned_at=datetime(2026, 9, 13, 12, 0),
     )
 
@@ -743,10 +805,16 @@ async def test_accept_task_rejects_invalid_status(
         now=datetime(2026, 9, 13, 10, 0),
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
         assigned_at=datetime(2026, 9, 13, 12, 0),
     )
 
@@ -781,10 +849,16 @@ async def test_reject_task(
         now=created_at,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
         assigned_at=assigned_at,
     )
 
@@ -826,10 +900,16 @@ async def test_reject_task_requires_reason(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     with pytest.raises(ValueError, match="Причина обязательна"):
@@ -852,10 +932,16 @@ async def test_reject_task_only_by_assigned_engineer(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     with pytest.raises(ValueError, match="назначенный инженер"):
@@ -876,7 +962,7 @@ async def test_reassign_task(
 
     first_engineer_id = uuid4()
     second_engineer_id = uuid4()
-    manager_id = uuid4()
+    manager_id = system_user_id
 
     task = await service.create_task(
         urza_id=uuid4(),
@@ -884,6 +970,35 @@ async def test_reassign_task(
         created_by=system_user_id,
         now=created_at,
     )
+
+    enterprise_id = uuid7()
+
+    service.access_service.urza_repository.urzas[task.urza_id] = (
+        SimpleNamespace(
+            connection=SimpleNamespace(
+                substation=SimpleNamespace(
+                    enterprise_id=enterprise_id,
+                ),
+            ),
+        )
+    )
+
+    service.access_service.user_repository.engineers_by_enterprise[
+        enterprise_id
+    ] = [
+        SimpleNamespace(
+            id=first_engineer_id,
+            role=UserRole.ENGINEER,
+            active=True,
+            deleted_at=None,
+        ),
+        SimpleNamespace(
+            id=second_engineer_id,
+            role=UserRole.ENGINEER,
+            active=True,
+            deleted_at=None,
+        ),
+    ]
 
     await service.assign_task(
         task=task,
@@ -953,18 +1068,137 @@ async def test_reassign_task_requires_new_assignee(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     with pytest.raises(ValueError, match="отличаться"):
         await service.reassign_task(
             task=task,
             assigned_to=engineer_id,
-            actor_id=uuid4(),
+            actor_id=system_user_id,
         )
+
+
+
+@pytest.mark.asyncio
+async def test_reassign_task_rejects_unavailable_assignee_without_mutation(
+    service: TaskService,
+    repository: FakeTaskRepository,
+    system_user_id,
+) -> None:
+    engineer_id = uuid4()
+    unavailable_engineer_id = uuid4()
+    assigned_at = datetime(2026, 9, 13, 12, 0)
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+        now=datetime(2026, 9, 13, 10, 0),
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=system_user_id,
+        assigned_at=assigned_at,
+    )
+
+    original_assigned_to = task.assigned_to
+    original_assigned_at = task.assigned_at
+    original_acceptance_deadline_at = task.acceptance_deadline_at
+    original_deadline_at = task.deadline_at
+    original_updated_by = task.updated_by
+    original_status = task.status
+    original_history_count = len(repository.history)
+
+    with pytest.raises(ValueError, match="доступным"):
+        await service.reassign_task(
+            task=task,
+            assigned_to=unavailable_engineer_id,
+            actor_id=system_user_id,
+            assigned_at=datetime(2026, 9, 14, 9, 30),
+        )
+
+    assert task.assigned_to == original_assigned_to
+    assert task.assigned_at == original_assigned_at
+    assert task.acceptance_deadline_at == original_acceptance_deadline_at
+    assert task.deadline_at == original_deadline_at
+    assert task.updated_by == original_updated_by
+    assert task.status is original_status
+    assert len(repository.history) == original_history_count
+
+
+
+@pytest.mark.asyncio
+async def test_reassign_task_rejects_unauthorized_actor_without_mutation(
+    service: TaskService,
+    repository: FakeTaskRepository,
+    system_user_id,
+) -> None:
+    engineer_id = uuid4()
+    unauthorized_actor_id = uuid4()
+    assigned_at = datetime(2026, 9, 13, 12, 0)
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+        now=datetime(2026, 9, 13, 10, 0),
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=system_user_id,
+        assigned_at=assigned_at,
+    )
+
+    original_assigned_to = task.assigned_to
+    original_assigned_at = task.assigned_at
+    original_acceptance_deadline_at = task.acceptance_deadline_at
+    original_deadline_at = task.deadline_at
+    original_updated_by = task.updated_by
+    original_status = task.status
+    original_history_count = len(repository.history)
+
+    with pytest.raises(PermissionError):
+        await service.reassign_task(
+            task=task,
+            assigned_to=uuid4(),
+            actor_id=unauthorized_actor_id,
+            assigned_at=datetime(2026, 9, 14, 9, 30),
+        )
+
+    assert task.assigned_to == original_assigned_to
+    assert task.assigned_at == original_assigned_at
+    assert task.acceptance_deadline_at == original_acceptance_deadline_at
+    assert task.deadline_at == original_deadline_at
+    assert task.updated_by == original_updated_by
+    assert task.status is original_status
+    assert len(repository.history) == original_history_count
+
 
 
 @pytest.mark.asyncio
@@ -984,10 +1218,16 @@ async def test_complete_task(
         now=created_at,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
         assigned_at=assigned_at,
     )
 
@@ -1044,10 +1284,16 @@ async def test_complete_task_only_by_assigned_engineer(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     await service.accept_task(
@@ -1075,10 +1321,16 @@ async def test_complete_task_rejects_invalid_status(
 
     engineer_id = uuid4()
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     with pytest.raises(ValueError, match="Недопустимый переход"):
@@ -1101,10 +1353,16 @@ async def test_complete_otd_task_requires_otd_version(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     await service.accept_task(
@@ -1133,10 +1391,16 @@ async def test_complete_otd_task_with_otd_version(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
     )
 
     await service.accept_task(
@@ -1181,10 +1445,22 @@ async def test_complete_settings_task_requires_settings_record(
         created_by=system_user_id,
     )
 
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
     await service.assign_task(
         task=task,
         assigned_to=engineer_id,
-        actor_id=uuid4(),
+        actor_id=system_user_id,
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
     )
 
     await service.accept_task(
@@ -2618,3 +2894,108 @@ async def test_substation_task_creation_checks_role_and_access(
     assert not await service.can_issue_task(
         actor_id=system_user_id, substation_id=substation_id
     )
+
+
+
+@pytest.mark.asyncio
+async def test_assign_task_rejects_actor_without_issue_permission(
+    service: TaskService,
+    system_user_id,
+) -> None:
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+    unauthorized_actor_id = uuid4()
+
+    with pytest.raises(PermissionError):
+        await service.assign_task(
+            task=task,
+            assigned_to=uuid4(),
+            actor_id=unauthorized_actor_id,
+        )
+
+    assert task.status is TaskStatus.CREATED
+    assert task.assigned_to is None
+
+
+
+@pytest.mark.asyncio
+async def test_reassign_task_rejects_actor_without_issue_permission(
+    service: TaskService,
+    system_user_id,
+) -> None:
+    engineer_id = uuid4()
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=system_user_id,
+    )
+
+    unauthorized_actor_id = uuid4()
+
+    with pytest.raises(PermissionError):
+        await service.reassign_task(
+            task=task,
+            assigned_to=uuid4(),
+            actor_id=unauthorized_actor_id,
+        )
+
+    assert task.status is TaskStatus.ASSIGNED
+    assert task.assigned_to == engineer_id
+
+
+
+@pytest.mark.asyncio
+async def test_assign_task_rejects_unavailable_assignee(
+    service: TaskService,
+    access_service: FakeAccessService,
+    system_user_id,
+) -> None:
+    urza_id = uuid7()
+    enterprise_id = uuid7()
+    available_engineer_id = uuid7()
+    unavailable_engineer_id = uuid7()
+
+    access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(enterprise_id=enterprise_id),
+        ),
+    )
+    access_service.user_repository.engineers_by_enterprise[enterprise_id] = [
+        SimpleNamespace(
+            id=available_engineer_id,
+            role=UserRole.ENGINEER,
+            active=True,
+            deleted_at=None,
+        ),
+    ]
+
+    task = await service.create_task(
+        urza_id=urza_id,
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+
+    with pytest.raises(ValueError, match="доступным"):
+        await service.assign_task(
+            task=task,
+            assigned_to=unavailable_engineer_id,
+            actor_id=system_user_id,
+        )
+
+    assert task.status is TaskStatus.CREATED
+    assert task.assigned_to is None

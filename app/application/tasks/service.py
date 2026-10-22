@@ -428,10 +428,34 @@ class TaskService:
     ) -> Task:
         # Назначение возможно только из CREATED; переназначение обработаем отдельно.
         self._ensure_task_is_active(task)
+
         validate_transition(
             task.status,
             TaskStatus.ASSIGNED,
         )
+
+        if not await self.can_issue_task(
+                actor_id=actor_id,
+                urza_id=task.urza_id,
+                substation_id=getattr(task, "substation_id", None),
+        ):
+            raise PermissionError(
+                "Пользователь не может выдавать задания для этого объекта."
+            )
+
+        available_assignees = await self.get_available_assignees(
+            actor_id=actor_id,
+            urza_id=task.urza_id,
+            substation_id=getattr(task, "substation_id", None),
+        )
+
+        if assigned_to not in {
+            engineer.id for engineer in available_assignees
+        }:
+            raise ValueError(
+                "Выбранный исполнитель не является доступным "
+                "активным инженером этого предприятия."
+            )
 
         assignment_time = assigned_at or datetime.now().astimezone()
 
@@ -733,14 +757,37 @@ class TaskService:
                 "Переназначить можно только назначенную задачу."
             )
 
-        assignment_time = assigned_at or datetime.now().astimezone()
-
         previous_assignee = task.assigned_to
 
         if previous_assignee == assigned_to:
             raise ValueError(
                 "Новый исполнитель должен отличаться от текущего."
             )
+
+        if not await self.can_issue_task(
+                actor_id=actor_id,
+                urza_id=task.urza_id,
+                substation_id=getattr(task, "substation_id", None),
+        ):
+            raise PermissionError(
+                "Пользователь не может переназначать задания для этого объекта."
+            )
+
+        available_assignees = await self.get_available_assignees(
+            actor_id=actor_id,
+            urza_id=task.urza_id,
+            substation_id=getattr(task, "substation_id", None),
+        )
+
+        if assigned_to not in {
+            engineer.id for engineer in available_assignees
+        }:
+            raise ValueError(
+                "Выбранный исполнитель не является доступным "
+                "активным инженером этого предприятия."
+            )
+
+        assignment_time = assigned_at or datetime.now().astimezone()
 
         task.assigned_to = assigned_to
         task.assigned_at = assignment_time
