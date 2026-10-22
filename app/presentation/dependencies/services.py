@@ -10,6 +10,7 @@ from app.application.auth.service import AuthService
 from app.application.connections.repository import ConnectionRepository
 from app.application.connections.service import ConnectionService
 from app.application.enterprises.repository import EnterpriseRepository
+from app.application.enterprises.service import EnterpriseService
 from app.application.files.access_service import FileAccessService
 from app.application.files.owner_repository import FileOwnerRepository
 from app.application.files.owner_resolver import FileOwnerResolver
@@ -31,7 +32,6 @@ from app.application.rza_instructions.repository import RZAInstructionRepository
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.schema.repository import SchemaRepository
 from app.application.schema.service import SchemaService
-from app.application.enterprises.service import EnterpriseService
 from app.application.selectivity_schemes.repository import (
     SelectivitySchemeRepository,
 )
@@ -44,6 +44,7 @@ from app.application.substations.repository import SubstationRepository
 from app.application.substations.service import SubstationService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
+from app.application.tasks.statistics import TaskStatisticsService
 from app.application.tree.service import TreeService
 from app.application.urza_instructions.repository import (
     URZAInstructionRepository,
@@ -285,6 +286,18 @@ def get_schema_service(
         repository=SchemaRepository(session),
         access_service=access_service,
         task_repository=TaskRepository(session),
+    )
+
+
+def get_task_statistics_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> TaskStatisticsService:
+    return TaskStatisticsService(
+        task_repository=TaskRepository(session),
+        inspection_repository=InspectionTaskRepository(session),
+        enterprise_repository=EnterpriseRepository(session),
+        access_service=access_service,
     )
 
 

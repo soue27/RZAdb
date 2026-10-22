@@ -3944,6 +3944,40 @@ def test_create_settings_record_uploads_required_file(system_user_id):
         assert settings_service.calls[0][0] == "create_record"
         assert settings_service.calls[0][1]["signed_form_file_id"] == uploaded_file.id
         assert "Ток срабатывания" in response.text
+        assert f'href="/files/{uploaded_file.id}/view"' in response.text
+        assert f'href="/files/{uploaded_file.id}/download"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_settings_record_denies_inaccessible_urza_before_upload(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    file_service = FakeFileService(settings_file(uuid7()))
+    settings_service = FakeSettingsService()
+    set_settings_dependencies(
+        user,
+        urza_id,
+        settings_service,
+        file_service,
+        object_error=ObjectAccessDeniedError(),
+    )
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings",
+            data={
+                "change_date": "2026-09-01",
+                "parameter_name": "Параметр",
+                "initial_setting": "1",
+                "new_setting": "2",
+                "change_reason": "Причина",
+            },
+            files={"signed_form_file": ("signed.pdf", b"scan", "application/pdf")},
+        )
+
+        assert response.status_code == 403
+        assert not file_service.upload_calls
+        assert not settings_service.calls
     finally:
         app.dependency_overrides.clear()
 

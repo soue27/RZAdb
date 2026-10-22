@@ -175,7 +175,7 @@
                 {% if "create_result" in actions %}
                     <a
                         class="btn btn-primary"
-                        href="{% if task.substation_id %}/objects/substation/{{ task.substation_id }}/{% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}/new?new_version=true&task_id={{ task.id }}{% elif task.work_type.value == 'MAINTENANCE' %}/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}{% elif task.work_type.value == 'OTD' %}/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}{% else %}/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}{% endif %}"
+                        href="{% if task.substation_id %}/objects/substation/{{ task.substation_id }}/{% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}/new?new_version=true&task_id={{ task.id }}{% elif task.work_type.value == 'maintenance' %}/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}{% elif task.work_type.value == 'otd' %}/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}{% else %}/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}{% endif %}"
                     >
                         Выполнить задание
                     </a>
@@ -292,7 +292,7 @@
                         <tr>
                             <th>Событие</th>
                             <th>Переход</th>
-                            <th>Пользователь</th>
+                            <th>Исполнитель / инициатор</th>
                             <th>Дата</th>
                             <th>Комментарий</th>
                         </tr>
@@ -312,7 +312,18 @@
                                     {% endif %}
                                 </td>
 
-                                <td>{{ event.actor.full_name }}</td>
+                                <td>
+                                    {% if event.event_type == "reassigned" %}
+                                        {{ event.previous_assignee.full_name if event.previous_assignee else "Исполнитель не указан" }}
+                                        →
+                                        {{ event.new_assignee.full_name if event.new_assignee else "Исполнитель не указан" }}
+                                        <div class="small text-body-secondary">
+                                            Переназначил: {{ event.actor.full_name if event.actor else "—" }}
+                                        </div>
+                                    {% else %}
+                                        {{ event.actor.full_name if event.actor else "—" }}
+                                    {% endif %}
+                                </td>
 
                                 <td>
                                     {{ event.created_at.strftime("%d.%m.%Y %H:%M") }}

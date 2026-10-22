@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -19,6 +19,7 @@ from app.domain.program import Program, ProgramType
 from app.domain.schema import SchemaRecord
 from app.domain.settings_record import SettingsRecord
 from app.domain.task import Task
+from app.domain.task_history import TaskHistory
 
 
 class FakeTaskRepository:
@@ -1055,10 +1056,80 @@ async def test_reassign_task(
 
     assert history.task_id == task.id
     assert history.event_type == "reassigned"
+    assert history.previous_assignee_id == first_engineer_id
+    assert history.new_assignee_id == second_engineer_id
     assert history.old_status == TaskStatus.ASSIGNED
     assert history.new_status == TaskStatus.ASSIGNED
     assert history.actor_id == manager_id
     assert history.created_at == reassigned_at
+
+
+@pytest.mark.asyncio
+async def test_repeated_reassignments_keep_each_pair_of_assignees(
+    service: TaskService,
+    repository: FakeTaskRepository,
+    system_user_id,
+) -> None:
+    initial_assignee_id = uuid4()
+    second_assignee_id = uuid4()
+    third_assignee_id = uuid4()
+    urza_id = uuid4()
+    enterprise_id = uuid7()
+
+    service.access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(enterprise_id=enterprise_id),
+        ),
+    )
+    service.access_service.user_repository.engineers_by_enterprise[
+        enterprise_id
+    ] = [
+        SimpleNamespace(id=user_id, role=UserRole.ENGINEER, active=True, deleted_at=None)
+        for user_id in (
+            initial_assignee_id,
+            second_assignee_id,
+            third_assignee_id,
+        )
+    ]
+
+    task = await service.create_task(
+        urza_id=urza_id,
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+    await service.assign_task(
+        task=task,
+        assigned_to=initial_assignee_id,
+        actor_id=system_user_id,
+    )
+    await service.reassign_task(
+        task=task,
+        assigned_to=second_assignee_id,
+        actor_id=system_user_id,
+    )
+    await service.reassign_task(
+        task=task,
+        assigned_to=third_assignee_id,
+        actor_id=system_user_id,
+    )
+
+    reassignment_events = [
+        event for event in repository.history if event.event_type == "reassigned"
+    ]
+    assert len(reassignment_events) == 2
+    assert [
+        (event.previous_assignee_id, event.new_assignee_id)
+        for event in reassignment_events
+    ] == [
+        (initial_assignee_id, second_assignee_id),
+        (second_assignee_id, third_assignee_id),
+    ]
+
+    assigned_event = next(
+        event for event in repository.history if event.event_type == "assigned"
+    )
+    assert assigned_event.previous_assignee_id is None
+    assert assigned_event.new_assignee_id is None
 
 
 @pytest.mark.asyncio
@@ -2348,6 +2419,69 @@ async def test_return_for_revision_requires_reason(
 
     assert task.status is TaskStatus.UNDER_REVIEW
     assert repository.history == []
+
+
+@pytest.mark.asyncio
+async def test_revision_cycle_clears_previous_completion_and_records_new_date(
+    repository: FakeTaskRepository,
+    access_service: FakeAccessService,
+) -> None:
+    engineer_id = uuid4()
+    manager_id = uuid4()
+    original_completion = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
+    new_completion = datetime(2026, 10, 13, 15, 30, tzinfo=UTC)
+    task = _review_task(TaskStatus.COMPLETED, work_type=TaskWorkType.PROGRAM)
+    task.assigned_to = engineer_id
+    task.completed_at = original_completion
+    original_completion_event = TaskHistory(
+        task_id=task.id,
+        event_type="completed",
+        old_status=TaskStatus.IN_PROGRESS,
+        new_status=TaskStatus.COMPLETED,
+        actor_id=engineer_id,
+        created_at=original_completion,
+    )
+    repository.history.append(original_completion_event)
+    repository.programs.append(
+        SimpleNamespace(task_id=task.id, deleted_at=None)
+    )
+    access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    _add_manager(access_service, manager_id)
+    service = make_task_service(repository, access_service)
+
+    await service.submit_for_review(task=task, actor_id=engineer_id)
+    await service.return_for_revision(
+        task=task,
+        actor_id=manager_id,
+        returned_at=datetime(2026, 10, 11, 9, 0, tzinfo=UTC),
+        comment="Исправить замечания",
+    )
+
+    assert task.status is TaskStatus.IN_PROGRESS
+    assert task.completed_at is None
+    assert repository.history[0] is original_completion_event
+    assert original_completion_event.created_at == original_completion
+
+    await service.complete_task(
+        task=task,
+        actor_id=engineer_id,
+        completed_at=new_completion,
+    )
+
+    assert task.status is TaskStatus.COMPLETED
+    assert task.completed_at == new_completion
+    completion_events = [
+        event for event in repository.history if event.event_type == "completed"
+    ]
+    assert [event.created_at for event in completion_events] == [
+        original_completion,
+        new_completion,
+    ]
 
 
 @pytest.mark.asyncio

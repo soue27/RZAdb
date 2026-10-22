@@ -238,6 +238,46 @@ def _task_context(
     }
 
 
+async def _task_detail_context(
+    *,
+    task: Task,
+    current_user: User,
+    repository: TaskRepository,
+    task_service: TaskService,
+    tree_service: TreeService,
+    error_message: str | None = None,
+) -> dict:
+    history = await repository.get_history(task.id)
+    actions = await task_service.get_available_actions(
+        task=task,
+        actor_id=current_user.id,
+    )
+    tree = await tree_service.get_tree(user_id=current_user.id)
+
+    program_result = None
+    if task.work_type is TaskWorkType.PROGRAM:
+        program_result = await repository.get_program_by_task_id(task.id)
+        if program_result is not None and program_result.deleted_at is not None:
+            program_result = None
+
+    available_assignees = []
+    if "reassign_task" in actions:
+        available_assignees = await task_service.get_available_assignees(
+            actor_id=current_user.id,
+            urza_id=task.urza_id,
+            substation_id=task.substation_id,
+        )
+
+    return {
+        "current_user": current_user,
+        "tree": tree,
+        **_task_context(task, history, actions),
+        "available_assignees": available_assignees,
+        "program_result": program_result,
+        "error_message": error_message,
+    }
+
+
 @router.get("/create")
 async def get_task_create_form(
     request: Request,
@@ -671,44 +711,16 @@ async def get_task_detail(
         task_id,
     )
 
-    program_result = None
-
-    if task.work_type is TaskWorkType.PROGRAM:
-        program_result = await repository.get_program_by_task_id(task.id)
-
-        if program_result is not None and program_result.deleted_at is not None:
-            program_result = None
-
-    history = await repository.get_history(task.id)
-
-    actions = await task_service.get_available_actions(
-        task=task,
-        actor_id=current_user.id,
-    )
-
-    available_assignees = []
-    if "reassign_task" in actions:
-        available_assignees = await task_service.get_available_assignees(
-            actor_id=current_user.id,
-            urza_id=task.urza_id,
-            substation_id=task.substation_id,
-        )
-
-    tree = await tree_service.get_tree(
-        user_id=current_user.id,
-    )
-
     return templates.TemplateResponse(
         request=request,
         name="tasks/detail.html",
-        context={
-            "current_user": current_user,
-            "tree": tree,
-            **_task_context(task, history, actions),
-            "available_assignees": available_assignees,
-            "program_result": program_result,
-            "error_message": None,
-        },
+        context=await _task_detail_context(
+            task=task,
+            current_user=current_user,
+            repository=repository,
+            task_service=task_service,
+            tree_service=tree_service,
+        ),
     )
 
 
@@ -752,17 +764,6 @@ async def _run_review_action(
             )
 
     except PermissionError as exc:
-        history = await repository.get_history(task.id)
-
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-
-        tree = await tree_service.get_tree(
-            user_id=current_user.id,
-        )
-
         return templates.TemplateResponse(
             request=request,
             name=(
@@ -770,12 +771,14 @@ async def _run_review_action(
                 if request.headers.get("HX-Request") == "true"
                 else "tasks/detail.html"
             ),
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": str(exc),
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+                error_message=str(exc),
+            ),
             status_code=(
                 200
                 if request.headers.get("HX-Request") == "true"
@@ -784,17 +787,6 @@ async def _run_review_action(
         )
 
     except ValueError as exc:
-        history = await repository.get_history(task.id)
-
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-
-        tree = await tree_service.get_tree(
-            user_id=current_user.id,
-        )
-
         return templates.TemplateResponse(
             request=request,
             name=(
@@ -802,12 +794,14 @@ async def _run_review_action(
                 if request.headers.get("HX-Request") == "true"
                 else "tasks/detail.html"
             ),
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": str(exc),
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+                error_message=str(exc),
+            ),
             status_code=(
                 200
                 if request.headers.get("HX-Request") == "true"
@@ -816,26 +810,16 @@ async def _run_review_action(
         )
 
     if request.headers.get("HX-Request") == "true":
-        history = await repository.get_history(task.id)
-
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-
-        tree = await tree_service.get_tree(
-            user_id=current_user.id,
-        )
-
         return templates.TemplateResponse(
             request=request,
             name="tasks/_detail_content.html",
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": None,
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+            ),
         )
 
     return RedirectResponse(
@@ -885,15 +869,6 @@ async def _run_executor_action(
             raise ValueError(f"Неизвестное действие: {action}")
 
     except (PermissionError, ValueError) as exc:
-        history = await repository.get_history(task.id)
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-        tree = await tree_service.get_tree(
-            user_id=current_user.id,
-        )
-
         is_htmx = request.headers.get("HX-Request") == "true"
 
         return templates.TemplateResponse(
@@ -903,12 +878,14 @@ async def _run_executor_action(
                 if is_htmx
                 else "tasks/detail.html"
             ),
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": str(exc),
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+                error_message=str(exc),
+            ),
             status_code=(
                 200
                 if is_htmx
@@ -921,24 +898,16 @@ async def _run_executor_action(
         )
 
     if request.headers.get("HX-Request") == "true":
-        history = await repository.get_history(task.id)
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-        tree = await tree_service.get_tree(
-            user_id=current_user.id,
-        )
-
         return templates.TemplateResponse(
             request=request,
             name="tasks/_detail_content.html",
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": None,
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+            ),
         )
 
     return RedirectResponse(
@@ -1137,13 +1106,6 @@ async def reassign_task(
         )
 
     except (PermissionError, ValueError) as exc:
-        history = await repository.get_history(task.id)
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-        tree = await tree_service.get_tree(user_id=current_user.id)
-
         is_htmx = request.headers.get("HX-Request") == "true"
         return templates.TemplateResponse(
             request=request,
@@ -1152,12 +1114,14 @@ async def reassign_task(
                 if is_htmx
                 else "tasks/detail.html"
             ),
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": str(exc),
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+                error_message=str(exc),
+            ),
             status_code=(
                 200
                 if is_htmx
@@ -1166,22 +1130,16 @@ async def reassign_task(
         )
 
     if request.headers.get("HX-Request") == "true":
-        history = await repository.get_history(task.id)
-        actions = await task_service.get_available_actions(
-            task=task,
-            actor_id=current_user.id,
-        )
-        tree = await tree_service.get_tree(user_id=current_user.id)
-
         return templates.TemplateResponse(
             request=request,
             name="tasks/_detail_content.html",
-            context={
-                "current_user": current_user,
-                "tree": tree,
-                **_task_context(task, history, actions),
-                "error_message": None,
-            },
+            context=await _task_detail_context(
+                task=task,
+                current_user=current_user,
+                repository=repository,
+                task_service=task_service,
+                tree_service=tree_service,
+            ),
         )
 
     return RedirectResponse(

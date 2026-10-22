@@ -412,6 +412,7 @@ class TaskService:
         review_time = returned_at or datetime.now().astimezone()
         old_status = task.status
         task.status = TaskStatus.IN_PROGRESS
+        task.completed_at = None
         task.updated_by = actor_id
         await self.task_repository.save(task)
         self.task_repository.session.add(
@@ -820,6 +821,8 @@ class TaskService:
             old_status=TaskStatus.ASSIGNED,
             new_status=TaskStatus.ASSIGNED,
             actor_id=actor_id,
+            previous_assignee_id=previous_assignee,
+            new_assignee_id=assigned_to,
             comment=None,
             created_at=assignment_time,
         )

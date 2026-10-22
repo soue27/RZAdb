@@ -47,6 +47,16 @@ class TaskHistory(UUIDMixin, Base):
         nullable=False,
     )
 
+    previous_assignee_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
+    new_assignee_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
     comment: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -59,4 +69,14 @@ class TaskHistory(UUIDMixin, Base):
 
     task: Mapped[Task] = relationship()
 
-    actor: Mapped[User] = relationship()
+    actor: Mapped[User] = relationship(
+        foreign_keys=[actor_id],
+    )
+
+    previous_assignee: Mapped[User | None] = relationship(
+        foreign_keys=[previous_assignee_id],
+    )
+
+    new_assignee: Mapped[User | None] = relationship(
+        foreign_keys=[new_assignee_id],
+    )

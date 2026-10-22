@@ -1,17 +1,22 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
+from app.domain.connection import Connection
+from app.domain.enums import TaskStatus, UserRole
 from app.domain.maintenance import TORecord
 from app.domain.program import Program
+from app.domain.rza_instruction import RZAInstructionVersion
 from app.domain.schema import SchemaRecord
+from app.domain.selectivity_scheme import SelectivitySchemeVersion
 from app.domain.settings_record import SettingsRecord
+from app.domain.substation import Substation
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
-from app.domain.rza_instruction import RZAInstructionVersion
-from app.domain.selectivity_scheme import SelectivitySchemeVersion
+from app.domain.urza import URZA
 
 
 class TaskRepository:
@@ -57,10 +62,84 @@ class TaskRepository:
         )
         return list(result.scalars().all())
 
+    async def count_dashboard_statuses(
+        self,
+        *,
+        user_id: UUID,
+        role: UserRole,
+        enterprise_ids: set[UUID],
+        now: datetime,
+    ) -> tuple[dict[TaskStatus, int], int]:
+        if not enterprise_ids:
+            return {}, 0
+
+        task_urza = aliased(URZA)
+        task_connection = aliased(Connection)
+        urza_substation = aliased(Substation)
+        direct_substation = aliased(Substation)
+        visible_in_enterprise = or_(
+            and_(
+                Task.urza_id.is_not(None),
+                or_(
+                    role is UserRole.SUPERADMIN,
+                    task_urza.deleted_at.is_(None),
+                ),
+                urza_substation.enterprise_id.in_(enterprise_ids),
+            ),
+            and_(
+                Task.substation_id.is_not(None),
+                direct_substation.enterprise_id.in_(enterprise_ids),
+            ),
+        )
+        overdue = func.count(
+            case(
+                (
+                    and_(
+                        Task.deadline_at.is_not(None),
+                        Task.deadline_at < now,
+                        Task.status.not_in({TaskStatus.CLOSED, TaskStatus.REJECTED}),
+                    ),
+                    Task.id,
+                )
+            )
+        )
+        query = (
+            select(Task.status, func.count(Task.id), overdue)
+            .outerjoin(task_urza, Task.urza_id == task_urza.id)
+            .outerjoin(task_connection, task_urza.connection_id == task_connection.id)
+            .outerjoin(urza_substation, task_connection.substation_id == urza_substation.id)
+            .outerjoin(direct_substation, Task.substation_id == direct_substation.id)
+            .where(Task.deleted_at.is_(None), visible_in_enterprise)
+        )
+        if role is UserRole.ENGINEER:
+            query = query.where(Task.assigned_to == user_id)
+        elif role is UserRole.SUPERADMIN:
+            reviewed = select(TaskHistory.id).where(
+                TaskHistory.task_id == Task.id,
+                TaskHistory.actor_id == user_id,
+                TaskHistory.event_type.in_({"review_approved", "review_rejected"}),
+            ).exists()
+            query = query.where(
+                or_(Task.created_by == user_id, Task.assigned_to == user_id, reviewed)
+            )
+
+        result = await self.session.execute(
+            query.group_by(Task.status)
+        )
+        rows = result.all()
+        return (
+            {status: count for status, count, _ in rows},
+            sum(overdue_count for _, _, overdue_count in rows),
+        )
+
     async def get_history(self, task_id: UUID) -> list[TaskHistory]:
         result = await self.session.execute(
             select(TaskHistory)
-            .options(selectinload(TaskHistory.actor))
+            .options(
+                selectinload(TaskHistory.actor),
+                selectinload(TaskHistory.previous_assignee),
+                selectinload(TaskHistory.new_assignee),
+            )
             .where(TaskHistory.task_id == task_id)
             .order_by(TaskHistory.created_at.desc(), TaskHistory.id.desc())
         )

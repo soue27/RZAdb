@@ -38,6 +38,7 @@ def _task(user_id: UUID, status: TaskStatus = TaskStatus.COMPLETED):
         description="Проверить схему",
         assigned_to=user_id,
         assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        substation_id=None,
         created_by=user_id,
         created_by_user=SimpleNamespace(full_name="Автор"),
         status=status,
@@ -55,6 +56,7 @@ class FakeTaskRepository:
     def __init__(self, tasks):
         self.tasks = tasks
         self.history = {}
+        self.program_results = {}
 
     async def list_active(self):
         return [task for task in self.tasks if task.deleted_at is None]
@@ -71,6 +73,9 @@ class FakeTaskRepository:
 
     async def get_history(self, task_id):
         return self.history.get(task_id, [])
+
+    async def get_program_by_task_id(self, task_id):
+        return self.program_results.get(task_id)
 
 
 class FakeInspectionTaskRepository:
@@ -221,6 +226,22 @@ class FakeTaskService:
         self.calls.append(("assign_task", task.id, assigned_to, actor_id))
         task.assigned_to = assigned_to
         task.status = TaskStatus.ASSIGNED
+        return task
+
+    async def reassign_task(self, *, task, assigned_to, actor_id):
+        self.calls.append(("reassign_task", task.id, assigned_to, actor_id))
+        error = self.errors.get("reassign_task")
+        if error:
+            raise error
+        task.assigned_to = assigned_to
+        task.assigned_to_user = next(
+            (
+                engineer
+                for engineer in self.engineers
+                if engineer.id == assigned_to
+            ),
+            None,
+        )
         return task
 
     async def get_available_actions(self, *, task, actor_id):
@@ -472,6 +493,7 @@ def test_task_routes_are_registered_in_openapi():
     assert "post" in paths["/tasks/{task_id}/accept"]
     assert "post" in paths["/tasks/{task_id}/reject"]
     assert "post" in paths["/tasks/{task_id}/complete"]
+    assert "post" in paths["/tasks/{task_id}/reassign"]
 
 
 @pytest.mark.parametrize(
@@ -876,6 +898,75 @@ def test_task_detail_displays_history_and_review_actions(system_user_id):
     assert "УРЗА из дерева" in response.text
 
 
+@pytest.mark.parametrize(
+    ("assignees", "expected_participants"),
+    [
+        (None, "Исполнитель не указан"),
+        (("Прежний инженер", "Новый инженер"), "Прежний инженер"),
+    ],
+)
+def test_task_detail_renders_reassignment_history_with_legacy_compatibility(
+    system_user_id, assignees, expected_participants
+):
+    user = _user(system_user_id, UserRole.MANAGER)
+    task = _task(user.id, TaskStatus.ASSIGNED)
+    event_fields = {}
+    if assignees:
+        event_fields = {
+            "previous_assignee": SimpleNamespace(full_name=assignees[0]),
+            "new_assignee": SimpleNamespace(full_name=assignees[1]),
+        }
+    event = SimpleNamespace(
+        event_type="reassigned",
+        old_status=TaskStatus.ASSIGNED,
+        new_status=TaskStatus.ASSIGNED,
+        actor=SimpleNamespace(full_name="Руководитель"),
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        comment=None,
+        **event_fields,
+    )
+    repository = FakeTaskRepository([task])
+    repository.history[task.id] = [event]
+
+    with _client(user, repository, FakeAccessService(), FakeTaskService()) as client:
+        response = client.get(f"/tasks/{task.id}")
+
+    assert response.status_code == 200
+    assert expected_participants in response.text
+    if assignees:
+        assert "Новый инженер" in response.text
+        assert "Переназначил: Руководитель" in response.text
+    else:
+        assert "Руководитель" in response.text
+
+
+@pytest.mark.parametrize(
+    ("work_type", "expected_path"),
+    [
+        (TaskWorkType.MAINTENANCE, "maintenance/new"),
+        (TaskWorkType.OTD, "otd/new"),
+        (TaskWorkType.PROGRAM, "programs/new"),
+    ],
+)
+def test_task_result_link_uses_matching_work_type_route(
+    system_user_id, work_type, expected_path
+):
+    user = _user(system_user_id)
+    task = _task(user.id, TaskStatus.IN_PROGRESS)
+    task.work_type = work_type
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService({task.id: {"create_result"}})
+
+    with _client(user, repository, FakeAccessService(), service) as client:
+        response = client.get(f"/tasks/{task.id}")
+
+    assert response.status_code == 200
+    assert (
+        f'href="/objects/urza/{task.urza_id}/{expected_path}?task_id={task.id}"'
+        in response.text
+    )
+
+
 def test_task_detail_denies_user_without_urza_access(system_user_id):
     user = _user(system_user_id)
     task = _task(user.id)
@@ -887,6 +978,128 @@ def test_task_detail_denies_user_without_urza_access(system_user_id):
         response = client.get(f"/tasks/{task.id}")
 
     assert response.status_code == 403
+
+
+def test_reassign_task_accepts_available_engineer(system_user_id):
+    manager = _user(system_user_id, UserRole.MANAGER)
+    task = _task(uuid7(), TaskStatus.ASSIGNED)
+    engineer = SimpleNamespace(
+        id=uuid7(),
+        full_name="Новый исполнитель",
+        active=True,
+        deleted_at=None,
+    )
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService(engineers=[engineer])
+
+    with _client(manager, repository, FakeAccessService(), service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reassign",
+            data={"engineer_id": str(engineer.id)},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/tasks/{task.id}"
+    assert task.assigned_to == engineer.id
+    assert ("reassign_task", task.id, engineer.id, manager.id) in service.calls
+
+
+@pytest.mark.parametrize("engineer_id", ["not-a-uuid", str(uuid7())])
+def test_reassign_task_rejects_invalid_or_unavailable_engineer(
+    system_user_id, engineer_id
+):
+    manager = _user(system_user_id, UserRole.MANAGER)
+    task = _task(uuid7(), TaskStatus.ASSIGNED)
+    original_assignee = task.assigned_to
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService()
+
+    with _client(manager, repository, FakeAccessService(), service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reassign",
+            data={"engineer_id": engineer_id},
+        )
+
+    assert response.status_code == 400
+    assert task.assigned_to == original_assignee
+    assert all(call[0] != "reassign_task" for call in service.calls)
+
+
+def test_reassign_task_forbids_user_without_issue_permission(system_user_id):
+    engineer_user = _user(system_user_id, UserRole.ENGINEER)
+    task = _task(engineer_user.id, TaskStatus.ASSIGNED)
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService(
+        can_issue=False,
+        engineers=[SimpleNamespace(id=uuid7(), active=True, deleted_at=None)],
+    )
+
+    with _client(engineer_user, repository, FakeAccessService(), service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reassign",
+            data={"engineer_id": str(service.engineers[0].id)},
+        )
+
+    assert response.status_code == 403
+    assert task.assigned_to == engineer_user.id
+    assert all(call[0] != "reassign_task" for call in service.calls)
+
+
+def test_reassign_task_returns_htmx_detail_partial(system_user_id):
+    manager = _user(system_user_id, UserRole.MANAGER)
+    task = _task(uuid7(), TaskStatus.ASSIGNED)
+    engineer = SimpleNamespace(
+        id=uuid7(),
+        full_name="Новый исполнитель",
+        active=True,
+        deleted_at=None,
+    )
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService(
+        {task.id: {"reassign_task"}},
+        engineers=[engineer],
+    )
+
+    with _client(manager, repository, FakeAccessService(), service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reassign",
+            data={"engineer_id": str(engineer.id)},
+            headers={"HX-Request": "true"},
+        )
+
+    assert response.status_code == 200
+    assert 'id="task-page-content"' in response.text
+    assert "<html" not in response.text
+    assert task.assigned_to == engineer.id
+    assert "Новый исполнитель" in response.text
+
+
+def test_reassigned_task_access_moves_from_previous_to_new_engineer():
+    previous_engineer = _user(uuid7())
+    new_engineer = _user(uuid7())
+    new_engineer.full_name = "Новый исполнитель"
+    manager = _user(uuid7(), UserRole.MANAGER)
+    task = _task(previous_engineer.id, TaskStatus.ASSIGNED)
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService(engineers=[new_engineer])
+    access = FakeAccessService()
+
+    with _client(manager, repository, access, service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/reassign",
+            data={"engineer_id": str(new_engineer.id)},
+            follow_redirects=False,
+        )
+    assert response.status_code == 303
+
+    with _client(previous_engineer, repository, access, service) as client:
+        previous_response = client.get(f"/tasks/{task.id}")
+    with _client(new_engineer, repository, access, service) as client:
+        new_response = client.get(f"/tasks/{task.id}")
+
+    assert previous_response.status_code == 403
+    assert new_response.status_code == 200
 
 
 def test_task_action_denies_direct_post_without_urza_access(system_user_id):
@@ -1062,6 +1275,53 @@ def test_htmx_task_action_returns_updated_task_fragment(system_user_id):
     assert "Закрыто" in response.text
     assert "История задания" in response.text
     assert "<!doctype html>" not in response.text.lower()
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_error"),
+    [
+        (None, None),
+        (
+            ValueError("Нельзя завершить задание."),
+            "Нельзя завершить задание.",
+        ),
+    ],
+)
+def test_program_result_remains_in_successful_and_error_htmx_action(
+    system_user_id, error, expected_error
+):
+    user = _user(system_user_id)
+    task = _task(user.id, TaskStatus.IN_PROGRESS)
+    task.work_type = TaskWorkType.PROGRAM
+    repository = FakeTaskRepository([task])
+    repository.program_results[task.id] = SimpleNamespace(
+        program_type=SimpleNamespace(label="Рабочая"),
+        program_number="ПР-HTMX-01",
+        status=SimpleNamespace(label="Утверждена"),
+        deleted_at=None,
+        scan_file_id=None,
+        editable_file_id=None,
+    )
+    errors = {"complete_task": error} if error is not None else None
+    service = FakeTaskService(
+        {task.id: {"submit_for_review"}},
+        errors=errors,
+    )
+
+    with _client(user, repository, FakeAccessService(), service) as client:
+        response = client.post(
+            f"/tasks/{task.id}/complete",
+            headers={"HX-Request": "true"},
+        )
+
+    assert response.status_code == 200
+    assert 'id="task-page-content"' in response.text
+    assert "Результат задания" in response.text
+    assert "ПР-HTMX-01" in response.text
+    if expected_error:
+        assert expected_error in response.text
+    else:
+        assert task.status is TaskStatus.COMPLETED
 
 
 from html.parser import HTMLParser

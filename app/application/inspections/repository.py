@@ -1,12 +1,15 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.domain.enums import TaskStatus, UserRole
 from app.domain.inspection import Inspection
 from app.domain.inspection_history import InspectionHistory
 from app.domain.inspection_task import InspectionTask
+from app.domain.substation import Substation
 
 
 class InspectionTaskRepository:
@@ -66,6 +69,60 @@ class InspectionTaskRepository:
             .order_by(InspectionTask.created_at.desc())
         )
         return list(result.all())
+
+    async def count_dashboard_statuses(
+        self,
+        *,
+        user_id: UUID,
+        role: UserRole,
+        enterprise_ids: set[UUID],
+        now: datetime,
+    ) -> tuple[dict[TaskStatus, int], int]:
+        if not enterprise_ids:
+            return {}, 0
+
+        overdue = func.count(
+            case(
+                (
+                    and_(
+                        InspectionTask.deadline_at.is_not(None),
+                        InspectionTask.deadline_at < now,
+                        InspectionTask.status.not_in({TaskStatus.CLOSED, TaskStatus.REJECTED}),
+                    ),
+                    InspectionTask.id,
+                )
+            )
+        )
+        query = (
+            select(InspectionTask.status, func.count(InspectionTask.id), overdue)
+            .join(Substation, InspectionTask.substation_id == Substation.id)
+            .where(
+                InspectionTask.deleted_at.is_(None),
+                Substation.enterprise_id.in_(enterprise_ids),
+            )
+        )
+        if role is UserRole.ENGINEER:
+            query = query.where(InspectionTask.assigned_to == user_id)
+        elif role is UserRole.SUPERADMIN:
+            reviewed = select(InspectionHistory.id).where(
+                InspectionHistory.inspection_task_id == InspectionTask.id,
+                InspectionHistory.actor_id == user_id,
+                InspectionHistory.event_type.in_({"review_approved", "review_rejected"}),
+            ).exists()
+            query = query.where(
+                or_(
+                    InspectionTask.created_by == user_id,
+                    InspectionTask.assigned_to == user_id,
+                    reviewed,
+                )
+            )
+
+        result = await self.session.execute(query.group_by(InspectionTask.status))
+        rows = result.all()
+        return (
+            {status: count for status, count, _ in rows},
+            sum(overdue_count for _, _, overdue_count in rows),
+        )
 
     async def get_history(self, task_id: UUID) -> list[InspectionHistory]:
         result = await self.session.scalars(

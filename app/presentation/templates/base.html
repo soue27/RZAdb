@@ -43,6 +43,16 @@
 <body class="bg-body">
 
     {% include "components/topbar.html" %}
+    {% if current_user|default(none) %}
+        <section
+            id="task-statistics"
+            class="task-statistics container-fluid px-4"
+            aria-label="Краткая статистика задач"
+            hx-get="/task-statistics"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+        ></section>
+    {% endif %}
 
     <div class="app-layout">
 

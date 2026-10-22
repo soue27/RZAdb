@@ -101,3 +101,42 @@ async def test_get_history_orders_events_and_loads_actor() -> None:
     sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
     assert "task_history.task_id" in sql
     assert "ORDER BY task_history.created_at DESC, task_history.id DESC" in sql
+    eager_relationships = {
+        str(option.path).split(" -> ")[1]
+        for option in statement._with_options
+    }
+    assert eager_relationships == {
+        "TaskHistory.actor",
+        "TaskHistory.previous_assignee",
+        "TaskHistory.new_assignee",
+    }
+
+
+@pytest.mark.asyncio
+async def test_dashboard_task_count_is_aggregated_and_scoped_to_engineer():
+    from datetime import UTC, datetime
+
+    from app.domain.enums import UserRole
+
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.execute.return_value = result
+    repository = TaskRepository(session)
+    user_id, enterprise_id = uuid7(), uuid7()
+
+    await repository.count_dashboard_statuses(
+        user_id=user_id,
+        role=UserRole.ENGINEER,
+        enterprise_ids={enterprise_id},
+        now=datetime.now(UTC),
+    )
+
+    statement = session.execute.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "GROUP BY tasks.status" in sql
+    assert "tasks.assigned_to =" in sql
+    assert "tasks.deleted_at IS NULL" in sql
+    assert "tasks.deadline_at" in sql
+    assert "closed" in sql and "rejected" in sql
+    assert "urzas_1.deleted_at IS NULL" in sql

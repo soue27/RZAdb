@@ -25,6 +25,13 @@ class EnterpriseRepository:
 
         return list(result)
 
+    async def get_all_for_access_scope(self) -> list[Enterprise]:
+        """Returns existing enterprise rows for global-role access checks."""
+        result = await self.session.scalars(
+            select(Enterprise).order_by(Enterprise.full_name)
+        )
+        return list(result)
+
     async def is_ancestor_or_same(
         self,
         ancestor_id: UUID,

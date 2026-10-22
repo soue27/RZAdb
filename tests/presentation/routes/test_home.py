@@ -366,3 +366,45 @@ def test_home_renders_htmx_attributes_for_urza(system_user_id) -> None:
         assert 'hx-swap="innerHTML"' in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_task_statistics_endpoint_renders_all_four_counters():
+    from app.presentation.dependencies.services import get_task_statistics_service
+
+    user = User(
+        id=uuid7(),
+        full_name="Статистика",
+        role=UserRole.ENGINEER,
+        email="stats@example.com",
+        password_hash="hash",
+        access_category=AccessCategory.IV,
+        active=True,
+        created_by=uuid7(),
+        updated_by=uuid7(),
+    )
+
+    async def override_current_user():
+        return user
+
+    class FakeStatisticsService:
+        async def get_for_user(self, user_id):
+            assert user_id == user.id
+            return {
+                "in_progress": 3,
+                "under_review": 2,
+                "overdue": 1,
+                "closed": 9,
+            }
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_task_statistics_service] = FakeStatisticsService
+    try:
+        response = TestClient(app).get("/task-statistics")
+
+        assert response.status_code == 200
+        assert "В работе" in response.text and ">3<" in response.text
+        assert "На рассмотрении" in response.text and ">2<" in response.text
+        assert "Просрочено" in response.text and ">1<" in response.text
+        assert "Завершено за всё время" in response.text and ">9<" in response.text
+    finally:
+        app.dependency_overrides.clear()
