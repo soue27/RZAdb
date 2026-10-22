@@ -158,6 +158,22 @@ def make_task_service(
     )
 
 
+def make_task_service_with_active_assignee(
+    repository: FakeTaskRepository,
+    actor_id,
+    instruction_repository: FakeURZAInstructionRepository | None = None,
+) -> TaskService:
+    """Создаёт сервис с зарегистрированным активным исполнителем задачи."""
+    access_service = FakeAccessService()
+    access_service.user_repository.users[actor_id] = SimpleNamespace(
+        id=actor_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    return make_task_service(repository, access_service, instruction_repository)
+
+
 def configure_available_assignee(
     service: TaskService,
     *,
@@ -175,6 +191,13 @@ def configure_available_assignee(
                 ),
             ),
         )
+    )
+
+    service.access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
     )
 
     service.access_service.user_repository.engineers_by_enterprise[
@@ -1506,7 +1529,7 @@ async def test_complete_settings_task_with_result(system_user_id) -> None:
     )
     repository.settings_records.append(settings_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -1537,7 +1560,7 @@ async def test_complete_schemes_task_requires_schema_record(system_user_id) -> N
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1582,7 +1605,7 @@ async def test_complete_schemes_task_with_scan_and_signed_form(system_user_id) -
     )
     repository.schema_records.append(schema_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -1629,7 +1652,7 @@ async def test_complete_schemes_task_requires_signed_form(system_user_id) -> Non
     )
     repository.schema_records.append(schema_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1676,7 +1699,7 @@ async def test_complete_schemes_task_requires_scan_or_editable_file(
     )
     repository.schema_records.append(schema_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1723,7 +1746,7 @@ async def test_complete_schemes_task_with_editable_and_signed_form(
     )
     repository.schema_records.append(schema_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -1754,7 +1777,7 @@ async def test_complete_program_task_requires_program(system_user_id) -> None:
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1795,7 +1818,7 @@ async def test_complete_program_task_with_scan(system_user_id) -> None:
     )
     repository.programs.append(program)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -1827,7 +1850,7 @@ async def test_complete_maintenance_task_requires_to_record(system_user_id) -> N
     repository = FakeTaskRepository()
     repository.tasks.append(task)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1868,7 +1891,7 @@ async def test_complete_maintenance_task_requires_signed_form(system_user_id) ->
     )
 
     with pytest.raises(ValueError, match="скан подписанной формы"):
-        await make_task_service(repository, FakeAccessService()).complete_task(
+        await make_task_service_with_active_assignee(repository, engineer_id).complete_task(
             task=task,
             actor_id=engineer_id,
         )
@@ -1905,7 +1928,7 @@ async def test_complete_maintenance_task_requires_protocol(system_user_id) -> No
     )
     repository.to_records.append(to_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -1950,7 +1973,7 @@ async def test_complete_maintenance_task_without_protocol_for_tk(
     )
     repository.to_records.append(to_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -2004,7 +2027,7 @@ async def test_complete_maintenance_task_without_protocol_for_non_protocol_types
     )
     repository.to_records.append(to_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -2049,7 +2072,7 @@ async def test_complete_maintenance_task_with_protocol(system_user_id) -> None:
     )
     repository.to_records.append(to_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     completed_at = datetime.now().astimezone()
 
@@ -2097,7 +2120,7 @@ async def test_complete_maintenance_task_requires_matching_maintenance_type(
     )
     repository.to_records.append(to_record)
 
-    service = make_task_service(repository, FakeAccessService())
+    service = make_task_service_with_active_assignee(repository, engineer_id)
 
     with pytest.raises(
         ValueError,
@@ -2608,9 +2631,8 @@ def _instruction_review_dependencies(task: Task, system_user_id):
 async def test_complete_instruction_task_requires_instruction(system_user_id) -> None:
     created_at = datetime(2026, 9, 13, 10, 0)
     task = _instruction_task(created_at, system_user_id)
-    service = make_task_service(
-        FakeTaskRepository(),
-        FakeAccessService(),
+    service = make_task_service_with_active_assignee(
+        FakeTaskRepository(), system_user_id
     )
 
     with pytest.raises(ValueError, match="не создана инструкция"):
@@ -2628,10 +2650,8 @@ async def test_complete_instruction_task_requires_instruction_version(
     instruction_repository.instructions[task.urza_id] = SimpleNamespace(
         id=uuid7(),
     )
-    service = make_task_service(
-        FakeTaskRepository(),
-        FakeAccessService(),
-        instruction_repository,
+    service = make_task_service_with_active_assignee(
+        FakeTaskRepository(), system_user_id, instruction_repository
     )
 
     with pytest.raises(ValueError, match="создать версию инструкции"):
@@ -2653,10 +2673,8 @@ async def test_complete_instruction_task_rejects_version_created_before_task(
         created_at=task_created_at,
         status=DocumentStatus.DRAFT,
     )
-    service = make_task_service(
-        FakeTaskRepository(),
-        FakeAccessService(),
-        instruction_repository,
+    service = make_task_service_with_active_assignee(
+        FakeTaskRepository(), system_user_id, instruction_repository
     )
 
     with pytest.raises(ValueError, match="создать новую версию инструкции"):
@@ -2677,9 +2695,16 @@ async def test_complete_instruction_task_accepts_new_draft_version(system_user_i
         status=DocumentStatus.DRAFT,
     )
     repository = FakeTaskRepository()
+    access_service = FakeAccessService()
+    access_service.user_repository.users[system_user_id] = SimpleNamespace(
+        id=system_user_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
     service = make_task_service(
         repository,
-        FakeAccessService(),
+        access_service,
         instruction_repository,
     )
 
@@ -2999,3 +3024,125 @@ async def test_assign_task_rejects_unavailable_assignee(
 
     assert task.status is TaskStatus.CREATED
     assert task.assigned_to is None
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("active", "deleted_at"),
+    [
+        (False, None),
+        (True, datetime(2026, 1, 1)),
+    ],
+)
+async def test_accept_task_rejects_inactive_or_deleted_assignee(
+    service: TaskService,
+    access_service: FakeAccessService,
+    repository: FakeTaskRepository,
+    system_user_id,
+    active: bool,
+    deleted_at: datetime | None,
+) -> None:
+    engineer_id = uuid4()
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
+    access_service.user_repository.users[engineer_id] = SimpleNamespace(
+        id=engineer_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+
+    await service.assign_task(
+        task=task,
+        assigned_to=engineer_id,
+        actor_id=system_user_id,
+    )
+    original_updated_by = task.updated_by
+
+    # После назначения учётная запись становится неактивной
+    # либо помечается удалённой.
+    access_service.user_repository.users[engineer_id].active = active
+    access_service.user_repository.users[engineer_id].deleted_at = deleted_at
+
+    history_count = len(repository.history)
+
+    with pytest.raises(PermissionError):
+        await service.accept_task(
+            task=task,
+            actor_id=engineer_id,
+        )
+
+    assert task.status is TaskStatus.ASSIGNED
+    assert task.assigned_to == engineer_id
+    assert task.updated_by == original_updated_by
+    assert len(repository.history) == history_count
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method_name", "status", "active", "deleted_at"),
+    [
+        ("reject_task", TaskStatus.ASSIGNED, False, None),
+        ("reject_task", TaskStatus.ASSIGNED, True, datetime(2026, 1, 1)),
+        ("complete_task", TaskStatus.IN_PROGRESS, False, None),
+        ("complete_task", TaskStatus.IN_PROGRESS, True, datetime(2026, 1, 1)),
+        ("submit_for_review", TaskStatus.COMPLETED, False, None),
+        ("submit_for_review", TaskStatus.COMPLETED, True, datetime(2026, 1, 1)),
+    ],
+)
+async def test_executor_actions_reject_inactive_or_deleted_assignee(
+    service: TaskService,
+    repository: FakeTaskRepository,
+    access_service: FakeAccessService,
+    system_user_id,
+    method_name: str,
+    status: TaskStatus,
+    active: bool,
+    deleted_at: datetime | None,
+) -> None:
+    actor_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.PROGRAM,
+        created_by=system_user_id,
+    )
+    task.assigned_to = actor_id
+    task.status = status
+
+    access_service.user_repository.users[actor_id] = SimpleNamespace(
+        id=actor_id,
+        role=UserRole.ENGINEER,
+        active=active,
+        deleted_at=deleted_at,
+    )
+
+    history_count = len(repository.history)
+    original_updated_by = task.updated_by
+
+    kwargs = {
+        "task": task,
+        "actor_id": actor_id,
+    }
+    if method_name == "reject_task":
+        kwargs["reason"] = "Тестовая причина"
+
+    with pytest.raises(PermissionError):
+        await getattr(service, method_name)(**kwargs)
+
+    assert task.status is status
+    assert task.assigned_to == actor_id
+    assert task.updated_by == original_updated_by
+    assert len(repository.history) == history_count

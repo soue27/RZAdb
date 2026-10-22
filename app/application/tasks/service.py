@@ -37,7 +37,15 @@ class TaskService:
         if task.deleted_at is not None:
             raise ValueError("Нельзя изменять удалённое задание.")
 
+    async def _ensure_active_actor(self, actor_id: UUID) -> None:
+        """Проверяет, что пользователь существует, активен и не удалён."""
+        actor = await self.access_service.user_repository.get_by_id(actor_id)
 
+        if actor is None:
+            raise PermissionError("Пользователь не найден.")
+
+        if not actor.active or actor.deleted_at is not None:
+            raise PermissionError("Пользователь неактивен или удалён.")
 
     async def get_available_actions(
         self,
@@ -290,6 +298,7 @@ class TaskService:
             raise ValueError(
                 "Отправить задание на согласование может только назначенный исполнитель."
             )
+        await self._ensure_active_actor(actor_id)
 
         review_time = submitted_at or datetime.now().astimezone()
         old_status = task.status
@@ -496,6 +505,8 @@ class TaskService:
                 "Принять задачу может только назначенный инженер."
             )
 
+        await self._ensure_active_actor(actor_id)
+
         validate_transition(
             task.status,
             TaskStatus.IN_PROGRESS,
@@ -549,6 +560,8 @@ class TaskService:
             raise ValueError(
                 "Завершить задачу может только назначенный инженер."
             )
+
+        await self._ensure_active_actor(actor_id)
 
         # На этом этапе разрешён только переход IN_PROGRESS -> COMPLETED.
         validate_transition(
@@ -712,6 +725,8 @@ class TaskService:
             raise ValueError(
                 "Отклонить задачу может только назначенный инженер."
             )
+
+        await self._ensure_active_actor(actor_id)
 
         validate_transition(
             task.status,

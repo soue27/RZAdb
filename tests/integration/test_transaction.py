@@ -190,13 +190,16 @@ async def test_program_submission_rolls_back_task_and_history(
     urza_repository = URZARepository(db_session)
 
     class AllowURZAAccess:
+        def __init__(self, user_repository):
+            self.user_repository = user_repository
+
         async def can_access_urza(self, user_id, requested_urza_id):
             return (
                 user_id == engineer_id
                 and requested_urza_id == urza_id
             )
 
-    access_service = AllowURZAAccess()
+    access_service = AllowURZAAccess(user_repository)
 
     task_service = TaskService(
         task_repository=task_repository,
