@@ -406,5 +406,29 @@ def test_task_statistics_endpoint_renders_all_four_counters():
         assert "На рассмотрении" in response.text and ">2<" in response.text
         assert "Просрочено" in response.text and ">1<" in response.text
         assert "Завершено за всё время" in response.text and ">9<" in response.text
+        assert 'href="/tasks?stat=work"' in response.text
+        assert 'href="/tasks?stat=review"' in response.text
+        assert 'href="/tasks?stat=overdue"' in response.text
+        assert 'href="/tasks?stat=closed"' in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_task_statistics_bar_is_loaded_below_top_navigation():
+    user = make_user(uuid7())
+
+    async def override_current_user():
+        return user
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService([])
+    try:
+        response = TestClient(app).get("/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    nav_end = response.text.index("</nav>")
+    statistics_start = response.text.index('id="task-statistics"')
+    assert nav_end < statistics_start
+    assert 'hx-get="/task-statistics"' in response.text

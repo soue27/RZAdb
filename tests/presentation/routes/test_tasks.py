@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import UUID
@@ -8,12 +8,11 @@ from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectAccessDeniedError
-from app.application.inspections.service import InspectionTaskService
 from app.application.work_items.service import (
     SchemaWorkItemSource,
     TaskWorkItemSource,
-    WorkItemService,
     WorkItem,
+    WorkItemService,
 )
 from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
 from app.presentation.app import app
@@ -21,11 +20,13 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_access_service,
     get_inspection_task_repository,
+    get_inspection_task_service,
+    get_inspection_work_item_source,
     get_object_service,
     get_task_repository,
     get_task_service,
     get_tree_service,
-    get_work_item_service, get_inspection_task_service,
+    get_work_item_service,
 )
 
 
@@ -364,6 +365,7 @@ def test_tasks_list_shows_only_accessible_assigned_inspection_tasks():
             assigned_to=assignee_id,
             created_at=datetime(2026, 10, 1, tzinfo=UTC),
             status=TaskStatus.ASSIGNED,
+            deadline_at=None,
         )
 
     visible = inspection_task(visible_substation_id, user.id)
@@ -403,6 +405,7 @@ def test_superadmin_sees_only_related_inspection_tasks():
             assigned_to=assigned_to,
             created_at=datetime(2026, 10, 1, tzinfo=UTC),
             status=TaskStatus.ASSIGNED,
+                deadline_at=None,
         )
 
     authored = inspection_task(created_by=user.id)
@@ -1584,3 +1587,442 @@ def test_under_review_item_remains_in_review_tab_without_approval_rights(
         assert 'id="approval-pane"' in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    ("stat", "expected_titles"),
+    [
+        ("work", {"ITEM-CREATED", "ITEM-ASSIGNED", "ITEM-IN-PROGRESS"}),
+        ("review", {"ITEM-REVIEW"}),
+        ("closed", {"ITEM-CLOSED"}),
+    ],
+)
+def test_task_statistics_filter_shows_matching_tasks_only(stat, expected_titles):
+    user = _user(uuid7())
+    now = datetime.now(UTC)
+    values = [
+        ("ITEM-CREATED", "Создано", TaskStatus.CREATED, "work"),
+        ("ITEM-ASSIGNED", "Назначено", TaskStatus.ASSIGNED, "work"),
+        ("ITEM-IN-PROGRESS", "В работе", TaskStatus.IN_PROGRESS, "work"),
+        ("ITEM-REVIEW", "На проверке", TaskStatus.UNDER_REVIEW, "review"),
+        ("ITEM-CLOSED", "Закрыто", TaskStatus.CLOSED, "completed"),
+        ("ITEM-REJECTED", "Отклонено", TaskStatus.REJECTED, "completed"),
+    ]
+    work_items = [
+        WorkItem(
+            item_type="Задание · Схема",
+            title=title,
+            status=status_label,
+            status_class="text-bg-secondary",
+            created_at=now,
+            author="Автор",
+            assignee="Исполнитель",
+            parent="УРЗА-1",
+            parent_id=uuid7(),
+            url=f"/tasks/{uuid7()}",
+            actions=(),
+            tab=tab,
+            status_code=status.value,
+            deadline_at=now - timedelta(days=1),
+        )
+        for title, status_label, status, tab in values
+    ]
+    access = FakeAccessService()
+    client = _client(user, FakeTaskRepository([]), access, FakeTaskService())
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest(work_items)]
+    )
+
+    try:
+        response = client.get(f"/tasks?stat={stat}")
+        reset_response = client.get("/tasks") if stat == "review" else None
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert '<a href="/tasks" class="ms-2">Сбросить фильтр</a>' in response.text
+    for title in expected_titles:
+        assert title in response.text
+    for title, _, _, _ in values:
+        if title not in expected_titles:
+            assert title not in response.text
+
+    if stat == "review":
+        assert reset_response is not None
+        assert reset_response.status_code == 200
+        assert "Показаны задачи на рассмотрении." not in reset_response.text
+        for title, _, _, _ in values:
+            assert title in reset_response.text
+
+
+def test_review_statistics_filter_matches_tasks_inspections_and_documents():
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    now = datetime.now(UTC)
+    review_tasks = [
+        WorkItem(
+            item_type="Задание · Схема",
+            title=f"Задание-на-рассмотрении-{index}",
+            status="На согласовании",
+            status_class="text-bg-warning",
+            created_at=now,
+            author="Автор",
+            assignee="Исполнитель",
+            parent="УРЗА-1",
+            parent_id=uuid7(),
+            url=f"/tasks/review-{index}",
+            actions=(),
+            tab="review",
+            can_approve=False,
+            status_code=TaskStatus.UNDER_REVIEW.value,
+        )
+        for index in (1, 2)
+    ]
+    standalone_document = WorkItem(
+        item_type="Самостоятельная программа",
+        title="Документ-на-согласовании",
+        status="На согласовании",
+        status_class="text-bg-warning",
+        created_at=now,
+        author="Автор",
+        assignee="—",
+        parent="УРЗА-1",
+        parent_id=uuid7(),
+        url="/objects/urza/example?tab=programs",
+        actions=(),
+        tab="review",
+    )
+    inspection = SimpleNamespace(
+        id=uuid7(),
+        substation_id=uuid7(),
+        substation=SimpleNamespace(dispatch_name="ПС осмотра"),
+        created_by=user.id,
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        assigned_to=uuid7(),
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        created_at=now,
+        status=TaskStatus.UNDER_REVIEW,
+        deadline_at=None,
+        deleted_at=None,
+    )
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest([*review_tasks, standalone_document])]
+    )
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository([inspection])
+    )
+
+    try:
+        all_response = client.get("/tasks")
+        filtered_response = client.get("/tasks?stat=review")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert all_response.status_code == filtered_response.status_code == 200
+    all_review = _pane_text(all_response.text, "review-pane")
+    filtered = filtered_response.text
+    for item in review_tasks:
+        assert item.title in all_review
+        assert item.title in filtered
+    assert standalone_document.title in all_review
+    assert standalone_document.title in filtered
+    assert "Осмотр ПС · ПС осмотра" in all_review
+    assert "Осмотр ПС · ПС осмотра" in filtered
+
+
+def test_statistics_and_review_filter_include_standalone_program_and_instruction():
+    from app.application.tasks.statistics import TaskStatisticsService
+    from app.presentation.dependencies.services import get_task_statistics_service
+
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    documents = [
+        WorkItem(
+            item_type="Самостоятельная программа",
+            title="Скрытое-название-A",
+            status="На согласовании",
+            status_class="text-bg-warning",
+            created_at=datetime.now(UTC),
+            author="Автор",
+            assignee="—",
+            parent="УРЗА-Тест",
+            parent_id=uuid7(),
+            url="/objects/urza/test?tab=programs",
+            actions=(),
+            tab="review",
+        ),
+        WorkItem(
+            item_type="Самостоятельная инструкция URZA",
+            title="Скрытое-название-B",
+            status="На согласовании",
+            status_class="text-bg-warning",
+            created_at=datetime.now(UTC),
+            author="Автор",
+            assignee="—",
+            parent="УРЗА-Тест",
+            parent_id=uuid7(),
+            url="/objects/urza/test?tab=instruction",
+            actions=(),
+            tab="review",
+        ),
+    ]
+    work_item_service = WorkItemService([FakeSourceForTest(documents)])
+
+    class EmptyStatisticsRepository:
+        async def count_dashboard_statuses(self, **kwargs):
+            return {}, 0
+
+    class EmptyInspectionSource:
+        async def list_for_user(self, user_id, **kwargs):
+            return []
+
+    department_id = uuid7()
+    statistics_user = SimpleNamespace(
+        id=user.id,
+        role=UserRole.MANAGER,
+        enterprise_id=department_id,
+        active=True,
+        deleted_at=None,
+    )
+    statistics_access = SimpleNamespace(
+        user_repository=SimpleNamespace(
+            get_by_id=AsyncMock(return_value=statistics_user)
+        )
+    )
+    statistics_service = TaskStatisticsService(
+        task_repository=EmptyStatisticsRepository(),
+        inspection_repository=EmptyStatisticsRepository(),
+        enterprise_repository=SimpleNamespace(
+            get_by_id=AsyncMock(
+                return_value=SimpleNamespace(id=department_id)
+            )
+        ),
+        access_service=statistics_access,
+        work_item_service=work_item_service,
+        inspection_work_item_source=EmptyInspectionSource(),
+    )
+
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: work_item_service
+    app.dependency_overrides[get_inspection_work_item_source] = EmptyInspectionSource
+    app.dependency_overrides[get_task_statistics_service] = lambda: statistics_service
+
+    try:
+        full_list = client.get("/tasks")
+        filtered = client.get("/tasks?stat=review")
+        statistics = client.get("/task-statistics")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert (
+        full_list.status_code
+        == filtered.status_code
+        == statistics.status_code
+        == 200
+    )
+    review_pane = _pane_text(full_list.text, "review-pane")
+    for item in documents:
+        assert item.item_type in review_pane
+        assert item.item_type in filtered.text
+    assert "Самостоятельная программа" in review_pane
+    assert "Самостоятельная инструкция URZA" in review_pane
+    assert 'class="task-statistic-value">2</span>' in statistics.text
+
+
+def test_review_list_stats_keep_archived_urza_task_and_inspection():
+    from app.application.tasks.statistics import TaskStatisticsService
+    from app.application.work_items.service import InspectionTaskWorkItemSource
+    from app.presentation.dependencies.services import get_task_statistics_service
+
+    user = _user(uuid7(), role=UserRole.MANAGER)
+    task = _task(user.id, TaskStatus.UNDER_REVIEW)
+    task.urza.deleted_at = datetime(2026, 10, 20, tzinfo=UTC)
+    inspection = SimpleNamespace(
+        id=uuid7(),
+        substation_id=uuid7(),
+        substation=SimpleNamespace(dispatch_name="ПС-Тест"),
+        created_by=user.id,
+        created_by_user=SimpleNamespace(full_name="Автор"),
+        assigned_to=user.id,
+        assigned_to_user=SimpleNamespace(full_name="Исполнитель"),
+        created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        status=TaskStatus.UNDER_REVIEW,
+        deadline_at=None,
+        deleted_at=None,
+    )
+
+    class AccessForArchivedURZA(FakeAccessService):
+        def __init__(self):
+            super().__init__()
+            self.department_id = uuid7()
+            self.user_repository = SimpleNamespace(
+                get_by_id=AsyncMock(
+                    return_value=SimpleNamespace(
+                        id=user.id,
+                        role=user.role,
+                        enterprise_id=self.department_id,
+                        active=True,
+                        deleted_at=None,
+                    )
+                )
+            )
+            self.accessed_urzas = []
+
+        async def can_access_urza(self, user_id, urza_id):
+            self.accessed_urzas.append(urza_id)
+            return True
+
+    class EmptyStatisticsRepository:
+        async def count_dashboard_statuses(self, **kwargs):
+            return {}, 0
+
+    access = AccessForArchivedURZA()
+    client = _client(
+        user,
+        FakeTaskRepository([task]),
+        access,
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository([inspection])
+    )
+    statistics_service = TaskStatisticsService(
+        task_repository=EmptyStatisticsRepository(),
+        inspection_repository=EmptyStatisticsRepository(),
+        enterprise_repository=SimpleNamespace(
+            get_by_id=AsyncMock(
+                return_value=SimpleNamespace(id=access.department_id)
+            )
+        ),
+        access_service=access,
+        work_item_service=app.dependency_overrides[get_work_item_service](),
+        inspection_work_item_source=InspectionTaskWorkItemSource(
+            repository=app.dependency_overrides[
+                get_inspection_task_repository
+            ](),
+            access_service=access,
+            inspection_service=app.dependency_overrides[
+                get_inspection_task_service
+            ](),
+        ),
+    )
+    app.dependency_overrides[get_task_statistics_service] = (
+        lambda: statistics_service
+    )
+
+    try:
+        full_list = client.get("/tasks")
+        review_filter = client.get("/tasks?stat=review")
+        statistics = client.get("/task-statistics")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert (
+        full_list.status_code
+        == review_filter.status_code
+        == statistics.status_code
+        == 200
+    )
+    for response in (full_list, review_filter):
+        assert "Проверить схему" in response.text
+        assert "Осмотр ПС · ПС-Тест" in response.text
+    assert "Проверить схему" in _pane_text(full_list.text, "review-pane")
+    assert "Осмотр ПС · ПС-Тест" in _pane_text(full_list.text, "review-pane")
+    assert "На рассмотрении" in statistics.text
+    assert ">2<" in statistics.text
+    assert access.accessed_urzas == [task.urza_id] * 3
+
+
+def test_overdue_statistics_filter_excludes_terminal_tasks():
+    user = _user(uuid7())
+    now = datetime.now(UTC)
+    items = [
+        WorkItem(
+            item_type="Задание · Схема",
+            title="Просроченное в работе",
+            status="В работе",
+            status_class="text-bg-primary",
+            created_at=now,
+            author="Автор",
+            assignee="Исполнитель",
+            parent="УРЗА-1",
+            parent_id=uuid7(),
+            url="/tasks/work",
+            actions=(),
+            tab="work",
+            status_code=TaskStatus.IN_PROGRESS.value,
+            deadline_at=now - timedelta(days=1),
+        ),
+        WorkItem(
+            item_type="Задание · Схема",
+            title="Просроченное закрытое",
+            status="Закрыто",
+            status_class="text-bg-success",
+            created_at=now,
+            author="Автор",
+            assignee="Исполнитель",
+            parent="УРЗА-1",
+            parent_id=uuid7(),
+            url="/tasks/closed",
+            actions=(),
+            tab="completed",
+            status_code=TaskStatus.CLOSED.value,
+            deadline_at=now - timedelta(days=1),
+        ),
+    ]
+    inspection = SimpleNamespace(
+        id=uuid7(),
+        substation_id=uuid7(),
+        substation=SimpleNamespace(dispatch_name="ПС статистики"),
+        created_by=user.id,
+        created_by_user=SimpleNamespace(full_name="Руководитель"),
+        assigned_to=user.id,
+        assigned_to_user=SimpleNamespace(full_name="Исполнитель"),
+        created_at=now,
+        status=TaskStatus.IN_PROGRESS,
+        deadline_at=now - timedelta(days=1),
+        deleted_at=None,
+    )
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        FakeAccessService(),
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_inspection_task_repository] = lambda: (
+        FakeInspectionTaskRepository([inspection])
+    )
+    app.dependency_overrides[get_work_item_service] = lambda: WorkItemService(
+        [FakeSourceForTest(items)]
+    )
+
+    try:
+        response = client.get("/tasks?stat=overdue")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert "Просроченное в работе" in response.text
+    assert "Осмотр ПС · ПС статистики" in response.text
+    assert "Просроченное закрытое" not in response.text
+
+
+def test_task_statistics_rejects_unknown_filter():
+    user = _user(uuid7())
+    client = _client(user, FakeTaskRepository([]), FakeAccessService(), FakeTaskService())
+
+    try:
+        response = client.get("/tasks?stat=unknown")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400

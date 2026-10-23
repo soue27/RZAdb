@@ -1,18 +1,30 @@
 <div class="task-statistics-grid">
-    <div class="task-statistic">
-        <span class="task-statistic-label">В работе</span>
-        <strong class="task-statistic-value">{{ statistics.in_progress }}</strong>
-    </div>
-    <div class="task-statistic">
-        <span class="task-statistic-label">На рассмотрении</span>
-        <strong class="task-statistic-value">{{ statistics.under_review }}</strong>
-    </div>
-    <div class="task-statistic">
-        <span class="task-statistic-label">Просрочено</span>
-        <strong class="task-statistic-value">{{ statistics.overdue }}</strong>
-    </div>
-    <div class="task-statistic">
-        <span class="task-statistic-label">Завершено за всё время</span>
-        <strong class="task-statistic-value">{{ statistics.closed }}</strong>
-    </div>
+    <a class="task-statistic task-statistic-work" href="/tasks?stat=work">
+        <span class="task-statistic-icon material-icons" aria-hidden="true">pending_actions</span>
+        <span class="task-statistic-copy">
+            <span class="task-statistic-value">{{ statistics.in_progress }}</span>
+            <span class="task-statistic-label">В работе</span>
+        </span>
+    </a>
+    <a class="task-statistic task-statistic-review" href="/tasks?stat=review">
+        <span class="task-statistic-icon material-icons" aria-hidden="true">rate_review</span>
+        <span class="task-statistic-copy">
+            <span class="task-statistic-value">{{ statistics.under_review }}</span>
+            <span class="task-statistic-label">На рассмотрении</span>
+        </span>
+    </a>
+    <a class="task-statistic task-statistic-overdue" href="/tasks?stat=overdue">
+        <span class="task-statistic-icon material-icons" aria-hidden="true">warning_amber</span>
+        <span class="task-statistic-copy">
+            <span class="task-statistic-value">{{ statistics.overdue }}</span>
+            <span class="task-statistic-label">Просрочено</span>
+        </span>
+    </a>
+    <a class="task-statistic task-statistic-closed" href="/tasks?stat=closed">
+        <span class="task-statistic-icon material-icons" aria-hidden="true">task_alt</span>
+        <span class="task-statistic-copy">
+            <span class="task-statistic-value">{{ statistics.closed }}</span>
+            <span class="task-statistic-label">Завершено за всё время</span>
+        </span>
+    </a>
 </div>

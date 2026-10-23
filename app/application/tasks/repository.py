@@ -73,24 +73,19 @@ class TaskRepository:
         if not enterprise_ids:
             return {}, 0
 
-        task_urza = aliased(URZA)
-        task_connection = aliased(Connection)
-        urza_substation = aliased(Substation)
-        direct_substation = aliased(Substation)
-        visible_in_enterprise = or_(
-            and_(
-                Task.urza_id.is_not(None),
-                or_(
-                    role is UserRole.SUPERADMIN,
-                    task_urza.deleted_at.is_(None),
-                ),
-                urza_substation.enterprise_id.in_(enterprise_ids),
-            ),
-            and_(
-                Task.substation_id.is_not(None),
-                direct_substation.enterprise_id.in_(enterprise_ids),
-            ),
+        statuses = (
+            TaskStatus.CREATED,
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+            TaskStatus.COMPLETED,
+            TaskStatus.CLOSED,
+            TaskStatus.REJECTED,
         )
+        status_counts = [
+            func.count(case((Task.status == status, Task.id)))
+            for status in statuses
+        ]
         overdue = func.count(
             case(
                 (
@@ -103,8 +98,22 @@ class TaskRepository:
                 )
             )
         )
+        task_urza = aliased(URZA)
+        task_connection = aliased(Connection)
+        urza_substation = aliased(Substation)
+        direct_substation = aliased(Substation)
+        visible_in_enterprise = or_(
+            and_(
+                Task.urza_id.is_not(None),
+                urza_substation.enterprise_id.in_(enterprise_ids),
+            ),
+            and_(
+                Task.substation_id.is_not(None),
+                direct_substation.enterprise_id.in_(enterprise_ids),
+            ),
+        )
         query = (
-            select(Task.status, func.count(Task.id), overdue)
+            select(*status_counts, overdue)
             .outerjoin(task_urza, Task.urza_id == task_urza.id)
             .outerjoin(task_connection, task_urza.connection_id == task_connection.id)
             .outerjoin(urza_substation, task_connection.substation_id == urza_substation.id)
@@ -123,15 +132,8 @@ class TaskRepository:
                 or_(Task.created_by == user_id, Task.assigned_to == user_id, reviewed)
             )
 
-        result = await self.session.execute(
-            query.group_by(Task.status)
-        )
-        rows = result.all()
-        return (
-            {status: count for status, count, _ in rows},
-            sum(overdue_count for _, _, overdue_count in rows),
-        )
-
+        row = (await self.session.execute(query)).one()
+        return dict(zip(statuses, row[:-1], strict=True)), row[-1]
     async def get_history(self, task_id: UUID) -> list[TaskHistory]:
         result = await self.session.execute(
             select(TaskHistory)

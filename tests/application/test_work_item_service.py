@@ -74,6 +74,7 @@ async def test_task_source_keeps_assignment_and_access_filters():
         created_by_user=SimpleNamespace(full_name="Руководитель"),
         status=TaskStatus.IN_PROGRESS,
         created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        deadline_at=None,
         deleted_at=None,
     )
     reassigned = SimpleNamespace(
@@ -135,6 +136,7 @@ async def test_superadmin_sees_only_tasks_where_is_participant(
         created_by_user=SimpleNamespace(full_name="Автор"),
         status=TaskStatus.CLOSED if is_reviewer else TaskStatus.IN_PROGRESS,
         created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        deadline_at=None,
         deleted_at=None,
     )
 
@@ -239,6 +241,7 @@ async def test_closed_maintenance_task_remains_in_work_items():
         created_by_user=SimpleNamespace(full_name="Руководитель"),
         status=TaskStatus.CLOSED,
         created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        deadline_at=None,
         deleted_at=None,
     )
 

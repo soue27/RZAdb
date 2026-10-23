@@ -54,6 +54,7 @@ from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
 from app.application.work_items.service import (
+    InspectionTaskWorkItemSource,
     InstructionWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
@@ -289,18 +290,6 @@ def get_schema_service(
     )
 
 
-def get_task_statistics_service(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    access_service: Annotated[AccessService, Depends(get_access_service)],
-) -> TaskStatisticsService:
-    return TaskStatisticsService(
-        task_repository=TaskRepository(session),
-        inspection_repository=InspectionTaskRepository(session),
-        enterprise_repository=EnterpriseRepository(session),
-        access_service=access_service,
-    )
-
-
 def get_task_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TaskRepository:
@@ -394,4 +383,44 @@ def get_work_item_service(
             RZAInstructionWorkItemSource(rza_instruction_service),
             SelectivitySchemeWorkItemSource(selectivity_scheme_service),
         ]
+    )
+
+
+def get_inspection_work_item_source(
+    inspection_repository: Annotated[
+        InspectionTaskRepository,
+        Depends(get_inspection_task_repository),
+    ],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    inspection_service: Annotated[
+        InspectionTaskService,
+        Depends(get_inspection_task_service),
+    ],
+) -> InspectionTaskWorkItemSource:
+    return InspectionTaskWorkItemSource(
+        repository=inspection_repository,
+        access_service=access_service,
+        inspection_service=inspection_service,
+    )
+
+
+def get_task_statistics_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    work_item_service: Annotated[
+        WorkItemService,
+        Depends(get_work_item_service),
+    ],
+    inspection_work_item_source: Annotated[
+        InspectionTaskWorkItemSource,
+        Depends(get_inspection_work_item_source),
+    ],
+) -> TaskStatisticsService:
+    return TaskStatisticsService(
+        task_repository=TaskRepository(session),
+        inspection_repository=InspectionTaskRepository(session),
+        enterprise_repository=EnterpriseRepository(session),
+        access_service=access_service,
+        work_item_service=work_item_service,
+        inspection_work_item_source=inspection_work_item_source,
     )

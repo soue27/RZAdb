@@ -4,12 +4,14 @@ from typing import Protocol
 from uuid import UUID
 
 from app.application.access.service import AccessService
+from app.application.inspections.repository import InspectionTaskRepository
+from app.application.inspections.service import InspectionTaskService
 from app.application.otd.service import OTDService
 from app.application.programs.service import ProgramService
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.schema.service import SchemaService
-from app.application.settings.service import SettingsService
 from app.application.selectivity_schemes.service import SelectivitySchemeService
+from app.application.settings.service import SettingsService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.urza_instructions.service import URZAInstructionService
@@ -97,6 +99,8 @@ class WorkItem:
     actions: tuple[str, ...]
     tab: str = "work"
     can_approve: bool = False
+    status_code: str | None = None
+    deadline_at: datetime | None = None
 
 
 class WorkItemSource(Protocol):
@@ -169,6 +173,8 @@ class TaskWorkItemSource:
                     can_approve=bool(
                         actions.intersection({"close_task", "return_for_revision"})
                     ),
+                    status_code=task.status.value,
+                    deadline_at=task.deadline_at,
                     created_at=task.created_at,
                     author=(
                         task.created_by_user.full_name if task.created_by_user else "—"
@@ -186,6 +192,102 @@ class TaskWorkItemSource:
                     parent_id=task.urza_id or task.substation_id,
                     url=f"/tasks/{task.id}",
                     actions=_action_labels(actions),
+                )
+            )
+        return items
+
+
+_INSPECTION_STATUS_LABELS = {
+    TaskStatus.CREATED: "Создано",
+    TaskStatus.ASSIGNED: "Назначено",
+    TaskStatus.IN_PROGRESS: "В работе",
+    TaskStatus.COMPLETED: "Выполнено",
+    TaskStatus.UNDER_REVIEW: "На проверке",
+    TaskStatus.CLOSED: "Закрыто",
+    TaskStatus.REJECTED: "Отклонено",
+}
+
+
+class InspectionTaskWorkItemSource:
+    def __init__(
+        self,
+        repository: InspectionTaskRepository,
+        access_service: AccessService,
+        inspection_service: InspectionTaskService,
+    ) -> None:
+        self.repository = repository
+        self.access_service = access_service
+        self.inspection_service = inspection_service
+
+    async def list_for_user(
+        self,
+        user_id: UUID,
+        prior_items: tuple[WorkItem, ...] = (),
+        *,
+        role: UserRole | None = None,
+    ) -> list[WorkItem]:
+        user = await self.access_service.user_repository.get_by_id(user_id)
+        if user is None or not user.active or user.deleted_at is not None:
+            return []
+        role = role or user.role
+
+        reviewed_task_ids = set()
+        if role is UserRole.SUPERADMIN:
+            reviewed_task_ids = await self.repository.list_reviewed_task_ids(user_id)
+
+        items = []
+        for task in await self.repository.list_active():
+            if not await self.access_service.can_access_substation(
+                user_id, task.substation_id
+            ):
+                continue
+
+            if role is UserRole.ENGINEER and task.assigned_to != user_id:
+                continue
+
+            if role is UserRole.SUPERADMIN and not (
+                task.created_by == user_id
+                or task.assigned_to == user_id
+                or task.id in reviewed_task_ids
+            ):
+                continue
+
+            can_approve = await self.inspection_service.can_review(
+                task.id,
+                actor_id=user_id,
+            )
+            tab = (
+                "review"
+                if task.status is TaskStatus.UNDER_REVIEW
+                else "completed"
+                if task.status is TaskStatus.CLOSED
+                else "work"
+            )
+            items.append(
+                WorkItem(
+                    item_type="Задача осмотра",
+                    title=f"Осмотр ПС · {task.substation.dispatch_name}",
+                    status=_INSPECTION_STATUS_LABELS[task.status],
+                    status_class=_TASK_STATUS_BADGES[task.status.value],
+                    created_at=task.created_at,
+                    author=(
+                        task.created_by_user.full_name
+                        if task.created_by_user
+                        else "—"
+                    ),
+                    assignee=(
+                        task.assigned_to_user.full_name
+                        if task.assigned_to_user
+                        else "Не назначен"
+                    ),
+                    parent=task.substation.dispatch_name,
+                    parent_id=task.substation_id,
+                    url=f"/objects/substation/inspection-tasks/{task.id}",
+                    actions=(),
+                    tab=tab,
+                    can_approve=can_approve,
+                    status_code=task.status.value,
+                    deadline_at=task.deadline_at,
                 )
             )
         return items

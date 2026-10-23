@@ -81,6 +81,19 @@ class InspectionTaskRepository:
         if not enterprise_ids:
             return {}, 0
 
+        statuses = (
+            TaskStatus.CREATED,
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+            TaskStatus.COMPLETED,
+            TaskStatus.CLOSED,
+            TaskStatus.REJECTED,
+        )
+        status_counts = [
+            func.count(case((InspectionTask.status == status, InspectionTask.id)))
+            for status in statuses
+        ]
         overdue = func.count(
             case(
                 (
@@ -94,7 +107,7 @@ class InspectionTaskRepository:
             )
         )
         query = (
-            select(InspectionTask.status, func.count(InspectionTask.id), overdue)
+            select(*status_counts, overdue)
             .join(Substation, InspectionTask.substation_id == Substation.id)
             .where(
                 InspectionTask.deleted_at.is_(None),
@@ -117,13 +130,8 @@ class InspectionTaskRepository:
                 )
             )
 
-        result = await self.session.execute(query.group_by(InspectionTask.status))
-        rows = result.all()
-        return (
-            {status: count for status, count, _ in rows},
-            sum(overdue_count for _, _, overdue_count in rows),
-        )
-
+        row = (await self.session.execute(query)).one()
+        return dict(zip(statuses, row[:-1], strict=True)), row[-1]
     async def get_history(self, task_id: UUID) -> list[InspectionHistory]:
         result = await self.session.scalars(
             select(InspectionHistory)

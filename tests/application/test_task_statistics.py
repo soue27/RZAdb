@@ -52,27 +52,60 @@ class FakeStatisticsRepository:
         return self.statuses, self.overdue
 
 
+class FakeWorkItemService:
+    def __init__(self, items=()):
+        self.items = list(items)
+
+    async def list_for_user(self, user_id):
+        return self.items
+
+
+class FakeInspectionWorkItemSource:
+    def __init__(self, items=()):
+        self.items = list(items)
+
+    async def list_for_user(self, user_id, **kwargs):
+        return self.items
+
+
 def _enterprise(enterprise_id, parent_id=None):
     return SimpleNamespace(id=enterprise_id, parent_id=parent_id, deleted_at=None)
 
 
 def _service(user, *, roots=(), enterprises=(), task_statuses=None,
-             task_overdue=0, inspection_statuses=None, inspection_overdue=0):
+             task_overdue=0, inspection_statuses=None, inspection_overdue=0,
+             work_items=None, inspection_items=None):
     task_repository = FakeStatisticsRepository(task_statuses or {}, task_overdue)
     inspection_repository = FakeStatisticsRepository(
         inspection_statuses or {}, inspection_overdue
     )
+    if work_items is None:
+        work_items = [
+            SimpleNamespace(tab="review")
+            for _ in range((task_statuses or {}).get(TaskStatus.UNDER_REVIEW, 0))
+        ]
+    if inspection_items is None:
+        inspection_items = [
+            SimpleNamespace(tab="review")
+            for _ in range(
+                (inspection_statuses or {}).get(TaskStatus.UNDER_REVIEW, 0)
+            )
+        ]
     service = TaskStatisticsService(
         task_repository=task_repository,
         inspection_repository=inspection_repository,
         enterprise_repository=FakeEnterpriseRepository(enterprises),
         access_service=FakeAccessService(user, roots),
+        work_item_service=FakeWorkItemService(work_items),
+        inspection_work_item_source=FakeInspectionWorkItemSource(
+            inspection_items
+        ),
     )
     return service, task_repository, inspection_repository
 
 
 @pytest.mark.asyncio
-async def test_engineer_statistics_include_assigned_work_and_inspections_only():
+async def test_engineer_statistics_keep_existing_non_review_counts():
     enterprise_id = uuid4()
     user = SimpleNamespace(
         id=uuid4(),
@@ -130,11 +163,61 @@ async def test_manager_scope_is_own_department_only():
             _enterprise(child_id, department_id),
             _enterprise(other_id),
         ],
+        task_statuses={TaskStatus.UNDER_REVIEW: 2},
+        inspection_statuses={TaskStatus.UNDER_REVIEW: 1},
     )
 
-    await service.get_for_user(user.id)
+    result = await service.get_for_user(user.id)
 
+    # The statistic includes the two ordinary tasks and a separate
+    # inspection task visible in the same department.
+    assert result["under_review"] == 3
+    assert tasks.calls[0]["role"] is UserRole.MANAGER
     assert tasks.calls[0]["enterprise_ids"] == {department_id}
+
+
+@pytest.mark.asyncio
+async def test_under_review_counts_visible_work_items_and_inspections():
+    department_id = uuid4()
+    user = SimpleNamespace(
+        id=uuid4(),
+        role=UserRole.MANAGER,
+        enterprise_id=department_id,
+        active=True,
+        deleted_at=None,
+    )
+    service, task_repository, inspection_repository = _service(
+        user,
+        enterprises=[_enterprise(department_id)],
+        task_statuses={
+            TaskStatus.UNDER_REVIEW: 99,
+            TaskStatus.IN_PROGRESS: 2,
+            TaskStatus.CLOSED: 3,
+        },
+        task_overdue=4,
+        inspection_statuses={
+            TaskStatus.UNDER_REVIEW: 88,
+            TaskStatus.CLOSED: 5,
+        },
+        inspection_overdue=6,
+        work_items=[
+            SimpleNamespace(tab="review", item_type="Самостоятельная программа"),
+            SimpleNamespace(tab="review", item_type="Самостоятельная инструкция URZA"),
+            SimpleNamespace(tab="completed", item_type="Задание · Схемы"),
+        ],
+        inspection_items=[SimpleNamespace(tab="review")],
+    )
+
+    result = await service.get_for_user(user.id)
+
+    assert result == {
+        "in_progress": 2,
+        "under_review": 3,
+        "overdue": 10,
+        "closed": 8,
+    }
+    assert task_repository.calls[0]["enterprise_ids"] == {department_id}
+    assert inspection_repository.calls[0]["enterprise_ids"] == {department_id}
 
 
 @pytest.mark.asyncio

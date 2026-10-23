@@ -116,16 +116,16 @@ async def test_get_history_orders_events_and_loads_actor() -> None:
 async def test_dashboard_task_count_is_aggregated_and_scoped_to_engineer():
     from datetime import UTC, datetime
 
-    from app.domain.enums import UserRole
+    from app.domain.enums import TaskStatus, UserRole
 
     session = AsyncMock()
     result = MagicMock()
-    result.all.return_value = []
+    result.one.return_value = (0, 0, 0, 2, 0, 0, 0, 1)
     session.execute.return_value = result
     repository = TaskRepository(session)
     user_id, enterprise_id = uuid7(), uuid7()
 
-    await repository.count_dashboard_statuses(
+    counts, overdue = await repository.count_dashboard_statuses(
         user_id=user_id,
         role=UserRole.ENGINEER,
         enterprise_ids={enterprise_id},
@@ -134,9 +134,14 @@ async def test_dashboard_task_count_is_aggregated_and_scoped_to_engineer():
 
     statement = session.execute.await_args.args[0]
     sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
-    assert "GROUP BY tasks.status" in sql
+    assert "CASE WHEN (tasks.status = 'under_review'" in sql
     assert "tasks.assigned_to =" in sql
     assert "tasks.deleted_at IS NULL" in sql
     assert "tasks.deadline_at" in sql
     assert "closed" in sql and "rejected" in sql
-    assert "urzas_1.deleted_at IS NULL" in sql
+    # List access is allowed for archived URZA when its parent remains
+    # accessible; dashboard counts must not silently drop those tasks.
+    assert "urzas_1.deleted_at IS NULL" not in sql
+    assert "substations_1.enterprise_id IN" in sql
+    assert counts[TaskStatus.UNDER_REVIEW] == 2
+    assert overdue == 1

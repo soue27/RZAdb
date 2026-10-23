@@ -7,12 +7,13 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.access.service import AccessService
-from app.application.inspections.repository import InspectionTaskRepository
-from app.application.inspections.service import InspectionTaskService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.service import TaskService
 from app.application.tree.service import TreeService
-from app.application.work_items.service import WorkItemService
+from app.application.work_items.service import (
+    InspectionTaskWorkItemSource,
+    WorkItemService,
+)
 from app.domain.enums import (
     MaintenanceType,
     TaskStatus,
@@ -27,8 +28,7 @@ from app.presentation.auth.dependencies import (
 )
 from app.presentation.dependencies.services import (
     get_access_service,
-    get_inspection_task_repository,
-    get_inspection_task_service,
+    get_inspection_work_item_source,
     get_task_repository,
     get_task_service,
     get_tree_service,
@@ -90,17 +90,6 @@ HISTORY_EVENT_LABELS = {
     "rejected": "Отказ от задания",
     "reassigned": "Задание переназначено",
 }
-
-INSPECTION_STATUS_LABELS = {
-    TaskStatus.CREATED: "Создано",
-    TaskStatus.ASSIGNED: "Назначено",
-    TaskStatus.IN_PROGRESS: "В работе",
-    TaskStatus.COMPLETED: "Выполнено",
-    TaskStatus.UNDER_REVIEW: "На проверке",
-    TaskStatus.CLOSED: "Закрыто",
-    TaskStatus.REJECTED: "Отклонено",
-}
-
 
 def _default_task_return_url(
     *,
@@ -572,52 +561,23 @@ async def get_tasks(
         Depends(get_work_item_service),
     ],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
-    inspection_repository: Annotated[
-        InspectionTaskRepository,
-        Depends(get_inspection_task_repository),
-        ],
-    inspection_service: Annotated[
-        InspectionTaskService,
-        Depends(get_inspection_task_service),
+    inspection_work_item_source: Annotated[
+        InspectionTaskWorkItemSource,
+        Depends(get_inspection_work_item_source),
     ],
-    access_service: Annotated[AccessService, Depends(get_access_service)],
+    stat: str | None = None,
 ):
+    if stat not in {None, "work", "review", "overdue", "closed"}:
+        raise HTTPException(status_code=400, detail="Неизвестный фильтр заданий.")
+
     work_items = await work_item_service.list_for_user(current_user.id)
-    inspection_tasks = []
-
-    reviewed_inspection_ids = set()
-    if current_user.role is UserRole.SUPERADMIN:
-        reviewed_inspection_ids = (
-            await inspection_repository.list_reviewed_task_ids(
-                current_user.id,
-            )
-        )
-
-    for task in await inspection_repository.list_active():
-        if not await access_service.can_access_substation(
-            current_user.id, task.substation_id
-        ):
-            continue
-
-        if (
-            current_user.role is UserRole.ENGINEER
-            and task.assigned_to != current_user.id
-        ):
-            continue
-
-        if current_user.role is UserRole.SUPERADMIN:
-            is_author = task.created_by == current_user.id
-            is_assignee = task.assigned_to == current_user.id
-            is_reviewer = task.id in reviewed_inspection_ids
-
-            if not (is_author or is_assignee or is_reviewer):
-                continue
-
-        inspection_tasks.append(task)
-
+    inspection_items = await inspection_work_item_source.list_for_user(
+        current_user.id,
+        role=current_user.role,
+    )
     all_items = []
 
-    for item in work_items:
+    for item in (*work_items, *inspection_items):
         all_items.append({
             "tab": item.tab,
             "title": item.title,
@@ -630,41 +590,12 @@ async def get_tasks(
             "status_class": item.status_class,
             "url": item.url,
             "can_approve": item.can_approve,
-        })
-
-    for task in inspection_tasks:
-        if task.status is TaskStatus.UNDER_REVIEW:
-            tab = "review"
-        elif task.status is TaskStatus.CLOSED:
-            tab = "completed"
-        else:
-            tab = "work"
-
-        can_approve = (
-            await inspection_service.can_review(
-                task.id,
-                actor_id=current_user.id,
-            )
-        )
-
-        all_items.append({
-            "tab": tab,
-            "title": f"Осмотр ПС · {task.substation.dispatch_name}",
-            "item_type": "Задача осмотра",
-            "parent": task.substation.dispatch_name,
-            "author": (
-                task.created_by_user.full_name
-                if task.created_by_user else "—"
+            "status_code": item.status_code,
+            "deadline_at": item.deadline_at,
+            "is_task": (
+                item.item_type.startswith("Задание · ")
+                or item.item_type == "Задача осмотра"
             ),
-            "assignee": (
-                task.assigned_to_user.full_name
-                if task.assigned_to_user else "Не назначен"
-            ),
-            "created_at": task.created_at,
-            "status": INSPECTION_STATUS_LABELS[task.status],
-            "status_class": TASK_STATUS_BADGES[task.status],
-            "url": f"/objects/substation/inspection-tasks/{task.id}",
-            "can_approve": can_approve,
         })
 
     all_items.sort(
@@ -672,6 +603,53 @@ async def get_tasks(
         reverse=True,
     )
 
+    if stat is not None:
+        now = datetime.now().astimezone()
+        status_groups = {
+            "work": {TaskStatus.CREATED.value, TaskStatus.ASSIGNED.value, TaskStatus.IN_PROGRESS.value},
+            "closed": {TaskStatus.CLOSED.value},
+        }
+        if stat == "overdue":
+            all_items = [
+                item for item in all_items
+                if item["is_task"]
+                and item["status_code"] not in {
+                    TaskStatus.CLOSED.value,
+                    TaskStatus.REJECTED.value,
+                }
+                and item["deadline_at"] is not None
+                and (
+                    item["deadline_at"].astimezone()
+                    if item["deadline_at"].tzinfo is None
+                    else item["deadline_at"]
+                ) < now
+            ]
+        else:
+            if stat == "review":
+                all_items = [
+                    item for item in all_items if item["tab"] == "review"
+                ]
+            else:
+                allowed_statuses = status_groups[stat]
+                all_items = [
+                    item for item in all_items
+                    if item["is_task"]
+                    and item["status_code"] in allowed_statuses
+                ]
+
+    active_tab = {
+        "work": "work",
+        "review": "review",
+        "closed": "completed",
+    }.get(stat, "work")
+    if stat == "overdue":
+        active_tab = next(
+            (
+                tab for tab in ("work", "review", "completed")
+                if any(item["tab"] == tab for item in all_items)
+            ),
+            "work",
+        )
 
     tree = await tree_service.get_tree(
         user_id=current_user.id,
@@ -684,12 +662,13 @@ async def get_tasks(
             "current_user": current_user,
             "tree": tree,
             "all_items": all_items,
-            "inspection_status_labels": INSPECTION_STATUS_LABELS,
             "status_badges": TASK_STATUS_BADGES,
             "can_approve_items": (
                     current_user.role is UserRole.MANAGER
                     and bool(tree)
             ),
+            "active_tab": active_tab,
+            "stat_filter": stat,
         },
     )
 
