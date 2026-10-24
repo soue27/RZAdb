@@ -304,14 +304,11 @@ async def _create_document(
     except FileUploadValidationError as exc:
         for uploaded_file in uploaded:
             try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
+                await file_service.discard_upload(uploaded_file)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
-                    "валидации документа подстанции: file_id=%s",
+                    "Не удалось удалить загруженный объект после ошибки "
+                    "создания документа подстанции: file_id=%s",
                     uploaded_file.id,
                 )
 
@@ -332,13 +329,10 @@ async def _create_document(
     except (ValueError, PermissionError) as exc:
         for uploaded_file in uploaded:
             try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
+                await file_service.discard_upload(uploaded_file)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
+                    "Не удалось удалить загруженный объект после ошибки "
                     "создания документа подстанции: file_id=%s",
                     uploaded_file.id,
                 )
@@ -360,14 +354,11 @@ async def _create_document(
     except Exception:
         for uploaded_file in uploaded:
             try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
+                await file_service.discard_upload(uploaded_file)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки создания документа: "
-                    "file_id=%s",
+                    "Не удалось удалить загруженный объект после ошибки "
+                    "создания документа подстанции: file_id=%s",
                     uploaded_file.id,
                 )
         raise

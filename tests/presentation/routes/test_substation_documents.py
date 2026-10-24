@@ -215,7 +215,7 @@ def test_substation_instruction_tab_renders_version_details_without_dto_attribut
 
 
 
-def test_selectivity_scheme_unexpected_error_archives_uploaded_file():
+def test_selectivity_scheme_unexpected_error_discards_uploaded_file():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id = uuid7()
     files = _Files()
@@ -243,9 +243,8 @@ def test_selectivity_scheme_unexpected_error_archives_uploaded_file():
                 files={"scan_file": ("scan.pdf", b"pdf", "application/pdf")},
             )
 
-        assert files.discarded == []
-        assert len(files.archived) == 1
-        assert files.archived[0]["user_id"] == user.id
+        assert len(files.discarded) == 1
+        assert files.archived == []
     finally:
         app.dependency_overrides.clear()
 
