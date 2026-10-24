@@ -37,6 +37,7 @@ from app.presentation.dependencies.services import (
     get_task_repository,
     get_tree_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 router = APIRouter(prefix="/objects/substation", tags=["substation documents"])
 templates = Jinja2Templates(directory="app/presentation/templates")
@@ -151,7 +152,7 @@ async def _upload(file_service: FileService, user: User, upload: UploadFile):
     filename = upload.filename or "document"
     return await file_service.upload(
         actor_id=user.id,
-        content=await upload.read(),
+        content=await read_upload_content(upload),
         original_name=filename,
         display_name=filename,
         extension=("." + filename.rsplit(".", 1)[1]) if "." in filename else "",

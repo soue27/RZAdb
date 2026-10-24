@@ -26,6 +26,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 logger = logging.getLogger(__name__)
 
@@ -444,7 +445,7 @@ async def create_urza_program(
 
     try:
         # Загружаем обязательный скан.
-        scan_content = await scan_file.read()
+        scan_content = await read_upload_content(scan_file)
 
         if not scan_content:
             raise HTTPException(
@@ -472,7 +473,7 @@ async def create_urza_program(
         editable_file_id = None
 
         if editable_file and editable_file.filename:
-            editable_content = await editable_file.read()
+            editable_content = await read_upload_content(editable_file)
 
             if not editable_content:
                 raise HTTPException(
@@ -667,7 +668,7 @@ async def update_urza_program(
 
     try:
         if scan_file and scan_file.filename:
-            scan_content = await scan_file.read()
+            scan_content = await read_upload_content(scan_file)
 
             if not scan_content:
                 raise HTTPException(
@@ -694,7 +695,7 @@ async def update_urza_program(
             uploaded_file_keys.append(saved_scan.s3_key)
 
         if has_editable_upload:
-            editable_content = await editable_file.read()
+            editable_content = await read_upload_content(editable_file)
 
             if not editable_content:
                 raise HTTPException(

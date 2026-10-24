@@ -9,6 +9,11 @@ from app.application.files.repository import FileRepository
 from app.domain.file import File
 from app.infrastructure.storage.base import ObjectStorage
 
+from app.application.files.validation import (
+    MIME_TYPES_BY_EXTENSION,
+    validate_upload,
+)
+
 logger = logging.getLogger(__name__)
 
 class FileService:
@@ -32,7 +37,14 @@ class FileService:
     ) -> File:
         uploaded_at = datetime.now(UTC)
 
-        extension = extension.lstrip(".").lower()
+        normalized_extension = validate_upload(
+            filename=original_name,
+            extension=extension,
+            content_size=len(content),
+        )
+
+        extension = normalized_extension.lstrip(".")
+        mime_type = MIME_TYPES_BY_EXTENSION[normalized_extension]
 
         key = str(
             PurePosixPath(

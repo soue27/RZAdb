@@ -28,6 +28,7 @@ from app.presentation.dependencies.services import (
     get_file_access_service,
     get_file_service,
 )
+from app.application.files import validation
 
 
 @pytest.fixture
@@ -427,3 +428,45 @@ async def test_ambiguous_owner_returns_safe_internal_error_without_storage_read(
     )
     state["access_service"].can_access_urza.assert_not_awaited()
     state["file_service"].storage.download.assert_not_awaited()
+
+
+
+def test_upload_rejects_unsupported_extension(
+    authenticated_client: TestClient,
+) -> None:
+    response = authenticated_client.post(
+        "/files",
+        files={
+            "file": (
+                "payload.exe",
+                b"test content",
+                "application/octet-stream",
+            ),
+        },
+        data={"display_name": "Недопустимый файл"},
+    )
+
+    assert response.status_code == 415
+    assert "Формат файла не поддерживается" in response.json()["detail"]
+
+
+def test_upload_rejects_file_over_size_limit(
+    authenticated_client: TestClient,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(validation, "MAX_FILE_SIZE_BYTES", 10)
+
+    response = authenticated_client.post(
+        "/files",
+        files={
+            "file": (
+                "scan.pdf",
+                b"x" * 11,
+                "application/pdf",
+            ),
+        },
+        data={"display_name": "Скан"},
+    )
+
+    assert response.status_code == 413
+    assert "максимально допустимый размер" in response.json()["detail"]

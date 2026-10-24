@@ -41,6 +41,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -333,7 +334,7 @@ async def create_urza_maintenance(
     uploaded_file_ids: list[UUID] = []
 
     try:
-        signed_content = await signed_form_file.read()
+        signed_content = await read_upload_content(signed_form_file)
 
         saved_signed_form = await file_service.upload(
             actor_id=current_user.id,
@@ -356,7 +357,7 @@ async def create_urza_maintenance(
         scan_protocol_file_id: UUID | None = None
 
         if scan_protocol_file and scan_protocol_file.filename:
-            scan_content = await scan_protocol_file.read()
+            scan_content = await read_upload_content(scan_protocol_file)
 
             saved_scan = await file_service.upload(
                 actor_id=current_user.id,
@@ -384,7 +385,7 @@ async def create_urza_maintenance(
             editable_protocol_file
             and editable_protocol_file.filename
         ):
-            editable_content = await editable_protocol_file.read()
+            editable_content = await read_upload_content(editable_protocol_file)
 
             saved_editable = await file_service.upload(
                 actor_id=current_user.id,

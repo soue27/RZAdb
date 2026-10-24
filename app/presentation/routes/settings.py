@@ -23,6 +23,7 @@ from app.presentation.dependencies.services import (
     get_settings_service,
     get_task_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ async def _upload_signed_form(
 
     return await file_service.upload(
         actor_id=user_id,
-        content=await signed_form_file.read(),
+        content= await read_upload_content(signed_form_file),
         original_name=filename,
         display_name=(
             filename

@@ -35,6 +35,7 @@ from app.presentation.dependencies.services import (
     get_object_service,
     get_tree_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 router = APIRouter(prefix="/objects/substation", tags=["inspection tasks"])
 logger = logging.getLogger(__name__)
@@ -277,7 +278,9 @@ async def _upload(file_service: FileService, user: User, upload: UploadFile | No
         return None
     filename = upload.filename
     return await file_service.upload(
-        actor_id=user.id, content=await upload.read(), original_name=filename,
+        actor_id=user.id,
+        content=await read_upload_content(upload),
+        original_name=filename,
         display_name=filename,
         extension=("." + filename.rsplit(".", 1)[1]) if "." in filename else "",
         mime_type=upload.content_type or "application/octet-stream",

@@ -33,6 +33,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_urza_instruction_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 router = APIRouter(
     prefix="/objects",
@@ -291,7 +292,7 @@ async def _upload(
     upload: UploadFile,
     label: str,
 ):
-    content = await upload.read()
+    content=await read_upload_content(upload),
     filename = upload.filename or label
 
     return await file_service.upload(

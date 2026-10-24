@@ -28,6 +28,7 @@ from app.presentation.dependencies.services import (
     get_schema_service,
     get_task_service,
 )
+from app.presentation.file_uploads import read_upload_content
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/objects", tags=["schemes"])
@@ -154,7 +155,7 @@ async def _upload_file(
     filename = upload.filename or fallback_name
     return await file_service.upload(
         actor_id=user_id,
-        content=await upload.read(),
+        content=await read_upload_content(upload),
         original_name=filename,
         display_name=filename,
         extension=_upload_extension(upload.filename),

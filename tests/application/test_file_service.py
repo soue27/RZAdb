@@ -7,6 +7,12 @@ from uuid6 import uuid7
 from app.application.files.service import FileService
 from app.domain.file import File
 
+from app.application.files import validation
+from app.application.files.validation import (
+    FileTooLargeError,
+    UnsupportedFileTypeError,
+)
+
 
 @pytest.fixture
 def repository():
@@ -174,10 +180,10 @@ async def test_upload_stores_exact_content(
     result = await service.upload(
         actor_id=system_user_id,
         content=content,
-        original_name="data.bin",
+        original_name="data.pdf",
         display_name="Данные",
-        extension=".bin",
-        mime_type="application/octet-stream",
+        extension=".pdf",
+        mime_type="application/pdf",
     )
 
     storage.upload.assert_awaited_once_with(
@@ -198,10 +204,10 @@ async def test_upload_sets_file_size_from_content(
     result = await service.upload(
         actor_id=system_user_id,
         content=content,
-        original_name="test.txt",
+        original_name="test.pdf",
         display_name="Тест",
-        extension=".txt",
-        mime_type="text/plain",
+        extension=".pdf",
+        mime_type="application/pdf",
     )
 
     assert result.size == 9
@@ -366,3 +372,59 @@ async def test_archive_already_archived_file(
 
     repository.save.assert_not_awaited()
     storage.delete.assert_not_called()
+
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_unsupported_extension_before_storage(
+    service,
+    repository,
+    storage,
+    system_user_id,
+):
+    with pytest.raises(UnsupportedFileTypeError):
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"not allowed",
+            original_name="payload.exe",
+            display_name="Недопустимый файл",
+            extension=".exe",
+            mime_type="application/octet-stream",
+        )
+
+    storage.upload.assert_not_awaited()
+    repository.add.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_file_over_size_limit_before_storage(
+    service,
+    repository,
+    storage,
+    system_user_id,
+    monkeypatch,
+):
+    monkeypatch.setattr(validation, "MAX_FILE_SIZE_BYTES", 10)
+
+    with pytest.raises(FileTooLargeError):
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"x" * 11,
+            original_name="scan.pdf",
+            display_name="Скан",
+            extension=".pdf",
+            mime_type="application/pdf",
+        )
+
+    storage.upload.assert_not_awaited()
+    repository.add.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "extension",
+    sorted(validation.MIME_TYPES_BY_EXTENSION),
+)
+def test_validate_upload_accepts_allowed_extensions(extension):
+    assert validation.validate_upload(
+        filename=f"document{extension}",
+    ) == extension

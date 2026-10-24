@@ -21,9 +21,12 @@ from app.presentation.dependencies.services import (
     get_file_service,
 )
 from app.presentation.schemas.files import FileResponse
+from app.application.files.validation import FileUploadValidationError
+from app.presentation.file_uploads import read_upload_content
 
 router = APIRouter(prefix="/files", tags=["files"])
 logger = logging.getLogger(__name__)
+
 
 
 @router.post("", response_model=FileResponse)
@@ -33,22 +36,29 @@ async def upload_file(
     file_service: Annotated[FileService, Depends(get_file_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> FileResponse:
-    content = await file.read()
+    try:
+        content = await read_upload_content(file)
 
-    extension = ""
-    if file.filename and "." in file.filename:
-        extension = "." + file.filename.rsplit(".", 1)[1]
+        extension = ""
+        if file.filename and "." in file.filename:
+            extension = "." + file.filename.rsplit(".", 1)[1]
 
-    saved_file = await file_service.upload(
-        actor_id=current_user.id,
-        content=content,
-        original_name=file.filename or "file",
-        display_name=display_name,
-        extension=extension,
-        mime_type=file.content_type or "application/octet-stream",
-    )
+        saved_file = await file_service.upload(
+            actor_id=current_user.id,
+            content=content,
+            original_name=file.filename or "file",
+            display_name=display_name,
+            extension=extension,
+            mime_type=file.content_type or "application/octet-stream",
+        )
+    except FileUploadValidationError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=str(exc),
+        ) from exc
 
     return FileResponse.model_validate(saved_file)
+
 
 
 async def _get_file_response(
