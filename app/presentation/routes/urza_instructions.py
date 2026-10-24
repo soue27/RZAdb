@@ -407,41 +407,25 @@ async def create_instruction(
 
 
     except PermissionError as exc:
-
         for uploaded_file in uploaded_files:
-
             try:
-
                 await file_service.archive(
-
                     file_id=uploaded_file.id,
-
                     user_id=current_user.id,
-
                 )
-
             except Exception:
-
                 logger.exception(
-
                     "Не удалось архивировать файл после ошибки доступа "
-
                     "при создании инструкции РЗА: file_id=%s",
-
                     uploaded_file.id,
-
                 )
-
         raise HTTPException(
-
             status_code=403,
-
             detail=str(exc),
-
         ) from exc
 
 
-    except ValueError as exc:
+    except Exception:
         for uploaded_file in uploaded_files:
             try:
                 await file_service.archive(
@@ -450,14 +434,12 @@ async def create_instruction(
                 )
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки данных "
-                    "при создании инструкции РЗА: file_id=%s",
+                    "Не удалось архивировать файл после "
+                    "неожиданной ошибки при обработке инструкции РЗА: "
+                    "file_id=%s",
                     uploaded_file.id,
                 )
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+        raise
 
     return await _render_instruction(
         request,
@@ -578,7 +560,8 @@ async def create_instruction_version(
             detail=str(exc),
         ) from exc
 
-    except ValueError as exc:
+
+    except Exception:
         for uploaded_file in uploaded_files:
             try:
                 await file_service.archive(
@@ -587,14 +570,12 @@ async def create_instruction_version(
                 )
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки данных "
-                    "при создании версии инструкции РЗА: file_id=%s",
+                    "Не удалось архивировать файл после "
+                    "неожиданной ошибки при создании версии инструкции РЗА: "
+                    "file_id=%s",
                     uploaded_file.id,
                 )
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+        raise
 
     return await _render_instruction(
         request,
