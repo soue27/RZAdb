@@ -119,7 +119,17 @@ class FakeURZARepository:
         self.urzas = {}
 
     async def get_by_id(self, urza_id):
-        return self.urzas.get(urza_id)
+        if urza_id not in self.urzas:
+            self.urzas[urza_id] = SimpleNamespace(
+                id=urza_id,
+                deleted_at=None,
+                connection=SimpleNamespace(
+                    substation=SimpleNamespace(
+                        enterprise_id=uuid4(),
+                    ),
+                ),
+            )
+        return self.urzas[urza_id]
 
     async def lock_active_by_id(self, urza_id):
         urza = await self.get_by_id(urza_id)
@@ -557,6 +567,7 @@ async def test_manager_with_urza_access_gets_available_assignees(
     )
     access_service.access[(manager_id, urza_id)] = True
     access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        deleted_at=None,
         connection=SimpleNamespace(
             substation=SimpleNamespace(enterprise_id=enterprise_id),
         ),
@@ -621,6 +632,8 @@ async def test_missing_urza_after_issue_permission_raises_value_error(
     service = make_task_service(FakeTaskRepository(), access_service)
     manager_id = uuid7()
     urza_id = uuid7()
+    access_service.urza_repository.urzas[urza_id] = None
+    access_service.urza_repository.urzas[urza_id] = None
     access_service.user_repository.users[manager_id] = SimpleNamespace(
         id=manager_id,
         role=UserRole.MANAGER,
@@ -2681,6 +2694,10 @@ async def test_review_transition_requires_access_to_task_urza(
     task = _review_task(status, work_type=TaskWorkType.PROGRAM)
     manager_id = uuid7()
     _add_manager(access_service, manager_id)
+    access_service.urza_repository.urzas[task.urza_id] = SimpleNamespace(
+        id=task.urza_id,
+        deleted_at=None,
+    )
     access_service.access[(manager_id, task.urza_id)] = False
     service = make_task_service(repository, access_service)
 

@@ -479,7 +479,6 @@ class TaskService:
         """Возвращает задачу исполнителю на доработку."""
         task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
-        await self._ensure_task_object_is_active(task, actor_id)
         validate_transition(task.status, TaskStatus.IN_PROGRESS)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
         validate_reason(comment)

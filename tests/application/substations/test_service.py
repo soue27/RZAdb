@@ -25,6 +25,7 @@ class FakeSubstation:
         enterprise_id=None,
         created_by=None,
         updated_by=None,
+        deleted_at=None,
     ):
         self.id = substation_id
         self.dispatch_name = dispatch_name
@@ -38,6 +39,7 @@ class FakeSubstation:
         self.enterprise_id = enterprise_id
         self.created_by = created_by
         self.updated_by = updated_by
+        self.deleted_at = None
 
 
 class FakeSubstationRepository:

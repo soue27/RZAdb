@@ -21,8 +21,19 @@ from app.presentation.dependencies.services import (
 
 
 class _Objects:
-    async def get_object(self, *, user_id, object_type, object_id):
-        return SimpleNamespace(id=object_id, name="ПС", object_type=object_type)
+    async def get_object(
+        self,
+        *,
+        user_id,
+        object_type,
+        object_id,
+        **kwargs,
+    ):
+        return SimpleNamespace(
+            id=object_id,
+            name="ПС",
+            object_type=object_type,
+        )
 
 
 class _Files:

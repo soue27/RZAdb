@@ -147,15 +147,15 @@ async def test_get_available_actions_resolves_parent_from_persisted_version(
     )
     repository.get_version_by_id = AsyncMock(return_value=version_record)
     repository.get_by_id = AsyncMock(return_value=instruction)
-    access_service.can_access_substation.return_value = True
-
+    access_service.can_modify_substation.return_value = True
     actions = await service.get_available_actions(user_id, version_details)
 
     assert actions == {"submit", "new_version"}
     repository.get_version_by_id.assert_awaited_once_with(version_id)
     repository.get_by_id.assert_awaited_once_with(instruction_id)
-    access_service.can_access_substation.assert_awaited_once_with(
-        user_id, substation_id
+    access_service.can_modify_substation.assert_awaited_once_with(
+        user_id,
+        substation_id,
     )
 
 
@@ -257,7 +257,7 @@ async def test_create_instruction_denies_access(
     user_id = uuid7()
     substation_id = uuid7()
 
-    access_service.can_access_substation.return_value = False
+    access_service.can_modify_substation.return_value = False
     repository.get_by_substation_id = AsyncMock()
 
     with pytest.raises(PermissionError):
@@ -601,7 +601,7 @@ async def test_create_version_denies_access(
     repository.get_by_id = AsyncMock(
         return_value=instruction,
     )
-    access_service.can_access_substation.return_value = False
+    access_service.can_modify_substation = AsyncMock(return_value=False)
     repository.add_version = AsyncMock()
 
     with pytest.raises(PermissionError):
@@ -612,7 +612,7 @@ async def test_create_version_denies_access(
             scan_file_id=uuid7(),
         )
 
-    access_service.can_access_substation.assert_awaited_once_with(
+    access_service.can_modify_substation.assert_awaited_once_with(
         user_id,
         substation_id,
     )

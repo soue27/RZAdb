@@ -137,7 +137,7 @@ async def test_create_raises_permission_error_when_access_denied() -> None:
     user_id = uuid7()
     urza_id = uuid7()
 
-    access_service.can_access_urza.return_value = False
+    access_service.can_modify_urza.return_value = False
 
     service = OTDService(
         repository=repository,
@@ -146,7 +146,7 @@ async def test_create_raises_permission_error_when_access_denied() -> None:
 
     with pytest.raises(
         PermissionError,
-        match="Доступ к URZA запрещён",
+        match="Изменение архивной URZA запрещено",
     ):
         await service.create(
             user_id=user_id,

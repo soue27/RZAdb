@@ -218,7 +218,7 @@ async def test_create_scheme_denies_access(
     user_id = uuid7()
     substation_id = uuid7()
 
-    access_service.can_access_substation.return_value = False
+    access_service.can_modify_substation.return_value = False
     repository.get_by_substation_id = AsyncMock()
 
     with pytest.raises(PermissionError):

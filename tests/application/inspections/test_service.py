@@ -1204,6 +1204,7 @@ async def test_can_review_returns_true_for_manager_from_same_department(
     substation = SimpleNamespace(
         id=substation_id,
         enterprise_id=department_id,
+        deleted_at=None,
     )
 
     repository.tasks[task.id] = task
@@ -1242,6 +1243,7 @@ async def test_can_review_returns_false_for_own_inspection(
     substation_repository.substations[substation_id] = SimpleNamespace(
         id=substation_id,
         enterprise_id=department_id,
+        deleted_at=None,
     )
 
     assert await service.can_review(
@@ -1275,6 +1277,7 @@ async def test_can_review_returns_false_for_another_department(
     substation_repository.substations[substation_id] = SimpleNamespace(
         id=substation_id,
         enterprise_id=uuid4(),
+        deleted_at=None,
     )
 
     assert await service.can_review(
@@ -1306,6 +1309,7 @@ async def test_can_review_returns_false_for_non_manager(
     substation_repository.substations[substation_id] = SimpleNamespace(
         id=substation_id,
         enterprise_id=engineer.enterprise_id,
+        deleted_at=None,
     )
 
     assert await service.can_review(
