@@ -328,13 +328,20 @@ async def _create_document(
             response_status=exc.status_code,
         )
 
+
     except (ValueError, PermissionError) as exc:
         for uploaded_file in uploaded:
-            await file_service.archive(
-                file_id=uploaded_file.id,
-                user_id=current_user.id,
-            )
-
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "создания документа подстанции: file_id=%s",
+                    uploaded_file.id,
+                )
         return await _render_form(
             request,
             substation_id=substation_id,
@@ -345,8 +352,10 @@ async def _create_document(
             values=values,
             error=str(exc),
             task_id=task_id,
+            response_status=(
+                403 if isinstance(exc, PermissionError) else 400
+            ),
         )
-
 
     except Exception:
         for uploaded_file in uploaded:
