@@ -14,7 +14,7 @@
         </div>
 
         <div class="d-flex gap-2">
-            {% if current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
+            {% if not is_archived and current_user.role.value in ["superadmin", "admin", "manager", "engineer"] %}
                 <button
                     type="button"
                     class="btn btn-primary"

@@ -32,6 +32,8 @@ class ConnectionService:
         actor_id: UUID,
         data: ConnectionCreate,
     ) -> ConnectionDetails:
+        if not await self.repository.lock_active_substation(substation_id):
+            raise ObjectNotFoundError
         if await self.repository.exists_by_name(
             substation_id,
             data.dispatch_name,
@@ -72,10 +74,14 @@ class ConnectionService:
     async def get_by_id(
         self,
         connection_id: UUID,
+        *,
+        include_archived: bool = False,
     ) -> ConnectionDetails | None:
         connection = await self.repository.get_by_id(connection_id)
 
-        if connection is None:
+        if connection is None or (
+            connection.deleted_at is not None and not include_archived
+        ):
             return None
 
         return ConnectionDetails(
@@ -115,7 +121,9 @@ class ConnectionService:
     ) -> ConnectionDetails:
         connection = await self.repository.get_by_id(connection_id)
 
-        if connection is None:
+        if connection is None or connection.deleted_at is not None:
+            raise ObjectNotFoundError
+        if not await self.repository.has_active_substation(connection.substation_id):
             raise ObjectNotFoundError
 
         if await self.repository.exists_by_name(

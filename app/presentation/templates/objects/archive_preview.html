@@ -1,0 +1,50 @@
+<section class="archive-preview" aria-labelledby="archive-preview-title">
+    <h2 id="archive-preview-title" class="h5">Состав операции архивирования</h2>
+
+    {% if objects %}
+        <ul class="mb-3">
+            {% for item in objects %}
+                <li>{{ item.label }} <span class="text-body-secondary">({{ item.id }})</span></li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-body-secondary">Объект уже архивирован; изменений не потребуется.</p>
+    {% endif %}
+
+    <h3 class="h6">Блокирующие процессы</h3>
+    {% if blockers %}
+        <ul class="mb-0">
+            {% for blocker in blockers %}
+                <li>
+                    <a href="{{ blocker.url }}">{{ blocker.label }} {{ blocker.process_id }}</a>
+                    — {{ blocker.status }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-body-secondary mb-0">Блокирующих процессов не найдено.</p>
+    {% endif %}
+
+    <form
+        class="mt-4"
+        method="post"
+        action="/objects/{{ object_type }}/{{ object_id }}/archive"
+        hx-post="/objects/{{ object_type }}/{{ object_id }}/archive"
+        hx-target="#archive-preview-modal-body"
+        hx-swap="innerHTML"
+    >
+        <label class="form-label" for="archive-reason-{{ object_id }}">Причина архивирования</label>
+        <textarea
+            class="form-control"
+            id="archive-reason-{{ object_id }}"
+            name="reason"
+            rows="3"
+            maxlength="2000"
+            required
+        ></textarea>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-danger">Подтвердить архивирование</button>
+        </div>
+    </form>
+</section>

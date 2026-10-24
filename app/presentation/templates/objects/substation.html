@@ -1,4 +1,5 @@
 <div class="object-card">
+    {% if is_archived %}<div class="alert alert-secondary py-2">Архивная запись · только чтение</div>{% endif %}
     <!-- =========================================================
          HEADER
          ========================================================= -->
@@ -12,16 +13,19 @@
                 {{ substation.dispatch_name }}
             </h2>
         </div>
-        {% if can_create_connection %}
-            <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
+            {% if can_create_connection and not is_archived %}
                 <button type="button" class="btn btn-outline-primary"
                         hx-get="/objects/substation/{{ substation.id }}/connections/new"
                         hx-target="#object-content" hx-swap="innerHTML">
                     <span class="material-icons align-middle me-1">add</span>
                     Добавить присоединение
                 </button>
-            </div>
-        {% endif %}
+            {% endif %}
+            {% set archive_object_type = "substation" %}
+            {% set archive_object_id = substation.id %}
+            {% include "objects/archive_actions.html" %}
+        </div>
     </div>
 
 
@@ -38,7 +42,7 @@
                 class="nav-link active"
                 data-rzadb-tab
                 data-tab="details"
-                hx-get="/objects/substation/{{ substation.id }}/details"
+                hx-get="/objects/substation/{{ substation.id }}/details{% if is_archived %}?archived=true{% endif %}"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
             >
@@ -52,7 +56,7 @@
                 class="nav-link"
                 data-rzadb-tab
                 data-tab="inspections"
-                hx-get="/objects/substation/{{ substation.id }}/inspections"
+                hx-get="/objects/substation/{{ substation.id }}/inspections{% if is_archived %}?archived=true{% endif %}"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
             >
@@ -66,7 +70,7 @@
                 class="nav-link"
                 data-rzadb-tab
                 data-tab="instructions"
-                hx-get="/objects/substation/{{ substation.id }}/instructions"
+                hx-get="/objects/substation/{{ substation.id }}/instructions{% if is_archived %}?archived=true{% endif %}"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
             >
@@ -80,7 +84,7 @@
                 class="nav-link"
                 data-rzadb-tab
                 data-tab="selectivity-schemes"
-                hx-get="/objects/substation/{{ substation.id }}/selectivity-schemes"
+                hx-get="/objects/substation/{{ substation.id }}/selectivity-schemes{% if is_archived %}?archived=true{% endif %}"
                 hx-target="#substation-tab-content"
                 hx-swap="innerHTML"
             >

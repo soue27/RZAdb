@@ -1,0 +1,46 @@
+{% if is_htmx %}
+<section class="archive-conflict" role="alert" aria-labelledby="archive-conflict-title">
+    <h2 id="archive-conflict-title" class="h5">Нельзя архивировать объект</h2>
+    <p>{{ message }}</p>
+    {% if blockers %}
+        <ul>
+            {% for blocker in blockers %}
+                <li>
+                    <a href="{{ blocker.url }}">{{ blocker.label }} {{ blocker.process_id }}</a>
+                    — {{ blocker.status }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Есть незавершённые процессы, сведения о которых недоступны в вашей области доступа.</p>
+    {% endif %}
+</section>
+{% else %}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Архивирование невозможно · RZAdb</title>
+</head>
+<body>
+    <main>
+        <h1>Нельзя архивировать объект</h1>
+        <p>{{ message }}</p>
+        {% if blockers %}
+            <ul>
+                {% for blocker in blockers %}
+                    <li>
+                        <a href="{{ blocker.url }}">{{ blocker.label }} {{ blocker.process_id }}</a>
+                        — {{ blocker.status }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Есть незавершённые процессы, сведения о которых недоступны в вашей области доступа.</p>
+        {% endif %}
+        <a href="{{ return_url }}">Вернуться к карточке объекта</a>
+    </main>
+</body>
+</html>
+{% endif %}

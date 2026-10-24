@@ -92,11 +92,11 @@ class RZAInstructionService:
         change_justification: str | None = None,
         task_id: UUID | None = None,
     ) -> RZAInstruction:
-        if not await self.access_service.can_access_substation(
+        if not await self.access_service.can_modify_substation(
             user_id,
             substation_id,
         ):
-            raise PermissionError("Доступ к подстанции запрещён")
+            raise PermissionError("Изменение архивной подстанции запрещено")
 
         existing = await self.repository.get_by_substation_id(
             substation_id,
@@ -201,11 +201,11 @@ class RZAInstructionService:
         if instruction is None:
             raise ValueError("Инструкция РЗА не найдена")
 
-        if not await self.access_service.can_access_substation(
+        if not await self.access_service.can_modify_substation(
             user_id,
             instruction.substation_id,
         ):
-            raise PermissionError("Доступ к подстанции запрещён")
+            raise PermissionError("Изменение архивной подстанции запрещено")
 
         current_version = await self.repository.get_current_version(
             instruction_id,
@@ -289,8 +289,8 @@ class RZAInstructionService:
         instruction = await self.repository.get_by_id(version.rza_instruction_id)
         if instruction is None or instruction.substation_id != substation_id:
             raise ValueError("Инструкция не принадлежит указанной подстанции.")
-        if not await self.access_service.can_access_substation(user_id, substation_id):
-            raise PermissionError("Доступ к подстанции запрещён.")
+        if not await self.access_service.can_modify_substation(user_id, substation_id):
+            raise PermissionError("Изменение архивной подстанции запрещено.")
         return version
 
     async def _check_reviewer(self, user_id: UUID, substation_id: UUID) -> None:
@@ -348,7 +348,7 @@ class RZAInstructionService:
         if (
             instruction is None
             or instruction.deleted_at is not None
-            or not await self.access_service.can_access_substation(
+            or not await self.access_service.can_modify_substation(
                 user_id, instruction.substation_id
             )
         ):

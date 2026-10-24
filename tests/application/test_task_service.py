@@ -56,6 +56,9 @@ class FakeTaskRepository:
     async def save(self, task):
         return task
 
+    async def refresh_for_mutation(self, task):
+        return task
+
     async def get_otd_version_by_task_id(self, task_id):
         """Возвращает версию ОТД, связанную с указанной задачей."""
         return next(
@@ -118,11 +121,25 @@ class FakeURZARepository:
     async def get_by_id(self, urza_id):
         return self.urzas.get(urza_id)
 
+    async def lock_active_by_id(self, urza_id):
+        urza = await self.get_by_id(urza_id)
+        return urza is not None and getattr(urza, "deleted_at", None) is None
+
+
+class FakeSubstationRepository:
+    async def get_by_id(self, substation_id):
+        return SimpleNamespace(id=substation_id, deleted_at=None)
+
+    async def lock_active_by_id(self, substation_id):
+        substation = await self.get_by_id(substation_id)
+        return substation is not None and substation.deleted_at is None
+
 
 class FakeAccessService:
     def __init__(self) -> None:
         self.user_repository = FakeUserRepository()
         self.urza_repository = FakeURZARepository()
+        self.substation_repository = FakeSubstationRepository()
         self.access = {}
         self.substation_access = {}
 
@@ -131,6 +148,12 @@ class FakeAccessService:
 
     async def can_access_substation(self, user_id, substation_id):
         return self.substation_access.get((user_id, substation_id), True)
+
+    async def can_modify_urza(self, user_id, urza_id):
+        return await self.can_access_urza(user_id, urza_id)
+
+    async def can_modify_substation(self, user_id, substation_id):
+        return await self.can_access_substation(user_id, substation_id)
 
 
 class FakeURZAInstructionRepository:
@@ -157,6 +180,129 @@ def make_task_service(
         access_service,
         instruction_repository or FakeURZAInstructionRepository(),
     )
+
+
+@pytest.mark.asyncio
+async def test_task_mutation_rejects_archived_object_without_changing_status() -> None:
+    repository = FakeTaskRepository()
+    access_service = FakeAccessService()
+    service = make_task_service(repository, access_service)
+    actor_id, urza_id = uuid4(), uuid4()
+    access_service.access[(actor_id, urza_id)] = False
+    task = SimpleNamespace(
+        id=uuid4(),
+        urza_id=urza_id,
+        substation_id=None,
+        assigned_to=actor_id,
+        deleted_at=None,
+        status=TaskStatus.ASSIGNED,
+    )
+
+    with pytest.raises(PermissionError, match="архивного объекта"):
+        await service.accept_task(task=task, actor_id=actor_id)
+
+    assert task.status is TaskStatus.ASSIGNED
+
+
+@pytest.mark.asyncio
+async def test_task_owner_is_locked_before_task_is_refreshed() -> None:
+    calls = []
+
+    class LockingURZARepository(FakeURZARepository):
+        async def lock_active_by_id(self, urza_id):
+            calls.append(("owner_lock", urza_id))
+            return True
+
+    class RefreshingTaskRepository(FakeTaskRepository):
+        async def refresh_for_mutation(self, task):
+            calls.append(("task_refresh", task.id))
+            return task
+
+    repository = RefreshingTaskRepository()
+    access_service = FakeAccessService()
+    access_service.urza_repository = LockingURZARepository()
+    service = make_task_service(repository, access_service)
+    task = SimpleNamespace(
+        id=uuid4(), urza_id=uuid4(), substation_id=None, deleted_at=None
+    )
+
+    await service._lock_task_owner(task)
+
+    assert calls == [
+        ("owner_lock", task.urza_id),
+        ("task_refresh", task.id),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_reassign_executor_locks_current_owner_before_mutation() -> None:
+    calls = []
+    repository = FakeTaskRepository()
+    access_service = FakeAccessService()
+    urza_id = uuid4()
+    manager_id = uuid4()
+    previous_assignee_id = uuid4()
+    new_assignee_id = uuid4()
+    enterprise_id = uuid4()
+
+    class RecordingURZARepository(FakeURZARepository):
+        async def lock_active_by_id(self, owner_id):
+            calls.append(("owner_lock", owner_id))
+            return True
+
+    class RecordingTaskRepository(FakeTaskRepository):
+        async def refresh_for_mutation(self, task):
+            calls.append(("task_refresh", task.id))
+            return task
+
+    repository = RecordingTaskRepository()
+    access_service.urza_repository = RecordingURZARepository()
+    access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        deleted_at=None,
+        connection=SimpleNamespace(
+            substation=SimpleNamespace(enterprise_id=enterprise_id),
+        ),
+    )
+    access_service.user_repository.users[manager_id] = SimpleNamespace(
+        id=manager_id,
+        role=UserRole.MANAGER,
+        active=True,
+        deleted_at=None,
+    )
+    engineer = SimpleNamespace(
+        id=new_assignee_id,
+        role=UserRole.ENGINEER,
+        active=True,
+        deleted_at=None,
+    )
+    access_service.user_repository.engineers_by_enterprise[enterprise_id] = [
+        engineer,
+    ]
+    task = SimpleNamespace(
+        id=uuid4(),
+        urza_id=urza_id,
+        substation_id=None,
+        assigned_to=previous_assignee_id,
+        status=TaskStatus.ASSIGNED,
+        deleted_at=None,
+        deadline_at=datetime(2026, 9, 20, 10, 0),
+    )
+    service = make_task_service(repository, access_service)
+
+    await service.reassign_task(
+        task=task,
+        assigned_to=new_assignee_id,
+        actor_id=manager_id,
+        assigned_at=datetime(2026, 9, 14, 9, 30),
+    )
+
+    assert calls == [
+        ("owner_lock", urza_id),
+        ("task_refresh", task.id),
+    ]
+    assert task.assigned_to == new_assignee_id
+    assert repository.history[-1].previous_assignee_id == previous_assignee_id
+    assert repository.history[-1].new_assignee_id == new_assignee_id
 
 
 def make_task_service_with_active_assignee(
@@ -186,6 +332,7 @@ def configure_available_assignee(
 
     service.access_service.urza_repository.urzas[urza_id] = (
         SimpleNamespace(
+            deleted_at=None,
             connection=SimpleNamespace(
                 substation=SimpleNamespace(
                     enterprise_id=enterprise_id,
@@ -308,6 +455,37 @@ async def test_can_issue_task_checks_role_activity_and_urza_access(
     access_service.access[(actor_id, urza_id)] = has_access
 
     assert await service.can_issue_task(actor_id=actor_id, urza_id=urza_id) is expected
+
+
+@pytest.mark.asyncio
+async def test_cannot_issue_task_for_archived_urza() -> None:
+    actor_id = uuid7()
+    urza_id = uuid7()
+
+    class _UserRepository:
+        async def get_by_id(self, _user_id):
+            return SimpleNamespace(
+                id=actor_id, role=UserRole.MANAGER, active=True, deleted_at=None,
+            )
+
+    class _URZARepository:
+        async def get_by_id(self, _urza_id):
+            return SimpleNamespace(deleted_at=datetime(2026, 1, 1))
+
+    class _Access:
+        user_repository = _UserRepository()
+        urza_repository = _URZARepository()
+
+        async def can_access_urza(self, _user_id, _urza_id):
+            return True
+
+    service = TaskService(
+        task_repository=SimpleNamespace(),
+        access_service=_Access(),
+        urza_instruction_repository=SimpleNamespace(),
+    )
+
+    assert not await service.can_issue_task(actor_id=actor_id, urza_id=urza_id)
 
 
 @pytest.mark.asyncio
@@ -438,9 +616,9 @@ async def test_engineer_cannot_get_available_assignees(
 
 @pytest.mark.asyncio
 async def test_missing_urza_after_issue_permission_raises_value_error(
-    service: TaskService,
     access_service: FakeAccessService,
 ) -> None:
+    service = make_task_service(FakeTaskRepository(), access_service)
     manager_id = uuid7()
     urza_id = uuid7()
     access_service.user_repository.users[manager_id] = SimpleNamespace(
@@ -451,7 +629,7 @@ async def test_missing_urza_after_issue_permission_raises_value_error(
     )
     access_service.access[(manager_id, urza_id)] = True
 
-    with pytest.raises(ValueError, match="URZA не найден"):
+    with pytest.raises(PermissionError, match="не может выдавать задания"):
         await service.get_available_assignees(actor_id=manager_id, urza_id=urza_id)
 
     assert access_service.user_repository.requested_enterprise_ids == []
@@ -999,6 +1177,7 @@ async def test_reassign_task(
 
     service.access_service.urza_repository.urzas[task.urza_id] = (
         SimpleNamespace(
+            deleted_at=None,
             connection=SimpleNamespace(
                 substation=SimpleNamespace(
                     enterprise_id=enterprise_id,
@@ -1077,6 +1256,7 @@ async def test_repeated_reassignments_keep_each_pair_of_assignees(
     enterprise_id = uuid7()
 
     service.access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        deleted_at=None,
         connection=SimpleNamespace(
             substation=SimpleNamespace(enterprise_id=enterprise_id),
         ),
@@ -3130,6 +3310,7 @@ async def test_assign_task_rejects_unavailable_assignee(
     unavailable_engineer_id = uuid7()
 
     access_service.urza_repository.urzas[urza_id] = SimpleNamespace(
+        deleted_at=None,
         connection=SimpleNamespace(
             substation=SimpleNamespace(enterprise_id=enterprise_id),
         ),

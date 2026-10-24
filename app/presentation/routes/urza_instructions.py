@@ -48,12 +48,15 @@ async def _ensure_access(
     object_service: ObjectService,
     user: User,
     urza_id: UUID,
+    *,
+    include_archived: bool = False,
 ) -> None:
     try:
         await object_service.get_object(
             user_id=user.id,
             object_type="urza",
             object_id=urza_id,
+            include_archived=include_archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -75,6 +78,7 @@ async def _render_instruction(
     task_service: TaskService,
     instruction_version: UUID | None = None,
     history_open: bool = False,
+    is_archived: bool = False,
 ):
     instruction = await service.get_by_urza(
         user.id,
@@ -117,11 +121,11 @@ async def _render_instruction(
             user.id,
             selected_version,
         )
-        if selected_version
+        if selected_version and not is_archived
         else set()
     )
 
-    can_issue_task = await task_service.can_issue_task(
+    can_issue_task = False if is_archived else await task_service.can_issue_task(
         actor_id=user.id,
         urza_id=urza_id,
     )
@@ -137,8 +141,9 @@ async def _render_instruction(
             "selected_version": selected_version,
             "actions": actions,
             "history_open": history_open,
+            "is_archived": is_archived,
             "current_user": user,
-            "can_create": user.role.value
+            "can_create": not is_archived and user.role.value
             in {
                 "engineer",
                 "admin",
@@ -168,11 +173,13 @@ async def get_urza_instruction(
         Depends(get_task_service),
     ],
     instruction_version: UUID | None = Query(default=None),
+    archived: bool = Query(default=False),
 ):
     await _ensure_access(
         object_service,
         current_user,
         urza_id,
+        include_archived=archived,
     )
 
     return await _render_instruction(
@@ -183,6 +190,7 @@ async def get_urza_instruction(
         task_service,
         instruction_version,
         history_open=instruction_version is not None,
+        is_archived=archived,
     )
 
 

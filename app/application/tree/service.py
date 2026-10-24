@@ -35,6 +35,9 @@ class TreeService:
     async def get_tree(
         self,
         user_id: UUID,
+        *,
+        archive_only: bool = False,
+        query: str | None = None,
     ) -> list[EnterpriseTreeNode]:
         """Возвращает дерево объектов, доступных пользователю."""
 
@@ -60,8 +63,11 @@ class TreeService:
             if enterprise.id in visible_enterprise_ids
         ]
 
+        has_query = bool(query and query.strip())
+        include_archived = has_query or archive_only
         substations = await self.substation_repository.get_by_enterprise_ids(
             visible_enterprise_ids,
+            include_archived=include_archived,
         )
 
         substation_ids = {
@@ -71,6 +77,7 @@ class TreeService:
 
         connections = await self.connection_repository.get_by_substation_ids(
             substation_ids,
+            include_archived=include_archived,
         )
 
         connection_ids = {
@@ -80,7 +87,84 @@ class TreeService:
 
         urzas = await self.urza_repository.get_by_connection_ids(
             connection_ids,
+            include_archived=include_archived,
         )
+
+        if archive_only and not has_query:
+            urzas = [item for item in urzas if item.deleted_at is not None]
+            archived_urza_connection_ids = {
+                item.connection_id for item in urzas if item.deleted_at is not None
+            }
+            connections = [
+                item for item in connections
+                if item.deleted_at is not None or item.id in archived_urza_connection_ids
+            ]
+            archived_connection_substation_ids = {
+                item.substation_id for item in connections if item.deleted_at is not None
+            }
+            substations = [
+                item for item in substations
+                if item.deleted_at is not None
+                or item.id in archived_connection_substation_ids
+                or any(
+                    connection.substation_id == item.id
+                    and connection.id in archived_urza_connection_ids
+                    for connection in connections
+                )
+            ]
+
+        if query and query.strip():
+            needle = query.strip().casefold()
+            matched_urza_ids = {
+                item.id for item in urzas if needle in item.dispatch_name.casefold()
+            }
+            matched_connection_ids = {
+                item.id for item in connections if needle in item.dispatch_name.casefold()
+            }
+            matched_substation_ids = {
+                item.id for item in substations
+                if needle in item.dispatch_name.casefold()
+            }
+            substation_by_connection = {
+                item.id: item.substation_id for item in connections
+            }
+            connection_ids_by_substation: dict[UUID, set[UUID]] = {}
+            urza_connection_ids_by_id = {}
+            for item in connections:
+                connection_ids_by_substation.setdefault(
+                    item.substation_id, set()
+                ).add(item.id)
+            for item in urzas:
+                urza_connection_ids_by_id[item.id] = item.connection_id
+            matched_urza_connection_ids = {
+                urza_connection_ids_by_id[item_id]
+                for item_id in matched_urza_ids
+            }
+            relevant_connection_ids = (
+                matched_connection_ids
+                | matched_urza_connection_ids
+                | set().union(*(
+                    connection_ids_by_substation.get(item_id, set())
+                    for item_id in matched_substation_ids
+                ))
+            )
+            relevant_substation_ids = matched_substation_ids | {
+                substation_by_connection[item_id]
+                for item_id in relevant_connection_ids
+            }
+            connections = [
+                item for item in connections if item.id in relevant_connection_ids
+            ]
+            urzas = [
+                item for item in urzas
+                if item.id in matched_urza_ids
+                or item.connection_id in matched_connection_ids
+                or substation_by_connection.get(item.connection_id)
+                in matched_substation_ids
+            ]
+            substations = [
+                item for item in substations if item.id in relevant_substation_ids
+            ]
 
         return self._build_tree(
             root_enterprises=root_enterprises,
@@ -152,6 +236,7 @@ class TreeService:
                 URZATreeNode(
                     id=urza.id,
                     dispatch_name=urza.dispatch_name,
+                    is_archived=urza.deleted_at is not None,
                 ),
             )
 
@@ -168,6 +253,7 @@ class TreeService:
                 ConnectionTreeNode(
                     id=connection.id,
                     dispatch_name=connection.dispatch_name,
+                    is_archived=connection.deleted_at is not None,
                     urzas=sorted(
                         urzas_by_connection.get(
                             connection.id,
@@ -191,6 +277,7 @@ class TreeService:
                 SubstationTreeNode(
                     id=substation.id,
                     dispatch_name=substation.dispatch_name,
+                    is_archived=substation.deleted_at is not None,
                     connections=sorted(
                         connections_by_substation.get(
                             substation.id,

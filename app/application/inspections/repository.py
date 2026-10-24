@@ -28,6 +28,14 @@ class InspectionTaskRepository:
     async def get_by_id(self, task_id: UUID) -> InspectionTask | None:
         return await self.session.get(InspectionTask, task_id)
 
+    async def refresh_for_mutation(
+        self,
+        task: InspectionTask,
+    ) -> InspectionTask:
+        """Reload task state after its substation row has been locked."""
+        await self.session.refresh(task)
+        return task
+
     async def get_active_by_id(self, task_id: UUID) -> InspectionTask | None:
         result = await self.session.execute(
             select(InspectionTask)

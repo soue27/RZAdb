@@ -78,6 +78,8 @@ class ProgramService:
         user = await self.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return set()
+        if not await self.access_service.can_modify_urza(user_id, program.urza_id):
+            return set()
 
         actions: set[str] = set()
 
@@ -220,11 +222,11 @@ class ProgramService:
         editable_file_id: UUID | None = None,
         task_id: UUID | None = None,
     ) -> Program:
-        if not await self.access_service.can_access_urza(
+        if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
         ):
-            raise PermissionError("Доступ к URZA запрещён")
+            raise PermissionError("Изменение архивной URZA запрещено")
         user = await self.user_repository.get_by_id(user_id)
 
         if task_id is not None:
@@ -279,11 +281,11 @@ class ProgramService:
         remove_editable_file: bool = False,
     ) -> Program:
         """Обновляет черновик программы без изменения связанного задания."""
-        if not await self.access_service.can_access_urza(
+        if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
         ):
-            raise PermissionError("Доступ к URZA запрещён")
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         program = await self.repository.get_by_id(program_id)
 
@@ -346,8 +348,8 @@ class ProgramService:
             program_id: UUID,
             urza_id: UUID,
     ) -> Program:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         program = await self.repository.get_by_id(program_id)
 
@@ -416,8 +418,8 @@ class ProgramService:
             program_id: UUID,
             urza_id: UUID,
     ) -> Program:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         program = await self.repository.get_by_id(program_id)
 
@@ -466,8 +468,8 @@ class ProgramService:
             urza_id: UUID,
             comment: str | None = None,
     ) -> Program:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         program = await self.repository.get_by_id(program_id)
 

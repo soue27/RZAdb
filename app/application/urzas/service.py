@@ -21,8 +21,14 @@ class URZAService:
     def __init__(self, repository: URZARepository) -> None:
         self.repository = repository
 
-    async def get_details(self, urza_id: UUID) -> URZADetails:
-        urza = await self.repository.get_by_id(urza_id)
+    async def get_details(
+        self, urza_id: UUID, *, include_archived: bool = False
+    ) -> URZADetails:
+        urza = (
+            await self.repository.get_by_id_including_deleted(urza_id)
+            if include_archived
+            else await self.repository.get_by_id(urza_id)
+        )
 
         if urza is None:
             raise ObjectNotFoundError
@@ -55,6 +61,10 @@ class URZAService:
             actor_id: UUID,
             data: URZACreate,
     ) -> URZADetails:
+        if not await self.repository.lock_active_connection(connection_id):
+            raise ObjectNotFoundError
+        if not await self.repository.has_active_connection(connection_id):
+            raise ObjectNotFoundError
         if await self.repository.exists_by_name(
                 connection_id,
                 data.dispatch_name,
@@ -92,6 +102,9 @@ class URZAService:
         urza = await self.repository.get_by_id(urza_id)
 
         if urza is None:
+            raise ObjectNotFoundError
+
+        if not await self.repository.has_active_connection(urza.connection_id):
             raise ObjectNotFoundError
 
         if await self.repository.exists_by_name(

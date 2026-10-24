@@ -176,7 +176,7 @@
                             <button
                                 type="button"
                                 class="btn btn-link p-0 text-start text-decoration-none"
-                                hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
+                                hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
                                 hx-target="#urza-tab-content"
                                 hx-swap="outerHTML"
                                 hx-push-url="true"

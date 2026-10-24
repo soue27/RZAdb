@@ -3,7 +3,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
 
@@ -38,12 +38,15 @@ async def _check_urza_access(
     object_service: ObjectService,
     user_id: UUID,
     urza_id: UUID,
+    *,
+    include_archived: bool = False,
 ) -> None:
     try:
         await object_service.get_object(
             user_id=user_id,
             object_type="urza",
             object_id=urza_id,
+            include_archived=include_archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -64,6 +67,7 @@ async def _render_schemes(
     schema_service: SchemaService,
     task_service: TaskService,
     *,
+    is_archived: bool = False,
     error_message: str | None = None,
     notice_message: str | None = None,
     response_status: int = status.HTTP_200_OK,
@@ -76,14 +80,14 @@ async def _render_schemes(
         user_id=current_user.id,
         urza_id=urza_id,
     )
-    schema_actions = {
+    schema_actions = {} if is_archived else {
         record.id: await schema_service.get_available_actions(
             user_id=current_user.id,
             record=record,
         )
         for record in schema_records
     }
-    can_issue_task = await task_service.can_issue_task(
+    can_issue_task = False if is_archived else await task_service.can_issue_task(
         actor_id=current_user.id,
         urza_id=urza_id,
     )
@@ -96,11 +100,14 @@ async def _render_schemes(
             "current_record": current_record,
             "schema_actions": schema_actions,
             "urza_id": urza_id,
+            "is_archived": is_archived,
             "current_user": current_user,
             "error_message": error_message,
             "notice_message": notice_message,
             "can_issue_task": can_issue_task,
-            "can_create_schema": current_user.role is not UserRole.SPECIALIST,
+            "can_create_schema": (
+                not is_archived and current_user.role is not UserRole.SPECIALIST
+            ),
         },
         status_code=response_status,
     )
@@ -229,8 +236,11 @@ async def get_urza_schemas(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
+    archived: bool = Query(default=False),
 ):
-    await _check_urza_access(object_service, current_user.id, urza_id)
+    await _check_urza_access(
+        object_service, current_user.id, urza_id, include_archived=archived
+    )
     try:
         return await _render_schemes(
             request,
@@ -238,6 +248,7 @@ async def get_urza_schemas(
             current_user,
             schema_service,
             task_service,
+            is_archived=archived,
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc

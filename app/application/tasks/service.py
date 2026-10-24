@@ -37,6 +37,48 @@ class TaskService:
         if task.deleted_at is not None:
             raise ValueError("Нельзя изменять удалённое задание.")
 
+    async def _ensure_task_object_is_active(
+        self, task: Task, actor_id: UUID
+    ) -> None:
+        has_access = (
+            await self.access_service.can_modify_urza(actor_id, task.urza_id)
+            if task.urza_id is not None
+            else await self.access_service.can_modify_substation(
+                actor_id, getattr(task, "substation_id", None)
+            )
+        )
+        if not has_access:
+            raise PermissionError("Нельзя изменять задание архивного объекта.")
+
+    async def _lock_task_owner(self, task: Task) -> Task:
+        original_urza_id = task.urza_id
+        original_substation_id = getattr(task, "substation_id", None)
+
+        if original_urza_id is not None:
+            is_active = await self.access_service.urza_repository.lock_active_by_id(
+                original_urza_id
+            )
+        elif original_substation_id is not None:
+            is_active = await self.access_service.substation_repository.lock_active_by_id(
+                original_substation_id
+            )
+        else:
+            is_active = False
+
+        if not is_active:
+            raise PermissionError("Нельзя изменять задание архивного объекта.")
+
+        refreshed_task = await self.task_repository.refresh_for_mutation(task)
+        if (
+            refreshed_task.urza_id != original_urza_id
+            or getattr(refreshed_task, "substation_id", None)
+            != original_substation_id
+        ):
+            raise PermissionError(
+                "Объект задания изменился. Повторите операцию."
+            )
+        return refreshed_task
+
     async def _ensure_active_actor(self, actor_id: UUID) -> None:
         """Проверяет, что пользователь существует, активен и не удалён."""
         actor = await self.access_service.user_repository.get_by_id(actor_id)
@@ -55,6 +97,10 @@ class TaskService:
     ) -> set[str]:
         """Возвращает доступные действия с учётом статуса и прав пользователя."""
         if task.deleted_at is not None:
+            return set()
+        try:
+            await self._ensure_task_object_is_active(task, actor_id)
+        except PermissionError:
             return set()
 
         if task.status is TaskStatus.ASSIGNED:
@@ -135,9 +181,9 @@ class TaskService:
         if actor.role is not UserRole.MANAGER:
             raise PermissionError("Проверять задачу может только MANAGER.")
         has_access = (
-            await self.access_service.can_access_urza(actor_id, task.urza_id)
+            await self.access_service.can_modify_urza(actor_id, task.urza_id)
             if task.urza_id is not None
-            else await self.access_service.can_access_substation(
+            else await self.access_service.can_modify_substation(
                 actor_id, getattr(task, "substation_id", None)
             )
         )
@@ -170,9 +216,17 @@ class TaskService:
             return False
 
         if substation_id is not None:
+            substation = await self.access_service.substation_repository.get_by_id(
+                substation_id
+            )
+            if substation is None or substation.deleted_at is not None:
+                return False
             return await self.access_service.can_access_substation(
                 actor_id, substation_id
             )
+        urza = await self.access_service.urza_repository.get_by_id(urza_id)
+        if urza is None or urza.deleted_at is not None:
+            return False
         return await self.access_service.can_access_urza(actor_id, urza_id)
 
     async def get_available_assignees(
@@ -221,6 +275,22 @@ class TaskService:
         deadline_at: datetime | None = None,
         now: datetime | None = None,
     ) -> Task:
+        if urza_id is not None and substation_id is None:
+            is_active = await self.access_service.urza_repository.lock_active_by_id(
+                urza_id
+            )
+        elif substation_id is not None and urza_id is None:
+            is_active = await self.access_service.substation_repository.lock_active_by_id(
+                substation_id
+            )
+        else:
+            is_active = False
+
+        if not is_active:
+            raise PermissionError(
+                "Пользователь не может выдавать задания для этого URZA."
+            )
+
         # Передаём время явно для тестируемости и фиксируем оба срока от одного момента.
         if not await self.can_issue_task(
                 actor_id=created_by,
@@ -289,7 +359,9 @@ class TaskService:
         submitted_at: datetime | None = None,
         comment: str | None = None,
     ) -> Task:
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
+        await self._ensure_task_object_is_active(task, actor_id)
         """Назначенный исполнитель передаёт завершённую задачу на проверку."""
         validate_transition(task.status, TaskStatus.UNDER_REVIEW)
         if task.deleted_at is not None:
@@ -328,6 +400,7 @@ class TaskService:
         comment: str | None = None,
     ) -> Task:
         """Закрывает задачу после проверки результата MANAGER."""
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
         validate_transition(task.status, TaskStatus.CLOSED)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
@@ -404,7 +477,9 @@ class TaskService:
             comment: str | None = None,
     ) -> Task:
         """Возвращает задачу исполнителю на доработку."""
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
+        await self._ensure_task_object_is_active(task, actor_id)
         validate_transition(task.status, TaskStatus.IN_PROGRESS)
         await self._check_reviewer_access(task=task, actor_id=actor_id)
         validate_reason(comment)
@@ -437,6 +512,7 @@ class TaskService:
             assigned_at: datetime | None = None,
     ) -> Task:
         # Назначение возможно только из CREATED; переназначение обработаем отдельно.
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
 
         validate_transition(
@@ -500,7 +576,9 @@ class TaskService:
         accepted_at: datetime | None = None,
     ) -> Task:
         # Принять задачу может только назначенный ей инженер.
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
+        await self._ensure_task_object_is_active(task, actor_id)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Принять задачу может только назначенный инженер."
@@ -556,7 +634,9 @@ class TaskService:
     ) -> Task:
         """Завершает выполнение задачи после проверки результата работы."""
         # Завершить задачу может только назначенный ей инженер.
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
+        await self._ensure_task_object_is_active(task, actor_id)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Завершить задачу может только назначенный инженер."
@@ -721,7 +801,9 @@ class TaskService:
         rejected_at: datetime | None = None,
     ) -> Task:
         # Отклонить задачу может только назначенный инженер.
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
+        await self._ensure_task_object_is_active(task, actor_id)
         if task.assigned_to != actor_id:
             raise ValueError(
                 "Отклонить задачу может только назначенный инженер."
@@ -767,6 +849,7 @@ class TaskService:
         assigned_at: datetime | None = None,
     ) -> Task:
         # Переназначение допустимо только для уже назначенной задачи.
+        task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
         if task.status != TaskStatus.ASSIGNED:
             raise ValueError(

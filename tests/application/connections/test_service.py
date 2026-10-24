@@ -28,6 +28,7 @@ class FakeConnection:
         self.rdu_subordination = rdu_subordination
         self.substation_id = substation_id
         self.updated_by = updated_by
+        self.deleted_at = None
 
 
 class FakeConnectionRepository:
@@ -41,6 +42,15 @@ class FakeConnectionRepository:
         self.rollback_calls = 0
         self.received_exclude_id = None
         self.updated = None
+        self.locked_substation_id = None
+        self.active_substation = True
+
+    async def lock_active_substation(self, substation_id):
+        self.locked_substation_id = substation_id
+        return self.active_substation
+
+    async def has_active_substation(self, substation_id):
+        return self.active_substation
 
     async def exists_by_name(
             self,
@@ -179,6 +189,7 @@ async def test_create_connection_sets_parent_and_audit_fields():
         ),
     )
     assert repository.received_name == (substation_id, "ВЛ 110 кВ")
+    assert repository.locked_substation_id == substation_id
     assert repository.added.substation_id == substation_id
     assert repository.added.created_by == actor_id
     assert repository.added.updated_by == actor_id
@@ -198,6 +209,23 @@ async def test_create_connection_rejects_duplicate_name_before_insert():
             substation_id=uuid7(), actor_id=uuid7(),
             data=ConnectionCreate(dispatch_name="ВЛ", rdu_subordination=False),
         )
+    assert repository.added is None
+
+
+@pytest.mark.asyncio
+async def test_create_connection_rejects_archived_substation_after_lock():
+    repository = FakeConnectionRepository([])
+    repository.active_substation = False
+    service = ConnectionService(repository)
+
+    with pytest.raises(ObjectNotFoundError):
+        await service.create(
+            substation_id=uuid7(),
+            actor_id=uuid7(),
+            data=ConnectionCreate(dispatch_name="ВЛ", rdu_subordination=False),
+        )
+
+    assert repository.locked_substation_id is not None
     assert repository.added is None
 
 

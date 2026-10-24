@@ -7,3 +7,4 @@ class SelectedObject(BaseModel):
     object_type: str
     id: UUID
     name: str
+    is_archived: bool = False

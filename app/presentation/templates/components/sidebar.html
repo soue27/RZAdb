@@ -15,7 +15,15 @@
     </button>
 
     <!-- Search -->
-    <div class="sidebar-search">
+    <form
+        id="sidebar-search-form"
+        class="sidebar-search"
+        hx-get="/objects/tree"
+        hx-trigger="input changed delay:300ms from:#sidebar-search-input, refresh-tree from:body"
+        hx-target="#app-sidebar-tree"
+        hx-select="#app-sidebar-tree"
+        hx-swap="innerHTML"
+    >
         <div class="input-group">
             <span class="input-group-text">
                 <span class="material-icons">
@@ -25,12 +33,15 @@
 
             <input
                 type="search"
+                id="sidebar-search-input"
+                name="query"
                 class="form-control"
                 placeholder="Поиск по объектам..."
                 aria-label="Поиск по объектам"
             >
         </div>
-    </div>
+        <input id="sidebar-archive-only" name="archive_only" type="hidden" value="false">
+    </form>
 
     {% macro connection_contains_urza(connection, selected_urza_id) -%}
         {%- for item in connection.urzas -%}
@@ -162,7 +173,7 @@
     {% macro substation_node(substation) %}
         {% set selected_urza_id = urza.id if urza is defined and urza else none %}
         {% set is_open = selected_urza_id is not none and (substation_contains_urza(substation, selected_urza_id)|trim == "true") %}
-        <div class="tree-node">
+        <div class="tree-node{% if substation.is_archived %} tree-node-archived{% endif %}">
 
             <div class="tree-row">
 
@@ -188,7 +199,8 @@
                     class="tree-item tree-item-select{% if selected_substation_id is defined and selected_substation_id is not none and selected_substation_id|string == substation.id|string %} active{% endif %}"
                     data-object-type="substation"
                     data-object-id="{{ substation.id }}"
-                    hx-get="/objects/substation/{{ substation.id }}"
+                    data-archived="{{ 'true' if substation.is_archived else 'false' }}"
+                    hx-get="/objects/substation/{{ substation.id }}{% if substation.is_archived %}?archived=true{% endif %}"
                     hx-target="#object-content"
                     hx-swap="innerHTML"
                 >
@@ -199,6 +211,7 @@
                     <span class="tree-label">
                         {{ substation.dispatch_name }}
                     </span>
+                    {% if substation.is_archived %}<span class="badge text-bg-secondary">Архив</span>{% endif %}
                 </button>
 
             </div>
@@ -221,7 +234,7 @@
     {% macro connection_node(connection) %}
         {% set selected_urza_id = urza.id if urza is defined and urza else none %}
         {% set is_open = selected_urza_id is not none and (connection_contains_urza(connection, selected_urza_id)|trim == "true") %}
-        <div class="tree-node">
+        <div class="tree-node{% if connection.is_archived %} tree-node-archived{% endif %}">
 
             <div class="tree-row">
 
@@ -247,7 +260,8 @@
                     class="tree-item tree-item-select"
                     data-object-type="connection"
                     data-object-id="{{ connection.id }}"
-                    hx-get="/objects/connection/{{ connection.id }}"
+                    data-archived="{{ 'true' if connection.is_archived else 'false' }}"
+                    hx-get="/objects/connection/{{ connection.id }}{% if connection.is_archived %}?archived=true{% endif %}"
                     hx-target="#object-content"
                     hx-swap="innerHTML"
                 >
@@ -258,6 +272,7 @@
                     <span class="tree-label">
                         {{ connection.dispatch_name }}
                     </span>
+                    {% if connection.is_archived %}<span class="badge text-bg-secondary">Архив</span>{% endif %}
                 </button>
 
             </div>
@@ -273,7 +288,8 @@
                             class="tree-item{% if selected_urza_id is not none and selected_urza_id|string == urza.id|string %} active{% endif %}"
                             data-object-type="urza"
                             data-object-id="{{ urza.id }}"
-                            hx-get="/objects/urza/{{ urza.id }}"
+                            data-archived="{{ 'true' if urza.is_archived else 'false' }}"
+                            hx-get="/objects/urza/{{ urza.id }}{% if urza.is_archived %}?archived=true{% endif %}"
                             hx-target="#object-content"
                             hx-swap="innerHTML"
                         >
@@ -286,6 +302,7 @@
                             <span class="tree-label">
                                 {{ urza.dispatch_name }}
                             </span>
+                            {% if urza.is_archived %}<span class="badge text-bg-secondary">Архив</span>{% endif %}
                         </button>
                     {% endfor %}
                 </div>
@@ -295,7 +312,7 @@
     {% endmacro %}
 
 
-    <div class="app-sidebar-tree">
+    <div class="app-sidebar-tree" id="app-sidebar-tree">
 
         {% for node in tree %}
             {{ enterprise_node(node) }}
@@ -308,13 +325,14 @@
             <button
                 type="button"
                 class="tree-item"
+                id="sidebar-archive-toggle"
             >
                 <span class="material-icons tree-icon">
                     inventory_2
                 </span>
 
                 <span class="tree-label">
-                    Архив
+                    {{ "К обычному дереву" if archive_only|default(false) else "Архив" }}
                 </span>
 
                 <span class="material-icons tree-archive-arrow">

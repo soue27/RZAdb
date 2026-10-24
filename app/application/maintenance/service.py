@@ -25,8 +25,8 @@ class TORecordService:
         urza_id: UUID,
         task_id: UUID,
     ):
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
         task = await self.task_repository.get_by_id(task_id)
         if task is None or task.deleted_at is not None:
             raise ValueError("Активная задача не найдена.")
@@ -89,7 +89,7 @@ class TORecordService:
         historical_data: bool = False,
         task_id: UUID | None = None,
     ) -> TORecord:
-        if not await self.access_service.can_access_urza(
+        if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
         ):

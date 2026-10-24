@@ -12,6 +12,10 @@ from sqlalchemy.pool import NullPool
 load_dotenv(Path(".env.test"), override=True)
 
 from app.core.config import get_settings
+from app.infrastructure.database.test_safety import assert_test_database
+
+assert_test_database(get_settings().database_url)
+
 from app.domain.user import User
 from app.infrastructure.database.engine import async_session_factory, engine
 

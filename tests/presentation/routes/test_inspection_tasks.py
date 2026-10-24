@@ -427,6 +427,166 @@ def test_accept_inspection_task_returns_400_when_service_rejects_transition():
         app.dependency_overrides.clear()
 
 
+def test_create_inspection_task_returns_403_when_owner_becomes_archived():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.MANAGER)
+    substation_id = uuid7()
+    service = FakeInspectionTaskService(substation_id)
+    service.create_and_assign = AsyncMock(
+        side_effect=PermissionError("Нельзя изменять осмотр архивной подстанции.")
+    )
+    _install(user, substation_id, service)
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/inspection-tasks",
+            data={},
+        )
+
+        assert response.status_code == 403
+        assert "архивной подстанции" in response.text
+        service.create_and_assign.assert_awaited_once()
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    ("action", "role", "data", "service_method"),
+    [
+        ("assign", UserRole.MANAGER, {"assignee_id": "assignee"}, "assign"),
+        ("accept", UserRole.ENGINEER, {}, "accept"),
+        ("send-to-review", UserRole.ENGINEER, {}, "send_to_review"),
+        ("review", UserRole.MANAGER, {"approve": "true", "reason": ""}, "review"),
+    ],
+)
+def test_inspection_mutations_return_403_when_owner_is_archived(
+    action, role, data, service_method
+):
+    user = SimpleNamespace(id=uuid7(), role=role)
+    substation_id, task_id, assignee_id = uuid7(), uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7()),
+    )
+    service = FakeInspectionTaskService(
+        substation_id,
+        assignees=[SimpleNamespace(id=assignee_id)],
+    )
+    method = AsyncMock(
+        side_effect=PermissionError("Нельзя изменять осмотр архивной подстанции.")
+    )
+    setattr(service, service_method, method)
+    repository = FakeInspectionRepository(task)
+    _install(user, substation_id, service, repository=repository)
+
+    try:
+        if action == "assign":
+            data = {"assignee_id": str(assignee_id)}
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/{action}",
+            data=data,
+        )
+
+        assert response.status_code == 403
+        assert "архивной подстанции" in response.text
+        method.assert_awaited_once()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_completion_validation_returns_403_before_upload_for_archived_owner():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7(), dispatch_name="ПС"),
+        created_by_user=None,
+        assigned_to_user=None,
+        assigned_to=user.id,
+        status=TaskStatus.IN_PROGRESS,
+        created_at=datetime.now(UTC),
+        deadline_at=None,
+        inspection=None,
+    )
+    service = FakeInspectionTaskService(
+        substation_id,
+        validation_error=PermissionError(
+            "Нельзя изменять осмотр архивной подстанции."
+        ),
+    )
+    files = FakeFileService()
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=FakeInspectionRepository(task),
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/complete",
+            data={"inspection_date": "2026-10-24", "remarks": "Проверено"},
+            files={"scan_file": ("scan.pdf", b"scan", "application/pdf")},
+        )
+
+        assert response.status_code == 403
+        assert "архивной подстанции" in response.text
+        assert files.upload_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_completion_race_returns_403_and_archives_uploaded_file():
+    user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7(), dispatch_name="ПС"),
+        created_by_user=None,
+        assigned_to_user=None,
+        assigned_to=user.id,
+        status=TaskStatus.IN_PROGRESS,
+        created_at=datetime.now(UTC),
+        deadline_at=None,
+        inspection=None,
+    )
+    service = FakeInspectionTaskService(
+        substation_id,
+        complete_error=PermissionError(
+            "Нельзя изменять осмотр архивной подстанции."
+        ),
+    )
+    files = FakeFileService()
+    uploaded = SimpleNamespace(id=uuid7())
+    files.upload = AsyncMock(return_value=uploaded)
+    _install(
+        user,
+        substation_id,
+        service,
+        repository=FakeInspectionRepository(task),
+        file_service=files,
+    )
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/complete",
+            data={"inspection_date": "2026-10-24", "remarks": "Проверено"},
+            files={"scan_file": ("scan.pdf", b"scan", "application/pdf")},
+        )
+
+        assert response.status_code == 403
+        assert "архивной подстанции" in response.text
+        assert files.archive_calls == [
+            {"file_id": uploaded.id, "user_id": user.id}
+        ]
+        assert files.discard_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
 
 def test_non_manager_cannot_review_inspection_task():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)

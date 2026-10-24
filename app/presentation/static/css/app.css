@@ -230,6 +230,10 @@ body {
     position: relative;
 }
 
+.tree-node-archived > .tree-row > .tree-item {
+    color: var(--rzadb-text-secondary);
+}
+
 
 /*
  * Children container.

@@ -24,6 +24,7 @@ def repository():
 def access_service():
     service = MagicMock()
     service.can_access_substation = AsyncMock()
+    service.can_modify_substation = AsyncMock()
     service.user_repository.get_by_id = AsyncMock(
         return_value=SimpleNamespace(
             role=UserRole.ENGINEER, active=True, deleted_at=None,
@@ -31,6 +32,23 @@ def access_service():
         )
     )
     return service
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_archived_substation(service, repository, access_service):
+    access_service.can_modify_substation.return_value = False
+
+    with pytest.raises(PermissionError, match="архивной подстанции"):
+        await service.create(
+            user_id=uuid7(),
+            substation_id=uuid7(),
+            number="S-1",
+            name="Scheme",
+            effective_date=date(2026, 10, 1),
+            scan_file_id=uuid7(),
+        )
+
+    repository.add_scheme.assert_not_called()
 
 
 @pytest.fixture

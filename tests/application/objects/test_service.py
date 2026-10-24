@@ -62,6 +62,8 @@ class FakeObjectResolver:
         self,
         object_type: str,
         object_id: UUID,
+        *,
+        include_archived: bool = False,
     ) -> SelectedObject | None:
         return self.result
 
@@ -114,6 +116,27 @@ async def test_raises_access_denied_when_user_has_no_access() -> None:
             user_id=uuid7(),
             object_type="substation",
             object_id=uuid7(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_archive_read_still_requires_existing_object_access() -> None:
+    service = make_service(
+        access=FakeAccessService(substation_access=False),
+        result=SelectedObject(
+            object_type="substation",
+            id=uuid7(),
+            name="Архивная ПС",
+            is_archived=True,
+        ),
+    )
+
+    with pytest.raises(ObjectAccessDeniedError):
+        await service.get_object(
+            user_id=uuid7(),
+            object_type="substation",
+            object_id=uuid7(),
+            include_archived=True,
         )
 
 

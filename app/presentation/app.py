@@ -4,25 +4,28 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
 from app.infrastructure.database import models  # noqa: F401
+from app.presentation.routes.archive import router as archive_router
 from app.presentation.routes.auth import router as auth_router
 from app.presentation.routes.files import router as files_router
 from app.presentation.routes.health import router as health_router
 from app.presentation.routes.home import router as home_router
+from app.presentation.routes.inspection_tasks import router as inspection_tasks_router
 from app.presentation.routes.maintenance import (
     router as maintenance_router,
 )
 from app.presentation.routes.objects import router as objects_router
-from app.presentation.routes.substation_documents import router as substation_documents_router
-from app.presentation.routes.substation_tasks import router as substation_tasks_router
-from app.presentation.routes.inspection_tasks import router as inspection_tasks_router
 from app.presentation.routes.otd import router as otd_router
 from app.presentation.routes.programs import router as programs_router
 from app.presentation.routes.schemes import router as schemes_router
 from app.presentation.routes.settings import router as settings_router
+from app.presentation.routes.substation_documents import (
+    router as substation_documents_router,
+)
+from app.presentation.routes.substation_tasks import router as substation_tasks_router
 from app.presentation.routes.tasks import router as tasks_router
 from app.presentation.routes.urza_instructions import router as urza_instructions_router
-from app.presentation.routes.users import router as users_router
 from app.presentation.routes.urza_objects import router as urza_objects_router
+from app.presentation.routes.users import router as users_router
 
 
 def create_app() -> FastAPI:
@@ -52,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(home_router)
     app.include_router(objects_router)
+    app.include_router(archive_router)
     app.include_router(urza_objects_router)
     app.include_router(substation_documents_router)
     app.include_router(substation_tasks_router)
@@ -63,7 +67,6 @@ def create_app() -> FastAPI:
     app.include_router(settings_router)
     app.include_router(schemes_router)
     app.include_router(tasks_router)
-
 
     return app
 

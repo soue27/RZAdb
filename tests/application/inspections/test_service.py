@@ -31,6 +31,9 @@ class FakeInspectionTaskRepository:
     async def get_by_id(self, task_id):
         return self.tasks.get(task_id)
 
+    async def refresh_for_mutation(self, task):
+        return task
+
     async def save(self, task):
         self.tasks[task.id] = task
         return task
@@ -89,6 +92,62 @@ class FakeSubstationRepository:
 
     async def get_by_id(self, substation_id):
         return self.substations.get(substation_id)
+
+    async def lock_active_by_id(self, substation_id):
+        substation = await self.get_by_id(substation_id)
+        return substation is None or substation.deleted_at is None
+
+
+@pytest.mark.asyncio
+async def test_create_inspection_task_rejects_archived_substation() -> None:
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    substation_repository = FakeSubstationRepository()
+    service = InspectionTaskService(
+        repository, user_repository, substation_repository
+    )
+    actor_id = uuid4()
+    substation_id = uuid4()
+    user_repository.users[actor_id] = SimpleNamespace(role=UserRole.MANAGER)
+    substation_repository.substations[substation_id] = SimpleNamespace(
+        id=substation_id, deleted_at=datetime.now(UTC)
+    )
+
+    with pytest.raises(PermissionError, match="архивной подстанции"):
+        await service.create(substation_id=substation_id, actor_id=actor_id)
+
+    assert repository.created_task is None
+
+
+@pytest.mark.asyncio
+async def test_inspection_task_mutation_locks_substation_before_refresh():
+    calls = []
+    repository = FakeInspectionTaskRepository()
+    user_repository = FakeUserRepository()
+    substation_repository = FakeSubstationRepository()
+    service = InspectionTaskService(
+        repository, user_repository, substation_repository
+    )
+    task = SimpleNamespace(id=uuid4(), substation_id=uuid4(), deleted_at=None)
+    repository.tasks[task.id] = task
+
+    async def lock_active_by_id(substation_id):
+        calls.append(("owner_lock", substation_id))
+        return True
+
+    async def refresh_for_mutation(current_task):
+        calls.append(("task_refresh", current_task.id))
+        return current_task
+
+    substation_repository.lock_active_by_id = lock_active_by_id
+    repository.refresh_for_mutation = refresh_for_mutation
+
+    await service._lock_task_owner(task.id)
+
+    assert calls == [
+        ("owner_lock", task.substation_id),
+        ("task_refresh", task.id),
+    ]
 
 
 @pytest.mark.asyncio

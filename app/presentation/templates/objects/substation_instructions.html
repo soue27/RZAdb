@@ -161,7 +161,7 @@
                             <button
                                 type="button"
                                 class="btn btn-link p-0 text-start text-decoration-none"
-                                hx-get="/objects/substation/{{ substation_id }}/instructions?instruction_version={{ version.id }}"
+                                hx-get="/objects/substation/{{ substation_id }}/instructions?instruction_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
                                 hx-target="#substation-tab-content"
                                 hx-swap="innerHTML"
                                 hx-push-url="true"

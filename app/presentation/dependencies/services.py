@@ -22,6 +22,8 @@ from app.application.inspections.repository import InspectionTaskRepository
 from app.application.inspections.service import InspectionTaskService
 from app.application.maintenance.repository import TORecordRepository
 from app.application.maintenance.service import TORecordService
+from app.application.objects.archive_repository import ArchiveRepository
+from app.application.objects.archive_service import ArchiveService
 from app.application.objects.resolver import ObjectResolver
 from app.application.objects.service import ObjectService
 from app.application.otd.repository import OTDRepository
@@ -99,6 +101,7 @@ def get_auth_service(
         password_service=password_service,
     )
 
+
 def get_access_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AccessService:
@@ -158,6 +161,16 @@ def get_object_service(
             urza_repository=URZARepository(session),
             enterprise_repository=EnterpriseRepository(session),
         ),
+    )
+
+
+def get_archive_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+) -> ArchiveService:
+    return ArchiveService(
+        repository=ArchiveRepository(session),
+        access_service=access_service,
     )
 
 
@@ -308,7 +321,6 @@ def get_task_service(
     )
 
 
-
 def get_program_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
@@ -322,7 +334,6 @@ def get_program_service(
         task_repository=TaskRepository(session),
         task_service=task_service,
     )
-
 
 
 def get_urza_instruction_service(

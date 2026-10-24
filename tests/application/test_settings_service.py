@@ -51,6 +51,7 @@ def make_service(role=UserRole.ENGINEER, *, active=True, accessible=True):
         setattr(repository, method, AsyncMock())
     access_service = MagicMock()
     access_service.can_access_urza = AsyncMock(return_value=accessible)
+    access_service.can_modify_urza = AsyncMock(return_value=True)
     access_service.user_repository = MagicMock()
     access_service.user_repository.get_by_id = AsyncMock(
         return_value=make_user(role, active=active)
@@ -372,12 +373,13 @@ async def test_inactive_manager_cannot_approve():
 @pytest.mark.asyncio
 async def test_manager_without_urza_access_cannot_approve_or_return():
     service, repository, access = make_service(UserRole.MANAGER, accessible=False)
+    access.can_modify_urza.return_value = False
     urza_id = uuid7()
     record = make_record(uuid7(), DocumentStatus.UNDER_REVIEW)
     connect_record(service, repository, record, urza_id)
-    with pytest.raises(PermissionError, match="Доступ"):
+    with pytest.raises(PermissionError, match="Изменение архивной URZA"):
         await service.approve(uuid7(), urza_id, record.id)
-    with pytest.raises(PermissionError, match="Доступ"):
+    with pytest.raises(PermissionError, match="Изменение архивной URZA"):
         await service.return_to_draft(uuid7(), urza_id, record.id)
 
 

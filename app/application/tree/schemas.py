@@ -8,6 +8,7 @@ class URZATreeNode(BaseModel):
 
     id: UUID
     dispatch_name: str
+    is_archived: bool = False
 
 
 class ConnectionTreeNode(BaseModel):
@@ -15,6 +16,7 @@ class ConnectionTreeNode(BaseModel):
 
     id: UUID
     dispatch_name: str
+    is_archived: bool = False
     urzas: list[URZATreeNode] = Field(default_factory=list)
 
 
@@ -23,6 +25,7 @@ class SubstationTreeNode(BaseModel):
 
     id: UUID
     dispatch_name: str
+    is_archived: bool = False
     connections: list[ConnectionTreeNode] = Field(
         default_factory=list,
     )

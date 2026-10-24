@@ -165,6 +165,11 @@ class TaskStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class ArchiveEventType(StrEnum):
+    ARCHIVED = "archived"
+    RESTORED = "restored"
+
+
 class DocumentStatus(StrEnum):
     DRAFT = "draft"
     UNDER_REVIEW = "under_review"

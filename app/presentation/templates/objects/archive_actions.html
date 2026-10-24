@@ -1,0 +1,108 @@
+{% if is_archived %}
+<span class="badge text-bg-secondary me-2">В архиве</span>
+{% endif %}
+
+{% if can_manage_archive %}
+<div class="d-flex flex-wrap align-items-center gap-2 archive-actions">
+    {% if is_archived %}
+        <button
+            type="button"
+            class="btn btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#archive-restore-modal"
+        >
+            Восстановить
+        </button>
+    {% else %}
+        <button
+            type="button"
+            class="btn btn-outline-danger"
+            hx-get="/objects/{{ archive_object_type }}/{{ archive_object_id }}/archive/preview"
+            hx-target="#archive-preview-modal-body"
+            hx-swap="innerHTML"
+            data-bs-toggle="modal"
+            data-bs-target="#archive-preview-modal"
+        >
+            В архив
+        </button>
+    {% endif %}
+
+    <button
+        type="button"
+        class="btn btn-outline-secondary"
+        hx-get="/objects/{{ archive_object_type }}/{{ archive_object_id }}/archive/history"
+        hx-target="#archive-history-modal-body"
+        hx-swap="innerHTML"
+        data-bs-toggle="modal"
+        data-bs-target="#archive-history-modal"
+    >
+        История архива
+    </button>
+</div>
+
+{% if not is_archived %}
+<div class="modal fade" id="archive-preview-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5">Архивирование объекта</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body" id="archive-preview-modal-body">
+                <p class="text-body-secondary mb-0">Загрузка предварительного состава…</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<div class="modal fade" id="archive-restore-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5">Восстановить объект</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <form
+                method="post"
+                action="/objects/{{ archive_object_type }}/{{ archive_object_id }}/restore"
+                hx-post="/objects/{{ archive_object_type }}/{{ archive_object_id }}/restore"
+                hx-swap="none"
+            >
+                <div class="modal-body">
+                    <p>Будет восстановлен только этот объект. Его дочерние объекты останутся в архиве.</p>
+                    <label class="form-label" for="restore-reason-{{ archive_object_id }}">
+                        Причина восстановления <span class="text-body-secondary">(необязательно)</span>
+                    </label>
+                    <textarea
+                        class="form-control"
+                        id="restore-reason-{{ archive_object_id }}"
+                        name="reason"
+                        rows="3"
+                        maxlength="2000"
+                    ></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Восстановить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="archive-history-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5">История архива</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body" id="archive-history-modal-body">
+                <p class="text-body-secondary mb-0">Загрузка истории…</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

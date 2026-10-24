@@ -11,7 +11,7 @@ from app.domain.enums import DocumentStatus, TaskStatus, TaskWorkType, UserRole
 from app.domain.schema import SchemaForm, SchemaRecord
 
 
-def _service(role: UserRole, *, accessible: bool = True):
+def _service(role: UserRole, *, accessible: bool = True, modifiable: bool = True):
     repository = AsyncMock()
     user_id = uuid7()
     urza_id = uuid7()
@@ -19,6 +19,7 @@ def _service(role: UserRole, *, accessible: bool = True):
     user_repository = SimpleNamespace(get_by_id=AsyncMock(return_value=user))
     access_service = SimpleNamespace(
         can_access_urza=AsyncMock(return_value=accessible),
+        can_modify_urza=AsyncMock(return_value=modifiable),
         user_repository=user_repository,
     )
     task_repository = AsyncMock()
@@ -92,7 +93,7 @@ async def test_get_by_urza_returns_form_when_access_allowed() -> None:
 @pytest.mark.asyncio
 async def test_get_by_urza_returns_none_when_access_denied() -> None:
     service, repository, _, user_id, urza_id = _service(
-        UserRole.ENGINEER, accessible=False
+        UserRole.ENGINEER, accessible=False, modifiable=False
     )
 
     assert await service.get_by_urza(user_id, urza_id) is None
@@ -216,10 +217,10 @@ async def test_create_rejects_missing_signed_form() -> None:
 @pytest.mark.asyncio
 async def test_create_rejects_when_access_denied() -> None:
     service, repository, _, user_id, urza_id = _service(
-        UserRole.ENGINEER, accessible=False
+        UserRole.ENGINEER, accessible=False, modifiable=False
     )
 
-    with pytest.raises(PermissionError, match="Доступ к URZA"):
+    with pytest.raises(PermissionError, match="Изменение архивной URZA"):
         await service.create(
             user_id, urza_id, "SC-1", "Schema", "Change", "Reason",
             date(2026, 1, 2), uuid7(),
@@ -492,14 +493,14 @@ async def test_approve_rejects_non_manager() -> None:
 @pytest.mark.asyncio
 async def test_approve_rejects_manager_without_urza_access() -> None:
     service, repository, _, user_id, urza_id = _service(
-        UserRole.MANAGER, accessible=False
+        UserRole.MANAGER, accessible=False, modifiable=False
     )
     schema_form = _form(user_id, urza_id)
     record = _record(user_id, schema_form.id, DocumentStatus.UNDER_REVIEW)
     repository.get_by_id.return_value = record
     repository.get_form_by_id.return_value = schema_form
 
-    with pytest.raises(PermissionError, match="Доступ к URZA"):
+    with pytest.raises(PermissionError, match="Изменение архивной URZA"):
         await service.approve(user_id, urza_id, record.id)
     repository.save.assert_not_awaited()
 

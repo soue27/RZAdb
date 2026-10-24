@@ -148,6 +148,35 @@ async def test_create_urza_sets_fields_and_audit_users(system_user_id) -> None:
     repository.get_by_id.assert_awaited_once_with(urza_id)
 
 
+@pytest.mark.asyncio
+async def test_create_urza_rejects_inactive_connection_after_lock() -> None:
+    repository = AsyncMock()
+    repository.lock_active_connection.return_value = False
+    service = URZAService(repository)
+
+    data = URZACreate(
+        dispatch_name="РЗА",
+        rdu_subordination=False,
+        inventory_number=None,
+        commissioning_date=date(2020, 1, 1),
+        status=URZAStatus.IN_OPERATION,
+        element_base=ElementBase.MICROPROCESSOR,
+        category=URZACategory.II,
+        room_category=RoomCategory.I,
+        complexity=False,
+    )
+
+    with pytest.raises(ObjectNotFoundError):
+        await service.create(
+            connection_id=uuid7(),
+            actor_id=uuid7(),
+            data=data,
+        )
+
+    repository.lock_active_connection.assert_awaited_once()
+    repository.add.assert_not_awaited()
+
+
 
 @pytest.mark.asyncio
 async def test_update_urza_updates_fields_and_audit_user(system_user_id) -> None:

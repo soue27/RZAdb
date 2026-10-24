@@ -8,6 +8,7 @@ from fastapi import (
     Depends,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     status,
@@ -122,12 +123,14 @@ async def get_urza_maintenance(
         TreeService,
         Depends(get_tree_service),
     ],
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="urza",
             object_id=urza_id,
+            include_archived=archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -145,7 +148,7 @@ async def get_urza_maintenance(
         urza_id=urza_id,
     )
 
-    can_issue_task = await task_service.can_issue_task(
+    can_issue_task = False if archived else await task_service.can_issue_task(
         actor_id=current_user.id,
         urza_id=urza_id,
     )
@@ -156,7 +159,10 @@ async def get_urza_maintenance(
         context={
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
-            "can_create_maintenance": current_user.role is not UserRole.SPECIALIST,
+            "can_create_maintenance": (
+                not archived and current_user.role is not UserRole.SPECIALIST
+            ),
+            "is_archived": archived,
             "urza_id": urza_id,
         },
         current_user=current_user,

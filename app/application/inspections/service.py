@@ -24,6 +24,27 @@ class InspectionTaskService:
         self.user_repository = user_repository
         self.substation_repository = substation_repository
 
+    async def _ensure_substation_active(self, substation_id: UUID) -> None:
+        substation = await self.substation_repository.get_by_id(substation_id)
+        if substation is not None and substation.deleted_at is not None:
+            raise PermissionError("Нельзя изменять осмотр архивной подстанции.")
+
+    async def _lock_active_substation(self, substation_id: UUID) -> None:
+        if not await self.substation_repository.lock_active_by_id(substation_id):
+            raise PermissionError("Нельзя изменять осмотр архивной подстанции.")
+
+    async def _lock_task_owner(self, task_id: UUID) -> InspectionTask:
+        task = await self.repository.get_by_id(task_id)
+        if task is None:
+            raise ValueError("Задача осмотра не найдена.")
+
+        original_substation_id = task.substation_id
+        await self._lock_active_substation(original_substation_id)
+        task = await self.repository.refresh_for_mutation(task)
+        if task.substation_id != original_substation_id:
+            raise ValueError("Владелец осмотра изменился. Повторите операцию.")
+        return task
+
     async def create(
         self,
         *,
@@ -32,6 +53,8 @@ class InspectionTaskService:
         now: datetime | None = None,
     ) -> InspectionTask:
         """Создаёт новую задачу осмотра без назначения исполнителя."""
+
+        await self._lock_active_substation(substation_id)
 
         creator = await self.user_repository.get_by_id(actor_id)
 
@@ -89,10 +112,7 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Назначает исполнителя на созданную задачу осмотра."""
 
-        task = await self.repository.get_by_id(task_id)
-
-        if task is None:
-            raise ValueError("Задача осмотра не найдена.")
+        task = await self._lock_task_owner(task_id)
 
         actor = await self.user_repository.get_by_id(actor_id)
 
@@ -158,10 +178,7 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Принимает назначенную задачу осмотра в работу."""
 
-        task = await self.repository.get_by_id(task_id)
-
-        if task is None:
-            raise ValueError("Задача осмотра не найдена.")
+        task = await self._lock_task_owner(task_id)
 
         actor = await self.user_repository.get_by_id(actor_id)
 
@@ -221,7 +238,8 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Завершает осмотр и сохраняет его результат."""
 
-        task = await self.validate_completion(
+        task = await self._lock_task_owner(task_id)
+        await self.validate_completion(
             task_id, actor_id=actor_id, remarks=remarks
         )
 
@@ -274,6 +292,8 @@ class InspectionTaskService:
         if task is None:
             raise ValueError("Задача осмотра не найдена.")
 
+        await self._ensure_substation_active(task.substation_id)
+
         actor = await self.user_repository.get_by_id(actor_id)
 
         if actor is None:
@@ -312,10 +332,7 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Передаёт завершённый осмотр на проверку Manager."""
 
-        task = await self.repository.get_by_id(task_id)
-
-        if task is None:
-            raise ValueError("Задача осмотра не найдена.")
+        task = await self._lock_task_owner(task_id)
 
         actor = await self.user_repository.get_by_id(actor_id)
 
@@ -374,6 +391,10 @@ class InspectionTaskService:
         if task is None or task.status is not TaskStatus.UNDER_REVIEW:
             return False
 
+        substation = await self.substation_repository.get_by_id(task.substation_id)
+        if substation is not None and substation.deleted_at is not None:
+            return False
+
         actor = await self.user_repository.get_by_id(actor_id)
         if actor is None or actor.role is not UserRole.MANAGER:
             return False
@@ -400,10 +421,7 @@ class InspectionTaskService:
     ) -> InspectionTask:
         """Проверяет результат осмотра и принимает или возвращает его."""
 
-        task = await self.repository.get_by_id(task_id)
-
-        if task is None:
-            raise ValueError("Задача осмотра не найдена.")
+        task = await self._lock_task_owner(task_id)
 
         actor = await self.user_repository.get_by_id(actor_id)
 

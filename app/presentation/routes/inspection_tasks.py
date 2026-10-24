@@ -201,6 +201,17 @@ async def create_inspection_task(
             actor_id=current_user.id,
             assignee_id=parsed_assignee,
         )
+    except PermissionError as exc:
+        return await _render_create_form(
+            request,
+            substation_id=substation_id,
+            current_user=current_user,
+            service=service,
+            tree=tree,
+            assignee_id=assignee_id,
+            error_message=str(exc),
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
     except ValueError as exc:
         return await _render_create_form(
             request,
@@ -236,6 +247,8 @@ async def assign_inspection_task(
         raise HTTPException(status_code=400, detail="Выбранный исполнитель недоступен.")
     try:
         await service.assign(task_id, actor_id=current_user.id, assignee_id=assignee_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _done(request, task.substation_id, task.id)
@@ -252,6 +265,8 @@ async def accept_inspection_task(
     task = await _accessible_task(objects, repository, current_user, task_id)
     try:
         await service.accept(task_id, actor_id=current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _done(request, task.substation_id, task.id)
@@ -287,7 +302,7 @@ async def complete_inspection_task(
         await service.validate_completion(
             task_id, actor_id=current_user.id, remarks=remarks
         )
-    except ValueError as exc:
+    except (PermissionError, ValueError) as exc:
         request.state.inspection_error_message = str(exc)
         request.state.inspection_form_values = {
             "inspection_date": inspection_date.isoformat(), "remarks": remarks
@@ -295,7 +310,11 @@ async def complete_inspection_task(
         response = await inspection_task_detail(
             request, task_id, current_user, objects, repository, service, tree
         )
-        response.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = (
+            status.HTTP_403_FORBIDDEN
+            if isinstance(exc, PermissionError)
+            else status.HTTP_400_BAD_REQUEST
+        )
         return response
 
 
@@ -318,7 +337,7 @@ async def complete_inspection_task(
             scan_file_id=scan.id if scan else None,
             editable_file_id=editable.id if editable else None,
         )
-    except ValueError as exc:
+    except (PermissionError, ValueError) as exc:
         for uploaded in uploaded_files:
             try:
                 await files.archive(
@@ -346,7 +365,11 @@ async def complete_inspection_task(
             service,
             tree,
         )
-        response.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = (
+            status.HTTP_403_FORBIDDEN
+            if isinstance(exc, PermissionError)
+            else status.HTTP_400_BAD_REQUEST
+        )
         return response
 
 
@@ -376,6 +399,8 @@ async def send_inspection_for_review(
     task = await _accessible_task(objects, repository, current_user, task_id)
     try:
         await service.send_to_review(task_id, actor_id=current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _done(request, task.substation_id, task.id)
@@ -398,6 +423,8 @@ async def review_inspection(
         )
     try:
         await service.review(task_id, actor_id=current_user.id, approve=approve, reason=reason or None)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return await _done(request, task.substation_id, task.id)

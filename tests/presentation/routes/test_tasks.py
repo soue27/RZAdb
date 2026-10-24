@@ -787,6 +787,7 @@ def test_tasks_list_sorts_work_items_and_inspections_together():
         assigned_to=user.id,
         created_at=newer,
         status=TaskStatus.CLOSED,
+        deadline_at=datetime(2026, 10, 20, tzinfo=UTC),
     )
 
     task = _task(user.id, TaskStatus.CLOSED)
@@ -1393,6 +1394,7 @@ def test_reviewable_inspection_appears_in_both_review_tabs(system_user_id):
         assigned_to_user=SimpleNamespace(full_name="Инженер"),
         created_at=datetime(2026, 10, 1, tzinfo=UTC),
         status=TaskStatus.UNDER_REVIEW,
+        deadline_at=datetime(2026, 10, 20, tzinfo=UTC),
     )
 
     not_reviewable = SimpleNamespace(
@@ -1405,6 +1407,7 @@ def test_reviewable_inspection_appears_in_both_review_tabs(system_user_id):
         assigned_to_user=SimpleNamespace(full_name="Менеджер"),
         created_at=datetime(2026, 10, 2, tzinfo=UTC),
         status=TaskStatus.UNDER_REVIEW,
+        deadline_at=datetime(2026, 10, 21, tzinfo=UTC),
     )
 
     repository = FakeTaskRepository([])

@@ -1,3 +1,4 @@
+from app.domain.archive_event import ArchiveEvent
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
 from app.domain.file import File
@@ -23,6 +24,7 @@ from app.domain.user import User
 __all__ = [
     "OTD",
     "URZA",
+    "ArchiveEvent",
     "Connection",
     "Enterprise",
     "File",

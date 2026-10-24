@@ -2,7 +2,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi import File as FastAPIFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -46,13 +46,15 @@ async def _render_urza_programs(
     program_service: ProgramService,
     task_service: TaskService,
     tree_service: TreeService,
+    *,
+    is_archived: bool = False,
 ):
     programs = await program_service.get_by_urza(
         user_id=current_user.id,
         urza_id=urza_id,
     )
 
-    program_actions = {
+    program_actions = {} if is_archived else {
         program.id: await program_service.get_available_actions(
             user_id=current_user.id,
             program=program,
@@ -60,17 +62,18 @@ async def _render_urza_programs(
         for program in programs
     }
 
-    can_issue_task = await task_service.can_issue_task(
+    can_issue_task = False if is_archived else await task_service.can_issue_task(
         actor_id=current_user.id,
         urza_id=urza_id,
     )
 
     context = {
         "urza_id": urza_id,
+        "is_archived": is_archived,
         "programs": programs,
         "program_actions": program_actions,
         "can_issue_task": can_issue_task,
-        "can_create_program": current_user.role in {
+        "can_create_program": not is_archived and current_user.role in {
             UserRole.MANAGER,
             UserRole.ENGINEER,
             UserRole.ADMIN,
@@ -117,12 +120,14 @@ async def get_urza_programs(
         TreeService,
         Depends(get_tree_service),
     ],
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="urza",
             object_id=urza_id,
+            include_archived=archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -142,6 +147,7 @@ async def get_urza_programs(
         program_service=program_service,
         task_service=task_service,
         tree_service=tree_service,
+        is_archived=archived,
     )
 
 

@@ -14,6 +14,7 @@ from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 def deps():
     repo, access, users, urzas = MagicMock(), MagicMock(), MagicMock(), MagicMock()
     access.can_access_urza = AsyncMock(return_value=True)
+    access.can_modify_urza = AsyncMock(return_value=True)
     repo.get_by_urza_id = AsyncMock(return_value=None)
     repo.add_instruction = AsyncMock(side_effect=lambda x: x)
     repo.add_version = AsyncMock(side_effect=lambda x: x)

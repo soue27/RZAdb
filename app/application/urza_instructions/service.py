@@ -69,8 +69,8 @@ class URZAInstructionService:
         change_description: str | None = None,
         change_justification: str | None = None,
     ) -> URZAInstruction:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
         status = await self._status_for_creator(user_id)
         if await self.repository.get_by_urza_id(urza_id) is not None:
             raise ValueError("Инструкция РЗА для данного URZA уже существует")
@@ -104,8 +104,8 @@ class URZAInstructionService:
         instruction = await self.repository.get_by_id(version.urza_instruction_id)
         if instruction is None:
             return None
-        if not await self.access_service.can_access_urza(user_id, instruction.urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, instruction.urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
         return version
 
     async def create_version(
@@ -174,8 +174,8 @@ class URZAInstructionService:
             raise ValueError("Инструкция РЗА не найдена.")
         if instruction.urza_id != urza_id:
             raise ValueError("Инструкция не принадлежит указанной URZA.")
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
         return version
 
     async def get_available_actions(self, user_id: UUID, version: URZAInstructionVersion) -> set[str]:

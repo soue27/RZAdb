@@ -1,0 +1,25 @@
+<section class="archive-history" aria-label="История архива">
+    {% if events %}
+        <ol class="list-group list-group-flush">
+            {% for event in events %}
+                <li class="list-group-item px-0">
+                    <div>
+                        <strong>
+                            {% if event.event_type.value == "archived" %}Архивирование{% else %}Восстановление{% endif %}
+                        </strong>
+                        <time datetime="{{ event.occurred_at.isoformat() }}">
+                            {{ event.occurred_at.strftime("%d.%m.%Y %H:%M") }}
+                        </time>
+                        · {{ event.actor.full_name }}
+                    </div>
+                    {% if event.reason %}
+                        <p class="mb-1">Причина: {{ event.reason }}</p>
+                    {% endif %}
+                    <small class="text-body-secondary">Операция {{ event.operation_id }}</small>
+                </li>
+            {% endfor %}
+        </ol>
+    {% else %}
+        <p class="text-body-secondary mb-0">Событий архива пока нет.</p>
+    {% endif %}
+</section>

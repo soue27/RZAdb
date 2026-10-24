@@ -1,4 +1,5 @@
 <div class="rzadb-object-card">
+    {% if is_archived %}<div class="alert alert-secondary py-2">Архивная запись · только чтение</div>{% endif %}
 
     <!-- Родительский путь -->
     <div class="mb-3 р-24">
@@ -18,7 +19,7 @@
 
         <div class="d-flex gap-2 flex-shrink-0">
 
-            {% if can_edit_urza %}
+            {% if can_edit_urza and not is_archived %}
             <button
                 type="button"
                 class="btn btn-outline-primary"
@@ -30,13 +31,17 @@
             </button>
             {% endif %}
 
-            <button
+            {% set archive_object_type = "urza" %}
+            {% set archive_object_id = urza.id %}
+            {% include "objects/archive_actions.html" %}
+
+            {% if not is_archived %}<button
                 type="button"
                 class="btn btn-outline-secondary"
                 title="Дополнительные действия"
             >
                 <span class="material-icons">more_horiz</span>
-            </button>
+            </button>{% endif %}
 
         </div>
 
@@ -205,7 +210,7 @@
                     class="nav-link active"
                     data-rzadb-tab
                     data-tab="otd"
-                    hx-get="/objects/urza/{{ urza.id }}?tab=otd"
+                    hx-get="/objects/urza/{{ urza.id }}?tab=otd{% if is_archived %}&archived=true{% endif %}"
                     hx-select="#urza-tab-content"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
@@ -220,7 +225,7 @@
                     class="nav-link"
                     data-rzadb-tab
                     data-tab="settings"
-                    hx-get="/objects/urza/{{ urza.id }}/settings"
+                    hx-get="/objects/urza/{{ urza.id }}/settings{% if is_archived %}?archived=true{% endif %}"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
                 >
@@ -234,7 +239,7 @@
                     class="nav-link"
                     data-rzadb-tab
                     data-tab="schemas"
-                    hx-get="/objects/urza/{{ urza.id }}/schemas"
+                    hx-get="/objects/urza/{{ urza.id }}/schemas{% if is_archived %}?archived=true{% endif %}"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
                 >
@@ -248,7 +253,7 @@
                     class="nav-link"
                     data-rzadb-tab
                     data-tab="maintenance"
-                    hx-get="/objects/urza/{{ urza.id }}/maintenance"
+                    hx-get="/objects/urza/{{ urza.id }}/maintenance{% if is_archived %}?archived=true{% endif %}"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
                 >
@@ -262,7 +267,7 @@
                     class="nav-link"
                     data-rzadb-tab
                     data-tab="programs"
-                    hx-get="/objects/urza/{{ urza.id }}/programs"
+                    hx-get="/objects/urza/{{ urza.id }}/programs{% if is_archived %}?archived=true{% endif %}"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
                 >
@@ -276,7 +281,7 @@
                     class="nav-link"
                     data-rzadb-tab
                     data-tab="instruction"
-                    hx-get="/objects/urza/{{ urza.id }}/instruction"
+                    hx-get="/objects/urza/{{ urza.id }}/instruction{% if is_archived %}?archived=true{% endif %}"
                     hx-target="#urza-tab-content"
                     hx-swap="outerHTML"
                 >
@@ -292,7 +297,7 @@
         <div id="urza-tab-content">
 
             <div class="d-flex justify-content-end mb-3">
-                {% if otd_create_actions %}
+                {% if otd_create_actions and not is_archived %}
                     <a
                         href="/objects/urza/{{ urza.id }}?tab=otd"
                         hx-get="/objects/urza/{{ urza.id }}/otd/new"
@@ -519,7 +524,7 @@
                                         <button
                                             type="button"
                                             class="btn btn-link p-0 text-start text-decoration-none"
-                                            hx-get="/objects/urza/{{ urza.id }}?otd_version={{ version.id }}"
+                                            hx-get="/objects/urza/{{ urza.id }}?otd_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
                                             hx-target="#object-content"
                                             hx-swap="innerHTML"
                                             hx-push-url="true"

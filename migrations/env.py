@@ -27,7 +27,11 @@ if environment == "test":
     get_settings.cache_clear()
 
 settings = get_settings()
-print(f"ALEMBIC DATABASE: {settings.database_url}")
+if environment == "test":
+    from app.infrastructure.database.test_safety import assert_test_database
+
+    assert_test_database(settings.database_url)
+
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 

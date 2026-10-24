@@ -2,6 +2,9 @@
     const sidebar = document.getElementById("app-sidebar");
     const resizer = document.getElementById("sidebar-resizer");
     const collapseButton = document.getElementById("sidebar-collapse");
+    const searchForm = document.getElementById("sidebar-search-form");
+    const archiveToggle = document.getElementById("sidebar-archive-toggle");
+    const searchInput = document.getElementById("sidebar-search-input");
 
     if (!sidebar || !resizer || !collapseButton) {
         return;
@@ -139,6 +142,22 @@
     }
 
     updateCollapseButton();
+
+    if (searchForm && archiveToggle) {
+        searchInput?.addEventListener("input", () => {
+            searchForm.elements.archive_only.value = "false";
+        });
+        sidebar.addEventListener("click", (event) => {
+            if (!event.target.closest("#sidebar-archive-toggle")) {
+                return;
+            }
+            const archiveMode = searchForm.elements.archive_only;
+            const enabled = archiveMode.value !== "true";
+            archiveMode.value = String(enabled);
+            archiveToggle.setAttribute("aria-pressed", String(enabled));
+            htmx.trigger(document.body, "refresh-tree");
+        });
+    }
 
 
     /*

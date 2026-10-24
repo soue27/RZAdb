@@ -3,7 +3,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
 
@@ -34,12 +34,15 @@ async def _check_urza_access(
     object_service: ObjectService,
     user_id: UUID,
     urza_id: UUID,
+    *,
+    include_archived: bool = False,
 ) -> None:
     try:
         await object_service.get_object(
             user_id=user_id,
             object_type="urza",
             object_id=urza_id,
+            include_archived=include_archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -60,6 +63,7 @@ async def _render_settings(
     settings_service: SettingsService,
     task_service: TaskService,
     *,
+    is_archived: bool = False,
     error_message: str | None = None,
     notice_message: str | None = None,
     response_status: int = status.HTTP_200_OK,
@@ -74,7 +78,7 @@ async def _render_settings(
         urza_id=urza_id,
     )
 
-    actions_by_record = {
+    actions_by_record = {} if is_archived else {
         record.id: await settings_service.get_available_actions(
             user_id=current_user.id,
             record=record,
@@ -82,7 +86,7 @@ async def _render_settings(
         for record in settings_records
     }
 
-    can_issue_task = await task_service.can_issue_task(
+    can_issue_task = False if is_archived else await task_service.can_issue_task(
         actor_id=current_user.id,
         urza_id=urza_id,
     )
@@ -97,9 +101,11 @@ async def _render_settings(
             "actions_by_record": actions_by_record,
             "current_user": current_user,
             "urza_id": urza_id,
+            "is_archived": is_archived,
             "can_issue_task": can_issue_task,
             "error_message": error_message,
             "notice_message": notice_message,
+            "is_archived": is_archived,
         },
         status_code=response_status,
     )
@@ -195,11 +201,13 @@ async def get_urza_settings(
         TaskService,
         Depends(get_task_service),
     ],
+    archived: bool = Query(default=False),
 ):
     await _check_urza_access(
         object_service,
         current_user.id,
         urza_id,
+        include_archived=archived,
     )
 
     try:
@@ -209,6 +217,7 @@ async def get_urza_settings(
             current_user,
             settings_service,
             task_service,
+            is_archived=archived,
         )
     except PermissionError as exc:
         raise HTTPException(

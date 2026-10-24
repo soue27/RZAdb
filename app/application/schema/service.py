@@ -40,8 +40,8 @@ class SchemaService:
         return user
 
     async def _ensure_access(self, user_id: UUID, urza_id: UUID) -> None:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
 
     async def _validate_task_for_result(
         self,

@@ -15,14 +15,27 @@ from app.application.objects.exceptions import (
     ObjectNotFoundError,
 )
 from app.application.objects.schemas import SelectedObject
+from app.application.objects.service import ObjectService
+from app.application.files.access_service import FileAccessService
+from app.application.files.owners import FileAccessTargetType, FileOwner, FileOwnerType
+from app.application.rza_instructions.service import RZAInstructionService
+from app.application.selectivity_schemes.service import SelectivitySchemeService
+from app.application.programs.service import ProgramService
+from app.application.schema.service import SchemaService
+from app.application.settings.service import SettingsService
+from app.application.urza_instructions.service import URZAInstructionService
 from app.application.substations.schemas import SubstationDetails
+from app.application.tree.service import TreeService
 from app.application.urzas.service import URZANameConflictError
 from app.domain.enums import (
     AccessCategory,
     DocumentStatus,
+    EnterpriseType,
     HighestVoltage,
     OperationalCurrentType,
     ProgramType,
+    TaskStatus,
+    TaskWorkType,
     UserRole,
 )
 from app.domain.file import File
@@ -33,15 +46,24 @@ from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_access_service,
     get_enterprise_service,
     get_file_service,
+    get_file_access_service,
     get_inspection_service,
+    get_inspection_task_service,
+    get_inspection_task_repository,
     get_object_service,
+    get_maintenance_service,
     get_otd_service,
     get_program_service,
+    get_rza_instruction_service,
+    get_schema_service,
+    get_selectivity_scheme_service,
     get_settings_service,
     get_substation_service,
     get_task_service,
+    get_task_repository,
     get_tree_service,
     get_urza_instruction_service,
     get_urza_service,
@@ -83,7 +105,9 @@ class FakeSubstationService:
         self.updated = None
         self.missing = missing
 
-    async def get_details(self, substation_id: UUID) -> SubstationDetails:
+    async def get_details(
+        self, substation_id: UUID, *, include_archived: bool = False
+    ) -> SubstationDetails:
         if self.missing:
             raise ObjectNotFoundError
         if self.updated is not None:
@@ -112,7 +136,7 @@ class FakeURZAService:
         self.error = error
         self.update_calls = []
 
-    async def get_details(self, urza_id):
+    async def get_details(self, urza_id, *, include_archived: bool = False):
         if self.details is None:
             raise ObjectNotFoundError
         return self.details
@@ -211,7 +235,7 @@ class FakeConnectionCreationService:
         )
         return self.connection
 
-    async def get_by_id(self, connection_id):
+    async def get_by_id(self, connection_id, *, include_archived: bool = False):
         if self.connection and self.connection.id == connection_id:
             return self.connection
         return None
@@ -648,6 +672,8 @@ class FakeObjectService:
         user_id: UUID,
         object_type: str,
         object_id: UUID,
+        *,
+        include_archived: bool = False,
     ) -> SelectedObject:
         if self.error is not None:
             raise self.error
@@ -4459,5 +4485,1053 @@ def test_department_substation_creation_denied_for_read_only_roles(role):
             },
         )
         assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchiveTreeAccess:
+    def __init__(self, root):
+        self.root = root
+
+    async def get_accessible_enterprise_roots(self, _user_id):
+        return [self.root]
+
+
+class _HTTPArchiveEnterpriseRepository:
+    def __init__(self, enterprises):
+        self.enterprises = enterprises
+
+    async def get_all_active(self):
+        return self.enterprises
+
+
+class _HTTPArchiveEntityRepository:
+    def __init__(self, items, parent_field):
+        self.items = items
+        self.parent_field = parent_field
+
+    async def get_by_enterprise_ids(self, ids, *, include_archived=False):
+        return [
+            item for item in self.items
+            if item.enterprise_id in ids
+            and (include_archived or item.deleted_at is None)
+        ]
+
+    async def get_by_substation_ids(self, ids, *, include_archived=False):
+        return [
+            item for item in self.items
+            if item.substation_id in ids
+            and (include_archived or item.deleted_at is None)
+        ]
+
+    async def get_by_connection_ids(self, ids, *, include_archived=False):
+        return [
+            item for item in self.items
+            if item.connection_id in ids
+            and (include_archived or item.deleted_at is None)
+        ]
+
+
+class _HTTPArchiveAccess:
+    def __init__(self, allowed=True):
+        self.allowed = allowed
+        self.calls = []
+
+    async def can_access_substation(self, *, user_id, substation_id):
+        self.calls.append(("substation", user_id, substation_id))
+        return self.allowed
+
+    async def can_access_connection(self, *, user_id, connection_id):
+        self.calls.append(("connection", user_id, connection_id))
+        return self.allowed
+
+    async def can_access_urza(self, *, user_id, urza_id):
+        self.calls.append(("urza", user_id, urza_id))
+        return self.allowed
+
+
+class _HTTPArchiveObjectResolver:
+    def __init__(self, result):
+        self.result = result
+        self.calls = []
+
+    async def resolve(self, *, object_type, object_id, include_archived=False):
+        self.calls.append((object_type, object_id, include_archived))
+        if self.result is None or self.result.id != object_id:
+            return None
+        if self.result.is_archived and not include_archived:
+            return None
+        return self.result
+
+
+def _http_archive_object_service(object_type, object_id, *, allowed=True):
+    selected = SelectedObject(
+        object_type=object_type,
+        id=object_id,
+        name="Archive test object",
+        is_archived=True,
+    )
+    access = _HTTPArchiveAccess(allowed=allowed)
+    resolver = _HTTPArchiveObjectResolver(selected)
+    return ObjectService(access, resolver), access, resolver
+
+
+def _install_unused_object_route_dependencies():
+    for dependency in (
+        get_connection_service,
+        get_urza_service,
+        get_otd_service,
+        get_settings_service,
+        get_otd_service,
+        get_task_service,
+        get_tree_service,
+        get_enterprise_service,
+    ):
+        app.dependency_overrides[dependency] = lambda: SimpleNamespace()
+
+
+def _http_tree_service():
+    enterprise = SimpleNamespace(
+        id=uuid7(), parent_id=None, type=EnterpriseType.DEPARTMENT,
+        full_name="Visible department", short_name="Visible",
+    )
+    outside = SimpleNamespace(
+        id=uuid7(), parent_id=None, type=EnterpriseType.DEPARTMENT,
+        full_name="Outside department", short_name="Outside",
+    )
+    station = SimpleNamespace(
+        id=uuid7(), enterprise_id=enterprise.id,
+        dispatch_name="Active station", deleted_at=None,
+    )
+    archived_station = SimpleNamespace(
+        id=uuid7(), enterprise_id=enterprise.id,
+        dispatch_name="Relay archived station", deleted_at=datetime.now(UTC),
+    )
+    outside_station = SimpleNamespace(
+        id=uuid7(), enterprise_id=outside.id,
+        dispatch_name="Private station", deleted_at=None,
+    )
+    line = SimpleNamespace(
+        id=uuid7(), substation_id=station.id,
+        dispatch_name="Active line", deleted_at=None,
+    )
+    archived_line = SimpleNamespace(
+        id=uuid7(), substation_id=station.id,
+        dispatch_name="Relay archived line", deleted_at=datetime.now(UTC),
+    )
+    outside_line = SimpleNamespace(
+        id=uuid7(), substation_id=outside_station.id,
+        dispatch_name="Private line", deleted_at=None,
+    )
+    active_urza = SimpleNamespace(
+        id=uuid7(), connection_id=line.id,
+        dispatch_name="Relay active", deleted_at=None,
+    )
+    archived_urza = SimpleNamespace(
+        id=uuid7(), connection_id=line.id,
+        dispatch_name="Relay archived", deleted_at=datetime.now(UTC),
+    )
+    private_urza = SimpleNamespace(
+        id=uuid7(), connection_id=outside_line.id,
+        dispatch_name="Private relay", deleted_at=None,
+    )
+    service = TreeService(
+        enterprise_repository=_HTTPArchiveEnterpriseRepository(
+            [enterprise, outside]
+        ),
+        substation_repository=_HTTPArchiveEntityRepository(
+            [station, archived_station, outside_station], "enterprise_id"
+        ),
+        connection_repository=_HTTPArchiveEntityRepository(
+            [line, archived_line, outside_line], "substation_id"
+        ),
+        urza_repository=_HTTPArchiveEntityRepository(
+            [active_urza, archived_urza, private_urza], "connection_id"
+        ),
+        access_service=_HTTPArchiveTreeAccess(enterprise),
+    )
+    return service, {
+        "outside": [outside_station.id, outside_line.id, private_urza.id],
+        "active": [station.id, line.id, active_urza.id],
+        "archived": [archived_station.id, archived_line.id, archived_urza.id],
+    }
+
+
+def test_tree_http_empty_query_is_active_only_and_search_includes_archive():
+    user = make_user(uuid7())
+    tree_service, ids = _http_tree_service()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_tree_service] = lambda: tree_service
+
+    try:
+        with TestClient(app) as client:
+            empty = client.get("/objects/tree")
+            assert empty.status_code == 200
+            assert empty.headers["content-type"].startswith("text/html")
+            assert "Active station" in empty.text
+            assert "Private station" not in empty.text
+            for archived_id in ids["archived"]:
+                assert str(archived_id) not in empty.text
+
+            searched = client.get(
+                "/objects/tree?query=relay",
+                headers={"HX-Request": "true"},
+            )
+            assert searched.status_code == 200
+            assert 'id="app-sidebar-tree"' in searched.text
+            assert "Relay active" in searched.text
+            assert "Relay archived" in searched.text
+            assert "Relay archived station" in searched.text
+            assert searched.text.count('>Архив</span>') >= 3
+            assert "Private relay" not in searched.text
+            for result_id in [ids["active"][2], ids["archived"][2]]:
+                assert searched.text.count(f'data-object-id="{result_id}"') == 1
+            assert 'id="sidebar-archive-toggle"' in searched.text
+            assert 'type="checkbox"' not in searched.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_archived_substation_card_requires_scope_and_archive_flag():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    substation_service = FakeSubstationService()
+    object_service, access, resolver = _http_archive_object_service(
+        "substation", substation_id
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_substation_service] = lambda: substation_service
+    _install_unused_object_route_dependencies()
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                f"/objects/substation/{substation_id}?archived=true",
+                headers={"HX-Request": "true"},
+            )
+            assert response.status_code == 200
+            assert "Архивная запись · только чтение" in response.text
+            assert "Добавить присоединение" not in response.text
+            assert resolver.calls[-1] == ("substation", substation_id, True)
+
+            without_flag = client.get(
+                f"/objects/substation/{substation_id}",
+                headers={"HX-Request": "true"},
+            )
+            assert without_flag.status_code == 404
+
+            access.allowed = False
+            outside_scope = client.get(
+                f"/objects/substation/{substation_id}?archived=true",
+                headers={"HX-Request": "true"},
+            )
+            assert outside_scope.status_code == 403
+            assert resolver.calls[-1] == ("substation", substation_id, False)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_archive_flag_does_not_allow_substation_mutation():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id = uuid7()
+    object_service, _, resolver = _http_archive_object_service(
+        "substation", substation_id
+    )
+    substation_service = FakeSubstationService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_substation_service] = lambda: substation_service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/edit?archived=true",
+            data={
+                "dispatch_name": "Changed",
+                "highest_voltage": "110",
+                "operational_current_type": "permanent",
+            },
+        )
+        assert response.status_code == 404
+        assert substation_service.updated is None
+        assert resolver.calls == [("substation", substation_id, False)]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_archived_object_creation_routes_reject_direct_posts():
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id, connection_id, urza_id, instruction_id = (
+        uuid7(), uuid7(), uuid7(), uuid7()
+    )
+    overrides = (
+        get_substation_service,
+        get_connection_service,
+        get_urza_service,
+        get_tree_service,
+        get_settings_service,
+        get_otd_service,
+        get_task_service,
+        get_file_service,
+        get_program_service,
+        get_schema_service,
+        get_maintenance_service,
+        get_rza_instruction_service,
+        get_selectivity_scheme_service,
+        get_inspection_task_service,
+        get_inspection_task_repository,
+        get_task_repository,
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    for dependency in overrides:
+        app.dependency_overrides[dependency] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_substation_service] = lambda: FakeSubstationService()
+
+    cases = [
+        (
+            f"/objects/substation/{substation_id}/edit?archived=true",
+            "substation", substation_id,
+            {"dispatch_name": "Changed", "highest_voltage": "110",
+             "operational_current_type": "permanent"}, None,
+        ),
+        (
+            f"/objects/connection/{connection_id}?archived=true",
+            "connection", connection_id,
+            {"dispatch_name": "Changed"}, None,
+        ),
+        (
+            f"/objects/connection/{connection_id}/urzas?archived=true",
+            "connection", connection_id,
+            {"dispatch_name": "Relay"}, None,
+        ),
+        (
+            f"/objects/substation/{substation_id}/instructions?archived=true",
+            "substation", substation_id, {}, None,
+        ),
+        (
+            f"/objects/substation/{substation_id}/selectivity-schemes?archived=true",
+            "substation", substation_id, {}, None,
+        ),
+        (
+            f"/objects/substation/{substation_id}/inspection-tasks?archived=true",
+            "substation", substation_id, {}, None,
+        ),
+        (
+            f"/objects/urza/{urza_id}/settings?archived=true",
+            "urza", urza_id,
+            {"change_date": "2026-10-01", "parameter_name": "P",
+             "initial_setting": "1", "new_setting": "2", "change_reason": "R"},
+            None,
+        ),
+        (
+            f"/objects/urza/{urza_id}/otd?archived=true",
+            "urza", urza_id,
+            {
+                "effective_date": "2026-10-01",
+                "urza_service_life": "25",
+                "urza_purpose": "rza",
+            },
+            None,
+        ),
+        (
+            f"/objects/urza/{urza_id}/programs?archived=true",
+            "urza", urza_id,
+            {"program_type": "commissioning", "program_number": "P-1"},
+            {"scan_file": ("scan.pdf", b"scan", "application/pdf")},
+        ),
+        (
+            f"/objects/urza/{urza_id}/schemas?archived=true",
+            "urza", urza_id,
+            {"schema_number": "S-1", "schema_name": "Schema",
+             "change_description": "Change", "change_justification": "Reason",
+             "upload_date": "2026-10-01"}, None,
+        ),
+        (
+            f"/objects/urza/{urza_id}/instruction?archived=true",
+            "urza", urza_id,
+            {"effective_date": "2026-10-01"},
+            {"scan_file": ("scan.pdf", b"scan", "application/pdf")},
+        ),
+        (
+            f"/objects/urza/{urza_id}/instruction/{instruction_id}/versions"
+            "?archived=true",
+            "urza", urza_id,
+            {"effective_date": "2026-10-01"},
+            {"scan_file": ("scan.pdf", b"scan", "application/pdf")},
+        ),
+        (
+            f"/objects/urza/{urza_id}/maintenance?archived=true",
+            "urza", urza_id,
+            {"maintenance_date": "2026-10-01", "maintenance_type": "В",
+             "detected_deviations": "None", "measures_taken": "None"}, None,
+        ),
+    ]
+
+    try:
+        with TestClient(app) as client:
+            for url, object_type, object_id, data, files in cases:
+                object_service, _, resolver = _http_archive_object_service(
+                    object_type, object_id
+                )
+                app.dependency_overrides[get_object_service] = lambda: object_service
+                response = client.post(url, data=data, files=files)
+                assert response.status_code == 404, (url, response.status_code, response.text)
+                assert resolver.calls == [(object_type, object_id, False)], (
+                    url, response.text, resolver.calls
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "/objects/urza/{urza_id}/settings/{record_id}",
+            {
+                "change_date": "2026-10-01",
+                "parameter_name": "P",
+                "initial_setting": "1",
+                "new_setting": "2",
+                "change_reason": "replacement",
+            },
+        ),
+        (
+            "/objects/urza/{urza_id}/schemas/{record_id}",
+            {
+                "schema_number": "S-1",
+                "schema_name": "Schema",
+                "change_description": "Change",
+                "change_justification": "Reason",
+                "upload_date": "2026-10-01",
+            },
+        ),
+        (
+            "/objects/urza/{urza_id}/programs/{record_id}/edit",
+            {"program_type": "commissioning", "program_number": "P-1"},
+        ),
+        ("/objects/urza/{urza_id}/settings/{record_id}/delete", {}),
+        ("/objects/urza/{urza_id}/schemas/{record_id}/delete", {}),
+    ],
+)
+def test_archived_urza_rejects_document_update_replacement_and_delete(
+    path, payload
+):
+    user = make_user(uuid7())
+    urza_id, record_id = uuid7(), uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    for dependency in (
+        get_settings_service,
+        get_schema_service,
+        get_program_service,
+        get_file_service,
+        get_task_service,
+        get_tree_service,
+    ):
+        app.dependency_overrides[dependency] = lambda: SimpleNamespace()
+
+    try:
+        object_service, _, resolver = _http_archive_object_service(
+            "urza", urza_id
+        )
+        app.dependency_overrides[get_object_service] = lambda: object_service
+        response = TestClient(app).post(
+            path.format(urza_id=urza_id, record_id=record_id)
+            + "?archived=true",
+            data=payload,
+        )
+        assert response.status_code == 404
+        assert resolver.calls == [("urza", urza_id, False)]
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPTaskArchiveAccess:
+    def __init__(self, actor):
+        self.user_repository = self
+        self.urza_repository = SimpleNamespace(
+            lock_active_by_id=self._lock_archived_owner,
+        )
+        self.actor = actor
+
+    async def _lock_archived_owner(self, _urza_id):
+        return False
+
+    async def get_by_id(self, user_id):
+        return self.actor if user_id == self.actor.id else None
+
+    async def can_access_urza(self, _user_id, _urza_id):
+        return True
+
+    async def can_modify_urza(self, _user_id, _urza_id):
+        return False
+
+
+class _HTTPTaskRepository:
+    def __init__(self, task):
+        self.task = task
+        self.session = self
+
+    async def get_active_by_id(self, task_id):
+        return self.task if task_id == self.task.id else None
+
+    async def get_history(self, _task_id):
+        return []
+
+    async def save(self, task):
+        return task
+
+    def add(self, _entity):
+        return None
+
+
+class _HTTPEmptyTreeService:
+    async def get_tree(self, **_kwargs):
+        return []
+
+
+def test_task_mutation_http_route_rejects_archived_owner():
+    user = make_user(uuid7())
+    user.role = UserRole.ENGINEER
+    task_id, urza_id = uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id, urza_id=urza_id, substation_id=None,
+        assigned_to=user.id, deleted_at=None, status=TaskStatus.ASSIGNED,
+        work_type=TaskWorkType.OTD,
+        description=None, urza=SimpleNamespace(dispatch_name="Archive URZA"),
+        substation=None, assigned_to_user=user, created_by_user=user,
+        assigned_at=None, acceptance_deadline_at=None, deadline_at=None,
+        completed_at=None, closed_at=None,
+    )
+    repository = _HTTPTaskRepository(task)
+    access = _HTTPTaskArchiveAccess(user)
+    from app.application.tasks.service import TaskService
+
+    task_service = TaskService(repository, access, SimpleNamespace())
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_task_repository] = lambda: repository
+    app.dependency_overrides[get_access_service] = lambda: access
+    app.dependency_overrides[get_task_service] = lambda: task_service
+    app.dependency_overrides[get_tree_service] = lambda: _HTTPEmptyTreeService()
+
+    try:
+        response = TestClient(app).post(
+            f"/tasks/{task_id}/accept?archived=true",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        assert "Нельзя изменять задание архивного объекта" in response.text
+        assert task.status is TaskStatus.ASSIGNED
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPInspectionTaskRepository:
+    def __init__(self, task):
+        self.task = task
+
+    async def get_active_by_id(self, task_id):
+        return self.task if task_id == self.task.id else None
+
+
+class _HTTPInspectionTaskMutationService:
+    def __init__(self):
+        self.calls = []
+
+    async def assign(self, *args, **kwargs):
+        self.calls.append(("assign", args, kwargs))
+
+    async def accept(self, *args, **kwargs):
+        self.calls.append(("accept", args, kwargs))
+
+    async def validate_completion(self, *args, **kwargs):
+        self.calls.append(("validate_completion", args, kwargs))
+
+    async def send_to_review(self, *args, **kwargs):
+        self.calls.append(("send_to_review", args, kwargs))
+
+    async def review(self, *args, **kwargs):
+        self.calls.append(("review", args, kwargs))
+
+
+@pytest.mark.parametrize(
+    ("action", "form_data"),
+    [
+        ("assign", {"assignee_id": str(uuid7())}),
+        ("accept", {}),
+        ("complete", {"inspection_date": "2026-10-23", "remarks": "test"}),
+        ("send-to-review", {}),
+        ("review", {"approve": "true", "reason": "test"}),
+    ],
+)
+def test_inspection_task_mutation_routes_reject_archived_substation(
+    action, form_data
+):
+    user = make_user(uuid7())
+    user.role = UserRole.MANAGER
+    substation_id, task_id = uuid7(), uuid7()
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7()),
+    )
+    repository = _HTTPInspectionTaskRepository(task)
+    service = _HTTPInspectionTaskMutationService()
+    object_service, _, resolver = _http_archive_object_service(
+        "substation", substation_id
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_inspection_task_repository] = lambda: repository
+    app.dependency_overrides[get_inspection_task_service] = lambda: service
+    app.dependency_overrides[get_file_service] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_tree_service] = lambda: SimpleNamespace()
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/inspection-tasks/{task_id}/{action}",
+            data=form_data,
+        )
+        assert response.status_code == 404
+        assert service.calls == []
+        assert resolver.calls == [("substation", substation_id, False)]
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchivedOTDService:
+    def __init__(self):
+        self.calls = []
+
+    async def submit_for_review(self, *args):
+        self.calls.append(("submit", args))
+
+
+def test_otd_version_transition_rejects_archived_urza_before_service_mutation():
+    user = make_user(uuid7())
+    urza_id, version_id = uuid7(), uuid7()
+    object_service, _, resolver = _http_archive_object_service("urza", urza_id)
+    service = _HTTPArchivedOTDService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_otd_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/otd/{version_id}/submit?archived=true"
+        )
+        assert response.status_code == 404
+        assert service.calls == []
+        assert resolver.calls == [("urza", urza_id, False)]
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchivedInstructionRepository:
+    def __init__(self, instruction, version):
+        self.instruction = instruction
+        self.version = version
+        self.save_calls = []
+
+    async def get_version_by_id(self, version_id):
+        return self.version if version_id == self.version.id else None
+
+    async def get_by_id(self, instruction_id):
+        return (
+            self.instruction
+            if instruction_id == self.instruction.id
+            else None
+        )
+
+    async def save(self, version):
+        self.save_calls.append(version)
+        return version
+
+
+class _HTTPArchivedSubstationWriteAccess:
+    async def can_modify_substation(self, _user_id, _substation_id):
+        return False
+
+
+def test_substation_instruction_transition_rejects_archived_owner_in_service():
+    user = make_user(uuid7())
+    substation_id, instruction_id, version_id = uuid7(), uuid7(), uuid7()
+    instruction = SimpleNamespace(id=instruction_id, substation_id=substation_id)
+    version = SimpleNamespace(
+        id=version_id,
+        rza_instruction_id=instruction_id,
+        deleted_at=None,
+        status=DocumentStatus.DRAFT,
+    )
+    repository = _HTTPArchivedInstructionRepository(instruction, version)
+    service = RZAInstructionService(
+        repository=repository,
+        access_service=_HTTPArchivedSubstationWriteAccess(),
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_rza_instruction_service] = lambda: service
+    app.dependency_overrides[get_task_service] = lambda: SimpleNamespace()
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/instructions/"
+            f"versions/{version_id}/submit?archived=true"
+        )
+        assert response.status_code == 403
+        assert "Изменение архивной подстанции запрещено" in response.text
+        assert version.status is DocumentStatus.DRAFT
+        assert repository.save_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_selectivity_scheme_transition_rejects_archived_owner_in_service():
+    user = make_user(uuid7())
+    substation_id, scheme_id, version_id = uuid7(), uuid7(), uuid7()
+    scheme = SimpleNamespace(id=scheme_id, substation_id=substation_id)
+    version = SimpleNamespace(
+        id=version_id,
+        selectivity_scheme_id=scheme_id,
+        deleted_at=None,
+        status=DocumentStatus.DRAFT,
+    )
+    repository = _HTTPArchivedInstructionRepository(scheme, version)
+    service = SelectivitySchemeService(
+        repository=repository,
+        access_service=_HTTPArchivedSubstationWriteAccess(),
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_selectivity_scheme_service] = lambda: service
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/substation/{substation_id}/selectivity-schemes/"
+            f"versions/{version_id}/submit?archived=true"
+        )
+        assert response.status_code == 403
+        assert "Изменение архивной подстанции запрещено" in response.text
+        assert version.status is DocumentStatus.DRAFT
+        assert repository.save_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchivedURZAWriteAccess:
+    async def can_modify_urza(self, _user_id, _urza_id):
+        return False
+
+
+@pytest.mark.parametrize(
+    ("route", "service_dependency", "make_service"),
+    [
+        (
+            "/objects/urza/{urza_id}/settings/{record_id}/submit",
+            get_settings_service,
+            lambda access: SettingsService(
+                repository=SimpleNamespace(), access_service=access
+            ),
+        ),
+        (
+            "/objects/urza/{urza_id}/schemas/{record_id}/submit",
+            get_schema_service,
+            lambda access: SchemaService(
+                repository=SimpleNamespace(),
+                access_service=access,
+                task_repository=SimpleNamespace(),
+            ),
+        ),
+        (
+            "/objects/urza/{urza_id}/programs/{record_id}/submit",
+            get_program_service,
+            lambda access: ProgramService(
+                repository=SimpleNamespace(),
+                access_service=access,
+                user_repository=SimpleNamespace(),
+                urza_repository=SimpleNamespace(),
+                task_repository=SimpleNamespace(),
+                task_service=SimpleNamespace(),
+            ),
+        ),
+    ],
+)
+def test_urza_document_workflow_routes_reject_archived_owner(
+    route, service_dependency, make_service
+):
+    user = make_user(uuid7())
+    urza_id, record_id = uuid7(), uuid7()
+    access = _HTTPArchivedURZAWriteAccess()
+    service = make_service(access)
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[service_dependency] = lambda: service
+    app.dependency_overrides[get_task_service] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_tree_service] = lambda: SimpleNamespace()
+
+    try:
+        response = TestClient(app).post(
+            route.format(urza_id=urza_id, record_id=record_id)
+            + "?archived=true"
+        )
+        assert response.status_code == 403
+        assert "архивной URZA" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_urza_instruction_version_transition_rejects_archived_owner_in_service():
+    user = make_user(uuid7())
+    urza_id, instruction_id, version_id = uuid7(), uuid7(), uuid7()
+    instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    version = SimpleNamespace(
+        id=version_id,
+        urza_instruction_id=instruction_id,
+        status=DocumentStatus.DRAFT,
+    )
+    repository = _HTTPArchivedInstructionRepository(instruction, version)
+    service = URZAInstructionService(
+        repository=repository,
+        access_service=_HTTPArchivedURZAWriteAccess(),
+        user_repository=SimpleNamespace(),
+        urza_repository=SimpleNamespace(),
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_urza_instruction_service] = lambda: service
+    app.dependency_overrides[get_task_service] = lambda: SimpleNamespace()
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/instruction/versions/"
+            f"{version_id}/submit?archived=true"
+        )
+        assert response.status_code == 403
+        assert "архивной URZA" in response.text
+        assert version.status is DocumentStatus.DRAFT
+        assert repository.save_calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchiveInstructionService:
+    def __init__(self, instruction, versions):
+        self.instruction = instruction
+        self.versions = versions
+
+    async def get_by_urza(self, _user_id, _urza_id):
+        return self.instruction
+
+    async def get_versions(self, _user_id, _urza_id):
+        return self.versions
+
+    async def get_current_version(self, _user_id, _urza_id):
+        return self.versions[0]
+
+    async def get_version_by_id(self, _user_id, version_id):
+        return next((item for item in self.versions if item.id == version_id), None)
+
+    async def get_available_actions(self, _user_id, _version):
+        return {"submit", "approve", "new_version"}
+
+
+class _HTTPArchiveTaskService:
+    async def can_issue_task(self, **_kwargs):
+        return True
+
+
+def test_archived_urza_instruction_history_preserves_context_and_file_routes():
+    user = make_user(uuid7())
+    urza_id, instruction_id = uuid7(), uuid7()
+    versions = [
+        SimpleNamespace(
+            id=uuid7(), urza_instruction_id=instruction_id,
+            version_number=2, effective_date=date(2026, 10, 1),
+            change_description="Recent", change_justification="Reason",
+            created_by_full_name="Test author", status=DocumentStatus.APPROVED,
+            scan_file_id=uuid7(), scan_file_name="scan.pdf",
+            scan_file=SimpleNamespace(original_name="scan.pdf"),
+            creator=SimpleNamespace(full_name="Test author"),
+            editable_file_id=None, editable_file_name=None, editable_file=None,
+        ),
+        SimpleNamespace(
+            id=uuid7(), urza_instruction_id=instruction_id,
+            version_number=1, effective_date=date(2026, 1, 1),
+            change_description="Earlier", change_justification="Reason",
+            created_by_full_name="Test author", status=DocumentStatus.APPROVED,
+            scan_file_id=uuid7(), scan_file_name="old-scan.pdf",
+            scan_file=SimpleNamespace(original_name="old-scan.pdf"),
+            creator=SimpleNamespace(full_name="Test author"),
+            editable_file_id=None, editable_file_name=None, editable_file=None,
+        ),
+    ]
+    instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    object_service, access, resolver = _http_archive_object_service(
+        "urza", urza_id
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_urza_instruction_service] = lambda: (
+        _HTTPArchiveInstructionService(instruction, versions)
+    )
+    app.dependency_overrides[get_task_service] = lambda: _HTTPArchiveTaskService()
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                f"/objects/urza/{urza_id}/instruction?instruction_version={versions[1].id}&archived=true"
+            )
+            assert response.status_code == 200
+            assert "История версий" in response.text
+            assert (
+                f"instruction_version={versions[0].id}&archived=true"
+                in response.text.replace("&amp;", "&")
+            )
+            assert f"/files/{versions[1].scan_file_id}/view" in response.text
+            assert f"/files/{versions[1].scan_file_id}/download" in response.text
+            assert "Новая версия" not in response.text
+            assert 'id="submits"' not in response.text
+            assert resolver.calls[-1] == ("urza", urza_id, True)
+
+            access.allowed = False
+            denied = client.get(
+                f"/objects/urza/{urza_id}/instruction?archived=true"
+            )
+            assert denied.status_code == 403
+            assert resolver.calls[-1] == ("urza", urza_id, True)
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPArchiveSubstationInstructionService:
+    def __init__(self, versions):
+        self.versions = versions
+
+    async def get_details(self, **_kwargs):
+        return SimpleNamespace(id=uuid7())
+
+    async def get_versions(self, **_kwargs):
+        return self.versions
+
+    async def get_available_actions(self, *_args):
+        return {"submit", "approve", "new_version"}
+
+
+def test_archived_substation_instruction_tab_keeps_version_history_read_only():
+    user = make_user(uuid7())
+    substation_id = uuid7()
+    versions = [
+        SimpleNamespace(
+            id=uuid7(), version_number=2,
+            effective_date=date(2026, 10, 1),
+            change_description="Latest", change_justification="Reason",
+            created_by_full_name="Test author",
+            status=DocumentStatus.APPROVED,
+            scan_file_id=uuid7(), scan_file_name="scan.pdf",
+            editable_file_id=None, editable_file_name=None,
+        ),
+        SimpleNamespace(
+            id=uuid7(), version_number=1,
+            effective_date=date(2026, 1, 1),
+            change_description="Earlier", change_justification="Reason",
+            created_by_full_name="Test author",
+            status=DocumentStatus.APPROVED,
+            scan_file_id=uuid7(), scan_file_name="old.pdf",
+            editable_file_id=None, editable_file_name=None,
+        ),
+    ]
+    object_service, _, resolver = _http_archive_object_service(
+        "substation", substation_id
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = lambda: object_service
+    app.dependency_overrides[get_rza_instruction_service] = lambda: (
+        _HTTPArchiveSubstationInstructionService(versions)
+    )
+    app.dependency_overrides[get_task_service] = lambda: _HTTPArchiveTaskService()
+
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/instructions?archived=true"
+        )
+        assert response.status_code == 200
+        assert "История версий" in response.text
+        assert (
+            f"instruction_version={versions[1].id}&archived=true"
+            in response.text.replace("&amp;", "&")
+        )
+        assert f"/files/{versions[0].scan_file_id}/view" in response.text
+        assert "Добавить инструкцию" not in response.text
+        assert "Отправить на согласование" not in response.text
+        assert resolver.calls[-1] == ("substation", substation_id, True)
+    finally:
+        app.dependency_overrides.clear()
+
+
+class _HTTPFileRepository:
+    def __init__(self, file):
+        self.file = file
+
+    async def get_by_id(self, _file_id):
+        return self.file
+
+
+class _HTTPFileOwnerResolver:
+    def __init__(self, owner):
+        self.owner = owner
+
+    async def resolve(self, _file_id):
+        return self.owner
+
+
+class _HTTPFileAccess:
+    async def can_access_urza(self, *, user_id, urza_id):
+        return True
+
+    async def can_access_substation(self, *, user_id, substation_id):
+        return True
+
+
+class _HTTPFileContent:
+    def __init__(self):
+        self.reads = 0
+
+    async def read(self, _file):
+        self.reads += 1
+        return b"test file"
+
+
+def test_file_http_route_uses_file_access_policy_for_archive_files():
+    user = make_user(uuid7())
+    file_id, urza_id = uuid7(), uuid7()
+    file = SimpleNamespace(
+        id=file_id, deleted_at=None, original_name="scan.pdf",
+        mime_type="application/pdf",
+    )
+    owner = FileOwner(
+        owner_type=FileOwnerType.URZA_INSTRUCTION_VERSION,
+        owner_id=uuid7(), access_target_type=FileAccessTargetType.URZA,
+        access_target_id=urza_id,
+    )
+    content = _HTTPFileContent()
+    file_access = FileAccessService(
+        file_repository=_HTTPFileRepository(file),
+        owner_resolver=_HTTPFileOwnerResolver(owner),
+        access_service=_HTTPFileAccess(),
+    )
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_file_access_service] = lambda: file_access
+    app.dependency_overrides[get_file_service] = lambda: content
+
+    try:
+        with TestClient(app) as client:
+            allowed = client.get(f"/files/{file_id}/view")
+            assert allowed.status_code == 200
+            assert allowed.content == b"test file"
+            assert content.reads == 1
+
+            file.deleted_at = datetime.now(UTC)
+            denied = client.get(f"/files/{file_id}/download")
+            assert denied.status_code == 403
+            assert content.reads == 1
     finally:
         app.dependency_overrides.clear()

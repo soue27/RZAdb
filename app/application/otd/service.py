@@ -114,11 +114,11 @@ class OTDService:
         task_id: UUID | None = None,
         **version_fields,
     ) -> OTD:
-        if not await self.access_service.can_access_urza(
+        if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
         ):
-            raise PermissionError("Доступ к URZA запрещён")
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         await self._check_author(user_id)
 
@@ -191,11 +191,11 @@ class OTDService:
         if otd is None:
             raise ValueError("OTD не найден")
 
-        if not await self.access_service.can_access_urza(
+        if not await self.access_service.can_modify_urza(
                 user_id,
                 otd.urza_id,
         ):
-            raise PermissionError("Доступ к URZA запрещён")
+            raise PermissionError("Изменение архивной URZA запрещено")
 
         await self._check_author(user_id)
 
@@ -259,8 +259,8 @@ class OTDService:
         otd = await self.repository.get_by_id(version.otd_id)
         if otd is None or otd.urza_id != urza_id:
             raise ValueError("Версия ОТД не принадлежит указанной URZA.")
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
         return version
 
     async def submit_for_review(
@@ -304,8 +304,8 @@ class OTDService:
             raise PermissionError("Пользователь неактивен.")
         if user.role is not UserRole.MANAGER:
             raise PermissionError("Согласовывать ОТД может только MANAGER.")
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Нет доступа к URZA в зоне ответственности.")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Нет доступа к активной URZA в зоне ответственности.")
 
     async def _check_author(self, user_id: UUID) -> None:
         user = await self.access_service.user_repository.get_by_id(user_id)
@@ -326,7 +326,7 @@ class OTDService:
         if user is None or not user.active or user.deleted_at is not None:
             return set()
         otd = await self.repository.get_by_id(version.otd_id)
-        if otd is None or not await self.access_service.can_access_urza(
+        if otd is None or not await self.access_service.can_modify_urza(
             user_id, otd.urza_id
         ):
             return set()
@@ -353,7 +353,7 @@ class OTDService:
             or not user.active
             or user.deleted_at is not None
             or user.role not in _AUTHOR_ROLES
-            or not await self.access_service.can_access_urza(user_id, urza_id)
+            or not await self.access_service.can_modify_urza(user_id, urza_id)
         ):
             return set()
         otd = await self.repository.get_by_urza_id(urza_id)

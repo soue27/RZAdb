@@ -24,7 +24,7 @@ class SubstationService:
         data: SubstationUpdate,
     ) -> SubstationDetails:
         substation = await self.repository.get_by_id(substation_id)
-        if substation is None:
+        if substation is None or substation.deleted_at is not None:
             raise ObjectNotFoundError
 
         for field, value in data.model_dump().items():
@@ -36,10 +36,12 @@ class SubstationService:
         return await self.get_details(substation_id)
 
 
-    async def get_details(self, substation_id: UUID) -> SubstationDetails:
+    async def get_details(
+        self, substation_id: UUID, *, include_archived: bool = False
+    ) -> SubstationDetails:
         substation = await self.repository.get_by_id(substation_id)
 
-        if substation is None:
+        if substation is None or (substation.deleted_at is not None and not include_archived):
             raise ObjectNotFoundError
 
         return SubstationDetails(

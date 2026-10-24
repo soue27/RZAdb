@@ -101,6 +101,7 @@ def repository():
 def access_service():
     service = MagicMock()
     service.can_access_urza = AsyncMock()
+    service.can_modify_urza = AsyncMock(return_value=True)
     return service
 
 
@@ -475,6 +476,7 @@ async def test_create_denies_access(
     urza_id = uuid7()
 
     access_service.can_access_urza.return_value = False
+    access_service.can_modify_urza.return_value = False
     repository.add = AsyncMock()
 
     with pytest.raises(PermissionError):

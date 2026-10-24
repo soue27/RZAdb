@@ -63,11 +63,11 @@ class SelectivitySchemeService:
         change_justification: str | None = None,
         task_id: UUID | None = None,
     ) -> SelectivityScheme:
-        if not await self.access_service.can_access_substation(
+        if not await self.access_service.can_modify_substation(
             user_id,
             substation_id,
         ):
-            raise PermissionError("Доступ к подстанции запрещён")
+            raise PermissionError("Изменение архивной подстанции запрещено")
 
         existing = await self.repository.get_by_substation_id(
             substation_id,
@@ -171,11 +171,11 @@ class SelectivitySchemeService:
         if scheme is None:
             raise ValueError("Схема селективности не найдена")
 
-        if not await self.access_service.can_access_substation(
+        if not await self.access_service.can_modify_substation(
             user_id,
             scheme.substation_id,
         ):
-            raise PermissionError("Доступ к подстанции запрещён")
+            raise PermissionError("Изменение архивной подстанции запрещено")
 
         current_version = await self.repository.get_current_version(
             scheme_id,
@@ -311,8 +311,8 @@ class SelectivitySchemeService:
         scheme = await self.repository.get_by_id(version.selectivity_scheme_id)
         if scheme is None or scheme.substation_id != substation_id:
             raise ValueError("Схема не принадлежит указанной подстанции.")
-        if not await self.access_service.can_access_substation(user_id, substation_id):
-            raise PermissionError("Доступ к подстанции запрещён.")
+        if not await self.access_service.can_modify_substation(user_id, substation_id):
+            raise PermissionError("Изменение архивной подстанции запрещено.")
         return version
 
     async def _check_reviewer(self, user_id: UUID, substation_id: UUID) -> None:
@@ -364,7 +364,7 @@ class SelectivitySchemeService:
         if user is None or not user.active or user.deleted_at is not None:
             return set()
         scheme = await self.repository.get_by_id(version.selectivity_scheme_id)
-        if scheme is None or not await self.access_service.can_access_substation(
+        if scheme is None or not await self.access_service.can_modify_substation(
             user_id, scheme.substation_id
         ):
             return set()

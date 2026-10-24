@@ -36,8 +36,8 @@ class SettingsService:
         return user
 
     async def _ensure_access(self, user_id: UUID, urza_id: UUID) -> None:
-        if not await self.access_service.can_access_urza(user_id, urza_id):
-            raise PermissionError("Доступ к URZA запрещён")
+        if not await self.access_service.can_modify_urza(user_id, urza_id):
+            raise PermissionError("Изменение архивной URZA запрещено")
 
     async def _get_record_for_urza(
         self,
@@ -95,7 +95,8 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SettingsRecord | None:
-        await self._ensure_access(user_id, urza_id)
+        if not await self.access_service.can_access_urza(user_id, urza_id):
+            raise PermissionError("Доступ к URZA запрещён")
         settings_form = await self.repository.get_form_by_urza_id(urza_id)
         if settings_form is None:
             return None
@@ -284,7 +285,7 @@ class SettingsService:
         try:
             user = await self._get_user(user_id)
             settings_form = await self.repository.get_form_by_id(record.settings_form_id)
-            if settings_form is None or not await self.access_service.can_access_urza(
+            if settings_form is None or not await self.access_service.can_modify_urza(
                 user_id, settings_form.urza_id
             ):
                 return set()

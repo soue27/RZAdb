@@ -23,6 +23,8 @@ class ObjectService:
         user_id: UUID,
         object_type: str,
         object_id: UUID,
+        *,
+        include_archived: bool = False,
     ) -> SelectedObject:
         if object_type == "substation":
             has_access = await self.access_service.can_access_substation(
@@ -53,6 +55,7 @@ class ObjectService:
         selected_object = await self.object_resolver.resolve(
             object_type=object_type,
             object_id=object_id,
+            include_archived=include_archived,
         )
 
         if selected_object is None:

@@ -203,3 +203,41 @@ class AccessService:
             user_id=user_id,
             enterprise_id=substation.enterprise_id,
         )
+
+    async def can_modify_substation(
+        self, user_id: UUID, substation_id: UUID
+    ) -> bool:
+        substation = await self.substation_repository.get_by_id(substation_id)
+        return bool(
+            substation is not None
+            and substation.deleted_at is None
+            and await self.can_access_substation(user_id, substation_id)
+        )
+
+    async def can_modify_connection(
+        self, user_id: UUID, connection_id: UUID
+    ) -> bool:
+        connection = await self.connection_repository.get_by_id(connection_id)
+        if connection is None or connection.deleted_at is not None:
+            return False
+        substation = await self.substation_repository.get_by_id(
+            connection.substation_id
+        )
+        return bool(
+            substation is not None
+            and substation.deleted_at is None
+            and await self.can_access_connection(user_id, connection_id)
+        )
+
+    async def can_modify_urza(self, user_id: UUID, urza_id: UUID) -> bool:
+        urza = await self.urza_repository.get_by_id(urza_id)
+        if urza is None or urza.connection is None:
+            return False
+        connection = urza.connection
+        substation = connection.substation
+        return bool(
+            connection.deleted_at is None
+            and substation is not None
+            and substation.deleted_at is None
+            and await self.can_access_urza(user_id, urza_id)
+        )

@@ -149,21 +149,33 @@ async def get_object(
     ],
     otd_version: UUID | None = Query(default=None),
     tab: str | None = Query(default=None),
+    archived: bool = Query(default=False),
 ):
     try:
         selected_object = await object_service.get_object(
             user_id=current_user.id,
             object_type=object_type,
             object_id=object_id,
+            include_archived=archived,
         )
 
         if object_type == "substation":
-            substation = await substation_service.get_details(object_id)
+            substation = await substation_service.get_details(
+                object_id, include_archived=archived
+            )
             context = {
                 "substation": substation,
-                "can_edit": can_edit_substation(current_user),
-                "can_create_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                "can_edit": (
+                    not selected_object.is_archived
+                    and can_edit_substation(current_user)
+                ),
+                "can_create_connection": (
+                    not selected_object.is_archived
+                    and current_user.role in CONNECTION_CREATE_ROLES
+                ),
+                "can_manage_archive": can_edit_substation(current_user),
                 "selected_substation_id": object_id,
+                "is_archived": selected_object.is_archived,
             }
             if request.headers.get("HX-Request") == "true":
                 return templates.TemplateResponse(
@@ -189,12 +201,8 @@ async def get_object(
             department = await enterprise_service.get_department(object_id)
             context = {
                 "department": department,
-                "can_edit_department": (
-                    current_user.role == UserRole.SUPERADMIN
-                ),
-                "can_create_substation": (
-                    current_user.role in CONNECTION_CREATE_ROLES
-                ),
+                "can_edit_department": (current_user.role == UserRole.SUPERADMIN),
+                "can_create_substation": (current_user.role in CONNECTION_CREATE_ROLES),
             }
 
             if request.headers.get("HX-Request") == "true":
@@ -217,9 +225,10 @@ async def get_object(
                 },
             )
 
-
         if object_type == "connection":
-            connection = await connection_service.get_by_id(object_id)
+            connection = await connection_service.get_by_id(
+                object_id, include_archived=archived
+            )
 
             if connection is None:
                 raise ObjectNotFoundError
@@ -230,8 +239,16 @@ async def get_object(
                     name="objects/connection.html",
                     context={
                         "connection": connection,
-                        "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
-                        "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                        "can_create_urza": (
+                            not selected_object.is_archived
+                            and current_user.role in CONNECTION_CREATE_ROLES
+                        ),
+                        "can_edit_connection": (
+                            not selected_object.is_archived
+                            and current_user.role in CONNECTION_CREATE_ROLES
+                        ),
+                        "can_manage_archive": can_edit_substation(current_user),
+                        "is_archived": selected_object.is_archived,
                     },
                 )
 
@@ -245,13 +262,21 @@ async def get_object(
                     "tree": tree,
                     "page_title": connection.dispatch_name,
                     "content_template": "objects/connection.html",
-                    "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
-                    "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
+                    "can_create_urza": (
+                        not selected_object.is_archived
+                        and current_user.role in CONNECTION_CREATE_ROLES
+                    ),
+                    "can_edit_connection": (
+                        not selected_object.is_archived
+                        and current_user.role in CONNECTION_CREATE_ROLES
+                    ),
+                    "can_manage_archive": can_edit_substation(current_user),
+                    "is_archived": selected_object.is_archived,
                 },
             )
 
         if object_type == "urza":
-            urza = await urza_service.get_details(object_id)
+            urza = await urza_service.get_details(object_id, include_archived=archived)
 
             otd = await otd_service.get_details(
                 user_id=current_user.id,
@@ -287,15 +312,22 @@ async def get_object(
                 current_user.id,
                 object_id,
             )
+            if selected_object.is_archived:
+                otd_actions = set()
+                otd_create_actions = set()
 
             settings_form, settings_records = await settings_service.get_details(
                 user_id=current_user.id,
                 urza_id=object_id,
             )
 
-            can_issue_task = await task_service.can_issue_task(
-                actor_id=current_user.id,
-                urza_id=object_id,
+            can_issue_task = (
+                False
+                if selected_object.is_archived
+                else await task_service.can_issue_task(
+                    actor_id=current_user.id,
+                    urza_id=object_id,
+                )
             )
 
             context = {
@@ -310,10 +342,15 @@ async def get_object(
                 "can_issue_task": can_issue_task,
                 "can_create_urza": current_user.role in CONNECTION_CREATE_ROLES,
                 "can_edit_connection": current_user.role in CONNECTION_CREATE_ROLES,
-                "can_edit_urza": current_user.role in {
+                "can_edit_urza": not selected_object.is_archived
+                and current_user.role
+                in {
                     UserRole.SUPERADMIN,
                     UserRole.ADMIN,
-                    UserRole.MANAGER,},
+                    UserRole.MANAGER,
+                },
+                "can_manage_archive": can_edit_substation(current_user),
+                "is_archived": selected_object.is_archived,
             }
 
             if request.headers.get("HX-Request") == "true":
@@ -354,6 +391,30 @@ async def get_object(
     )
 
 
+@router.get("/tree")
+async def get_sidebar_tree(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    query: str = Query(default=""),
+    archive_only: bool = Query(default=False),
+):
+    tree = await tree_service.get_tree(
+        user_id=current_user.id,
+        archive_only=archive_only,
+        query=query,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="components/sidebar.html",
+        context={
+            "tree": tree,
+            "current_user": current_user,
+            "archive_only": archive_only,
+        },
+    )
+
+
 @router.get("/substation/{substation_id}/inspections")
 async def get_substation_inspections(
     request: Request,
@@ -364,12 +425,14 @@ async def get_substation_inspections(
         InspectionService,
         Depends(get_inspection_service),
     ],
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
+            include_archived=archived,
         )
 
     except ObjectAccessDeniedError as exc:
@@ -394,15 +457,12 @@ async def get_substation_inspections(
             "inspections": inspections,
             "substation_id": substation_id,
             "current_user": current_user,
-            "can_manage_inspections": current_user.role is UserRole.MANAGER,
+            "can_manage_inspections": (
+                not archived and current_user.role is UserRole.MANAGER
+            ),
+            "is_archived": archived,
         },
     )
-
-
-
-
-
-
 
 
 @router.get("/substation/{substation_id}/details")
@@ -415,12 +475,14 @@ async def get_substation_details(
         SubstationService,
         Depends(get_substation_service),
     ],
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
+            include_archived=archived,
         )
     except ObjectAccessDeniedError as exc:
         raise HTTPException(
@@ -433,14 +495,17 @@ async def get_substation_details(
             detail="Объект не найден.",
         ) from exc
 
-    substation = await substation_service.get_details(substation_id)
+    substation = await substation_service.get_details(
+        substation_id, include_archived=archived
+    )
 
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_details.html",
         context={
             "substation": substation,
-            "can_edit": can_edit_substation(current_user),
+            "can_edit": not archived and can_edit_substation(current_user),
+            "is_archived": archived,
         },
     )
 
@@ -464,7 +529,9 @@ async def _check_substation_access(object_service, current_user, substation_id):
             object_id=substation_id,
         )
     except ObjectAccessDeniedError as exc:
-        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+        raise HTTPException(
+            status_code=403, detail="Доступ к объекту запрещён."
+        ) from exc
     except ObjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Объект не найден.") from exc
 
@@ -558,7 +625,6 @@ def _require_connection_create_role(current_user: User) -> None:
         )
 
 
-
 async def _render_connection_form(
     request: Request,
     substation_id: UUID,
@@ -613,7 +679,6 @@ async def _render_connection_form(
     )
 
 
-
 async def _render_urza_form(
     request: Request,
     connection_id: UUID,
@@ -633,9 +698,7 @@ async def _render_urza_form(
         "room_categories": list(RoomCategory),
     }
     response_status = (
-        status.HTTP_422_UNPROCESSABLE_CONTENT
-        if error_message
-        else status.HTTP_200_OK
+        status.HTTP_422_UNPROCESSABLE_CONTENT if error_message else status.HTTP_200_OK
     )
 
     if request.headers.get("HX-Request") == "true":
@@ -708,7 +771,10 @@ async def post_new_connection(
         data = ConnectionCreate.model_validate(values)
     except ValidationError:
         return await _render_connection_form(
-            request, substation_id, current_user, tree_service,
+            request,
+            substation_id,
+            current_user,
+            tree_service,
             form_values=values,
             error_message="Проверьте введённые значения.",
         )
@@ -721,7 +787,10 @@ async def post_new_connection(
         )
     except ConnectionNameConflictError as exc:
         return await _render_connection_form(
-            request, substation_id, current_user, tree_service,
+            request,
+            substation_id,
+            current_user,
+            tree_service,
             form_values=values,
             error_message=str(exc),
         )
@@ -736,7 +805,6 @@ async def post_new_connection(
         url=destination,
         status_code=status.HTTP_303_SEE_OTHER,
     )
-
 
 
 @router.get("/connection/{connection_id}/edit")
@@ -774,7 +842,6 @@ async def get_edit_connection_form(
         submit_label="Сохранить изменения",
         cancel_url=f"/objects/connection/{connection_id}",
     )
-
 
 
 @router.post("/connection/{connection_id}")
@@ -853,7 +920,6 @@ async def post_edit_connection(
         url=destination,
         status_code=status.HTTP_303_SEE_OTHER,
     )
-
 
 
 @router.get("/connection/{connection_id}/urzas/new")
@@ -1255,7 +1321,9 @@ async def post_substation_edit_form(
             name="objects/substation_form.html",
             status_code=422,
             context=_substation_form_context(
-                substation, current_user, form_values=values,
+                substation,
+                current_user,
+                form_values=values,
                 error_message="Проверьте введённые значения.",
             ),
         )
@@ -1289,12 +1357,14 @@ async def get_substation_instructions(
     ],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     instruction_version: UUID | None = Query(default=None),
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
+            include_archived=archived,
         )
     except ObjectAccessDeniedError:
         raise HTTPException(
@@ -1321,11 +1391,7 @@ async def get_substation_instructions(
 
     if instruction_version is not None:
         selected_version = next(
-            (
-                version
-                for version in versions
-                if version.id == instruction_version
-            ),
+            (version for version in versions if version.id == instruction_version),
             None,
         )
 
@@ -1344,14 +1410,24 @@ async def get_substation_instructions(
             "document_actions": (
                 await rza_instruction_service.get_available_actions(
                     current_user.id, selected_version
-                ) if selected_version is not None else set()
+                )
+                if selected_version is not None and not archived
+                else set()
             ),
-            "can_create_document": current_user.role in {
-                UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
+            "can_create_document": not archived
+            and current_user.role
+            in {
+                UserRole.ENGINEER,
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+                UserRole.MANAGER,
             },
-            "can_issue_task": await task_service.can_issue_task(
+            "can_issue_task": False
+            if archived
+            else await task_service.can_issue_task(
                 actor_id=current_user.id, substation_id=substation_id
             ),
+            "is_archived": archived,
         },
     )
 
@@ -1370,12 +1446,14 @@ async def get_substation_selectivity_schemes(
         Depends(get_selectivity_scheme_service),
     ],
     task_service: Annotated[TaskService, Depends(get_task_service)],
+    archived: bool = Query(default=False),
 ):
     try:
         await object_service.get_object(
             user_id=current_user.id,
             object_type="substation",
             object_id=substation_id,
+            include_archived=archived,
         )
     except ObjectAccessDeniedError:
         raise HTTPException(
@@ -1399,7 +1477,9 @@ async def get_substation_selectivity_schemes(
     document_actions = (
         await selectivity_scheme_service.get_available_actions(
             current_user.id, scheme_versions[0]
-        ) if scheme_versions else set()
+        )
+        if scheme_versions and not archived
+        else set()
     )
 
     return templates.TemplateResponse(
@@ -1410,11 +1490,19 @@ async def get_substation_selectivity_schemes(
             "current_user": current_user,
             "substation_id": substation_id,
             "document_actions": document_actions,
-            "can_create_document": current_user.role in {
-                UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
+            "can_create_document": not archived
+            and current_user.role
+            in {
+                UserRole.ENGINEER,
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+                UserRole.MANAGER,
             },
-            "can_issue_task": await task_service.can_issue_task(
+            "can_issue_task": False
+            if archived
+            else await task_service.can_issue_task(
                 actor_id=current_user.id, substation_id=substation_id
             ),
+            "is_archived": archived,
         },
     )

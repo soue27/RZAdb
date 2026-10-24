@@ -35,6 +35,11 @@ class TaskRepository:
     async def get_by_id(self, task_id: UUID) -> Task | None:
         return await self.session.get(Task, task_id)
 
+    async def refresh_for_mutation(self, task: Task) -> Task:
+        """Reload task state after its owner row has been locked."""
+        await self.session.refresh(task)
+        return task
+
     async def get_active_by_id(self, task_id: UUID) -> Task | None:
         result = await self.session.execute(
             select(Task)
