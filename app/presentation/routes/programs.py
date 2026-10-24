@@ -433,17 +433,14 @@ async def create_urza_program(
     uploaded_files = []
 
     async def cleanup_uploaded_files() -> None:
-        """Архивирует файлы, загруженные в рамках неудачного создания."""
+        """Удаляет объекты неудачной операции из хранилища."""
         for uploaded_file in uploaded_files:
             try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
+                await file_service.discard_upload(uploaded_file)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
-                    "создания программы: file_id=%s",
+                    "Не удалось удалить загруженный файл после "
+                    "неудачной операции с программой: file_id=%s",
                     uploaded_file.id,
                 )
 
@@ -679,17 +676,14 @@ async def update_urza_program(
     uploaded_files = []
 
     async def cleanup_uploaded_files() -> None:
-        """Архивирует файлы, загруженные в рамках неудачного редактирования."""
+        """Удаляет объекты неудачной операции из хранилища."""
         for uploaded_file in uploaded_files:
             try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
+                await file_service.discard_upload(uploaded_file)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
-                    "редактирования программы: file_id=%s",
+                    "Не удалось удалить загруженный файл после "
+                    "неудачной операции с программой: file_id=%s",
                     uploaded_file.id,
                 )
 

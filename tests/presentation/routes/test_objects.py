@@ -294,6 +294,8 @@ class FakeFileService:
         self.upload_calls: list[dict] = []
         self.archive_calls: list[dict] = []
         self.storage = FakeObjectStorage()
+        self.archive_calls: list[dict] = []
+        self.discard_calls: list[dict] = []
 
     async def upload(
         self,
@@ -320,6 +322,9 @@ class FakeFileService:
     async def archive(self, *, file_id: UUID, user_id: UUID) -> File:
         self.archive_calls.append({"file_id": file_id, "user_id": user_id})
         return self.file
+
+    async def discard_upload(self, file: File) -> None:
+        self.discard_calls.append({"file_id": file.id})
 
 
 class FakeSettingsService:
@@ -2943,8 +2948,8 @@ def test_update_urza_program_cleans_up_uploaded_file_on_update_error(
         assert response.json()["detail"] == (
             "Ошибка обновления программы."
         )
-        assert file_service.archive_calls == [
-            {"file_id": new_scan.id, "user_id": user.id},
+        assert file_service.discard_calls == [
+            {"file_id": new_scan.id},
         ]
 
         # Исходные данные программы не изменились.
@@ -3128,8 +3133,8 @@ def test_update_urza_program_cleans_up_scan_when_editable_upload_fails(
 
         assert response.status_code == 500
         assert file_service.upload_count == 2
-        assert file_service.archive_calls == [
-            {"file_id": new_scan.id, "user_id": user.id},
+        assert file_service.discard_calls == [
+            {"file_id": new_scan.id},
         ]
         assert program_service.update_calls == []
         assert program.program_number == "123"
@@ -3452,8 +3457,8 @@ def test_create_urza_program_empty_editable_file_cleans_up_scan(
 
         assert response.status_code == 400
         assert response.json()["detail"] == "Загруженный редактируемый файл пуст."
-        assert file_service.archive_calls == [
-            {"file_id": scan_file.id, "user_id": user.id},
+        assert file_service.discard_calls == [
+            {"file_id": scan_file.id},
         ]
         assert program_service.programs == []
 
@@ -3575,9 +3580,9 @@ def test_create_urza_program_cleans_up_files_on_create_error(
 
         assert response.status_code == 400
         assert response.json()["detail"] == "Ошибка создания программы"
-        assert file_service.archive_calls == [
-            {"file_id": scan_file.id, "user_id": user.id},
-            {"file_id": editable_file.id, "user_id": user.id},
+        assert file_service.discard_calls == [
+            {"file_id": scan_file.id},
+            {"file_id": editable_file.id},
         ]
         assert program_service.programs == []
 
@@ -3683,8 +3688,8 @@ def test_create_urza_program_cleans_up_scan_when_editable_upload_fails(
 
         assert response.status_code == 500
         assert len(file_service.upload_calls) == 2
-        assert file_service.archive_calls == [
-            {"file_id": scan_file.id, "user_id": user.id},
+        assert file_service.discard_calls == [
+            {"file_id": scan_file.id, },
         ]
         assert program_service.programs == []
 
