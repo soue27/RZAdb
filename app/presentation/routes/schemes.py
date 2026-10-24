@@ -333,41 +333,45 @@ async def create_urza_schema_record(
             response_status=422,
         )
 
-    uploaded: dict[str, UUID] = {}
+
+    uploaded = {}
+
+    async def cleanup_uploaded_files() -> None:
+        for uploaded_file in uploaded.values():
+            try:
+                await file_service.discard_upload(uploaded_file)
+            except Exception:
+                logger.exception(
+                    "Failed to discard uploaded Schema file %s",
+                    uploaded_file.id,
+                )
+
     try:
-        uploaded["signed_form_file_id"] = (
-            await _upload_file(
+        uploaded["signed_form_file"] = await _upload_file(
+            file_service,
+            current_user.id,
+            signed_form_file,
+            fallback_name="Подписанный формуляр схемы",
+        )
+
+        if scan_file is not None and scan_file.filename:
+            uploaded["scan_file"] = await _upload_file(
                 file_service,
                 current_user.id,
-                signed_form_file,
-                fallback_name="Подписанный формуляр схемы",
+                scan_file,
+                fallback_name="Скан схемы",
             )
-        ).id
-        if scan_file is not None and scan_file.filename:
-            uploaded["scan_file_id"] = (
-                await _upload_file(
-                    file_service,
-                    current_user.id,
-                    scan_file,
-                    fallback_name="Скан схемы",
-                )
-            ).id
+
         if editable_file is not None and editable_file.filename:
-            uploaded["editable_file_id"] = (
-                await _upload_file(
-                    file_service,
-                    current_user.id,
-                    editable_file,
-                    fallback_name="Редактируемая схема",
-                )
-            ).id
+            uploaded["editable_file"] = await _upload_file(
+                file_service,
+                current_user.id,
+                editable_file,
+                fallback_name="Редактируемая схема",
+            )
 
     except FileUploadValidationError as exc:
-        await _archive_uploaded(
-            file_service,
-            list(uploaded.values()),
-            current_user.id,
-        )
+        await cleanup_uploaded_files()
         return await _render_schema_form(
             request,
             urza_id,
@@ -376,12 +380,9 @@ async def create_urza_schema_record(
             error_message=str(exc),
             response_status=exc.status_code,
         )
+
     except Exception:
-        await _archive_uploaded(
-            file_service,
-            list(uploaded.values()),
-            current_user.id,
-        )
+        await cleanup_uploaded_files()
         logger.exception("Failed to upload Schema files")
         return await _render_schema_form(
             request,
@@ -401,13 +402,22 @@ async def create_urza_schema_record(
             change_description=change_description,
             change_justification=change_justification,
             upload_date=upload_date,
-            signed_form_file_id=uploaded["signed_form_file_id"],
-            scan_file_id=uploaded.get("scan_file_id"),
-            editable_file_id=uploaded.get("editable_file_id"),
+            signed_form_file_id=uploaded["signed_form_file"].id,
+            scan_file_id=(
+                uploaded["scan_file"].id
+                if "scan_file" in uploaded
+                else None
+            ),
+            editable_file_id=(
+                uploaded["editable_file"].id
+                if "editable_file" in uploaded
+                else None
+            ),
             task_id=task_id,
         )
+
     except (ValueError, PermissionError) as exc:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await cleanup_uploaded_files()
         code = 403 if isinstance(exc, PermissionError) else 400
         return await _render_schema_form(
             request,
@@ -417,8 +427,9 @@ async def create_urza_schema_record(
             error_message=str(exc),
             response_status=code,
         )
+
     except Exception:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await cleanup_uploaded_files()
         logger.exception("Failed to create Schema record")
         return await _render_schema_form(
             request,
@@ -428,6 +439,15 @@ async def create_urza_schema_record(
             error_message="Не удалось сохранить запись схемы.",
             response_status=500,
         )
+
+    return await _render_schemes(
+        request,
+        urza_id,
+        current_user,
+        schema_service,
+        task_service,
+    )
+
 
     return await _render_schemes(request, urza_id, current_user, schema_service, task_service)
 

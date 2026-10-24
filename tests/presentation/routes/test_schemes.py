@@ -61,18 +61,29 @@ class FakeObjectService:
         return SimpleNamespace(id=kwargs["object_id"])
 
 
+
 class FakeFileService:
     def __init__(self, *files):
         self.files = list(files)
         self.upload_calls = []
         self.archive_calls = []
+        self.discarded = []
 
     async def upload(self, **kwargs):
         self.upload_calls.append(kwargs)
         return self.files.pop(0)
 
     async def archive(self, *, file_id, user_id):
-        self.archive_calls.append({"file_id": file_id, "user_id": user_id})
+        self.archive_calls.append(
+            {
+                "file_id": file_id,
+                "user_id": user_id,
+            }
+        )
+
+    async def discard_upload(self, file):
+        self.discarded.append(file)
+
 
 
 class FakeTaskService:
@@ -531,7 +542,7 @@ def test_post_schema_create_reports_tampered_task_context_rejection(system_user_
         _roles_by_user.pop(user.id, None)
 
 
-def test_create_schema_archives_uploaded_files_after_service_error(system_user_id):
+def test_create_schema_discards_uploaded_files_after_service_error(system_user_id):
     user = _user(system_user_id)
     urza_id = uuid7()
     signed, scan = SimpleNamespace(id=uuid7()), SimpleNamespace(id=uuid7())
@@ -551,7 +562,12 @@ def test_create_schema_archives_uploaded_files_after_service_error(system_user_i
             },
         )
         assert response.status_code == 400
-        assert len(files.archive_calls) == 2
+        assert len(files.discarded) == 2
+        assert files.archive_calls == []
+        assert {file.id for file in files.discarded} == {
+            signed.id,
+            scan.id,
+        }
     finally:
         app.dependency_overrides.clear()
         _roles_by_user.pop(user.id, None)
