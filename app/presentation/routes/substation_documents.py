@@ -347,18 +347,21 @@ async def _create_document(
             task_id=task_id,
         )
 
+
     except Exception:
         for uploaded_file in uploaded:
             try:
-                await file_service.discard_upload(uploaded_file)
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
             except Exception:
                 logger.exception(
-                    "Не удалось очистить файл после ошибки создания документа: "
+                    "Не удалось архивировать файл после ошибки создания документа: "
                     "file_id=%s",
                     uploaded_file.id,
                 )
         raise
-
 
     destination = (
         f"/tasks/{task_id}" if task_id is not None else

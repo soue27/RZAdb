@@ -405,13 +405,55 @@ async def create_instruction(
             detail=str(exc),
         ) from exc
 
+
     except PermissionError as exc:
+
+        for uploaded_file in uploaded_files:
+
+            try:
+
+                await file_service.archive(
+
+                    file_id=uploaded_file.id,
+
+                    user_id=current_user.id,
+
+                )
+
+            except Exception:
+
+                logger.exception(
+
+                    "Не удалось архивировать файл после ошибки доступа "
+
+                    "при создании инструкции РЗА: file_id=%s",
+
+                    uploaded_file.id,
+
+                )
+
         raise HTTPException(
+
             status_code=403,
+
             detail=str(exc),
+
         ) from exc
 
+
     except ValueError as exc:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки данных "
+                    "при создании инструкции РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
         raise HTTPException(
             status_code=400,
             detail=str(exc),
@@ -517,13 +559,38 @@ async def create_instruction_version(
             detail=str(exc),
         ) from exc
 
+
     except PermissionError as exc:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки доступа "
+                    "при создании версии инструкции РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
         raise HTTPException(
             status_code=403,
             detail=str(exc),
         ) from exc
 
     except ValueError as exc:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки данных "
+                    "при создании версии инструкции РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
         raise HTTPException(
             status_code=400,
             detail=str(exc),

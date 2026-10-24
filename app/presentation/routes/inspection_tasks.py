@@ -408,14 +408,16 @@ async def complete_inspection_task(
         )
         return response
 
-
     except Exception:
         for uploaded in uploaded_files:
             try:
-                await files.discard_upload(uploaded)
+                await files.archive(
+                    file_id=uploaded.id,
+                    user_id=current_user.id,
+                )
             except Exception:
                 logger.exception(
-                    "Не удалось удалить загруженный файл после "
+                    "Не удалось архивировать файл после "
                     "неожиданной ошибки: file_id=%s",
                     uploaded.id,
                 )

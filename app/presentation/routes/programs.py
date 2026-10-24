@@ -430,18 +430,21 @@ async def create_urza_program(
             detail="Создавать программы с текущей ролью запрещено.",
         )
 
-    uploaded_file_keys: list[str] = []
+    uploaded_files = []
 
     async def cleanup_uploaded_files() -> None:
-        """Удаляет файлы, загруженные в рамках неудачного создания."""
-        for key in uploaded_file_keys:
+        """Архивирует файлы, загруженные в рамках неудачного создания."""
+        for uploaded_file in uploaded_files:
             try:
-                await file_service.storage.delete(key=key)
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
             except Exception:
                 logger.exception(
-                    "Не удалось очистить новый файл после ошибки "
-                    "создания программы: key=%s",
-                    key,
+                    "Не удалось архивировать файл после ошибки "
+                    "создания программы: file_id=%s",
+                    uploaded_file.id,
                 )
 
     try:
@@ -468,7 +471,7 @@ async def create_urza_program(
                 scan_file.content_type or "application/octet-stream"
             ),
         )
-        uploaded_file_keys.append(saved_scan.s3_key)
+        uploaded_files.append(saved_scan)
 
         # Редактируемый файл необязателен.
         editable_file_id = None
@@ -497,7 +500,7 @@ async def create_urza_program(
                     or "application/octet-stream"
                 ),
             )
-            uploaded_file_keys.append(saved_editable.s3_key)
+            uploaded_files.append(saved_editable)
             editable_file_id = saved_editable.id
 
         # Создаём запись программы.
@@ -672,7 +675,23 @@ async def update_urza_program(
 
     scan_file_id = None
     editable_file_id = None
-    uploaded_file_keys: list[str] = []
+
+    uploaded_files = []
+
+    async def cleanup_uploaded_files() -> None:
+        """Архивирует файлы, загруженные в рамках неудачного редактирования."""
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "редактирования программы: file_id=%s",
+                    uploaded_file.id,
+                )
 
     try:
         if scan_file and scan_file.filename:
@@ -700,7 +719,7 @@ async def update_urza_program(
                 ),
             )
             scan_file_id = saved_scan.id
-            uploaded_file_keys.append(saved_scan.s3_key)
+            uploaded_files.append(saved_scan)
 
         if has_editable_upload:
             editable_content = await read_upload_content(editable_file)
@@ -727,7 +746,7 @@ async def update_urza_program(
                 ),
             )
             editable_file_id = saved_editable.id
-            uploaded_file_keys.append(saved_editable.s3_key)
+            uploaded_files.append(saved_editable)
 
         await program_service.update(
             user_id=current_user.id,
@@ -741,59 +760,27 @@ async def update_urza_program(
         )
 
     except PermissionError as exc:
-        for key in uploaded_file_keys:
-            try:
-                await file_service.storage.delete(key=key)
-            except Exception:
-                logger.exception(
-                    "Не удалось очистить новый файл после ошибки "
-                    "редактирования программы: key=%s",
-                    key,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
 
     except FileUploadValidationError as exc:
-        for key in uploaded_file_keys:
-            try:
-                await file_service.storage.delete(key=key)
-            except Exception:
-                logger.exception(
-                    "Не удалось очистить новый файл после ошибки "
-                    "валидации при редактировании программы: key=%s",
-                    key,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=exc.status_code,
             detail=str(exc),
         ) from exc
 
     except ValueError as exc:
-        for key in uploaded_file_keys:
-            try:
-                await file_service.storage.delete(key=key)
-            except Exception:
-                logger.exception(
-                    "Не удалось очистить новый файл после ошибки "
-                    "редактирования программы: key=%s",
-                    key,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
     except Exception:
-        for key in uploaded_file_keys:
-            try:
-                await file_service.storage.delete(key=key)
-            except Exception:
-                logger.exception(
-                    "Не удалось очистить новый файл после ошибки "
-                    "редактирования программы: key=%s",
-                    key,
-                )
+        await cleanup_uploaded_files()
         raise
 
     if request.headers.get("HX-Request") != "true":

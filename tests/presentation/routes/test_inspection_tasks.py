@@ -648,7 +648,7 @@ def test_send_inspection_for_review_returns_400_when_service_rejects_transition(
         app.dependency_overrides.clear()
 
 
-def test_editable_upload_failure_discards_uploaded_scan():
+def test_editable_upload_failure_archives_uploaded_scan():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
     task = SimpleNamespace(id=task_id, substation_id=substation_id)
@@ -690,14 +690,16 @@ def test_editable_upload_failure_discards_uploaded_scan():
             )
 
         assert response.status_code == 500
-        assert files.discard_calls == [uploaded_scan]
-        assert files.archive_calls == []
+        assert files.discard_calls == []
+        assert files.archive_calls == [
+            {"file_id": uploaded_scan.id, "user_id": user.id}
+        ]
         assert service.calls == ["validate_completion"]
     finally:
         app.dependency_overrides.clear()
 
 
-def test_unexpected_completion_error_discards_uploaded_files():
+def test_unexpected_completion_error_archives_uploaded_files():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
     task = SimpleNamespace(id=task_id, substation_id=substation_id)
@@ -732,8 +734,10 @@ def test_unexpected_completion_error_discards_uploaded_files():
             )
 
         assert response.status_code == 500
-        assert files.discard_calls == [uploaded_scan]
-        assert files.archive_calls == []
+        assert files.discard_calls == []
+        assert files.archive_calls == [
+            {"file_id": uploaded_scan.id, "user_id": user.id}
+        ]
         assert service.calls == ["validate_completion"]
     finally:
         app.dependency_overrides.clear()

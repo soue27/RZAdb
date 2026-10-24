@@ -2943,8 +2943,8 @@ def test_update_urza_program_cleans_up_uploaded_file_on_update_error(
         assert response.json()["detail"] == (
             "Ошибка обновления программы."
         )
-        assert file_service.storage.delete_calls == [
-            {"key": "files/new-scan.pdf"},
+        assert file_service.archive_calls == [
+            {"file_id": new_scan.id, "user_id": user.id},
         ]
 
         # Исходные данные программы не изменились.
@@ -3128,8 +3128,8 @@ def test_update_urza_program_cleans_up_scan_when_editable_upload_fails(
 
         assert response.status_code == 500
         assert file_service.upload_count == 2
-        assert file_service.storage.delete_calls == [
-            {"key": "files/new-scan.pdf"},
+        assert file_service.archive_calls == [
+            {"file_id": new_scan.id, "user_id": user.id},
         ]
         assert program_service.update_calls == []
         assert program.program_number == "123"
@@ -3452,8 +3452,8 @@ def test_create_urza_program_empty_editable_file_cleans_up_scan(
 
         assert response.status_code == 400
         assert response.json()["detail"] == "Загруженный редактируемый файл пуст."
-        assert file_service.storage.delete_calls == [
-            {"key": scan_file.s3_key},
+        assert file_service.archive_calls == [
+            {"file_id": scan_file.id, "user_id": user.id},
         ]
         assert program_service.programs == []
 
@@ -3575,9 +3575,9 @@ def test_create_urza_program_cleans_up_files_on_create_error(
 
         assert response.status_code == 400
         assert response.json()["detail"] == "Ошибка создания программы"
-        assert file_service.storage.delete_calls == [
-            {"key": scan_file.s3_key},
-            {"key": editable_file.s3_key},
+        assert file_service.archive_calls == [
+            {"file_id": scan_file.id, "user_id": user.id},
+            {"file_id": editable_file.id, "user_id": user.id},
         ]
         assert program_service.programs == []
 
@@ -3683,8 +3683,8 @@ def test_create_urza_program_cleans_up_scan_when_editable_upload_fails(
 
         assert response.status_code == 500
         assert len(file_service.upload_calls) == 2
-        assert file_service.storage.delete_calls == [
-            {"key": scan_file.s3_key},
+        assert file_service.archive_calls == [
+            {"file_id": scan_file.id, "user_id": user.id},
         ]
         assert program_service.programs == []
 
