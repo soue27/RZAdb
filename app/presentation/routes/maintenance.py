@@ -42,6 +42,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -442,6 +443,28 @@ async def create_urza_maintenance(
             current_user=current_user,
             tree_service=tree_service,
             status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    except FileUploadValidationError as exc:
+        await _archive_uploaded_files(
+            file_service,
+            uploaded_file_ids,
+            current_user.id,
+        )
+
+        return await _render_maintenance_template(
+            request=request,
+            template_name="objects/urza_maintenance_form.html",
+            context={
+                "urza_id": urza_id,
+                "maintenance_types": list(MaintenanceType),
+                "form_values": form_values,
+                "task_id": task_id,
+                "error_message": str(exc),
+            },
+            current_user=current_user,
+            tree_service=tree_service,
+            status_code=exc.status_code,
         )
 
     except ValueError as exc:

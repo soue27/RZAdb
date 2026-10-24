@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Annotated
 from uuid import UUID
+import logging
 
 from fastapi import (
     APIRouter,
@@ -34,6 +35,10 @@ from app.presentation.dependencies.services import (
     get_urza_instruction_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
+
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/objects",
@@ -292,7 +297,7 @@ async def _upload(
     upload: UploadFile,
     label: str,
 ):
-    content=await read_upload_content(upload),
+    content = await read_upload_content(upload)
     filename = upload.filename or label
 
     return await file_service.upload(
@@ -346,25 +351,31 @@ async def create_instruction(
         urza_id,
     )
 
-    scan = await _upload(
-        file_service,
-        current_user.id,
-        scan_file,
-        "scan",
-    )
-
-    editable = (
-        await _upload(
-            file_service,
-            current_user.id,
-            editable_file,
-            "editable",
-        )
-        if editable_file and editable_file.filename
-        else None
-    )
+    uploaded_files = []
 
     try:
+        scan = await _upload(
+            file_service,
+            current_user.id,
+            scan_file,
+            "scan",
+        )
+        uploaded_files.append(scan)
+
+        editable = (
+            await _upload(
+                file_service,
+                current_user.id,
+                editable_file,
+                "editable",
+            )
+            if editable_file and editable_file.filename
+            else None
+        )
+
+        if editable is not None:
+            uploaded_files.append(editable)
+
         await service.create(
             user_id=current_user.id,
             urza_id=urza_id,
@@ -374,11 +385,32 @@ async def create_instruction(
             change_description=change_description,
             change_justification=change_justification,
         )
+
+    except FileUploadValidationError as exc:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "валидации инструкции РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
+
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=str(exc),
+        ) from exc
+
     except PermissionError as exc:
         raise HTTPException(
             status_code=403,
             detail=str(exc),
         ) from exc
+
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
@@ -431,25 +463,31 @@ async def create_instruction_version(
         urza_id,
     )
 
-    scan = await _upload(
-        file_service,
-        current_user.id,
-        scan_file,
-        "scan",
-    )
-
-    editable = (
-        await _upload(
-            file_service,
-            current_user.id,
-            editable_file,
-            "editable",
-        )
-        if editable_file and editable_file.filename
-        else None
-    )
+    uploaded_files = []
 
     try:
+        scan = await _upload(
+            file_service,
+            current_user.id,
+            scan_file,
+            "scan",
+        )
+        uploaded_files.append(scan)
+
+        editable = (
+            await _upload(
+                file_service,
+                current_user.id,
+                editable_file,
+                "editable",
+            )
+            if editable_file and editable_file.filename
+            else None
+        )
+
+        if editable is not None:
+            uploaded_files.append(editable)
+
         created = await service.create_version(
             user_id=current_user.id,
             instruction_id=instruction_id,
@@ -459,11 +497,32 @@ async def create_instruction_version(
             change_description=change_description,
             change_justification=change_justification,
         )
+
+    except FileUploadValidationError as exc:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "валидации инструкции РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
+
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=str(exc),
+        ) from exc
+
     except PermissionError as exc:
         raise HTTPException(
             status_code=403,
             detail=str(exc),
         ) from exc
+
     except ValueError as exc:
         raise HTTPException(
             status_code=400,

@@ -29,6 +29,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/objects", tags=["schemes"])
@@ -360,8 +361,27 @@ async def create_urza_schema_record(
                     fallback_name="Редактируемая схема",
                 )
             ).id
+
+    except FileUploadValidationError as exc:
+        await _archive_uploaded(
+            file_service,
+            list(uploaded.values()),
+            current_user.id,
+        )
+        return await _render_schema_form(
+            request,
+            urza_id,
+            task_id=task_id,
+            form_values=values,
+            error_message=str(exc),
+            response_status=exc.status_code,
+        )
     except Exception:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await _archive_uploaded(
+            file_service,
+            list(uploaded.values()),
+            current_user.id,
+        )
         logger.exception("Failed to upload Schema files")
         return await _render_schema_form(
             request,
@@ -499,8 +519,27 @@ async def update_urza_schema_record(
                         fallback_name=field,
                     )
                 ).id
+
+    except FileUploadValidationError as exc:
+        await _archive_uploaded(
+            file_service,
+            list(uploaded.values()),
+            current_user.id,
+        )
+        return await _render_schema_form(
+            request,
+            urza_id,
+            record=record,
+            form_values=values,
+            error_message=str(exc),
+            response_status=exc.status_code,
+        )
     except Exception:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await _archive_uploaded(
+            file_service,
+            list(uploaded.values()),
+            current_user.id,
+        )
         logger.exception("Failed to upload replacement Schema files")
         return await _render_schema_form(
             request,

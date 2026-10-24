@@ -36,6 +36,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 router = APIRouter(prefix="/objects/substation", tags=["inspection tasks"])
 logger = logging.getLogger(__name__)
@@ -340,6 +341,38 @@ async def complete_inspection_task(
             scan_file_id=scan.id if scan else None,
             editable_file_id=editable.id if editable else None,
         )
+
+    except FileUploadValidationError as exc:
+        for uploaded in uploaded_files:
+            try:
+                await files.archive(
+                    file_id=uploaded.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "валидации при завершении осмотра: file_id=%s",
+                    uploaded.id,
+                )
+
+        request.state.inspection_error_message = str(exc)
+        request.state.inspection_form_values = {
+            "inspection_date": inspection_date.isoformat(),
+            "remarks": remarks,
+        }
+        response = await inspection_task_detail(
+            request,
+            task_id,
+            current_user,
+            objects,
+            repository,
+            service,
+            tree,
+        )
+        response.status_code = exc.status_code
+        return response
+
     except (PermissionError, ValueError) as exc:
         for uploaded in uploaded_files:
             try:

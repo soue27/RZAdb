@@ -27,6 +27,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -517,6 +518,13 @@ async def create_urza_program(
             detail=str(exc),
         ) from exc
 
+    except FileUploadValidationError as exc:
+        await cleanup_uploaded_files()
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=str(exc),
+        ) from exc
+
     except ValueError as exc:
         await cleanup_uploaded_files()
         raise HTTPException(
@@ -746,6 +754,22 @@ async def update_urza_program(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
+
+    except FileUploadValidationError as exc:
+        for key in uploaded_file_keys:
+            try:
+                await file_service.storage.delete(key=key)
+            except Exception:
+                logger.exception(
+                    "Не удалось очистить новый файл после ошибки "
+                    "валидации при редактировании программы: key=%s",
+                    key,
+                )
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=str(exc),
+        ) from exc
+
     except ValueError as exc:
         for key in uploaded_file_keys:
             try:

@@ -24,6 +24,7 @@ from app.presentation.dependencies.services import (
     get_task_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,15 @@ async def create_urza_settings_record(
             current_user.id,
             signed_form_file,
         )
+
+    except FileUploadValidationError as exc:
+        return await _render_settings_form(
+            request,
+            urza_id,
+            error_message=str(exc),
+            form_values=form_values,
+            response_status=exc.status_code,
+        )
     except Exception:
         logger.exception("Failed to upload Settings signed form")
 
@@ -491,6 +501,16 @@ async def update_urza_settings_record(
                 file_service,
                 current_user.id,
                 signed_form_file,
+            )
+
+        except FileUploadValidationError as exc:
+            return await _render_settings_form(
+                request,
+                urza_id,
+                record=record,
+                form_values=form_values,
+                error_message=str(exc),
+                response_status=exc.status_code,
             )
         except Exception:
             logger.exception(

@@ -470,3 +470,22 @@ def test_upload_rejects_file_over_size_limit(
 
     assert response.status_code == 413
     assert "максимально допустимый размер" in response.json()["detail"]
+
+
+def test_upload_rejects_file_without_extension(
+    authenticated_client: TestClient,
+) -> None:
+    response = authenticated_client.post(
+        "/files",
+        files={
+            "file": (
+                "scan",
+                b"test content",
+                "application/pdf",
+            ),
+        },
+        data={"display_name": "Скан"},
+    )
+
+    assert response.status_code == 415
+    assert "Формат файла не поддерживается" in response.json()["detail"]

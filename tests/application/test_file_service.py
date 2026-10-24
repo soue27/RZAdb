@@ -428,3 +428,28 @@ def test_validate_upload_accepts_allowed_extensions(extension):
     assert validation.validate_upload(
         filename=f"document{extension}",
     ) == extension
+
+
+@pytest.mark.asyncio
+async def test_upload_accepts_file_at_size_limit(
+    service,
+    repository,
+    storage,
+    system_user_id,
+    monkeypatch,
+):
+    monkeypatch.setattr(validation, "MAX_FILE_SIZE_BYTES", 10)
+    content = b"x" * 10
+
+    result = await service.upload(
+        actor_id=system_user_id,
+        content=content,
+        original_name="scan.pdf",
+        display_name="Скан",
+        extension=".pdf",
+        mime_type="application/pdf",
+    )
+
+    assert result.size == 10
+    storage.upload.assert_awaited_once()
+    repository.add.assert_awaited_once_with(result)

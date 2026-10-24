@@ -38,6 +38,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.application.files.validation import FileUploadValidationError
 
 router = APIRouter(prefix="/objects/substation", tags=["substation documents"])
 templates = Jinja2Templates(directory="app/presentation/templates")
@@ -66,6 +67,7 @@ async def _render_form(
     values: dict | None = None,
     error: str | None = None,
     task_id: UUID | None = None,
+    response_status: int = status.HTTP_200_OK,
 ):
     context = {
         "substation_id": substation_id,
@@ -77,17 +79,22 @@ async def _render_form(
     }
     if request.headers.get("HX-Request") == "true":
         return templates.TemplateResponse(
-            request=request, name="objects/substation_document_form.html", context=context
+            request=request,
+            name="objects/substation_document_form.html",
+            context=context,
+            status_code=response_status,
         )
     return templates.TemplateResponse(
         request=request,
         name="objects/substation_document_page.html",
+        status_code=response_status,
         context={
             **context,
             "current_user": current_user,
             "tree": await tree_service.get_tree(user_id=current_user.id),
             "page_title": "Документ подстанции",
             "content_template": "objects/substation_document_form.html",
+
         },
     )
 
@@ -212,6 +219,7 @@ async def _create_document(
             raise ValueError("Укажите номер (до 255 символов) и наименование (до 500 символов).")
         if scan_file is None or not scan_file.filename:
             raise ValueError("Приложите скан документа.")
+
     except (ValueError, TypeError) as exc:
         return await _render_form(
             request, substation_id=substation_id, kind=kind,
@@ -292,6 +300,33 @@ async def _create_document(
                 change_justification=change_justification,
                 task_id=task_id,
             )
+
+    except FileUploadValidationError as exc:
+        for uploaded_file in uploaded:
+            try:
+                await file_service.archive(
+                    file_id=uploaded_file.id,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Не удалось архивировать файл после ошибки "
+                    "валидации документа подстанции: file_id=%s",
+                    uploaded_file.id,
+                )
+
+        return await _render_form(
+            request,
+            substation_id=substation_id,
+            kind=kind,
+            current_user=current_user,
+            tree_service=tree,
+            new_version=new_version,
+            values=values,
+            error=str(exc),
+            task_id=task_id,
+            response_status=exc.status_code,
+        )
 
     except (ValueError, PermissionError) as exc:
         for uploaded_file in uploaded:
