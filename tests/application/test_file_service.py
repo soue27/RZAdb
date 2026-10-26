@@ -420,14 +420,43 @@ async def test_upload_rejects_file_over_size_limit_before_storage(
     repository.add.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "extension",
-    sorted(validation.MIME_TYPES_BY_EXTENSION),
-)
+@pytest.mark.parametrize("extension", sorted(validation.MIME_TYPES_BY_EXTENSION))
 def test_validate_upload_accepts_allowed_extensions(extension):
     assert validation.validate_upload(
         filename=f"document{extension}",
     ) == extension
+
+
+@pytest.mark.parametrize("extension", [".exe", ".js", ".html", ".zip", ".dwg.exe"])
+def test_validate_upload_rejects_disallowed_extensions(extension):
+    with pytest.raises(UnsupportedFileTypeError):
+        validation.validate_upload(filename=f"drawing{extension}")
+
+
+@pytest.mark.parametrize(
+    "extension",
+    [".dwg", ".dxf", ".dgn", ".dwf", ".dwfx", ".plt", ".vsd", ".vsdx",
+     ".odg", ".step", ".stp", ".iges", ".igs", ".ifc", ".svg", ".eps"],
+)
+@pytest.mark.asyncio
+async def test_upload_stores_new_drawing_formats_as_generic_binary(
+    extension,
+    service,
+    repository,
+    system_user_id,
+):
+    result = await service.upload(
+        actor_id=system_user_id,
+        content=b"drawing content",
+        original_name=f"drawing{extension}",
+        display_name=f"drawing{extension}",
+        extension=extension,
+        mime_type="application/octet-stream",
+    )
+
+    assert result.extension == extension
+    assert result.mime_type == "application/octet-stream"
+    repository.add.assert_awaited_once_with(result)
 
 
 @pytest.mark.asyncio

@@ -63,11 +63,12 @@ class FakeObjectService:
 
 
 class FakeFileService:
-    def __init__(self, *files):
+    def __init__(self, *files, discard_error=None):
         self.files = list(files)
         self.upload_calls = []
         self.archive_calls = []
         self.discarded = []
+        self.discard_error = discard_error
 
     async def upload(self, **kwargs):
         self.upload_calls.append(kwargs)
@@ -83,6 +84,8 @@ class FakeFileService:
 
     async def discard_upload(self, file):
         self.discarded.append(file)
+        if self.discard_error:
+            raise self.discard_error
 
 
 
@@ -683,6 +686,87 @@ def test_update_draft_replaces_file_and_archives_old_after_save(system_user_id):
         assert response.status_code == 200
         assert service.calls[0][1]["scan_file_id"] == new_scan.id
         assert files.archive_calls == [{"file_id": old_scan, "user_id": user.id}]
+    finally:
+        app.dependency_overrides.clear()
+        _roles_by_user.pop(user.id, None)
+
+
+def test_update_draft_discards_new_files_without_archiving_after_service_error(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    old_scan, old_editable = uuid7(), uuid7()
+    new_signed = SimpleNamespace(id=uuid7())
+    new_scan = SimpleNamespace(id=uuid7())
+    new_editable = SimpleNamespace(id=uuid7())
+    record = _record(
+        urza_id,
+        DocumentStatus.DRAFT,
+        scan_file_id=old_scan,
+        editable_file_id=old_editable,
+    )
+    service = FakeSchemaService(
+        urza_id,
+        records=[record],
+        errors={"update": RuntimeError("database unavailable")},
+    )
+    files = FakeFileService(new_signed, new_scan, new_editable)
+    _setup(user, urza_id, service, file_service=files)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/schemas/{record.id}",
+            data=_post_data(),
+            files={
+                "signed_form_file": ("signed.pdf", b"signed", "application/pdf"),
+                "scan_file": ("scan.pdf", b"scan", "application/pdf"),
+                "editable_file": (
+                    "editable.docx",
+                    b"editable",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+            },
+        )
+        assert response.status_code == 500
+        assert {file.id for file in files.discarded} == {
+            new_signed.id,
+            new_scan.id,
+            new_editable.id,
+        }
+        assert files.archive_calls == []
+    finally:
+        app.dependency_overrides.clear()
+        _roles_by_user.pop(user.id, None)
+
+
+def test_update_draft_discard_error_is_logged_without_masking_update_error(
+    system_user_id,
+    caplog,
+):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    new_scan = SimpleNamespace(id=uuid7())
+    record = _record(urza_id, DocumentStatus.DRAFT, scan_file_id=uuid7())
+    service = FakeSchemaService(
+        urza_id,
+        records=[record],
+        errors={"update": RuntimeError("database unavailable")},
+    )
+    files = FakeFileService(
+        new_scan,
+        discard_error=RuntimeError("storage cleanup failed"),
+    )
+    _setup(user, urza_id, service, file_service=files)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/schemas/{record.id}",
+            data=_post_data(),
+            files={"scan_file": ("new-scan.pdf", b"scan", "application/pdf")},
+        )
+        assert response.status_code == 500
+        assert "Не удалось сохранить изменения схемы." in response.text
+        assert files.discarded == [new_scan]
+        assert files.archive_calls == []
+        assert "Failed to discard newly uploaded Schema file" in caplog.text
+        assert "Failed to update Schema record" in caplog.text
     finally:
         app.dependency_overrides.clear()
         _roles_by_user.pop(user.id, None)

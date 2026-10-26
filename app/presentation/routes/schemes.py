@@ -192,6 +192,20 @@ async def _archive_uploaded(
     return succeeded
 
 
+async def _discard_uploaded_safely(
+    file_service: FileService,
+    files: list,
+) -> None:
+    for file in files:
+        try:
+            await file_service.discard_upload(file)
+        except Exception:
+            logger.exception(
+                "Failed to discard newly uploaded Schema file %s",
+                file.id,
+            )
+
+
 def _form_values(
     schema_number: str,
     schema_name: str,
@@ -527,24 +541,27 @@ async def update_urza_schema_record(
         "scan_file_id": scan_file,
         "editable_file_id": editable_file,
     }
+
     uploaded: dict[str, UUID] = {}
+    uploaded_files = []
+
     try:
         for field, upload in uploads.items():
             if upload is not None and upload.filename:
-                uploaded[field] = (
-                    await _upload_file(
-                        file_service,
-                        current_user.id,
-                        upload,
-                        fallback_name=field,
-                    )
-                ).id
+                file = await _upload_file(
+                    file_service,
+                    current_user.id,
+                    upload,
+                    fallback_name=field,
+                )
+                uploaded[field] = file.id
+                uploaded_files.append(file)
+
 
     except FileUploadValidationError as exc:
-        await _archive_uploaded(
+        await _discard_uploaded_safely(
             file_service,
-            list(uploaded.values()),
-            current_user.id,
+            uploaded_files,
         )
         return await _render_schema_form(
             request,
@@ -555,10 +572,9 @@ async def update_urza_schema_record(
             response_status=exc.status_code,
         )
     except Exception:
-        await _archive_uploaded(
+        await _discard_uploaded_safely(
             file_service,
-            list(uploaded.values()),
-            current_user.id,
+            uploaded_files,
         )
         logger.exception("Failed to upload replacement Schema files")
         return await _render_schema_form(
@@ -588,7 +604,10 @@ async def update_urza_schema_record(
             ),
         )
     except (ValueError, PermissionError) as exc:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await _discard_uploaded_safely(
+            file_service,
+            uploaded_files,
+        )
         code = 403 if isinstance(exc, PermissionError) else _record_value_error_status(exc)
         return await _render_schema_form(
             request,
@@ -599,7 +618,10 @@ async def update_urza_schema_record(
             response_status=code,
         )
     except Exception:
-        await _archive_uploaded(file_service, list(uploaded.values()), current_user.id)
+        await _discard_uploaded_safely(
+            file_service,
+            uploaded_files,
+        )
         logger.exception("Failed to update Schema record")
         return await _render_schema_form(
             request,
