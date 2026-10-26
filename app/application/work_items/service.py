@@ -260,7 +260,7 @@ class InspectionTaskWorkItemSource:
                 "review"
                 if task.status is TaskStatus.UNDER_REVIEW
                 else "completed"
-                if task.status is TaskStatus.CLOSED
+                if task.status in {TaskStatus.CLOSED, TaskStatus.REJECTED}
                 else "work"
             )
             items.append(

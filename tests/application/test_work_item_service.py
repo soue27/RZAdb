@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.application.work_items.service import (
+    InspectionTaskWorkItemSource,
     InstructionWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
@@ -588,6 +589,64 @@ async def _active_engineer(user_id):
         active=True,
         deleted_at=None,
     )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_tab"),
+    [
+        (TaskStatus.CREATED, "work"),
+        (TaskStatus.ASSIGNED, "work"),
+        (TaskStatus.IN_PROGRESS, "work"),
+        (TaskStatus.COMPLETED, "work"),
+        (TaskStatus.UNDER_REVIEW, "review"),
+        (TaskStatus.CLOSED, "completed"),
+        (TaskStatus.REJECTED, "completed"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_inspection_task_statuses_map_to_work_review_and_completed_tabs(
+    status,
+    expected_tab,
+):
+    user_id = uuid4()
+    task = SimpleNamespace(
+        id=uuid4(),
+        substation_id=uuid4(),
+        substation=SimpleNamespace(dispatch_name="ПС-1"),
+        created_by=user_id,
+        created_by_user=SimpleNamespace(full_name="Автор"),
+        assigned_to=user_id,
+        assigned_to_user=SimpleNamespace(full_name="Инженер"),
+        created_at=datetime(2026, 10, 1, tzinfo=UTC),
+        status=status,
+        deadline_at=None,
+    )
+
+    class Repository:
+        async def list_active(self):
+            return [task]
+
+        async def list_reviewed_task_ids(self, actor_id):
+            return set()
+
+    class Access:
+        user_repository = SimpleNamespace(get_by_id=_active_engineer)
+
+        async def can_access_substation(self, *_):
+            return True
+
+    class InspectionService:
+        async def can_review(self, *_args, **_kwargs):
+            return False
+
+    result = await InspectionTaskWorkItemSource(
+        Repository(),
+        Access(),
+        InspectionService(),
+    ).list_for_user(user_id)
+
+    assert len(result) == 1
+    assert result[0].tab == expected_tab
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectAccessDeniedError
 from app.application.work_items.service import (
+    InspectionTaskWorkItemSource,
     SchemaWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
@@ -1436,6 +1437,61 @@ def test_reviewable_inspection_appears_in_both_review_tabs(system_user_id):
         assert "ПС-чужой-осмотр" not in approval_text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_rejected_and_closed_inspections_are_completed_and_excluded_from_work_filter():
+    user = _user(uuid7())
+    statuses = [
+        ("Отклонённый осмотр", TaskStatus.REJECTED),
+        ("Закрытый осмотр", TaskStatus.CLOSED),
+        ("Осмотр в работе", TaskStatus.IN_PROGRESS),
+    ]
+    tasks = [
+        SimpleNamespace(
+            id=uuid7(),
+            substation_id=uuid7(),
+            substation=SimpleNamespace(dispatch_name=title),
+            created_by=user.id,
+            created_by_user=SimpleNamespace(full_name="Автор"),
+            assigned_to=user.id,
+            assigned_to_user=SimpleNamespace(full_name="Инженер"),
+            created_at=datetime(2026, 10, 1, tzinfo=UTC),
+            status=status,
+            deadline_at=None,
+        )
+        for title, status in statuses
+    ]
+    access = FakeAccessService()
+    client = _client(
+        user,
+        FakeTaskRepository([]),
+        access,
+        FakeTaskService(),
+    )
+    app.dependency_overrides[get_inspection_work_item_source] = lambda: (
+        InspectionTaskWorkItemSource(
+            FakeInspectionTaskRepository(tasks),
+            access,
+            FakeInspectionTaskService(),
+        )
+    )
+
+    try:
+        full_list = client.get("/tasks")
+        work_filter = client.get("/tasks?stat=work")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert full_list.status_code == work_filter.status_code == 200
+    completed_pane = _pane_text(full_list.text, "completed-pane")
+    work_pane = _pane_text(full_list.text, "work-pane")
+    assert "Отклонённый осмотр" in completed_pane
+    assert "Закрытый осмотр" in completed_pane
+    assert "Осмотр в работе" in work_pane
+
+    assert "Отклонённый осмотр" not in work_filter.text
+    assert "Закрытый осмотр" not in work_filter.text
+    assert "Осмотр в работе" in work_filter.text
 
 
 
