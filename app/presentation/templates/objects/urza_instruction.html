@@ -2,15 +2,19 @@
 
 <div id="urza-tab-content">
 
-    {% if instruction and versions %}
+    {% if instruction and (versions or working_versions) %}
         {% set approved_version = current_version %}
-        {% set displayed_version = selected_version or approved_version or versions[0] %}
+        {% set displayed_version = selected_version or approved_version or working_versions[0] or versions[0] %}
 
         <div class="d-flex justify-content-between align-items-start mb-3">
 
             <div>
                 <div class="rzadb-otd-version-title">
-                    Версия {{ displayed_version.version_number }}
+                    {% if displayed_version.status.value == "approved" %}
+                        Версия {{ displayed_version.version_number }}
+                    {% else %}
+                        Рабочая редакция
+                    {% endif %}
                 </div>
 
                 <div class="rzadb-otd-version-date">
@@ -157,7 +161,7 @@
 
         </dl>
 
-        {% if versions|length > 1 %}
+        {% if versions and (versions|length > 1 or working_versions) %}
             <details
                 class="mt-4 rzadb-otd-history"
                 {% if history_open %}open{% endif %}
@@ -203,6 +207,26 @@
 
                 </div>
             </details>
+        {% endif %}
+
+        {% if working_versions %}
+            <section class="mt-4" aria-label="Рабочие редакции">
+                <h3 class="h6">Рабочие редакции</h3>
+                <div class="list-group">
+                    {% for version in working_versions %}
+                        <a
+                            class="list-group-item list-group-item-action{% if selected_version and selected_version.id == version.id %} active{% endif %}"
+                            href="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
+                            hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
+                            hx-target="#urza-tab-content"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                        >
+                            Рабочая редакция · {{ version.status.label }} · {{ version.effective_date.strftime("%d.%m.%Y") }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </section>
         {% endif %}
 
     {% else %}

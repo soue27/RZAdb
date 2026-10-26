@@ -96,6 +96,11 @@ async def _render_instruction(
         if instruction
         else []
     )
+    working_versions = (
+        await service.get_working_versions(user.id, urza_id)
+        if instruction
+        else []
+    )
 
     current_version = (
         await service.get_current_version(user.id, urza_id)
@@ -120,7 +125,11 @@ async def _render_instruction(
             selected_version = None
 
     if selected_version is None:
-        selected_version = versions[0] if versions else current_version
+        selected_version = (
+            working_versions[0]
+            if working_versions
+            else current_version
+        )
 
     actions = (
         await service.get_available_actions(
@@ -143,6 +152,7 @@ async def _render_instruction(
             "urza_id": urza_id,
             "instruction": instruction,
             "versions": versions,
+            "working_versions": working_versions,
             "current_version": current_version,
             "selected_version": selected_version,
             "actions": actions,

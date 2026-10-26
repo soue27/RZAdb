@@ -29,7 +29,7 @@ class URZAInstructionService:
         if user is None:
             raise ValueError("Пользователь не найден.")
         if user.role is UserRole.MANAGER:
-            return DocumentStatus.APPROVED
+            return DocumentStatus.UNDER_REVIEW
         if user.role in _AUTHOR_ROLES:
             return DocumentStatus.DRAFT
         raise PermissionError("Создавать инструкции с текущей ролью запрещено.")
@@ -97,6 +97,16 @@ class URZAInstructionService:
             return []
         return await self.repository.get_versions(instruction.id)
 
+    async def get_working_versions(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+    ) -> list[URZAInstructionVersion]:
+        instruction = await self.get_by_urza(user_id, urza_id)
+        if instruction is None:
+            return []
+        return await self.repository.get_working_versions(instruction.id)
+
     async def get_version_by_id(self, user_id: UUID, version_id: UUID) -> URZAInstructionVersion | None:
         version = await self.repository.get_version_by_id(version_id)
         if version is None:
@@ -116,6 +126,7 @@ class URZAInstructionService:
     ) -> URZAInstructionVersion:
         instruction = await self._get_accessible_instruction(user_id, instruction_id)
         status = await self._status_for_creator(user_id)
+        await self.repository.lock_instruction_for_versioning(instruction.id)
         max_version = await self.repository.get_max_version_number(instruction_id)
         version = URZAInstructionVersion(
             urza_instruction_id=instruction.id,
@@ -150,6 +161,12 @@ class URZAInstructionService:
         if version.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Утвердить можно только версию на согласовании.")
         await self._check_manager_reviewer(user_id, urza_id)
+        await self.repository.lock_and_refresh_version(version)
+        if version.status is not DocumentStatus.UNDER_REVIEW:
+            raise ValueError("Утвердить можно только версию на согласовании.")
+        version.version_number = await self.repository.assign_next_published_number(
+            version,
+        )
         version.status = DocumentStatus.APPROVED
         version.updated_by = user_id
         await self.repository.save(version)

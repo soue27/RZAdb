@@ -21,8 +21,12 @@ def deps():
     repo.get_by_id = AsyncMock()
     repo.get_version_by_id = AsyncMock()
     repo.get_versions = AsyncMock(return_value=[])
+    repo.get_working_versions = AsyncMock(return_value=[])
     repo.get_current_version = AsyncMock()
     repo.get_max_version_number = AsyncMock(return_value=None)
+    repo.lock_instruction_for_versioning = AsyncMock()
+    repo.lock_and_refresh_version = AsyncMock()
+    repo.assign_next_published_number = AsyncMock(return_value=3)
     repo.save = AsyncMock()
     users.get_by_id = AsyncMock()
     urzas.get_by_id = AsyncMock()
@@ -39,7 +43,7 @@ def make_user(role, enterprise_id=None, active=True):
     (UserRole.ENGINEER, DocumentStatus.DRAFT),
     (UserRole.ADMIN, DocumentStatus.DRAFT),
     (UserRole.SUPERADMIN, DocumentStatus.DRAFT),
-    (UserRole.MANAGER, DocumentStatus.APPROVED),
+    (UserRole.MANAGER, DocumentStatus.UNDER_REVIEW),
 ])
 async def test_create_first_version_assigns_role_status(deps, role, expected):
     service, repo, access, users, _ = deps
@@ -94,6 +98,29 @@ async def test_draft_can_submit_for_review(deps):
 
 
 @pytest.mark.asyncio
+async def test_return_and_resubmit_keep_same_version_record(deps):
+    service, repo, _, users, urzas, user, urza, version = setup_version(
+        deps,
+        DocumentStatus.UNDER_REVIEW,
+    )
+    manager_id, enterprise = uuid7(), uuid7()
+    users.get_by_id.side_effect = [
+        make_user(UserRole.MANAGER, enterprise),
+        make_user(UserRole.ENGINEER),
+    ]
+    urzas.get_by_id.return_value.connection.substation.enterprise_id = enterprise
+
+    returned = await service.return_to_draft(manager_id, version.id, urza)
+    submitted = await service.submit_for_review(user, version.id, urza)
+
+    assert returned is version
+    assert submitted is version
+    assert submitted.id == version.id
+    assert submitted.status is DocumentStatus.UNDER_REVIEW
+    assert repo.save.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_under_review_manager_can_approve_or_return(deps):
     for method, expected in (("approve", DocumentStatus.APPROVED), ("return_to_draft", DocumentStatus.DRAFT)):
         service, repo, _, users, urzas, _, urza, version = setup_version(deps, DocumentStatus.UNDER_REVIEW)
@@ -105,6 +132,46 @@ async def test_under_review_manager_can_approve_or_return(deps):
         assert result.status is expected
         assert repo.save.await_args.args == (version,)
         assert repo.save.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_approval_assigns_next_published_number(deps):
+    service, repo, _, users, urzas, _, urza, version = setup_version(
+        deps,
+        DocumentStatus.UNDER_REVIEW,
+    )
+    version.version_number = 8
+    enterprise = uuid7()
+    users.get_by_id.return_value = make_user(UserRole.MANAGER, enterprise)
+    urzas.get_by_id.return_value.connection.substation.enterprise_id = enterprise
+    repo.assign_next_published_number.return_value = 3
+
+    result = await service.approve(uuid7(), version.id, urza)
+
+    assert result.version_number == 3
+    assert result.status is DocumentStatus.APPROVED
+    repo.assign_next_published_number.assert_awaited_once_with(version)
+
+
+@pytest.mark.asyncio
+async def test_approval_rejects_version_changed_while_waiting_for_lock(deps):
+    service, repo, _, users, urzas, _, urza, version = setup_version(
+        deps,
+        DocumentStatus.UNDER_REVIEW,
+    )
+    enterprise = uuid7()
+    users.get_by_id.return_value = make_user(UserRole.MANAGER, enterprise)
+    urzas.get_by_id.return_value.connection.substation.enterprise_id = enterprise
+
+    async def refresh_as_already_approved(_version):
+        version.status = DocumentStatus.APPROVED
+
+    repo.lock_and_refresh_version.side_effect = refresh_as_already_approved
+
+    with pytest.raises(ValueError, match="только версию на согласовании"):
+        await service.approve(uuid7(), version.id, urza)
+
+    repo.assign_next_published_number.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -141,6 +208,27 @@ async def test_new_version_uses_max_and_preserves_approved_version(deps):
     assert old_version.status is DocumentStatus.APPROVED
     assert old_version.version_number == 2
     assert repo.get_max_version_number.await_args.args == (instruction.id,)
+    repo.lock_instruction_for_versioning.assert_awaited_once_with(instruction.id)
+
+
+@pytest.mark.asyncio
+async def test_new_version_created_by_manager_waits_for_approval(deps):
+    service, repo, _, users, _, user, _, old_version = setup_version(
+        deps,
+        DocumentStatus.APPROVED,
+    )
+    instruction = repo.get_by_id.return_value
+    users.get_by_id.return_value = make_user(UserRole.MANAGER)
+
+    created = await service.create_version(
+        user,
+        instruction.id,
+        date(2026, 2, 2),
+        uuid7(),
+    )
+
+    assert created.status is DocumentStatus.UNDER_REVIEW
+    assert old_version.status is DocumentStatus.APPROVED
 
 
 @pytest.mark.asyncio

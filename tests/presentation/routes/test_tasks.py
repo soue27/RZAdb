@@ -972,6 +972,21 @@ def test_task_result_link_uses_matching_work_type_route(
     )
 
 
+def test_urza_instruction_task_has_no_create_result_link(system_user_id):
+    user = _user(system_user_id)
+    task = _task(user.id, TaskStatus.IN_PROGRESS)
+    task.work_type = TaskWorkType.INSTRUCTION
+    repository = FakeTaskRepository([task])
+    service = FakeTaskService({task.id: {"create_result"}})
+
+    with _client(user, repository, FakeAccessService(), service) as client:
+        response = client.get(f"/tasks/{task.id}")
+
+    assert response.status_code == 200
+    assert f"/objects/urza/{task.urza_id}/programs/new?task_id={task.id}" not in response.text
+    assert f"/objects/urza/{task.urza_id}/instruction?task_id={task.id}" not in response.text
+
+
 def test_task_detail_denies_user_without_urza_access(system_user_id):
     user = _user(system_user_id)
     task = _task(user.id)

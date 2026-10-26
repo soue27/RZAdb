@@ -173,12 +173,20 @@
                 {% endif %}
 
                 {% if "create_result" in actions %}
-                    <a
-                        class="btn btn-primary"
-                        href="{% if task.substation_id %}/objects/substation/{{ task.substation_id }}/{% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}/new?new_version=true&task_id={{ task.id }}{% elif task.work_type.value == 'maintenance' %}/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}{% elif task.work_type.value == 'otd' %}/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}{% else %}/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}{% endif %}"
-                    >
-                        Выполнить задание
-                    </a>
+                    {% if task.substation_id %}
+                        <a
+                            class="btn btn-primary"
+                            href="/objects/substation/{{ task.substation_id }}/{% if task.work_type.value == 'instruction' %}instructions{% else %}selectivity-schemes{% endif %}/new?new_version=true&task_id={{ task.id }}"
+                        >
+                            Выполнить задание
+                        </a>
+                    {% elif task.work_type.value == 'maintenance' %}
+                        <a class="btn btn-primary" href="/objects/urza/{{ task.urza_id }}/maintenance/new?task_id={{ task.id }}">Выполнить задание</a>
+                    {% elif task.work_type.value == 'otd' %}
+                        <a class="btn btn-primary" href="/objects/urza/{{ task.urza_id }}/otd/new?task_id={{ task.id }}">Выполнить задание</a>
+                    {% elif task.work_type.value == 'program' %}
+                        <a class="btn btn-primary" href="/objects/urza/{{ task.urza_id }}/programs/new?task_id={{ task.id }}">Выполнить задание</a>
+                    {% endif %}
                 {% endif %}
             </div>
 

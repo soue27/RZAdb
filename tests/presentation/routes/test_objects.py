@@ -1740,7 +1740,22 @@ class FakeURZAInstructionService:
         return self.instruction
 
     async def get_versions(self, user_id, urza_id):
-        return [self.version] if self.version else []
+        return (
+            [self.version]
+            if self.version and self.version.status is DocumentStatus.APPROVED
+            else []
+        )
+
+    async def get_working_versions(self, user_id, urza_id):
+        return (
+            [self.version]
+            if self.version
+            and self.version.status in {
+                DocumentStatus.DRAFT,
+                DocumentStatus.UNDER_REVIEW,
+            }
+            else []
+        )
 
     async def get_current_version(self, user_id, urza_id):
         return self.version if self.version and self.version.status is DocumentStatus.APPROVED else None
@@ -1760,12 +1775,18 @@ class FakeURZAInstructionService:
 
     async def submit_for_review(self, *args):
         self.calls.append(("submit", args))
+        if self.version is not None:
+            self.version.status = DocumentStatus.UNDER_REVIEW
 
     async def approve(self, *args):
         self.calls.append(("approve", args))
+        if self.version is not None:
+            self.version.status = DocumentStatus.APPROVED
 
     async def return_to_draft(self, *args):
         self.calls.append(("return", args))
+        if self.version is not None:
+            self.version.status = DocumentStatus.DRAFT
 
 
 def override_urza_instruction_service(service):
@@ -1895,7 +1916,7 @@ def test_instruction_history_cannot_select_version_from_another_urza(system_user
     service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
     service.version = local_version
     async def get_versions(*_):
-        return [local_version]
+        return []
     async def get_version_by_id(*_):
         return foreign_version
     service.get_versions = get_versions
@@ -1910,7 +1931,7 @@ def test_instruction_history_cannot_select_version_from_another_urza(system_user
             params={"instruction_version": str(foreign_version.id)},
         )
         assert response.status_code == 200
-        assert "Версия 1" in response.text
+        assert "Рабочая редакция" in response.text
         assert "Версия 99" not in response.text
     finally:
         app.dependency_overrides.clear()
@@ -1969,7 +1990,7 @@ def test_instruction_create_routes_upload_files(system_user_id, new_version):
         assert response.status_code == 200
         assert len(fake_files.upload_calls) == 1
         assert fake_service.calls[0][0] == ("create_version" if new_version else "create")
-        assert "Версия 1" in response.text
+        assert "Рабочая редакция" in response.text
     finally:
         app.dependency_overrides.clear()
 
@@ -1995,7 +2016,10 @@ def test_instruction_workflow_routes(system_user_id, action, method_name):
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/instruction/versions/{fake_service.version.id}/{action}")
         assert response.status_code == 200
-        assert "Версия 1" in response.text
+        if action == "approve":
+            assert "Версия 1" in response.text
+        else:
+            assert "Рабочая редакция" in response.text
         assert any(call[0] == action for call in fake_service.calls)
     finally:
         app.dependency_overrides.clear()
@@ -5405,6 +5429,16 @@ class _HTTPArchiveInstructionService:
 
     async def get_versions(self, _user_id, _urza_id):
         return self.versions
+
+    async def get_working_versions(self, _user_id, _urza_id):
+        return [
+            version
+            for version in self.versions
+            if version.status in {
+                DocumentStatus.DRAFT,
+                DocumentStatus.UNDER_REVIEW,
+            }
+        ]
 
     async def get_current_version(self, _user_id, _urza_id):
         return self.versions[0]

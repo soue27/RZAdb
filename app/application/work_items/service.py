@@ -510,13 +510,6 @@ class InstructionWorkItemSource:
             instruction = version.urza_instruction
             if instruction is None or instruction.deleted_at is not None:
                 continue
-            if any(
-                item.item_type == "Задание · Инструкция"
-                and item.parent_id == instruction.urza_id
-                and version.created_at > item.created_at
-                for item in prior_items
-            ):
-                continue
             if not await self.service.access_service.can_access_urza(
                 user_id, instruction.urza_id
             ):

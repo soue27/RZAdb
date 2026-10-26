@@ -34,6 +34,7 @@ class FakeTaskRepository:
         self.schema_records = []
         self.programs = []
         self.to_records = []
+        self.substation_instruction_versions = {}
 
     def add(self, entity) -> None:
         if entity.__class__.__name__ == "TaskHistory":
@@ -98,6 +99,9 @@ class FakeTaskRepository:
             (record for record in self.to_records if record.task_id == task_id),
             None,
         )
+
+    async def get_substation_instruction_version_by_task_id(self, task_id):
+        return self.substation_instruction_versions.get(task_id)
 
 
 class FakeUserRepository:
@@ -172,12 +176,52 @@ class FakeURZAInstructionRepository:
     def __init__(self) -> None:
         self.instructions = {}
         self.latest_working_versions = {}
+        self.calls = []
 
     async def get_by_urza_id(self, urza_id):
+        self.calls.append(("get_by_urza_id", urza_id))
         return self.instructions.get(urza_id)
 
     async def get_latest_working_version(self, instruction_id):
+        self.calls.append(("get_latest_working_version", instruction_id))
         return self.latest_working_versions.get(instruction_id)
+
+
+@pytest.mark.asyncio
+async def test_only_substation_instruction_tasks_offer_create_result():
+    actor_id = uuid7()
+    repository = FakeTaskRepository()
+    service = make_task_service(repository, FakeAccessService())
+    urza_task = SimpleNamespace(
+        id=uuid7(),
+        urza_id=uuid7(),
+        substation_id=None,
+        work_type=TaskWorkType.INSTRUCTION,
+        assigned_to=actor_id,
+        status=TaskStatus.IN_PROGRESS,
+        deleted_at=None,
+    )
+    substation_task = SimpleNamespace(
+        id=uuid7(),
+        urza_id=None,
+        substation_id=uuid7(),
+        work_type=TaskWorkType.INSTRUCTION,
+        assigned_to=actor_id,
+        status=TaskStatus.IN_PROGRESS,
+        deleted_at=None,
+    )
+
+    urza_actions = await service.get_available_actions(
+        task=urza_task,
+        actor_id=actor_id,
+    )
+    substation_actions = await service.get_available_actions(
+        task=substation_task,
+        actor_id=actor_id,
+    )
+
+    assert urza_actions == {"complete_task"}
+    assert substation_actions == {"complete_task", "create_result"}
 
 
 def make_task_service(
@@ -2958,84 +3002,35 @@ def _instruction_review_dependencies(task: Task, system_user_id):
     )
 
 
+@pytest.mark.parametrize(
+    ("version_status", "version_created_at"),
+    [
+        (None, None),
+        (DocumentStatus.DRAFT, datetime(2026, 9, 12, 10, 0)),
+        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 14, 10, 0)),
+        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0)),
+    ],
+)
 @pytest.mark.asyncio
-async def test_complete_instruction_task_requires_instruction(system_user_id) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    task = _instruction_task(created_at, system_user_id)
-    service = make_task_service_with_active_assignee(
-        FakeTaskRepository(), system_user_id
-    )
-
-    with pytest.raises(ValueError, match="не создана инструкция"):
-        await service.complete_task(task=task, actor_id=system_user_id)
-
-    assert task.status is TaskStatus.IN_PROGRESS
-
-
-@pytest.mark.asyncio
-async def test_complete_instruction_task_requires_instruction_version(
+async def test_complete_urza_instruction_task_ignores_instruction_versions(
     system_user_id,
-) -> None:
-    task = _instruction_task(datetime(2026, 9, 13, 10, 0), system_user_id)
-    instruction_repository = FakeURZAInstructionRepository()
-    instruction_repository.instructions[task.urza_id] = SimpleNamespace(
-        id=uuid7(),
-    )
-    service = make_task_service_with_active_assignee(
-        FakeTaskRepository(), system_user_id, instruction_repository
-    )
-
-    with pytest.raises(ValueError, match="создать версию инструкции"):
-        await service.complete_task(task=task, actor_id=system_user_id)
-
-    assert task.status is TaskStatus.IN_PROGRESS
-
-
-@pytest.mark.asyncio
-async def test_complete_instruction_task_rejects_version_created_before_task(
-    system_user_id,
+    version_status,
+    version_created_at,
 ) -> None:
     task_created_at = datetime(2026, 9, 13, 10, 0)
     task = _instruction_task(task_created_at, system_user_id)
     instruction_repository = FakeURZAInstructionRepository()
-    instruction = SimpleNamespace(id=uuid7())
-    instruction_repository.instructions[task.urza_id] = instruction
-    instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
-        created_at=task_created_at,
-        status=DocumentStatus.DRAFT,
-    )
-    service = make_task_service_with_active_assignee(
-        FakeTaskRepository(), system_user_id, instruction_repository
-    )
-
-    with pytest.raises(ValueError, match="создать новую версию инструкции"):
-        await service.complete_task(task=task, actor_id=system_user_id)
-
-    assert task.status is TaskStatus.IN_PROGRESS
-
-
-@pytest.mark.asyncio
-async def test_complete_instruction_task_accepts_new_draft_version(system_user_id) -> None:
-    task_created_at = datetime(2026, 9, 13, 10, 0)
-    task = _instruction_task(task_created_at, system_user_id)
-    instruction_repository = FakeURZAInstructionRepository()
-    instruction = SimpleNamespace(id=uuid7())
-    instruction_repository.instructions[task.urza_id] = instruction
-    instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
-        created_at=datetime(2026, 9, 13, 10, 1),
-        status=DocumentStatus.DRAFT,
-    )
+    if version_status is not None:
+        instruction = SimpleNamespace(id=uuid7())
+        instruction_repository.instructions[task.urza_id] = instruction
+        instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
+            status=version_status,
+            created_at=version_created_at,
+        )
     repository = FakeTaskRepository()
-    access_service = FakeAccessService()
-    access_service.user_repository.users[system_user_id] = SimpleNamespace(
-        id=system_user_id,
-        role=UserRole.ENGINEER,
-        active=True,
-        deleted_at=None,
-    )
-    service = make_task_service(
+    service = make_task_service_with_active_assignee(
         repository,
-        access_service,
+        system_user_id,
         instruction_repository,
     )
 
@@ -3043,111 +3038,68 @@ async def test_complete_instruction_task_accepts_new_draft_version(system_user_i
 
     assert result.status is TaskStatus.COMPLETED
     assert repository.history[-1].event_type == "completed"
+    assert instruction_repository.calls == []
 
 
-@pytest.mark.asyncio
-async def test_close_instruction_task_requires_instruction(system_user_id) -> None:
-    task = _instruction_review_task(datetime(2026, 9, 13, 10, 0), system_user_id)
-    repository, access_service, manager_id, instruction_repository = (
-        _instruction_review_dependencies(task, system_user_id)
-    )
-    service = make_task_service(repository, access_service, instruction_repository)
-
-    with pytest.raises(ValueError, match="наличии инструкции"):
-        await service.close_task(task=task, actor_id=manager_id)
-
-    assert task.status is TaskStatus.UNDER_REVIEW
-    assert repository.history == []
-
-
-@pytest.mark.asyncio
-async def test_close_instruction_task_requires_new_version(system_user_id) -> None:
-    task = _instruction_review_task(datetime(2026, 9, 13, 10, 0), system_user_id)
-    repository, access_service, manager_id, instruction_repository = (
-        _instruction_review_dependencies(task, system_user_id)
-    )
-    instruction_repository.instructions[task.urza_id] = SimpleNamespace(id=uuid7())
-    service = make_task_service(repository, access_service, instruction_repository)
-
-    with pytest.raises(ValueError, match="новой версии инструкции"):
-        await service.close_task(task=task, actor_id=manager_id)
-
-    assert task.status is TaskStatus.UNDER_REVIEW
-    assert repository.history == []
-
-
-@pytest.mark.asyncio
-async def test_close_instruction_task_requires_newer_version(system_user_id) -> None:
-    task_created_at = datetime(2026, 9, 13, 10, 0)
-    task = _instruction_review_task(task_created_at, system_user_id)
-    repository, access_service, manager_id, instruction_repository = (
-        _instruction_review_dependencies(task, system_user_id)
-    )
-    instruction = SimpleNamespace(id=uuid7())
-    instruction_repository.instructions[task.urza_id] = instruction
-    instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
-        created_at=task_created_at,
-        status=DocumentStatus.APPROVED,
-    )
-    service = make_task_service(repository, access_service, instruction_repository)
-
-    with pytest.raises(ValueError, match="новой версии инструкции"):
-        await service.close_task(task=task, actor_id=manager_id)
-
-    assert task.status is TaskStatus.UNDER_REVIEW
-    assert repository.history == []
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "status",
-    [DocumentStatus.DRAFT, DocumentStatus.UNDER_REVIEW],
+    ("version_status", "version_created_at"),
+    [
+        (None, None),
+        (DocumentStatus.DRAFT, datetime(2026, 9, 14, 10, 0)),
+        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 12, 10, 0)),
+        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0)),
+    ],
 )
-async def test_close_instruction_task_rejects_unapproved_version(
-    system_user_id,
-    status,
-) -> None:
-    task = _instruction_review_task(datetime(2026, 9, 13, 10, 0), system_user_id)
-    repository, access_service, manager_id, instruction_repository = (
-        _instruction_review_dependencies(task, system_user_id)
-    )
-    instruction = SimpleNamespace(id=uuid7())
-    instruction_repository.instructions[task.urza_id] = instruction
-    instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
-        created_at=datetime(2026, 9, 13, 10, 1),
-        status=status,
-    )
-    service = make_task_service(repository, access_service, instruction_repository)
-
-    with pytest.raises(ValueError, match="утверждённой новой версии инструкции"):
-        await service.close_task(task=task, actor_id=manager_id)
-
-    assert task.status is TaskStatus.UNDER_REVIEW
-    assert repository.history == []
-
-
 @pytest.mark.asyncio
-async def test_close_instruction_task_with_approved_new_version(system_user_id) -> None:
+async def test_close_urza_instruction_task_ignores_instruction_versions(
+    system_user_id,
+    version_status,
+    version_created_at,
+) -> None:
     task_created_at = datetime(2026, 9, 13, 10, 0)
     task = _instruction_review_task(task_created_at, system_user_id)
     repository, access_service, manager_id, instruction_repository = (
         _instruction_review_dependencies(task, system_user_id)
     )
-    instruction = SimpleNamespace(id=uuid7())
-    instruction_repository.instructions[task.urza_id] = instruction
-    instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
-        created_at=datetime(2026, 9, 13, 10, 1),
-        status=DocumentStatus.APPROVED,
-    )
+    if version_status is not None:
+        instruction = SimpleNamespace(id=uuid7())
+        instruction_repository.instructions[task.urza_id] = instruction
+        instruction_repository.latest_working_versions[instruction.id] = SimpleNamespace(
+            status=version_status,
+            created_at=version_created_at,
+        )
     service = make_task_service(repository, access_service, instruction_repository)
 
     result = await service.close_task(task=task, actor_id=manager_id)
 
     assert result.status is TaskStatus.CLOSED
-    assert result.updated_by == manager_id
     assert repository.history[-1].event_type == "review_approved"
-    assert repository.history[-1].old_status is TaskStatus.UNDER_REVIEW
-    assert repository.history[-1].new_status is TaskStatus.CLOSED
+    assert instruction_repository.calls == []
+
+
+@pytest.mark.asyncio
+async def test_substation_instruction_task_still_requires_task_result(
+    system_user_id,
+) -> None:
+    task = SimpleNamespace(
+        id=uuid7(),
+        urza_id=None,
+        substation_id=uuid7(),
+        work_type=TaskWorkType.INSTRUCTION,
+        created_by=system_user_id,
+        assigned_to=system_user_id,
+        status=TaskStatus.IN_PROGRESS,
+        created_at=datetime(2026, 9, 13, 10, 0),
+        updated_by=system_user_id,
+        deleted_at=None,
+    )
+    repository = FakeTaskRepository()
+    service = make_task_service_with_active_assignee(repository, system_user_id)
+
+    with pytest.raises(ValueError, match="Создайте версию инструкции РЗА"):
+        await service.complete_task(task=task, actor_id=system_user_id)
+
+    assert task.status is TaskStatus.IN_PROGRESS
 
 
 

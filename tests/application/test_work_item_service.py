@@ -273,13 +273,17 @@ async def test_closed_maintenance_task_remains_in_work_items():
 
 
 @pytest.mark.asyncio
-async def test_instruction_version_used_by_task_is_not_added_twice():
+async def test_urza_instruction_work_item_remains_independent_from_task():
     user_id = uuid4()
     urza_id = uuid4()
     instruction = SimpleNamespace(urza_id=urza_id, deleted_at=None)
     version = SimpleNamespace(
         urza_instruction=instruction,
         created_at=datetime(2026, 10, 2, tzinfo=UTC),
+        version_number=2,
+        status=DocumentStatus.DRAFT,
+        created_by=user_id,
+        creator=SimpleNamespace(full_name="Инженер"),
     )
     task_item = WorkItem(
         item_type="Задание · Инструкция",
@@ -299,14 +303,31 @@ async def test_instruction_version_used_by_task_is_not_added_twice():
         async def list_standalone_work_items(self):
             return [version]
 
+    class Access:
+        async def can_access_urza(self, actor_id, object_id):
+            return actor_id == user_id and object_id == urza_id
+
+    class URZARepository:
+        async def get_by_id(self, object_id):
+            return SimpleNamespace(dispatch_name="УРЗА-1") if object_id == urza_id else None
+
     class Service:
         repository = Repository()
+        access_service = Access()
+        urza_repository = URZARepository()
+
+        async def get_available_actions(self, actor_id, candidate):
+            assert actor_id == user_id
+            assert candidate is version
+            return {"submit"}
 
     source = InstructionWorkItemSource(Service())
 
     result = await source.list_for_user(user_id, (task_item,))
 
-    assert result == []
+    assert len(result) == 1
+    assert result[0].item_type == "Самостоятельная инструкция URZA"
+    assert result[0].tab == "work"
 
 
 @pytest.mark.asyncio

@@ -725,14 +725,23 @@ def test_instruction_template_links_files_from_selected_version() -> None:
 
     html = templates.get_template("objects/urza_instruction.html").render(
         instruction=instruction,
-        versions=[current_version, selected_version],
+        versions=[current_version],
+        working_versions=[selected_version],
         selected_version=selected_version,
         current_version=current_version,
         actions=set(),
         history_open=False,
     )
 
-    assert "Версия 2" in html
+    assert "Рабочая редакция" in html
+    assert "Рабочие редакции" in html
+    assert f"instruction_version={selected_version.id}" in html
+    history = html.split('class="mt-4 rzadb-otd-history"', 1)[1].split(
+        "</details>",
+        1,
+    )[0]
+    assert str(current_version.id) in history
+    assert str(selected_version.id) not in history
     assert_file_actions(html, selected_scan_id)
     assert_file_actions(html, selected_editable_id)
     assert f"/files/{current_scan_id}/view" not in html
@@ -740,6 +749,7 @@ def test_instruction_template_links_files_from_selected_version() -> None:
     empty_html = templates.get_template("objects/urza_instruction.html").render(
         instruction=None,
         versions=[],
+        working_versions=[],
         selected_version=None,
     )
     assert_no_file_actions(empty_html)

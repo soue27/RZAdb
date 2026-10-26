@@ -147,6 +147,33 @@ async def test_get_max_version_number():
 
 
 @pytest.mark.asyncio
+async def test_assign_next_published_number_moves_working_conflict_before_assignment():
+    instruction_id = uuid7()
+    target = MagicMock(spec=URZAInstructionVersion)
+    target.urza_instruction_id = instruction_id
+    target.id = uuid7()
+    conflict = MagicMock(spec=URZAInstructionVersion)
+    conflict.version_number = 3
+
+    session = MagicMock()
+    session.scalar = AsyncMock(
+        side_effect=[instruction_id, 2, conflict, 7],
+    )
+    session.flush = AsyncMock()
+    repository = URZAInstructionRepository(session)
+
+    number = await repository.assign_next_published_number(target)
+
+    assert number == 3
+    assert conflict.version_number == 8
+    session.flush.assert_awaited_once()
+    lock_statement = session.scalar.await_args_list[0].args[0]
+    assert "FOR UPDATE" in str(lock_statement.compile(
+        compile_kwargs={"literal_binds": True},
+    ))
+
+
+@pytest.mark.asyncio
 async def test_list_standalone_work_items_selects_active_draft_and_review_versions():
     session = MagicMock()
     session.scalars = AsyncMock()
@@ -163,3 +190,46 @@ async def test_list_standalone_work_items_selects_active_draft_and_review_versio
     )
     assert "urza_instruction_versions.deleted_at IS NULL" in statement
     assert "urza_instruction_versions.status IN" in statement
+
+
+@pytest.mark.asyncio
+async def test_get_working_versions_selects_active_drafts_and_review_versions():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+    repository = URZAInstructionRepository(session)
+
+    assert await repository.get_working_versions(uuid7()) == []
+
+    statement = str(
+        session.scalars.await_args.args[0].compile(
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "urza_instruction_versions.deleted_at IS NULL" in statement
+    assert "urza_instruction_versions.status IN" in statement
+
+
+@pytest.mark.asyncio
+async def test_get_versions_selects_only_published_history():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    older, latest = MagicMock(spec=URZAInstructionVersion), MagicMock(
+        spec=URZAInstructionVersion,
+    )
+    result.all.return_value = [latest, older]
+    session.scalars.return_value = result
+    repository = URZAInstructionRepository(session)
+
+    assert await repository.get_versions(uuid7()) == [latest, older]
+
+    statement = str(
+        session.scalars.await_args.args[0].compile(
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "urza_instruction_versions.status = 'approved'" in statement
+    assert "urza_instruction_versions.deleted_at IS NULL" in statement

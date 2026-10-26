@@ -429,24 +429,6 @@ class TaskService:
                 instruction_version = await self.task_repository.get_substation_instruction_version_by_task_id(task.id)
                 if instruction_version is None or instruction_version.status is not DocumentStatus.APPROVED:
                     raise ValueError("Закрыть задачу можно после утверждения инструкции РЗА.")
-            else:
-                instruction = await self.urza_instruction_repository.get_by_urza_id(task.urza_id)
-                if instruction is None:
-                    raise ValueError(
-                        "Закрыть задачу по инструкции можно только при наличии инструкции."
-                    )
-                instruction_version = await self.urza_instruction_repository.get_latest_working_version(
-                    instruction.id,
-                )
-                if (
-                    instruction_version is None
-                    or instruction_version.created_at <= task.created_at
-                    or instruction_version.status is not DocumentStatus.APPROVED
-                ):
-                    raise ValueError(
-                        "Закрыть задачу по инструкции можно только при наличии "
-                        "активной утверждённой новой версии инструкции."
-                    )
 
         review_time = closed_at or datetime.now().astimezone()
         old_status = task.status
@@ -744,27 +726,12 @@ class TaskService:
                     "Для завершения задачи по программе необходимо сохранить программу."
                 )
 
-        # Для инструкции результатом выполнения является новая версия
-        # инструкции, созданная после выдачи задачи.
+        # Подстаночная инструкция связана с заданием. Инструкция URZA
+        # является независимым процессом и не проверяется здесь.
         if task.work_type == TaskWorkType.INSTRUCTION:
             if getattr(task, "substation_id", None) is not None:
                 if await self.task_repository.get_substation_instruction_version_by_task_id(task.id) is None:
                     raise ValueError("Создайте версию инструкции РЗА для этой задачи.")
-            else:
-                instruction = await self.urza_instruction_repository.get_by_urza_id(task.urza_id)
-                if instruction is None:
-                    raise ValueError("Для данного URZA не создана инструкция.")
-                instruction_version = await self.urza_instruction_repository.get_latest_working_version(
-                    instruction.id,
-                )
-                if instruction_version is None:
-                    raise ValueError(
-                        "Для завершения задачи необходимо создать версию инструкции."
-                    )
-                if instruction_version.created_at <= task.created_at:
-                    raise ValueError(
-                        "Для завершения задачи необходимо создать новую версию инструкции."
-                    )
 
         completion_time = completed_at or datetime.now().astimezone()
 
