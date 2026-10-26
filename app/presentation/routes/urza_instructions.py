@@ -363,6 +363,17 @@ async def create_instruction(
 
     uploaded_files = []
 
+    async def cleanup_uploaded_files() -> None:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.discard_upload(uploaded_file)
+            except Exception:
+                logger.exception(
+                    "Не удалось удалить загруженный файл после "
+                    "неудачной операции с инструкцией РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
+
     try:
         scan = await _upload(
             file_service,
@@ -398,72 +409,28 @@ async def create_instruction(
 
 
     except FileUploadValidationError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки "
-                    "валидации инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=exc.status_code,
             detail=str(exc),
         ) from exc
 
     except PermissionError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки доступа "
-                    "при создании инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=403,
             detail=str(exc),
         ) from exc
 
     except ValueError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки данных "
-                    "при создании инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         ) from exc
 
     except Exception:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после неожиданной "
-                    "ошибки при обработке инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise
 
     return await _render_instruction(
@@ -514,6 +481,17 @@ async def create_instruction_version(
 
     uploaded_files = []
 
+    async def cleanup_uploaded_files() -> None:
+        for uploaded_file in uploaded_files:
+            try:
+                await file_service.discard_upload(uploaded_file)
+            except Exception:
+                logger.exception(
+                    "Не удалось удалить загруженный файл после "
+                    "неудачной операции с инструкцией РЗА: file_id=%s",
+                    uploaded_file.id,
+                )
+
     try:
         scan = await _upload(
             file_service,
@@ -548,73 +526,28 @@ async def create_instruction_version(
         )
 
     except FileUploadValidationError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки "
-                    "валидации инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=exc.status_code,
             detail=str(exc),
         ) from exc
 
     except PermissionError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки доступа "
-                    "при создании версии инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=403,
             detail=str(exc),
         ) from exc
 
     except ValueError as exc:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после ошибки данных "
-                    "при создании версии инструкции РЗА: file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         ) from exc
 
     except Exception:
-        for uploaded_file in uploaded_files:
-            try:
-                await file_service.archive(
-                    file_id=uploaded_file.id,
-                    user_id=current_user.id,
-                )
-            except Exception:
-                logger.exception(
-                    "Не удалось архивировать файл после неожиданной "
-                    "ошибки при создании версии инструкции РЗА: "
-                    "file_id=%s",
-                    uploaded_file.id,
-                )
+        await cleanup_uploaded_files()
         raise
 
     return await _render_instruction(

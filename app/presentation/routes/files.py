@@ -57,7 +57,18 @@ async def upload_file(
             detail=str(exc),
         ) from exc
 
-    return FileResponse.model_validate(saved_file)
+    try:
+        return FileResponse.model_validate(saved_file)
+    except Exception:
+        try:
+            await file_service.discard_upload(saved_file)
+        except Exception:
+            logger.exception(
+                "Не удалось удалить загруженный файл после ошибки "
+                "формирования ответа: file_id=%s",
+                saved_file.id,
+            )
+        raise
 
 
 

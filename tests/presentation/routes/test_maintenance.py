@@ -36,10 +36,12 @@ class FakeObjectService:
 
 
 class FakeFileService:
-    def __init__(self, *files):
+    def __init__(self, *files, discard_error=None):
         self.files = list(files)
         self.upload_calls = []
         self.archive_calls = []
+        self.discard_calls = []
+        self.discard_error = discard_error
 
     async def upload(self, **kwargs):
         self.upload_calls.append(kwargs)
@@ -52,6 +54,11 @@ class FakeFileService:
                 "user_id": user_id,
             }
         )
+
+    async def discard_upload(self, file):
+        self.discard_calls.append(file)
+        if self.discard_error:
+            raise self.discard_error
 
 
 class FakeTaskService:
@@ -588,7 +595,8 @@ def test_create_maintenance_htmx_error_keeps_form_context(system_user_id):
         assert 'value="2026-10-01"' in response.text
         assert ">Не выявлено</textarea>" in response.text
         assert 'name="task_id"' in response.text
-        assert len(files.archive_calls) == 1
+        assert files.discard_calls == [signed]
+        assert files.archive_calls == []
     finally:
         _cleanup(user)
 
@@ -758,8 +766,8 @@ def test_create_maintenance_rejects_inaccessible_urza_before_upload(
         _cleanup(user)
 
 
-def test_create_maintenance_archives_uploaded_files_after_service_error(
-    system_user_id,
+def test_create_maintenance_discards_uploaded_files_after_service_error(
+    system_user_id, caplog,
 ):
     user = _user(system_user_id)
     urza_id = uuid7()
@@ -770,6 +778,7 @@ def test_create_maintenance_archives_uploaded_files_after_service_error(
     files = FakeFileService(
         signed,
         scan,
+        discard_error=RuntimeError("Ошибка очистки"),
     )
 
     maintenance_service = FakeMaintenanceService(
@@ -807,19 +816,18 @@ def test_create_maintenance_archives_uploaded_files_after_service_error(
         assert 'id="app-sidebar"' in response.text
         assert "требуется протокол" in response.text
         assert 'value="2026-10-01"' in response.text
-        assert len(files.archive_calls) == 2
-        assert {
-            call["file_id"]
-            for call in files.archive_calls
-        } == {
-            signed.id,
-            scan.id,
-        }
+        assert files.discard_calls == [signed, scan]
+        assert files.archive_calls == []
+        assert "требуется протокол" in response.text
+        assert any(
+            "Failed to discard uploaded maintenance file" in record.getMessage()
+            for record in caplog.records
+        )
     finally:
         _cleanup(user)
 
 
-def test_create_maintenance_archives_prior_upload_when_later_upload_fails(
+def test_create_maintenance_discards_prior_upload_when_later_upload_fails(
     system_user_id,
 ):
     user = _user(system_user_id)
@@ -855,7 +863,8 @@ def test_create_maintenance_archives_prior_upload_when_later_upload_fails(
         )
 
         assert response.status_code == 500
-        assert [call["file_id"] for call in files.archive_calls] == [signed.id]
+        assert files.discard_calls == [signed]
+        assert files.archive_calls == []
         assert not maintenance_service.calls
     finally:
         _cleanup(user)

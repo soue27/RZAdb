@@ -9,6 +9,7 @@ from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.connections.service import ConnectionNameConflictError
+from app.application.files.validation import FileUploadValidationError
 from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -1991,6 +1992,140 @@ def test_instruction_create_routes_upload_files(system_user_id, new_version):
         assert len(fake_files.upload_calls) == 1
         assert fake_service.calls[0][0] == ("create_version" if new_version else "create")
         assert "Рабочая редакция" in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("new_version", [False, True])
+def test_instruction_create_failure_discards_uploaded_files_and_logs_cleanup_error(
+    system_user_id, new_version, caplog,
+):
+    user = make_user(system_user_id)
+    urza_id, instruction_id = uuid7(), uuid7()
+    scan, editable = SimpleNamespace(id=uuid7()), SimpleNamespace(id=uuid7())
+    received_files = []
+
+    class FailingCleanupFileService(FakeFileService):
+        def __init__(self):
+            super().__init__(scan)
+            self.uploaded = [scan, editable]
+
+        async def upload(self, **kwargs):
+            self.upload_calls.append(kwargs)
+            return self.uploaded.pop(0)
+
+        async def discard_upload(self, file):
+            received_files.append(file)
+            raise RuntimeError("Ошибка очистки")
+
+    fake_service = FakeURZAInstructionService()
+    fake_service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+
+    async def fail_create(**kwargs):
+        raise ValueError("Ошибка создания инструкции")
+
+    if new_version:
+        fake_service.create_version = fail_create
+        url = f"/objects/urza/{urza_id}/instruction/{instruction_id}/versions"
+    else:
+        fake_service.create = fail_create
+        url = f"/objects/urza/{urza_id}/instruction"
+
+    files_service = FailingCleanupFileService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")
+        )
+    )
+    app.dependency_overrides[get_urza_instruction_service] = (
+        override_urza_instruction_service(fake_service)
+    )
+    app.dependency_overrides[get_file_service] = lambda: files_service
+
+    try:
+        response = TestClient(app).post(
+            url,
+            data={"effective_date": "2026-10-01"},
+            files=[
+                ("scan_file", ("scan.pdf", b"scan", "application/pdf")),
+                (
+                    "editable_file",
+                    ("editable.docx", b"editable", "application/octet-stream"),
+                ),
+            ],
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Ошибка создания инструкции"
+        assert received_files == [scan, editable]
+        assert files_service.archive_calls == []
+        assert any(
+            "Не удалось удалить загруженный файл после неудачной операции"
+            in record.getMessage()
+            for record in caplog.records
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("new_version", [False, True])
+def test_instruction_create_discards_first_file_when_second_upload_fails(
+    system_user_id, new_version,
+):
+    user = make_user(system_user_id)
+    urza_id, instruction_id = uuid7(), uuid7()
+    scan = SimpleNamespace(id=uuid7())
+
+    class FailingSecondUploadFileService(FakeFileService):
+        def __init__(self):
+            super().__init__(scan)
+            self.upload_count = 0
+
+        async def upload(self, **kwargs):
+            self.upload_calls.append(kwargs)
+            self.upload_count += 1
+            if self.upload_count == 2:
+                raise FileUploadValidationError("Недопустимый формат")
+            return scan
+
+    fake_service = FakeURZAInstructionService()
+    fake_service.instruction = SimpleNamespace(id=instruction_id, urza_id=urza_id)
+    if new_version:
+        url = f"/objects/urza/{urza_id}/instruction/{instruction_id}/versions"
+    else:
+        url = f"/objects/urza/{urza_id}/instruction"
+
+    files_service = FailingSecondUploadFileService()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(object_type="urza", id=urza_id, name="УРЗА")
+        )
+    )
+    app.dependency_overrides[get_urza_instruction_service] = (
+        override_urza_instruction_service(fake_service)
+    )
+    app.dependency_overrides[get_file_service] = lambda: files_service
+
+    try:
+        response = TestClient(app).post(
+            url,
+            data={"effective_date": "2026-10-01"},
+            files=[
+                ("scan_file", ("scan.pdf", b"scan", "application/pdf")),
+                (
+                    "editable_file",
+                    ("editable.docx", b"editable", "application/octet-stream"),
+                ),
+            ],
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Недопустимый формат"
+        assert files_service.discard_calls == [{"file_id": scan.id}]
+        assert files_service.archive_calls == []
+        assert fake_service.calls == []
     finally:
         app.dependency_overrides.clear()
 
@@ -4139,11 +4274,18 @@ def test_create_settings_record_without_file_returns_validation_message(system_u
         app.dependency_overrides.clear()
 
 
-def test_create_settings_record_unfinished_error_archives_uploaded_file(system_user_id):
+def test_create_settings_record_error_discards_file_and_logs_cleanup_failure(
+    system_user_id, caplog,
+):
     user = make_user(system_user_id)
     urza_id = uuid7()
     uploaded_file = settings_file(uuid7())
-    file_service = FakeFileService(uploaded_file)
+    class FailingDiscardFileService(FakeFileService):
+        async def discard_upload(self, file):
+            await super().discard_upload(file)
+            raise RuntimeError("Ошибка очистки")
+
+    file_service = FailingDiscardFileService(uploaded_file)
     settings_service = FakeSettingsService(
         error_by_method={"create_record": ValueError("Уже есть незавершённая запись.")}
     )
@@ -4162,7 +4304,13 @@ def test_create_settings_record_unfinished_error_archives_uploaded_file(system_u
         )
         assert response.status_code == 400
         assert "незавершённая запись" in response.text
-        assert file_service.archive_calls == [{"file_id": uploaded_file.id, "user_id": user.id}]
+        assert file_service.discard_calls == [{"file_id": uploaded_file.id}]
+        assert file_service.archive_calls == []
+        assert any(
+            "Failed to discard uploaded Settings signed-form file"
+            in record.getMessage()
+            for record in caplog.records
+        )
     finally:
         app.dependency_overrides.clear()
 
@@ -4268,6 +4416,51 @@ def test_update_settings_draft_replaces_file_and_archives_old(system_user_id):
         update_kwargs = next(kwargs for name, kwargs in service.calls if name == "update_draft")
         assert update_kwargs["signed_form_file_id"] == replacement.id
         assert file_service.archive_calls == [{"file_id": old_file_id, "user_id": user.id}]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_update_settings_error_discards_new_file_without_archiving_old(
+    system_user_id, caplog,
+):
+    user = make_user(system_user_id)
+    urza_id, old_file_id = uuid7(), uuid7()
+    replacement = settings_file(uuid7(), "replacement.pdf")
+    record = settings_record(urza_id, DocumentStatus.DRAFT, file_id=old_file_id)
+    service = FakeSettingsService(
+        records=[record],
+        error_by_method={"update_draft": ValueError("Ошибка обновления черновика")},
+    )
+
+    class FailingDiscardFileService(FakeFileService):
+        async def discard_upload(self, file):
+            await super().discard_upload(file)
+            raise RuntimeError("Ошибка очистки")
+
+    file_service = FailingDiscardFileService(replacement)
+    set_settings_dependencies(user, urza_id, service, file_service)
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/settings/{record.id}",
+            data={
+                "change_date": "2026-09-02",
+                "parameter_name": "Изменено",
+                "initial_setting": "1.0 A",
+                "new_setting": "1.3 A",
+                "change_reason": "Причина",
+            },
+            files={"signed_form_file": ("replacement.pdf", b"new scan", "application/pdf")},
+        )
+
+        assert response.status_code == 400
+        assert "Ошибка обновления черновика" in response.text
+        assert file_service.discard_calls == [{"file_id": replacement.id}]
+        assert file_service.archive_calls == []
+        assert any(
+            "Failed to discard uploaded Settings signed-form file"
+            in record.getMessage()
+            for record in caplog.records
+        )
     finally:
         app.dependency_overrides.clear()
 

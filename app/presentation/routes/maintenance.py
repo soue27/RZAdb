@@ -20,6 +20,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.domain.file import File
 from app.application.maintenance.service import TORecordService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -89,21 +90,17 @@ async def _render_maintenance_template(
     )
 
 
-async def _archive_uploaded_files(
+async def _discard_uploaded_files(
     file_service: FileService,
-    file_ids: list[UUID],
-    user_id: UUID,
+    uploaded_files: list[File],
 ) -> None:
-    for file_id in file_ids:
+    for file in uploaded_files:
         try:
-            await file_service.archive(
-                file_id=file_id,
-                user_id=user_id,
-            )
+            await file_service.discard_upload(file)
         except Exception:
             logger.exception(
-                "Failed to archive uploaded maintenance file %s",
-                file_id,
+                "Failed to discard uploaded maintenance file %s",
+                file.id,
             )
 
 
@@ -332,7 +329,7 @@ async def create_urza_maintenance(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
-    uploaded_file_ids: list[UUID] = []
+    uploaded_files: list[File] = []
 
     try:
         signed_content = await read_upload_content(signed_form_file)
@@ -353,7 +350,7 @@ async def create_urza_maintenance(
                 or "application/octet-stream"
             ),
         )
-        uploaded_file_ids.append(saved_signed_form.id)
+        uploaded_files.append(saved_signed_form)
 
         scan_protocol_file_id: UUID | None = None
 
@@ -378,7 +375,7 @@ async def create_urza_maintenance(
             )
 
             scan_protocol_file_id = saved_scan.id
-            uploaded_file_ids.append(saved_scan.id)
+            uploaded_files.append(saved_scan)
 
         editable_protocol_file_id: UUID | None = None
 
@@ -406,7 +403,7 @@ async def create_urza_maintenance(
             )
 
             editable_protocol_file_id = saved_editable.id
-            uploaded_file_ids.append(saved_editable.id)
+            uploaded_files.append(saved_editable)
 
         await maintenance_service.create(
             user_id=current_user.id,
@@ -424,10 +421,9 @@ async def create_urza_maintenance(
 
 
     except PermissionError as exc:
-        await _archive_uploaded_files(
+        await _discard_uploaded_files(
             file_service,
-            uploaded_file_ids,
-            current_user.id,
+            uploaded_files,
         )
 
         return await _render_maintenance_template(
@@ -446,10 +442,9 @@ async def create_urza_maintenance(
         )
 
     except FileUploadValidationError as exc:
-        await _archive_uploaded_files(
+        await _discard_uploaded_files(
             file_service,
-            uploaded_file_ids,
-            current_user.id,
+            uploaded_files,
         )
 
         return await _render_maintenance_template(
@@ -468,10 +463,9 @@ async def create_urza_maintenance(
         )
 
     except ValueError as exc:
-        await _archive_uploaded_files(
+        await _discard_uploaded_files(
             file_service,
-            uploaded_file_ids,
-            current_user.id,
+            uploaded_files,
         )
 
         return await _render_maintenance_template(
@@ -491,10 +485,9 @@ async def create_urza_maintenance(
 
 
     except Exception:
-        await _archive_uploaded_files(
+        await _discard_uploaded_files(
             file_service,
-            uploaded_file_ids,
-            current_user.id,
+            uploaded_files,
         )
         logger.exception(
             "Failed to create maintenance record for URZA %s",

@@ -28,6 +28,7 @@ from app.presentation.dependencies.services import (
     get_file_access_service,
     get_file_service,
 )
+from app.presentation.schemas.files import FileResponse
 from app.application.files import validation
 
 
@@ -193,6 +194,74 @@ def test_upload_file_without_display_name(authenticated_client: TestClient) -> N
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_upload_discards_file_when_response_construction_fails(
+    file_routes,
+    monkeypatch,
+) -> None:
+    state = file_routes
+    state["file_service"].upload = AsyncMock(return_value=state["file"])
+    state["file_service"].discard_upload = AsyncMock()
+    state["file_service"].archive = AsyncMock()
+
+    def fail_response(cls, file):
+        raise RuntimeError("response construction failed")
+
+    monkeypatch.setattr(
+        FileResponse,
+        "model_validate",
+        classmethod(fail_response),
+    )
+
+    with pytest.raises(RuntimeError, match="response construction failed"):
+        await state["client"].post(
+            "/files",
+            files={"file": ("scan.pdf", b"test", "application/pdf")},
+            data={"display_name": "Скан"},
+        )
+
+    state["file_service"].discard_upload.assert_awaited_once_with(state["file"])
+    state["file_service"].archive.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_cleanup_error_does_not_mask_response_error(
+    file_routes,
+    monkeypatch,
+    caplog,
+) -> None:
+    state = file_routes
+    state["file_service"].upload = AsyncMock(return_value=state["file"])
+    state["file_service"].discard_upload = AsyncMock(
+        side_effect=RuntimeError("cleanup failed")
+    )
+    state["file_service"].archive = AsyncMock()
+
+    def fail_response(cls, file):
+        raise ValueError("original response error")
+
+    monkeypatch.setattr(
+        FileResponse,
+        "model_validate",
+        classmethod(fail_response),
+    )
+
+    with pytest.raises(ValueError, match="original response error"):
+        await state["client"].post(
+            "/files",
+            files={"file": ("scan.pdf", b"test", "application/pdf")},
+            data={"display_name": "Скан"},
+        )
+
+    state["file_service"].discard_upload.assert_awaited_once_with(state["file"])
+    state["file_service"].archive.assert_not_awaited()
+    assert any(
+        "Не удалось удалить загруженный файл после ошибки формирования ответа"
+        in record.getMessage()
+        for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio

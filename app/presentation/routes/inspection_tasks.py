@@ -345,13 +345,10 @@ async def complete_inspection_task(
     except FileUploadValidationError as exc:
         for uploaded in uploaded_files:
             try:
-                await files.archive(
-                    file_id=uploaded.id,
-                    user_id=current_user.id,
-                )
+                await files.discard_upload(uploaded)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
+                    "Не удалось удалить загруженный файл после ошибки "
                     "валидации при завершении осмотра: file_id=%s",
                     uploaded.id,
                 )
@@ -376,13 +373,10 @@ async def complete_inspection_task(
     except (PermissionError, ValueError) as exc:
         for uploaded in uploaded_files:
             try:
-                await files.archive(
-                    file_id=uploaded.id,
-                    user_id=current_user.id,
-                )
+                await files.discard_upload(uploaded)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после ошибки "
+                    "Не удалось удалить загруженный файл после ошибки "
                     "завершения осмотра: file_id=%s",
                     uploaded.id,
                 )
@@ -411,13 +405,10 @@ async def complete_inspection_task(
     except Exception:
         for uploaded in uploaded_files:
             try:
-                await files.archive(
-                    file_id=uploaded.id,
-                    user_id=current_user.id,
-                )
+                await files.discard_upload(uploaded)
             except Exception:
                 logger.exception(
-                    "Не удалось архивировать файл после "
+                    "Не удалось удалить загруженный файл после "
                     "неожиданной ошибки: file_id=%s",
                     uploaded.id,
                 )

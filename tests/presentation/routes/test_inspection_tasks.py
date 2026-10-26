@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import ObjectAccessDeniedError
 from app.domain.enums import TaskStatus, UserRole
 from app.presentation.app import app
@@ -214,7 +215,7 @@ def test_invalid_completion_is_checked_before_files_are_uploaded():
         app.dependency_overrides.clear()
 
 
-def test_completion_failure_preserves_values_and_archives_uploaded_files():
+def test_completion_failure_preserves_values_and_discards_uploaded_files():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
     task = SimpleNamespace(
@@ -233,6 +234,8 @@ def test_completion_failure_preserves_values_and_archives_uploaded_files():
         substation_id, complete_error=ValueError("Состояние уже изменилось")
     )
     files = FakeFileService()
+    uploaded = SimpleNamespace(id=uuid7(), s3_key="test/scan.pdf")
+    files.upload = AsyncMock(return_value=uploaded)
     _install(
         user,
         substation_id,
@@ -249,7 +252,8 @@ def test_completion_failure_preserves_values_and_archives_uploaded_files():
         assert response.status_code == 400
         assert "Состояние уже изменилось" in response.text
         assert "Введённые замечания" in response.text
-        assert len(files.archive_calls) == 1
+        assert files.discard_calls == [uploaded]
+        assert files.archive_calls == []
     finally:
         app.dependency_overrides.clear()
 
@@ -538,7 +542,7 @@ def test_completion_validation_returns_403_before_upload_for_archived_owner():
         app.dependency_overrides.clear()
 
 
-def test_completion_race_returns_403_and_archives_uploaded_file():
+def test_completion_race_returns_403_and_discards_uploaded_file():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
     task = SimpleNamespace(
@@ -579,10 +583,8 @@ def test_completion_race_returns_403_and_archives_uploaded_file():
 
         assert response.status_code == 403
         assert "архивной подстанции" in response.text
-        assert files.archive_calls == [
-            {"file_id": uploaded.id, "user_id": user.id}
-        ]
-        assert files.discard_calls == []
+        assert files.discard_calls == [uploaded]
+        assert files.archive_calls == []
     finally:
         app.dependency_overrides.clear()
 
@@ -648,10 +650,21 @@ def test_send_inspection_for_review_returns_400_when_service_rejects_transition(
         app.dependency_overrides.clear()
 
 
-def test_editable_upload_failure_archives_uploaded_scan():
+def test_validation_error_discards_previously_uploaded_scan():
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
-    task = SimpleNamespace(id=task_id, substation_id=substation_id)
+    task = SimpleNamespace(
+        id=task_id,
+        substation_id=substation_id,
+        substation=SimpleNamespace(enterprise_id=uuid7(), dispatch_name="ПС"),
+        created_by_user=None,
+        assigned_to_user=None,
+        assigned_to=user.id,
+        status=TaskStatus.IN_PROGRESS,
+        created_at=datetime.now(UTC),
+        deadline_at=None,
+        inspection=None,
+    )
     service = FakeInspectionTaskService(substation_id)
     files = FakeFileService()
 
@@ -659,7 +672,7 @@ def test_editable_upload_failure_archives_uploaded_scan():
     files.upload = AsyncMock(
         side_effect=[
             uploaded_scan,
-            RuntimeError("Ошибка загрузки редактируемого файла"),
+            FileUploadValidationError("Неверный формат файла"),
         ]
     )
 
@@ -672,7 +685,7 @@ def test_editable_upload_failure_archives_uploaded_scan():
     )
 
     try:
-        with TestClient(app, raise_server_exceptions=False) as client:
+        with TestClient(app) as client:
             response = client.post(
                 f"/objects/substation/inspection-tasks/{task_id}/complete",
                 data={
@@ -689,17 +702,16 @@ def test_editable_upload_failure_archives_uploaded_scan():
                 },
             )
 
-        assert response.status_code == 500
-        assert files.discard_calls == []
-        assert files.archive_calls == [
-            {"file_id": uploaded_scan.id, "user_id": user.id}
-        ]
+        assert response.status_code == 400
+        assert "Неверный формат файла" in response.text
+        assert files.discard_calls == [uploaded_scan]
+        assert files.archive_calls == []
         assert service.calls == ["validate_completion"]
     finally:
         app.dependency_overrides.clear()
 
 
-def test_unexpected_completion_error_archives_uploaded_files():
+def test_unexpected_completion_error_discards_files_and_preserves_error(caplog):
     user = SimpleNamespace(id=uuid7(), role=UserRole.ENGINEER)
     substation_id, task_id = uuid7(), uuid7()
     task = SimpleNamespace(id=task_id, substation_id=substation_id)
@@ -709,8 +721,15 @@ def test_unexpected_completion_error_archives_uploaded_files():
     )
     files = FakeFileService()
     uploaded_scan = SimpleNamespace(id=uuid7(), s3_key="test/scan.pdf")
+    uploaded_editable = SimpleNamespace(id=uuid7(), s3_key="test/report.docx")
 
-    files.upload = AsyncMock(return_value=uploaded_scan)
+    files.upload = AsyncMock(side_effect=[uploaded_scan, uploaded_editable])
+
+    async def discard_with_error(file):
+        files.discard_calls.append(file)
+        raise RuntimeError("Ошибка очистки")
+
+    files.discard_upload = discard_with_error
 
     _install(
         user,
@@ -721,8 +740,11 @@ def test_unexpected_completion_error_archives_uploaded_files():
     )
 
     try:
-        with TestClient(app, raise_server_exceptions=False) as client:
-            response = client.post(
+        with TestClient(app) as client, pytest.raises(
+            RuntimeError,
+            match="Неожиданная ошибка",
+        ):
+            client.post(
                 f"/objects/substation/inspection-tasks/{task_id}/complete",
                 data={
                     "inspection_date": "2026-10-19",
@@ -730,14 +752,21 @@ def test_unexpected_completion_error_archives_uploaded_files():
                 },
                 files={
                     "scan_file": ("scan.pdf", b"scan", "application/pdf"),
+                    "editable_file": (
+                        "report.docx",
+                        b"report",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
                 },
             )
 
-        assert response.status_code == 500
-        assert files.discard_calls == []
-        assert files.archive_calls == [
-            {"file_id": uploaded_scan.id, "user_id": user.id}
-        ]
+        assert files.discard_calls == [uploaded_scan, uploaded_editable]
+        assert files.archive_calls == []
+        assert any(
+            "Не удалось удалить загруженный файл после неожиданной ошибки"
+            in record.getMessage()
+            for record in caplog.records
+        )
         assert service.calls == ["validate_completion"]
     finally:
         app.dependency_overrides.clear()

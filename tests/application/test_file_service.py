@@ -73,6 +73,65 @@ async def test_upload_file(
     )
 
     repository.add.assert_awaited_once_with(result)
+    storage.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_deletes_storage_object_when_storage_upload_fails(
+    service,
+    repository,
+    storage,
+    system_user_id,
+):
+    storage.upload.side_effect = OSError("storage upload error")
+
+    with pytest.raises(OSError, match="storage upload error"):
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"test file content",
+            original_name="scan.pdf",
+            display_name="Скан протокола.pdf",
+            extension=".pdf",
+            mime_type="application/pdf",
+        )
+
+    key = storage.upload.await_args.kwargs["key"]
+    storage.delete.assert_awaited_once_with(key=key)
+    repository.add.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_preserves_storage_upload_error_when_cleanup_fails(
+    service,
+    repository,
+    storage,
+    system_user_id,
+    caplog,
+):
+    upload_error = OSError("storage upload error")
+    storage.upload.side_effect = upload_error
+    storage.delete.side_effect = RuntimeError("storage cleanup error")
+
+    with pytest.raises(OSError) as exc_info:
+        await service.upload(
+            actor_id=system_user_id,
+            content=b"test file content",
+            original_name="scan.pdf",
+            display_name="Скан протокола.pdf",
+            extension=".pdf",
+            mime_type="application/pdf",
+        )
+
+    assert exc_info.value is upload_error
+    storage.delete.assert_awaited_once_with(
+        key=storage.upload.await_args.kwargs["key"],
+    )
+    repository.add.assert_not_awaited()
+    assert any(
+        "Не удалось удалить объект после ошибки загрузки"
+        in record.getMessage()
+        for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio

@@ -55,10 +55,20 @@ class FileService:
             )
         )
 
-        await self.storage.upload(
-            key=key,
-            content=content,
-        )
+        try:
+            await self.storage.upload(
+                key=key,
+                content=content,
+            )
+        except Exception:
+            try:
+                await self.storage.delete(key=key)
+            except Exception:
+                logger.exception(
+                    "Не удалось удалить объект после ошибки загрузки: key=%s",
+                    key,
+                )
+            raise
 
         file = File(
             s3_key=key,

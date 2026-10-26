@@ -15,6 +15,7 @@ from app.application.objects.exceptions import (
 from app.application.objects.service import ObjectService
 from app.application.settings.service import SettingsService
 from app.application.tasks.service import TaskService
+from app.domain.file import File
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
@@ -164,6 +165,19 @@ async def _archive_file_safely(
         return False
 
     return True
+
+
+async def _discard_file_safely(
+    file_service: FileService,
+    uploaded_file: File,
+) -> None:
+    try:
+        await file_service.discard_upload(uploaded_file)
+    except Exception:
+        logger.exception(
+            "Failed to discard uploaded Settings signed-form file %s",
+            uploaded_file.id,
+        )
 
 
 async def _render_settings_form(
@@ -336,11 +350,7 @@ async def create_urza_settings_record(
             signed_form_file_id=saved_file.id,
         )
     except (ValueError, PermissionError) as exc:
-        await _archive_file_safely(
-            file_service,
-            saved_file.id,
-            current_user.id,
-        )
+        await _discard_file_safely(file_service, saved_file)
 
         error_status = (
             403
@@ -356,11 +366,7 @@ async def create_urza_settings_record(
             response_status=error_status,
         )
     except Exception:
-        await _archive_file_safely(
-            file_service,
-            saved_file.id,
-            current_user.id,
-        )
+        await _discard_file_safely(file_service, saved_file)
 
         logger.exception("Failed to create Settings record")
 
@@ -542,11 +548,7 @@ async def update_urza_settings_record(
         )
     except (ValueError, PermissionError) as exc:
         if new_file:
-            await _archive_file_safely(
-                file_service,
-                new_file.id,
-                current_user.id,
-            )
+            await _discard_file_safely(file_service, new_file)
 
         error_status = (
             status.HTTP_403_FORBIDDEN
@@ -564,11 +566,7 @@ async def update_urza_settings_record(
         )
     except Exception:
         if new_file:
-            await _archive_file_safely(
-                file_service,
-                new_file.id,
-                current_user.id,
-            )
+            await _discard_file_safely(file_service, new_file)
 
         logger.exception("Failed to update Settings record")
 
