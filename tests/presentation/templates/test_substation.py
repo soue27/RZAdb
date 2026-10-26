@@ -35,16 +35,43 @@ def test_substation_template_renders_details():
     assert "г. Екатеринбург" in html
     assert "56.838900" in html
     assert "60.605700" in html
-    assert "Основные сведения" in html
-    assert "Осмотры" in html
-    assert "Инструкции" in html
-    assert "Схемы селективности" in html
+    expected_tabs = {
+        "details": (
+            "Основные сведения",
+            f"/objects/substation/{substation.id}/details",
+        ),
+        "inspections": (
+            "Осмотры",
+            f"/objects/substation/{substation.id}/inspections",
+        ),
+        "instructions": (
+            "Инструкции",
+            f"/objects/substation/{substation.id}/instructions",
+        ),
+        "selectivity-schemes": (
+            "Схемы селективности",
+            f"/objects/substation/{substation.id}/selectivity-schemes",
+        ),
+    }
+    assert html.count("data-rzadb-tab\n") == len(expected_tabs)
+    for tab_name, (label, url) in expected_tabs.items():
+        tab_marker = f'data-tab="{tab_name}"'
+        tab_start = html.rfind("<button", 0, html.index(tab_marker))
+        tab_end = html.index("</button>", html.index(tab_marker))
+        tab_html = html[tab_start:tab_end]
+        assert label in tab_html
+        assert f'hx-get="{url}"' in tab_html
+        assert 'hx-target="#substation-tab-content"' in tab_html
+        assert 'hx-swap="innerHTML"' in tab_html
+
+    assert 'id="substation-tab-content"' in html
+    assert "Присоединения" not in html
+    assert f'hx-get="/objects/substation/{substation.id}/connections"' not in html
+    assert 'data-tab="connections"' not in html
     assert "Изменить" not in html
     assert "Добавить присоединение" in html
     assert f"/objects/substation/{substation.id}/connections/new" in html
     assert 'hx-target="#object-content"' in html
-    for tab_name in ("details", "inspections", "instructions", "selectivity-schemes"):
-        assert f'data-tab="{tab_name}"' in html
 
 
 def test_connection_creation_button_hidden_for_other_roles():

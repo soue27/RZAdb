@@ -15,6 +15,21 @@ document.addEventListener("htmx:beforeRequest", (event) => {
     target.dataset.historyOpen = history?.open ? "true" : "false";
 });
 
+document.addEventListener("click", (event) => {
+    const item = event.target.closest(
+        "#app-sidebar-tree .tree-item[data-object-type]"
+    );
+
+    if (!item) {
+        return;
+    }
+
+    document
+        .querySelectorAll("#app-sidebar-tree .tree-item.active")
+        .forEach((activeItem) => activeItem.classList.remove("active"));
+    item.classList.add("active");
+});
+
 document.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail.target;
 

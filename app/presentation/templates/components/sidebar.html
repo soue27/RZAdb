@@ -85,6 +85,21 @@
         {%- endfor -%}
     {%- endmacro %}
 
+    {% macro enterprise_contains_connection(node, selected_connection_id) -%}
+        {%- for substation in node.substations -%}
+            {%- for connection in substation.connections -%}
+                {%- if connection.id|string == selected_connection_id|string -%}
+                    {{- "true" -}}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- endfor -%}
+        {%- for child in node.children -%}
+            {%- if enterprise_contains_connection(child, selected_connection_id)|trim == "true" -%}
+                {{- "true" -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endmacro %}
+
     {% macro substation_contains_selected(substation, selected_substation_id) -%}
         {%- if selected_substation_id is not none and substation.id|string == selected_substation_id|string -%}
             {{- "true" -}}
@@ -97,10 +112,12 @@
     {% macro enterprise_node(node) %}
         {% set selected_urza_id = urza.id if urza is defined and urza else none %}
         {% set selected_substation_id = selected_substation_id if selected_substation_id is defined else none %}
+        {% set selected_connection_id = selected_connection_id if selected_connection_id is defined else none %}
         {% set has_children = node.children or node.substations %}
         {% set contains_selected_urza = selected_urza_id is not none and (enterprise_contains_urza(node, selected_urza_id)|trim == "true") %}
         {% set contains_selected_substation = selected_substation_id is not none and (enterprise_contains_substation(node, selected_substation_id)|trim == "true") %}
-        {% set is_open = contains_selected_urza or contains_selected_substation %}
+        {% set contains_selected_connection = selected_connection_id is not none and (enterprise_contains_connection(node, selected_connection_id)|trim == "true") %}
+        {% set is_open = contains_selected_urza or contains_selected_substation or contains_selected_connection %}
         <div class="tree-node">
 
             <div class="tree-row">
@@ -172,7 +189,9 @@
 
     {% macro substation_node(substation) %}
         {% set selected_urza_id = urza.id if urza is defined and urza else none %}
-        {% set is_open = selected_urza_id is not none and (substation_contains_urza(substation, selected_urza_id)|trim == "true") %}
+        {% set selected_connection_id = selected_connection_id if selected_connection_id is defined else none %}
+        {% set contains_selected_connection = selected_connection_id is not none and (substation.connections|selectattr("id", "equalto", selected_connection_id)|list|length > 0) %}
+        {% set is_open = (selected_urza_id is not none and (substation_contains_urza(substation, selected_urza_id)|trim == "true")) or contains_selected_connection %}
         <div class="tree-node{% if substation.is_archived %} tree-node-archived{% endif %}">
 
             <div class="tree-row">
@@ -257,7 +276,7 @@
 
                 <button
                     type="button"
-                    class="tree-item tree-item-select"
+                    class="tree-item tree-item-select{% if selected_connection_id is defined and selected_connection_id is not none and selected_connection_id|string == connection.id|string %} active{% endif %}"
                     data-object-type="connection"
                     data-object-id="{{ connection.id }}"
                     data-archived="{{ 'true' if connection.is_archived else 'false' }}"

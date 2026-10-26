@@ -2004,6 +2004,83 @@ def test_instruction_workflow_routes(system_user_id, action, method_name):
 def test_get_object_requires_authentication() -> None:
     app.dependency_overrides.clear()
 
+
+def test_connection_full_page_marks_connection_active_and_opens_parent_in_tree(
+    system_user_id,
+):
+    user = make_user(system_user_id=system_user_id)
+    department_id, substation_id, connection_id = uuid7(), uuid7(), uuid7()
+    connection = SimpleNamespace(
+        id=connection_id,
+        dispatch_name="ВЛ 110 кВ",
+        sap_code=None,
+        asureo_code=None,
+        rdu_subordination=False,
+    )
+    tree = [
+        SimpleNamespace(
+            id=department_id,
+            type="department",
+            full_name="Производственное отделение",
+            short_name="ПО",
+            children=[],
+            substations=[
+                SimpleNamespace(
+                    id=substation_id,
+                    dispatch_name="ПС Центральная",
+                    is_archived=False,
+                    connections=[
+                        SimpleNamespace(
+                            id=connection_id,
+                            dispatch_name=connection.dispatch_name,
+                            is_archived=False,
+                            urzas=[],
+                        )
+                    ],
+                )
+            ],
+        )
+    ]
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="connection",
+                id=connection_id,
+                name=connection.dispatch_name,
+            )
+        )
+    )
+    connection_service = FakeConnectionCreationService()
+    connection_service.connection = connection
+    app.dependency_overrides[get_connection_service] = override_connection_service(
+        connection_service
+    )
+
+    class TreeWithConnection:
+        async def get_tree(self, *, user_id):
+            return tree
+
+    app.dependency_overrides[get_tree_service] = lambda: TreeWithConnection()
+
+    try:
+        response = TestClient(app).get(f"/objects/connection/{connection_id}")
+
+        assert response.status_code == 200
+        assert (
+            'class="tree-item tree-item-select active"\n'
+            '                    data-object-type="connection"\n'
+            f'                    data-object-id="{connection_id}"'
+        ) in response.text
+        assert (
+            f'id="tree-substation-{substation_id}"\n'
+            '                    '
+            'class="collapse tree-children show"'
+        ) in response.text
+    finally:
+        app.dependency_overrides.clear()
+
     client = TestClient(app)
 
     response = client.get(f"/objects/substation/{uuid7()}")

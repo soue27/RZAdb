@@ -260,6 +260,7 @@ async def get_object(
                     "connection": connection,
                     "current_user": current_user,
                     "tree": tree,
+                    "selected_connection_id": object_id,
                     "page_title": connection.dispatch_name,
                     "content_template": "objects/connection.html",
                     "can_create_urza": (
