@@ -55,6 +55,7 @@ from app.application.urza_instructions.service import URZAInstructionService
 from app.application.urzas.repository import URZARepository
 from app.application.urzas.service import URZAService
 from app.application.users.repository import UserRepository
+from app.application.users.service import UserService
 from app.application.work_items.service import (
     InspectionTaskWorkItemSource,
     InstructionWorkItemSource,
@@ -98,6 +99,17 @@ def get_auth_service(
 ) -> AuthService:
     return AuthService(
         user_repository=UserRepository(session),
+        password_service=password_service,
+    )
+
+
+def get_user_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    password_service: Annotated[PasswordService, Depends(get_password_service)],
+) -> UserService:
+    return UserService(
+        repository=UserRepository(session),
+        enterprise_repository=EnterpriseRepository(session),
         password_service=password_service,
     )
 

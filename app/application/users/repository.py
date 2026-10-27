@@ -1,8 +1,8 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.enums import UserRole
 from app.domain.user import User
@@ -21,6 +21,22 @@ class UserRepository:
     async def get_by_email(self, email: str) -> User | None:
         query = select(User).where(User.email == email)
         return await self.session.scalar(query)
+
+    async def get_managed_by_id(self, user_id: UUID) -> User | None:
+        result = await self.session.scalars(
+            select(User)
+            .options(selectinload(User.enterprise))
+            .where(User.id == user_id)
+        )
+        return result.one_or_none()
+
+    async def add(self, user: User) -> User:
+        self.session.add(user)
+        await self.session.flush()
+        return user
+
+    async def flush(self) -> None:
+        await self.session.flush()
 
     async def get_active_engineers_by_enterprise(
             self,

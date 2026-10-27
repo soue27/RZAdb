@@ -16,6 +16,7 @@
         <span class="badge text-bg-secondary">
             Найдено: {{ users|length }}
         </span>
+        <a href="/admin/users/new" class="btn btn-primary">Создать пользователя</a>
     </div>
 
     <div class="card border-0 shadow-sm">
@@ -137,6 +138,7 @@
                                 <th>Роль</th>
                                 <th>Предприятие</th>
                                 <th>Статус</th>
+                                <th>Действия</th>
                             </tr>
                         </thead>
 
@@ -169,6 +171,20 @@
                                                 Отключён
                                             </span>
                                         {% endif %}
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {% if user.id != current_user.id %}
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/users/{{ user.id }}">Изменить</a>
+                                            {% if not user.deleted_at %}
+                                            <form method="post" action="/admin/users/{{ user.id }}/active" class="d-inline">
+                                                <input type="hidden" name="active" value="{{ 'false' if user.active else 'true' }}">
+                                                <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Отключить' if user.active else 'Активировать' }}</button>
+                                            </form>
+                                            <form method="post" action="/admin/users/{{ user.id }}/archive" class="d-inline" onsubmit="return confirm('Архивировать учётную запись?')">
+                                                <button class="btn btn-sm btn-outline-danger" type="submit">Архивировать</button>
+                                            </form>
+                                            {% endif %}
+                                        {% else %}—{% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}

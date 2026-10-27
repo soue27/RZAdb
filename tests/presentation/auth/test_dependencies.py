@@ -10,12 +10,12 @@ from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 
 
-def make_request(session_data: dict) -> Request:
+def make_request(session_data: dict, path: str = "/") -> Request:
     request = Request(
         {
             "type": "http",
             "method": "GET",
-            "path": "/",
+            "path": path,
             "headers": [],
             "query_string": b"",
             "server": ("testserver", 80),
@@ -139,6 +139,30 @@ async def test_get_current_user_success(system_user_id) -> None:
 
     assert result is user
     repository.get_by_id.assert_awaited_once_with(user.id)
+
+
+@pytest.mark.asyncio
+async def test_temporary_password_blocks_all_routes_except_password_change(system_user_id):
+    user = make_user(system_user_id=system_user_id)
+    user.must_change_password = True
+    repository = AsyncMock()
+    repository.get_by_id.return_value = user
+    session = AsyncMock()
+
+    with patch(
+        "app.presentation.auth.dependencies.UserRepository",
+        return_value=repository,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(make_request({"user_id": str(user.id)}), session)
+        assert exc_info.value.status_code == 403
+
+        result = await get_current_user(
+            make_request({"user_id": str(user.id)}, "/auth/change-password"),
+            session,
+        )
+
+    assert result is user
 
 @pytest.mark.asyncio
 async def test_require_superadmin_allows_superadmin(system_user_id) -> None:

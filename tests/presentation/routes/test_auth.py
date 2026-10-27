@@ -67,6 +67,35 @@ def test_login_success(system_user_id) -> None:
         app.dependency_overrides.clear()
 
 
+def test_login_with_temporary_password_redirects_to_required_change(system_user_id) -> None:
+    user = User(
+        full_name="Тестовый пользователь",
+        role=UserRole.ENGINEER,
+        email="temporary@example.com",
+        password_hash="hash",
+        access_category=AccessCategory.IV,
+        active=True,
+        must_change_password=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    auth_service = AsyncMock(spec=AuthService)
+    auth_service.authenticate.return_value = user
+    app.dependency_overrides[get_auth_service] = lambda: auth_service
+
+    try:
+        response = TestClient(app).post(
+            "/auth/login",
+            data={"email": user.email, "password": "temporary"},
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/change-password"
+
+
 def test_login_invalid_credentials() -> None:
     auth_service = AsyncMock(spec=AuthService)
     auth_service.authenticate.side_effect = InvalidCredentialsError

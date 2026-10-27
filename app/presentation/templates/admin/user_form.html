@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Новый пользователь' if not user else 'Пользователь' }} — RZAdb{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width: 760px">
+    <h1 class="h3 mb-4">{{ 'Создать пользователя' if not user else 'Изменить пользователя' }}</h1>
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    {% set source = values if values else {} %}
+    <form method="post" action="{{ '/admin/users' if not user else '/admin/users/' ~ user.id }}" class="card card-body gap-3">
+        <div>
+            <label class="form-label" for="full_name">ФИО</label>
+            <input class="form-control" id="full_name" name="full_name" required maxlength="255" value="{{ source.get('full_name', user.full_name if user else '') }}">
+        </div>
+        <div>
+            <label class="form-label" for="email">Email</label>
+            <input class="form-control" type="email" id="email" name="email" required maxlength="255" value="{{ source.get('email', user.email if user else '') }}">
+        </div>
+        <div>
+            <label class="form-label" for="role">Роль</label>
+            <select class="form-select" id="role" name="role" required>
+                {% for role in roles %}<option value="{{ role.value }}" {% if source.get('role', user.role.value if user else 'engineer') == role.value %}selected{% endif %}>{{ role_labels[role.value] }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="enterprise_id">Предприятие</label>
+            <select class="form-select" id="enterprise_id" name="enterprise_id">
+                <option value="">Без предприятия</option>
+                {% for enterprise in enterprises %}<option value="{{ enterprise.id }}" {% if source.get('enterprise_id', user.enterprise_id|string if user and user.enterprise_id else '') == enterprise.id|string %}selected{% endif %}>{{ enterprise.short_name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="access_category">Категория допуска</label>
+            <select class="form-select" id="access_category" name="access_category" required>
+                {% for category in categories %}<option value="{{ category.value }}" {% if source.get('access_category', user.access_category.value if user else 'IV') == category.value %}selected{% endif %}>{{ category.value }}</option>{% endfor %}
+            </select>
+        </div>
+        {% if not user %}
+        <div>
+            <label class="form-label" for="temporary_password">Временный пароль</label>
+            <input class="form-control" type="password" id="temporary_password" name="temporary_password" required autocomplete="new-password">
+            <div class="form-text">При первом входе пользователь должен заменить пароль.</div>
+        </div>
+        {% endif %}
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <a class="btn btn-outline-secondary" href="/admin/">Отмена</a>
+        </div>
+    </form>
+    {% if user and user.id != current_user.id %}
+    <section class="card card-body mt-4">
+        <h2 class="h5">Сброс пароля</h2>
+        <form method="post" action="/admin/users/{{ user.id }}/password" class="d-flex gap-2">
+            <input class="form-control" type="password" name="temporary_password" required placeholder="Новый временный пароль" autocomplete="new-password">
+            <button class="btn btn-outline-primary" type="submit">Сбросить</button>
+        </form>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

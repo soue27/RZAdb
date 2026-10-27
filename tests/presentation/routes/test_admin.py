@@ -65,6 +65,24 @@ def test_admin_rejects_engineer(client):
     assert response.status_code == 403
 
 
+@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.ENGINEER])
+def test_user_creation_route_rejects_non_superadmin(client, role):
+    override_user(make_user(role))
+
+    response = client.post(
+        "/admin/users",
+        data={
+            "full_name": "Пользователь",
+            "email": "new@example.com",
+            "role": "superadmin",
+            "access_category": "IV",
+            "temporary_password": "TemporaryPassword123",
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def test_admin_renders_users_and_enterprises(client):
     override_user(make_user(UserRole.SUPERADMIN))
     enterprise = make_enterprise()

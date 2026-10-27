@@ -38,6 +38,14 @@ async def get_current_user(
             detail="Пользователь не найден или неактивен.",
         )
 
+    if user.must_change_password and request.url.path not in {
+        "/auth/change-password",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Для продолжения необходимо сменить временный пароль.",
+        )
+
     return user
 
 

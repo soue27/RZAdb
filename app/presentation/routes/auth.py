@@ -5,7 +5,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.auth.service import AuthService, InvalidCredentialsError
-from app.presentation.dependencies.services import get_auth_service
+from app.application.users.service import UserOperationError, UserService
+from app.domain.user import User
+from app.presentation.auth.dependencies import get_current_user
+from app.presentation.dependencies.services import get_auth_service, get_user_service
 
 router = APIRouter(
     prefix="/auth",
@@ -44,8 +47,50 @@ async def login(
     request.session["user_id"] = str(user.id)
 
     return RedirectResponse(
-        url="/",
+        url="/auth/change-password" if user.must_change_password else "/",
         status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/change-password")
+async def change_password_page(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/change_password.html",
+        context={"current_user": current_user, "error": None},
+    )
+
+
+@router.post("/change-password")
+async def change_password(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[UserService, Depends(get_user_service)],
+    current_password: Annotated[str | None, Form()],
+    new_password: Annotated[str, Form()],
+    confirm_password: Annotated[str, Form()],
+):
+    error = None
+    if new_password != confirm_password:
+        error = "Новый пароль и подтверждение не совпадают."
+    else:
+        try:
+            await service.change_password(
+                user=current_user,
+                current_password=current_password,
+                new_password=new_password,
+            )
+            return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        except UserOperationError as exc:
+            error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/change_password.html",
+        context={"current_user": current_user, "error": error},
+        status_code=400,
     )
 
 @router.post("/logout")
