@@ -1,9 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
 from app.infrastructure.database import models  # noqa: F401
+from app.presentation.auth.dependencies import PasswordChangeRequired
+from app.presentation.routes.admin import router as admin_router
 from app.presentation.routes.archive import router as archive_router
 from app.presentation.routes.auth import router as auth_router
 from app.presentation.routes.files import router as files_router
@@ -26,7 +30,42 @@ from app.presentation.routes.tasks import router as tasks_router
 from app.presentation.routes.urza_instructions import router as urza_instructions_router
 from app.presentation.routes.urza_objects import router as urza_objects_router
 from app.presentation.routes.users import router as users_router
-from app.presentation.routes.admin import router as admin_router
+
+
+def _is_api_request(request: Request) -> bool:
+    route = request.scope.get("route")
+    if getattr(route, "response_model", None) is not None:
+        return True
+
+    path = request.url.path
+    return path == "/files" or path.startswith("/files/")
+
+
+async def _handle_auth_http_exception(
+    request: Request,
+    exc: HTTPException,
+) -> Response:
+    is_authentication_failure = exc.status_code == status.HTTP_401_UNAUTHORIZED
+    is_password_change_required = isinstance(exc, PasswordChangeRequired)
+    is_login_submission = request.url.path == "/auth/login"
+
+    if (
+        not _is_api_request(request)
+        and not is_login_submission
+        and (is_authentication_failure or is_password_change_required)
+    ):
+        destination = (
+            "/auth/change-password"
+            if is_password_change_required
+            else "/auth/login"
+        )
+        response = RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
+        if is_authentication_failure:
+            request.session.clear()
+            response.delete_cookie("session", httponly=True, samesite="lax")
+        return response
+
+    return await http_exception_handler(request, exc)
 
 
 def create_app() -> FastAPI:
@@ -36,6 +75,7 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         debug=settings.debug,
     )
+    app.add_exception_handler(HTTPException, _handle_auth_http_exception)
 
     app.mount(
         "/static",

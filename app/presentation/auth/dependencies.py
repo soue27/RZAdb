@@ -9,6 +9,18 @@ from app.domain.enums import UserRole
 from app.domain.user import User
 from app.infrastructure.database.session import get_session
 
+PASSWORD_CHANGE_REQUIRED_DETAIL = (
+    "Для продолжения необходимо сменить временный пароль."
+)
+
+
+class PasswordChangeRequired(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=PASSWORD_CHANGE_REQUIRED_DETAIL,
+        )
+
 
 async def get_current_user(
     request: Request,
@@ -41,10 +53,7 @@ async def get_current_user(
     if user.must_change_password and request.url.path not in {
         "/auth/change-password",
     }:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Для продолжения необходимо сменить временный пароль.",
-        )
+        raise PasswordChangeRequired
 
     return user
 

@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
+from uuid6 import uuid7
 
 from app.application.auth.service import AuthService, InvalidCredentialsError
 from app.domain.enums import AccessCategory, UserRole
@@ -22,16 +23,17 @@ def test_login_page() -> None:
     assert 'name="password"' in response.text
 
 
-def test_login_success(system_user_id) -> None:
+def test_login_success() -> None:
     user = User(
+        id=uuid7(),
         full_name="Тестовый пользователь",
         role=UserRole.ENGINEER,
         email="test@example.com",
         password_hash="hash",
         access_category=AccessCategory.IV,
         active=True,
-        created_by=system_user_id,
-        updated_by=system_user_id,
+        created_by=uuid7(),
+        updated_by=uuid7(),
     )
 
     auth_service = AsyncMock(spec=AuthService)
@@ -67,8 +69,9 @@ def test_login_success(system_user_id) -> None:
         app.dependency_overrides.clear()
 
 
-def test_login_with_temporary_password_redirects_to_required_change(system_user_id) -> None:
+def test_login_with_temporary_password_redirects_to_required_change() -> None:
     user = User(
+        id=uuid7(),
         full_name="Тестовый пользователь",
         role=UserRole.ENGINEER,
         email="temporary@example.com",
@@ -76,8 +79,8 @@ def test_login_with_temporary_password_redirects_to_required_change(system_user_
         access_category=AccessCategory.IV,
         active=True,
         must_change_password=True,
-        created_by=system_user_id,
-        updated_by=system_user_id,
+        created_by=uuid7(),
+        updated_by=uuid7(),
     )
     auth_service = AsyncMock(spec=AuthService)
     auth_service.authenticate.return_value = user

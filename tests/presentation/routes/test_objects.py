@@ -2242,9 +2242,13 @@ def test_connection_full_page_marks_connection_active_and_opens_parent_in_tree(
 
     client = TestClient(app)
 
-    response = client.get(f"/objects/substation/{uuid7()}")
+    response = client.get(
+        f"/objects/substation/{uuid7()}",
+        follow_redirects=False,
+    )
 
-    assert response.status_code == 401
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
 
     app.dependency_overrides.clear()
 

@@ -142,8 +142,8 @@ async def test_get_current_user_success(system_user_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_temporary_password_blocks_all_routes_except_password_change(system_user_id):
-    user = make_user(system_user_id=system_user_id)
+async def test_temporary_password_blocks_all_routes_except_password_change():
+    user = make_user(system_user_id=uuid7())
     user.must_change_password = True
     repository = AsyncMock()
     repository.get_by_id.return_value = user

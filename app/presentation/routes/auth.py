@@ -69,9 +69,9 @@ async def change_password(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[UserService, Depends(get_user_service)],
-    current_password: Annotated[str | None, Form()],
     new_password: Annotated[str, Form()],
     confirm_password: Annotated[str, Form()],
+    current_password: Annotated[str | None, Form()] = None,
 ):
     error = None
     if new_password != confirm_password:

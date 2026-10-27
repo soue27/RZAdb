@@ -1,18 +1,24 @@
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
+from app.application.auth.service import AuthService
 from app.application.tree.schemas import (
     ConnectionTreeNode,
     EnterpriseTreeNode,
     SubstationTreeNode,
     URZATreeNode,
 )
+from app.application.users.repository import UserRepository
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User
+from app.infrastructure.database.session import get_session
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import get_tree_service
+from app.presentation.dependencies.services import get_auth_service, get_tree_service
 
 
 def make_user(system_user_id) -> User:
@@ -155,9 +161,51 @@ def test_home_renders_separate_connection_expand_and_select_controls(
 def test_home_requires_authentication() -> None:
     client = TestClient(app)
 
-    response = client.get("/")
+    response = client.get("/", follow_redirects=False)
 
-    assert response.status_code == 401
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
+
+
+def make_session_user(*, must_change_password=False, active=True, deleted_at=None):
+    return User(
+        id=uuid7(),
+        full_name="Пользователь с сессией",
+        role=UserRole.ENGINEER,
+        email="session@example.test",
+        password_hash="hash",
+        access_category=AccessCategory.IV,
+        active=active,
+        deleted_at=deleted_at,
+        must_change_password=must_change_password,
+        created_by=uuid7(),
+        updated_by=uuid7(),
+    )
+
+
+def _install_session_test_overrides(user):
+    auth_service = AsyncMock(spec=AuthService)
+    auth_service.authenticate.return_value = user
+
+    async def override_session():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_auth_service] = lambda: auth_service
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService([])
+    return auth_service
+
+
+def _login_test_client(client, user):
+    auth_service = _install_session_test_overrides(user)
+    with patch.object(UserRepository, "get_by_id", new=AsyncMock(return_value=user)):
+        response = client.post(
+            "/auth/login",
+            data={"email": user.email, "password": "password"},
+            follow_redirects=False,
+        )
+    assert response.status_code == 303
+    auth_service.authenticate.assert_awaited_once()
 
 
 def test_home_authenticated(system_user_id) -> None:
@@ -179,6 +227,71 @@ def test_home_authenticated(system_user_id) -> None:
         assert "Тестовый пользователь" in response.text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_home_with_valid_session_is_accessible():
+    user = make_session_user()
+    client = TestClient(app)
+
+    try:
+        _login_test_client(client, user)
+        with patch.object(UserRepository, "get_by_id", new=AsyncMock(return_value=user)):
+            response = client.get("/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert "Пользователь с сессией" in response.text
+
+
+def test_temporary_password_redirects_home_and_allows_password_page():
+    user = make_session_user(must_change_password=True)
+    client = TestClient(app)
+
+    try:
+        _login_test_client(client, user)
+        with patch.object(UserRepository, "get_by_id", new=AsyncMock(return_value=user)):
+            home_response = client.get("/", follow_redirects=False)
+            password_response = client.get(
+                "/auth/change-password", follow_redirects=False
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert home_response.status_code == 303
+    assert home_response.headers["location"] == "/auth/change-password"
+    assert password_response.status_code == 200
+    assert "Смените временный пароль" in password_response.text
+
+
+@pytest.mark.parametrize(
+    "user",
+    [
+        make_session_user(active=False),
+        make_session_user(deleted_at=datetime.now(UTC)),
+    ],
+    ids=["inactive", "archived"],
+)
+def test_inactive_or_archived_session_redirects_to_login(user):
+    client = TestClient(app)
+
+    try:
+        _login_test_client(client, user)
+        with patch.object(UserRepository, "get_by_id", new=AsyncMock(return_value=user)):
+            response = client.get("/", follow_redirects=False)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
+    assert "session=" in response.headers["set-cookie"]
+
+
+def test_users_api_keeps_401_json_without_authentication():
+    response = TestClient(app).get("/users/me")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Требуется аутентификация."}
 
 
 @pytest.mark.parametrize(

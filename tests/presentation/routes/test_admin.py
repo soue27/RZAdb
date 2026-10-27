@@ -52,9 +52,10 @@ def make_enterprise():
 
 
 def test_admin_requires_authentication(client):
-    response = client.get("/admin/")
+    response = client.get("/admin/", follow_redirects=False)
 
-    assert response.status_code == 401
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login"
 
 
 def test_admin_rejects_engineer(client):
