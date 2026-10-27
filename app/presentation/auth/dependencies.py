@@ -50,3 +50,17 @@ async def require_non_specialist(
             detail="Недостаточно прав для выполнения этого действия.",
         )
     return current_user
+
+
+async def require_superadmin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Разрешает доступ только пользователю с ролью SUPERADMIN."""
+
+    if current_user.role is not UserRole.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для выполнения этого действия.",
+        )
+
+    return current_user

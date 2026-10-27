@@ -54,3 +54,11 @@ class UserRepository:
             .order_by(User.full_name)
         )
         return list(result.all())
+
+
+    async def get_all(self) -> list[User]:
+        """Возвращает всех пользователей для административного списка."""
+        query = select(User).order_by(User.full_name, User.email)
+        result = await self.session.scalars(query)
+        return list(result.all())
+

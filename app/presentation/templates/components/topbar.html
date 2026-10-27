@@ -37,6 +37,25 @@
             {% endif %}
 
 
+            <!-- Admin -->
+            {% if current_user and current_user.role.value == "superadmin" %}
+            <a
+                href="/admin"
+                class="btn btn-outline-primary topbar-control
+                       d-flex align-items-center gap-2"
+            >
+                <span class="material-icons fs-5">
+                    admin_panel_settings
+                </span>
+
+                <span>
+                    Админка
+                </span>
+            </a>
+            {% endif %}
+
+
+
             <!-- Notifications -->
             <button
                 type="button"

@@ -26,11 +26,17 @@ def make_request(session_data: dict) -> Request:
     return request
 
 
-def make_user(*, active: bool = True, deleted_at=None, system_user_id) -> User:
+def make_user(
+    *,
+    active: bool = True,
+    deleted_at=None,
+    role: UserRole = UserRole.ENGINEER,
+    system_user_id,
+) -> User:
     return User(
         id=uuid7(),
         full_name="Тестовый пользователь",
-        role=UserRole.ENGINEER,
+        role=role,
         email="test@example.com",
         password_hash="hash",
         access_category=AccessCategory.IV,
@@ -133,3 +139,31 @@ async def test_get_current_user_success(system_user_id) -> None:
 
     assert result is user
     repository.get_by_id.assert_awaited_once_with(user.id)
+
+@pytest.mark.asyncio
+async def test_require_superadmin_allows_superadmin(system_user_id) -> None:
+    from app.presentation.auth.dependencies import require_superadmin
+
+    user = make_user(
+        role=UserRole.SUPERADMIN,
+        system_user_id=system_user_id,
+    )
+
+    result = await require_superadmin(user)
+
+    assert result is user
+
+
+@pytest.mark.asyncio
+async def test_require_superadmin_rejects_engineer(system_user_id) -> None:
+    from app.presentation.auth.dependencies import require_superadmin
+
+    user = make_user(system_user_id=system_user_id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await require_superadmin(user)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == (
+        "Недостаточно прав для выполнения этого действия."
+    )

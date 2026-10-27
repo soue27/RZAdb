@@ -43,3 +43,55 @@ async def test_get_by_email_returns_none_for_unknown_email() -> None:
         result = await repository.get_by_email("unknown@test.local")
 
         assert result is None
+
+
+
+@pytest.mark.asyncio
+async def test_get_all_returns_active_inactive_and_archived_users(
+    system_user_id,
+) -> None:
+    async with async_session_factory() as session:
+        active_user = User(
+            full_name="Активный пользователь",
+            role=UserRole.ENGINEER,
+            email="active@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        inactive_user = User(
+            full_name="Отключённый пользователь",
+            role=UserRole.ENGINEER,
+            email="inactive@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        archived_user = User(
+            full_name="Архивный пользователь",
+            role=UserRole.ENGINEER,
+            email="archived@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            deleted_at=None,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+
+        session.add_all([active_user, inactive_user, archived_user])
+        await session.flush()
+
+        # Здесь нужно выставить deleted_at у archived_user
+        # с учётом типа даты, используемого в SoftDeleteMixin.
+        # После этого проверяем get_all().
+
+        await session.rollback()
+
