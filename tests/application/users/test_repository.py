@@ -1,3 +1,5 @@
+from datetime import datetime, UTC
+
 import pytest
 
 from app.application.users.repository import UserRepository
@@ -46,6 +48,7 @@ async def test_get_by_email_returns_none_for_unknown_email() -> None:
 
 
 
+
 @pytest.mark.asyncio
 async def test_get_all_returns_active_inactive_and_archived_users(
     system_user_id,
@@ -81,7 +84,7 @@ async def test_get_all_returns_active_inactive_and_archived_users(
             enterprise_id=None,
             access_category=AccessCategory.III,
             active=True,
-            deleted_at=None,
+            deleted_at=datetime.now(UTC),
             created_by=system_user_id,
             updated_by=system_user_id,
         )
@@ -89,9 +92,18 @@ async def test_get_all_returns_active_inactive_and_archived_users(
         session.add_all([active_user, inactive_user, archived_user])
         await session.flush()
 
-        # Здесь нужно выставить deleted_at у archived_user
-        # с учётом типа даты, используемого в SoftDeleteMixin.
-        # После этого проверяем get_all().
+        repository = UserRepository(session)
+        users = await repository.get_all()
+        users_by_email = {user.email: user for user in users}
+
+        assert "active@test.local" in users_by_email
+        assert "inactive@test.local" in users_by_email
+        assert "archived@test.local" in users_by_email
+
+        assert users_by_email["active@test.local"].active is True
+        assert users_by_email["inactive@test.local"].active is False
+        assert users_by_email["archived@test.local"].deleted_at is not None
 
         await session.rollback()
+
 
