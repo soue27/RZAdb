@@ -1,9 +1,10 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 
 from app.application.users.repository import UserRepository
-from app.domain.enums import AccessCategory, UserRole
+from app.domain.enterprise import Enterprise
+from app.domain.enums import AccessCategory, EnterpriseType, UserRole
 from app.domain.user import User
 from app.infrastructure.database.engine import async_session_factory
 
@@ -105,5 +106,177 @@ async def test_get_all_returns_active_inactive_and_archived_users(
         assert users_by_email["archived@test.local"].deleted_at is not None
 
         await session.rollback()
+
+
+
+@pytest.mark.asyncio
+async def test_get_all_filters_by_enterprise(system_user_id) -> None:
+    async with async_session_factory() as session:
+        enterprise_a = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Тестовое предприятие А",
+            short_name="Предприятие А",
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        enterprise_b = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Тестовое предприятие Б",
+            short_name="Предприятие Б",
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add_all([enterprise_a, enterprise_b])
+        await session.flush()
+
+        user_a = User(
+            full_name="Инженер предприятия А",
+            role=UserRole.ENGINEER,
+            email="filter-enterprise-a@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise_a.id,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        user_b = User(
+            full_name="Инженер предприятия Б",
+            role=UserRole.ENGINEER,
+            email="filter-enterprise-b@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise_b.id,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add_all([user_a, user_b])
+        await session.flush()
+
+        users = await UserRepository(session).get_all(
+            enterprise_id=enterprise_a.id,
+        )
+        emails = {user.email for user in users}
+
+        assert "filter-enterprise-a@test.local" in emails
+        assert "filter-enterprise-b@test.local" not in emails
+
+        await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_get_all_filters_users_without_enterprise(system_user_id) -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Предприятие для теста",
+            short_name="Предприятие",
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add(enterprise)
+        await session.flush()
+
+        user_with_enterprise = User(
+            full_name="Пользователь с предприятием",
+            role=UserRole.ENGINEER,
+            email="filter-with-enterprise@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise.id,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        user_without_enterprise = User(
+            full_name="Пользователь без предприятия",
+            role=UserRole.ENGINEER,
+            email="filter-without-enterprise@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add_all([user_with_enterprise, user_without_enterprise])
+        await session.flush()
+
+        users = await UserRepository(session).get_all(
+            without_enterprise=True,
+        )
+        emails = {user.email for user in users}
+
+        assert "filter-without-enterprise@test.local" in emails
+        assert "filter-with-enterprise@test.local" not in emails
+
+        await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_get_all_combines_enterprise_role_and_status_filters(
+    system_user_id,
+) -> None:
+    async with async_session_factory() as session:
+        enterprise = Enterprise(
+            type=EnterpriseType.DEPARTMENT,
+            full_name="Предприятие комбинированного фильтра",
+            short_name="Предприятие комбинированного фильтра",
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add(enterprise)
+        await session.flush()
+
+        matching_user = User(
+            full_name="Активный инженер",
+            role=UserRole.ENGINEER,
+            email="filter-combined-match@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise.id,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        inactive_user = User(
+            full_name="Отключённый инженер",
+            role=UserRole.ENGINEER,
+            email="filter-combined-inactive@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise.id,
+            access_category=AccessCategory.III,
+            active=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        manager = User(
+            full_name="Активный руководитель",
+            role=UserRole.MANAGER,
+            email="filter-combined-manager@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=enterprise.id,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        )
+        session.add_all([matching_user, inactive_user, manager])
+        await session.flush()
+
+        users = await UserRepository(session).get_all(
+            role=UserRole.ENGINEER,
+            status_filter="active",
+            enterprise_id=enterprise.id,
+        )
+        emails = {user.email for user in users}
+
+        assert "filter-combined-match@test.local" in emails
+        assert "filter-combined-inactive@test.local" not in emails
+        assert "filter-combined-manager@test.local" not in emails
+
+        await session.rollback()
+
 
 
