@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.enums import UserRole
@@ -55,10 +56,13 @@ class UserRepository:
         )
         return list(result.all())
 
-
     async def get_all(self) -> list[User]:
-        """Возвращает всех пользователей для административного списка."""
-        query = select(User).order_by(User.full_name, User.email)
+        """Возвращает всех пользователей с данными их предприятий."""
+        query = (
+            select(User)
+            .options(selectinload(User.enterprise))
+            .order_by(User.full_name, User.email)
+        )
         result = await self.session.scalars(query)
         return list(result.all())
 

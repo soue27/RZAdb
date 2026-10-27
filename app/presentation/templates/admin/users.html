@@ -39,7 +39,11 @@
                                     <td>{{ user.email }}</td>
                                     <td>{{ user.role.value }}</td>
                                     <td>
-                                        {{ user.enterprise_id or "—" }}
+                                        {% if user.enterprise %}
+                                            {{ user.enterprise.short_name }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if user.deleted_at %}
