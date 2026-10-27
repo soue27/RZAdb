@@ -56,13 +56,43 @@ class UserRepository:
         )
         return list(result.all())
 
-    async def get_all(self) -> list[User]:
-        """Возвращает всех пользователей с данными их предприятий."""
+    async def get_all(
+            self,
+            *,
+            role: UserRole | None = None,
+            status_filter: str | None = None,
+            enterprise_id: UUID | None = None,
+            without_enterprise: bool = False,
+    ) -> list[User]:
+        """Возвращает пользователей с фильтрацией по роли, статусу и предприятию."""
         query = (
             select(User)
             .options(selectinload(User.enterprise))
-            .order_by(User.full_name, User.email)
         )
+
+        if role is not None:
+            query = query.where(User.role == role)
+
+        if status_filter == "active":
+            query = query.where(
+                User.active.is_(True),
+                User.deleted_at.is_(None),
+            )
+        elif status_filter == "inactive":
+            query = query.where(
+                User.active.is_(False),
+                User.deleted_at.is_(None),
+            )
+        elif status_filter == "archived":
+            query = query.where(User.deleted_at.is_not(None))
+
+        if enterprise_id is not None:
+            query = query.where(User.enterprise_id == enterprise_id)
+        elif without_enterprise:
+            query = query.where(User.enterprise_id.is_(None))
+
+        query = query.order_by(User.full_name, User.email)
         result = await self.session.scalars(query)
         return list(result.all())
+
 

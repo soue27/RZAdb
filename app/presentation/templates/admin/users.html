@@ -14,12 +14,119 @@
         </div>
 
         <span class="badge text-bg-secondary">
-            Всего: {{ users|length }}
+            Найдено: {{ users|length }}
         </span>
     </div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-body">
+
+            <form method="get" action="/admin/" class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label for="role-filter" class="form-label">
+                        Роль
+                    </label>
+                    <select
+                        id="role-filter"
+                        name="role_filter"
+                        class="form-select"
+                    >
+                        <option value="">Все роли</option>
+                        {% for role in roles %}
+                            <option
+                                value="{{ role.value }}"
+                                {% if role_filter == role %}selected{% endif %}
+                            >
+                                {{ role_labels[role.value] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label for="status-filter" class="form-label">
+                        Статус
+                    </label>
+                    <select
+                        id="status-filter"
+                        name="status_filter"
+                        class="form-select"
+                    >
+                        <option
+                            value=""
+                            {% if not status_filter %}selected{% endif %}
+                        >
+                            Все статусы
+                        </option>
+                        <option
+                            value="active"
+                            {% if status_filter == "active" %}selected{% endif %}
+                        >
+                            Активные
+                        </option>
+                        <option
+                            value="inactive"
+                            {% if status_filter == "inactive" %}selected{% endif %}
+                        >
+                            Отключённые
+                        </option>
+                        <option
+                            value="archived"
+                            {% if status_filter == "archived" %}selected{% endif %}
+                        >
+                            В архиве
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label for="enterprise-filter" class="form-label">
+                        Предприятие
+                    </label>
+                    <select
+                        id="enterprise-filter"
+                        name="enterprise_filter"
+                        class="form-select"
+                    >
+                        <option
+                            value=""
+                            {% if not enterprise_filter %}selected{% endif %}
+                        >
+                            Все предприятия
+                        </option>
+                        <option
+                            value="none"
+                            {% if enterprise_filter == "none" %}selected{% endif %}
+                        >
+                            Без предприятия
+                        </option>
+                        {% for enterprise in enterprises %}
+                            <option
+                                value="{{ enterprise.id }}"
+                                {% if enterprise_filter == enterprise.id|string %}selected{% endif %}
+                            >
+                                {{ enterprise.short_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Применить
+                    </button>
+                    <a
+                        href="/admin/"
+                        class="btn btn-outline-secondary"
+                    >
+                        Сбросить
+                    </a>
+                </div>
+            </form>
+
             {% if users %}
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -32,12 +139,15 @@
                                 <th>Статус</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             {% for user in users %}
                                 <tr>
                                     <td>{{ user.full_name }}</td>
                                     <td>{{ user.email }}</td>
-                                    <td>{{ user.role.value }}</td>
+                                    <td>
+                                        {{ role_labels.get(user.role.value, user.role.value) }}
+                                    </td>
                                     <td>
                                         {% if user.enterprise %}
                                             {{ user.enterprise.short_name }}
@@ -66,10 +176,17 @@
                     </table>
                 </div>
             {% else %}
-                <p class="text-body-secondary mb-0">
-                    Пользователи не найдены.
-                </p>
+                <div class="text-center py-5">
+                    <span class="material-icons text-body-secondary mb-2"
+                          style="font-size: 3rem;">
+                        person_search
+                    </span>
+                    <p class="text-body-secondary mb-0">
+                        Пользователи по выбранным фильтрам не найдены.
+                    </p>
+                </div>
             {% endif %}
+
         </div>
     </div>
 </div>
