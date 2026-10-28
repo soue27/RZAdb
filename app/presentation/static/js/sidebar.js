@@ -17,6 +17,18 @@
 
     let isResizing = false;
     let expandedWidth = sidebar.getBoundingClientRect().width;
+    let pendingSearchSelection = null;
+
+    function clearSearchResults() {
+        if (searchInput) {
+            searchInput.value = "";
+        }
+
+        const results = document.getElementById("sidebar-search-results");
+        if (results) {
+            results.innerHTML = "";
+        }
+    }
 
 
     /*
@@ -180,11 +192,18 @@
             const targetId = result.dataset.objectId;
             const targetNode = sidebar.querySelector(`[data-tree-node-id="${targetId}"]`);
             if (objectType === "enterprise" && result.dataset.hasCard === "true") {
-                const treeItem = sidebar.querySelector(`[data-object-id="${targetId}"]`);
+                const treeItem = sidebar.querySelector(
+        `#app-sidebar-tree [data-object-id="${targetId}"]`,
+                );
+                if (!treeItem) return;
+
                 treeItem?.classList.add("search-selected");
+                pendingSearchSelection = treeItem;
                 treeItem?.click();
                 treeItem?.scrollIntoView({block: "nearest"});
             } else if (objectType === "enterprise") {
+                if (!targetNode) return;
+
                 targetNode?.querySelectorAll(".collapse").forEach((element) => {
                     element.classList.add("show");
                 });
@@ -192,13 +211,33 @@
                     button.setAttribute("aria-expanded", "true");
                 });
                 const enterpriseItem = targetNode?.querySelector(":scope > .tree-row > .tree-item");
+                if (!enterpriseItem) return;
+
                 enterpriseItem?.classList.add("search-selected");
                 enterpriseItem?.scrollIntoView({block: "nearest"});
+                clearSearchResults();
             } else {
-                const treeItem = sidebar.querySelector(`[data-object-id="${targetId}"]`);
+                const treeItem = sidebar.querySelector(
+        `#app-sidebar-tree [data-object-id="${targetId}"]`,
+                );
+                if (!treeItem) return;
+
                 treeItem?.classList.add("search-selected");
+                pendingSearchSelection = treeItem;
                 treeItem?.click();
                 treeItem?.scrollIntoView({block: "nearest"});
+            }
+        });
+
+        document.body.addEventListener("htmx:afterRequest", (event) => {
+            if (!pendingSearchSelection || event.detail.elt !== pendingSearchSelection) {
+                return;
+            }
+
+            const succeeded = event.detail.successful;
+            pendingSearchSelection = null;
+            if (succeeded && event.detail.target?.id === "object-content") {
+                clearSearchResults();
             }
         });
 
