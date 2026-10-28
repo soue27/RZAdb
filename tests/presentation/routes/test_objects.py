@@ -4960,7 +4960,7 @@ def _http_tree_service():
     }
 
 
-def test_tree_http_empty_query_is_active_only_and_search_includes_archive():
+def test_tree_http_query_does_not_switch_to_archive_mode():
     user = make_user(uuid7())
     tree_service, ids = _http_tree_service()
     app.dependency_overrides[get_current_user] = override_user(user)
@@ -4983,14 +4983,53 @@ def test_tree_http_empty_query_is_active_only_and_search_includes_archive():
             assert searched.status_code == 200
             assert 'id="app-sidebar-tree"' in searched.text
             assert "Relay active" in searched.text
-            assert "Relay archived" in searched.text
-            assert "Relay archived station" in searched.text
-            assert searched.text.count('>Архив</span>') >= 3
+            assert "Relay archived" not in searched.text
+            assert "Relay archived station" not in searched.text
             assert "Private relay" not in searched.text
-            for result_id in [ids["active"][2], ids["archived"][2]]:
+            for result_id in [ids["active"][2]]:
                 assert searched.text.count(f'data-object-id="{result_id}"') == 1
             assert 'id="sidebar-archive-toggle"' in searched.text
             assert 'type="checkbox"' not in searched.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_tree_search_route_uses_active_and_archive_modes_separately():
+    user = make_user(uuid7())
+    tree_service, _ids = _http_tree_service()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_tree_service] = lambda: tree_service
+
+    try:
+        with TestClient(app) as client:
+            active = client.get("/objects/search?query=relay")
+            assert active.status_code == 200
+            assert "Relay active" in active.text
+            assert "Relay archived" not in active.text
+            assert "Найдено:" in active.text
+            assert "Путь:" in active.text
+
+            archived = client.get(
+                "/objects/search?query=relay&archive_only=true",
+            )
+            assert archived.status_code == 200
+            assert "Relay archived" in archived.text
+            assert "Relay active" not in archived.text
+            assert "Private relay" not in archived.text
+
+            for offset in (0, 50, 125):
+                short = client.get(f"/objects/search?query=r&offset={offset}")
+                assert short.status_code == 200
+                assert "Введите не менее 2 символов" in short.text
+                assert "data-search-result" not in short.text
+
+            empty = client.get("/objects/search?query=")
+            empty_offset = client.get("/objects/search?query=&offset=50")
+            assert "Введите не менее" not in empty.text
+            assert "data-search-result" not in empty.text
+            assert empty_offset.status_code == 200
+            assert "Введите не менее" not in empty_offset.text
+            assert "data-search-result" not in empty_offset.text
     finally:
         app.dependency_overrides.clear()
 

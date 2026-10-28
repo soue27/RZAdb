@@ -8,6 +8,7 @@ class URZATreeNode(BaseModel):
 
     id: UUID
     dispatch_name: str
+    inventory_number: str | None = None
     is_archived: bool = False
 
 
@@ -44,3 +45,24 @@ class EnterpriseTreeNode(BaseModel):
     substations: list[SubstationTreeNode] = Field(
         default_factory=list,
     )
+
+
+class TreeSearchResult(BaseModel):
+    id: UUID
+    object_type: str
+    type_label: str
+    name: str
+    matched_field: str
+    matched_value: str
+    path: list[str]
+    path_ids: list[UUID]
+    archived: bool = False
+    has_card: bool = False
+    relevance: int
+
+
+class TreeSearchPage(BaseModel):
+    items: list[TreeSearchResult]
+    total: int
+    offset: int
+    limit: int

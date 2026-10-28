@@ -3,7 +3,6 @@
     const resizer = document.getElementById("sidebar-resizer");
     const collapseButton = document.getElementById("sidebar-collapse");
     const searchForm = document.getElementById("sidebar-search-form");
-    const archiveToggle = document.getElementById("sidebar-archive-toggle");
     const searchInput = document.getElementById("sidebar-search-input");
 
     if (!sidebar || !resizer || !collapseButton) {
@@ -143,19 +142,103 @@
 
     updateCollapseButton();
 
-    if (searchForm && archiveToggle) {
-        searchInput?.addEventListener("input", () => {
-            searchForm.elements.archive_only.value = "false";
-        });
+    if (searchForm) {
         sidebar.addEventListener("click", (event) => {
-            if (!event.target.closest("#sidebar-archive-toggle")) {
+            const clickedToggle = event.target.closest("#sidebar-archive-toggle");
+            if (!clickedToggle) {
                 return;
             }
+            document.getElementById("sidebar-search-results").innerHTML = "";
+            sidebar.querySelectorAll(".search-selected").forEach((item) => item.classList.remove("search-selected"));
             const archiveMode = searchForm.elements.archive_only;
             const enabled = archiveMode.value !== "true";
             archiveMode.value = String(enabled);
-            archiveToggle.setAttribute("aria-pressed", String(enabled));
+            clickedToggle.setAttribute("aria-pressed", String(enabled));
             htmx.trigger(document.body, "refresh-tree");
+        });
+        searchInput?.addEventListener("input", () => {
+            sidebar.querySelectorAll(".search-selected").forEach((item) => item.classList.remove("search-selected"));
+        });
+
+        sidebar.addEventListener("click", (event) => {
+            const result = event.target.closest("[data-search-result]");
+            if (!result) return;
+
+            sidebar.querySelectorAll(".search-selected").forEach((item) => {
+                item.classList.remove("search-selected");
+            });
+
+            const pathIds = result.dataset.pathIds.split(",");
+            pathIds.slice(0, -1).forEach((id) => {
+                const node = sidebar.querySelector(`[data-tree-node-id="${id}"]`);
+                const children = node?.querySelector(":scope > .collapse");
+                children?.classList.add("show");
+                node?.querySelector(":scope > .tree-row > .tree-expand-button")?.setAttribute("aria-expanded", "true");
+            });
+
+            const objectType = result.dataset.objectType;
+            const targetId = result.dataset.objectId;
+            const targetNode = sidebar.querySelector(`[data-tree-node-id="${targetId}"]`);
+            if (objectType === "enterprise" && result.dataset.hasCard === "true") {
+                const treeItem = sidebar.querySelector(`[data-object-id="${targetId}"]`);
+                treeItem?.classList.add("search-selected");
+                treeItem?.click();
+                treeItem?.scrollIntoView({block: "nearest"});
+            } else if (objectType === "enterprise") {
+                targetNode?.querySelectorAll(".collapse").forEach((element) => {
+                    element.classList.add("show");
+                });
+                targetNode?.querySelectorAll(".tree-expand-button").forEach((button) => {
+                    button.setAttribute("aria-expanded", "true");
+                });
+                const enterpriseItem = targetNode?.querySelector(":scope > .tree-row > .tree-item");
+                enterpriseItem?.classList.add("search-selected");
+                enterpriseItem?.scrollIntoView({block: "nearest"});
+            } else {
+                const treeItem = sidebar.querySelector(`[data-object-id="${targetId}"]`);
+                treeItem?.classList.add("search-selected");
+                treeItem?.click();
+                treeItem?.scrollIntoView({block: "nearest"});
+            }
+        });
+
+        document.body.addEventListener("htmx:beforeRequest", (event) => {
+            if (event.detail.elt?.id !== "sidebar-load-more") return;
+            document.getElementById("sidebar-search-error")?.remove();
+        });
+
+        document.body.addEventListener("htmx:responseError", (event) => {
+            const source = event.detail.elt;
+            const target = event.detail.target;
+            if (
+                source?.id === "sidebar-search-form"
+                && target?.id === "sidebar-search-results"
+            ) {
+                const results = document.getElementById("sidebar-search-results");
+                if (results) {
+                    results.innerHTML = '<div class="small text-danger py-2">Не удалось выполнить поиск. Попробуйте ещё раз.</div>';
+                }
+                event.stopPropagation();
+                return;
+            }
+
+            if (
+                source?.id !== "sidebar-load-more"
+                || target?.id !== "sidebar-search-results-list"
+            ) {
+                return;
+            }
+
+            const resultList = document.getElementById("sidebar-search-results-list");
+            if (!resultList) return;
+
+            const message = document.createElement("div");
+            message.id = "sidebar-search-error";
+            message.className = "small text-danger py-2";
+            message.setAttribute("role", "alert");
+            message.textContent = "Не удалось загрузить следующие результаты. Нажмите «Загрузить ещё», чтобы повторить.";
+            resultList.insertAdjacentElement("afterend", message);
+            event.stopPropagation();
         });
     }
 

@@ -1,0 +1,11 @@
+<button type="button" class="tree-search-result w-100 text-start" data-search-result
+        data-object-id="{{ item.id }}" data-object-type="{{ item.object_type }}"
+        data-has-card="{{ 'true' if item.has_card else 'false' }}"
+        data-path-ids="{{ item.path_ids|map('string')|join(',') }}">
+    <span class="d-flex justify-content-between gap-2">
+        <strong>{{ item.type_label }}: {{ item.name }}</strong>
+        {% if item.archived %}<span class="badge text-bg-secondary">Архив</span>{% endif %}
+    </span>
+    <span class="small d-block">Поле: {{ item.matched_field }} — {{ item.matched_value }}</span>
+    <span class="small text-muted d-block">Путь: {{ item.path|join(' → ') }}</span>
+</button>

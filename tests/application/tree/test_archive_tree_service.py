@@ -17,10 +17,10 @@ class _Access:
 
 class _Enterprises:
     def __init__(self, enterprise):
-        self.enterprise = enterprise
+        self.enterprises = enterprise if isinstance(enterprise, list) else [enterprise]
 
     async def get_all_active(self):
-        return [self.enterprise]
+        return self.enterprises
 
 
 class _Objects:
@@ -64,11 +64,11 @@ async def test_tree_search_defaults_to_active_and_including_archive_is_scoped():
     )
     archived_urza = SimpleNamespace(
         id=uuid4(), connection_id=connection_id, dispatch_name="Archive relay",
-        deleted_at=object(),
+        inventory_number="INV-ARCHIVE", deleted_at=object(),
     )
     active_urza = SimpleNamespace(
         id=uuid4(), connection_id=connection_id, dispatch_name="Active relay",
-        deleted_at=None,
+        inventory_number="INV-ACTIVE", deleted_at=None,
     )
     substations = _Objects([active_station, archived_station])
     connections = _Objects([active_connection])
@@ -85,13 +85,9 @@ async def test_tree_search_defaults_to_active_and_including_archive_is_scoped():
     assert [item.dispatch_name for item in active_tree[0].substations] == ["Active station"]
     assert not substations.include_archived
 
-    search_tree = await service.get_tree(
-        user_id, archive_only=True, query="relay"
-    )
+    search_tree = await service.get_tree(user_id, archive_only=True, query="relay")
     result_urzas = search_tree[0].substations[0].connections[0].urzas
-    assert {item.id for item in result_urzas} == {active_urza.id, archived_urza.id}
-    assert sum(item.is_archived for item in result_urzas) == 1
-    assert len({item.id for item in result_urzas}) == 2
+    assert [item.id for item in result_urzas] == [archived_urza.id]
     assert substations.include_archived
     assert connections.include_archived
     assert urzas.include_archived
@@ -106,3 +102,47 @@ async def test_tree_search_defaults_to_active_and_including_archive_is_scoped():
     ]
     assert len(archived_results) == 1
     assert archived_results[0].is_archived
+
+    active_page = await service.search(user_id, "relay")
+    assert [item.id for item in active_page.items] == [active_urza.id]
+    assert active_page.items[0].matched_field == "Диспетчерское имя"
+    assert active_page.items[0].relevance == 2
+    all_active_matches = await service.search(user_id, "active")
+    assert [item.object_type for item in all_active_matches.items] == [
+        "substation", "connection", "urza",
+    ]
+    assert len({item.id for item in all_active_matches.items}) == 3
+    assert all_active_matches.items[-1].matched_field == "Диспетчерское имя"
+    inventory_page = await service.search(user_id, "inv-act")
+    assert [item.id for item in inventory_page.items] == [active_urza.id]
+    assert inventory_page.items[0].matched_field == "Инвентарный номер"
+    archived_page = await service.search(user_id, "relay", archive_only=True)
+    assert [item.id for item in archived_page.items] == [archived_urza.id]
+
+
+@pytest.mark.asyncio
+async def test_search_ranks_enterprise_fields_and_paginates_deterministically():
+    enterprise = SimpleNamespace(
+        id=uuid4(), parent_id=None, type=EnterpriseType.DEPARTMENT,
+        full_name="North Relay Department", short_name="Relay", deleted_at=None,
+    )
+    child = SimpleNamespace(
+        id=uuid4(), parent_id=enterprise.id, type=EnterpriseType.DEPARTMENT,
+        full_name="Relay Branch", short_name="RB", deleted_at=None,
+    )
+    service = TreeService(
+        enterprise_repository=_Enterprises([enterprise, child]),
+        substation_repository=_Objects([]), connection_repository=_Objects([]),
+        urza_repository=_Objects([]), access_service=_Access(enterprise),
+    )
+    exact = await service.search(uuid4(), "relay", limit=1)
+    assert exact.total == 2
+    assert exact.items[0].id == enterprise.id
+    assert exact.items[0].matched_field == "Краткое наименование"
+    assert exact.items[0].relevance == 0
+    assert exact.items[0].has_card
+    next_page = await service.search(uuid4(), "relay", offset=1, limit=1)
+    assert [item.id for item in next_page.items] == [child.id]
+    assert next_page.items[0].relevance == 1
+    empty = await service.search(uuid4(), "r")
+    assert empty.total == 0

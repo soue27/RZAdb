@@ -1,0 +1,40 @@
+{% if query|length < 2 %}
+    <div id="sidebar-search-results" aria-live="polite">
+        {% if query|length == 1 %}
+            <div class="small text-muted py-2">Введите не менее 2 символов</div>
+        {% endif %}
+    </div>
+{% elif offset|default(0) > 0 %}
+    {% set previous_type = namespace(value='') %}
+    {% for item in page.items %}
+        {% if item.object_type != previous_type.value %}<h6 class="small text-uppercase text-muted mt-2">{{ item.type_label }}</h6>{% set previous_type.value = item.object_type %}{% endif %}
+        {% include "components/tree_search_result_item.html" %}
+    {% endfor %}
+    {% if page.offset + page.items|length < page.total %}
+        <button id="sidebar-load-more" class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                hx-get="/objects/search?query={{ query|urlencode }}&archive_only={{ 'true' if archive_only else 'false' }}&offset={{ page.offset + page.items|length }}"
+                hx-target="#sidebar-search-results-list" hx-swap="beforeend">Загрузить ещё</button>
+    {% else %}
+        <button id="sidebar-load-more" hx-swap-oob="delete"></button>
+    {% endif %}
+{% else %}
+    <div id="sidebar-search-results">
+        {% if page.items %}
+            <div class="small text-muted mb-2">Найдено: {{ page.total }}</div>
+            <div id="sidebar-search-results-list">
+                {% set previous_type = namespace(value='') %}
+                {% for item in page.items %}
+                    {% if item.object_type != previous_type.value %}<h6 class="small text-uppercase text-muted mt-2">{{ item.type_label }}</h6>{% set previous_type.value = item.object_type %}{% endif %}
+                    {% include "components/tree_search_result_item.html" %}
+                {% endfor %}
+            </div>
+            {% if page.total > page.items|length %}
+                <button id="sidebar-load-more" class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                        hx-get="/objects/search?query={{ query|urlencode }}&archive_only={{ 'true' if archive_only else 'false' }}&offset={{ page.items|length }}"
+                        hx-target="#sidebar-search-results-list" hx-swap="beforeend">Загрузить ещё</button>
+            {% endif %}
+        {% else %}
+            <div class="small text-muted py-2">Ничего не найдено</div>
+        {% endif %}
+    </div>
+{% endif %}

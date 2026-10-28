@@ -397,13 +397,11 @@ async def get_sidebar_tree(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
-    query: str = Query(default=""),
     archive_only: bool = Query(default=False),
 ):
     tree = await tree_service.get_tree(
         user_id=current_user.id,
         archive_only=archive_only,
-        query=query,
     )
     return templates.TemplateResponse(
         request=request,
@@ -412,6 +410,35 @@ async def get_sidebar_tree(
             "tree": tree,
             "current_user": current_user,
             "archive_only": archive_only,
+        },
+    )
+
+
+@router.get("/search")
+async def search_sidebar_tree(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    query: str = Query(default=""),
+    archive_only: bool = Query(default=False),
+    offset: int = Query(default=0, ge=0),
+):
+    normalized_query = query.strip()
+    page = None
+    if len(normalized_query) >= 2:
+        page = await tree_service.search(
+            user_id=current_user.id,
+            query=normalized_query,
+            archive_only=archive_only,
+            offset=offset,
+            limit=50,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="components/tree_search_results.html",
+        context={
+            "page": page, "query": normalized_query,
+            "archive_only": archive_only, "offset": offset,
         },
     )
 
