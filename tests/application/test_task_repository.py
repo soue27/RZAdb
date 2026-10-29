@@ -145,3 +145,69 @@ async def test_dashboard_task_count_is_aggregated_and_scoped_to_engineer():
     assert "substations_1.enterprise_id IN" in sql
     assert counts[TaskStatus.UNDER_REVIEW] == 2
     assert overdue == 1
+
+
+
+@pytest.mark.asyncio
+async def test_email_digest_engineer_query_is_scoped_to_assignee() -> None:
+    from app.domain.enums import TaskStatus
+
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    session.execute.return_value = result
+    user_id = uuid7()
+
+    assert await TaskRepository(
+        session
+    ).list_for_email_digest_engineer(user_id) == []
+
+    statement = session.execute.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "tasks.assigned_to =" in sql
+    assert "tasks.deleted_at IS NULL" in sql
+    assert "tasks.status IN" in sql
+    assert all(
+        status.value in sql
+        for status in (
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+        )
+    )
+    assert "ORDER BY tasks.deadline_at ASC NULLS LAST" in sql
+
+
+@pytest.mark.asyncio
+async def test_email_digest_manager_query_is_scoped_to_enterprise() -> None:
+    from app.domain.enums import TaskStatus
+
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    session.execute.return_value = result
+    enterprise_id = uuid7()
+
+    assert await TaskRepository(
+        session
+    ).list_for_email_digest_manager(enterprise_id) == []
+
+    statement = session.execute.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "tasks.deleted_at IS NULL" in sql
+    assert "tasks.status IN" in sql
+    assert "urzas" in sql
+    assert "connections" in sql
+    assert "substations" in sql
+    assert all(
+        status.value in sql
+        for status in (
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+        )
+    )
+    assert "ORDER BY tasks.deadline_at ASC NULLS LAST" in sql
+

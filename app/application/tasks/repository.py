@@ -67,6 +67,104 @@ class TaskRepository:
         )
         return list(result.scalars().all())
 
+
+    async def list_for_email_digest_engineer(
+        self,
+        user_id: UUID,
+    ) -> list[Task]:
+        """Возвращает активные задачи инженера для email-сводки."""
+        statuses = (
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+        )
+
+        result = await self.session.execute(
+            select(Task)
+            .options(
+                selectinload(Task.urza),
+                selectinload(Task.substation),
+                selectinload(Task.created_by_user),
+                selectinload(Task.assigned_to_user),
+            )
+            .where(
+                Task.assigned_to == user_id,
+                Task.deleted_at.is_(None),
+                Task.status.in_(statuses),
+            )
+            .order_by(
+                Task.deadline_at.asc().nulls_last(),
+                Task.created_at.desc(),
+                Task.id.desc(),
+            )
+        )
+        return list(result.scalars().all())
+
+
+    async def list_for_email_digest_manager(
+        self,
+        enterprise_id: UUID,
+    ) -> list[Task]:
+        """Возвращает активные задачи предприятия для email-сводки руководителя."""
+        statuses = (
+            TaskStatus.ASSIGNED,
+            TaskStatus.IN_PROGRESS,
+            TaskStatus.UNDER_REVIEW,
+        )
+
+        task_urza = aliased(URZA)
+        task_connection = aliased(Connection)
+        urza_substation = aliased(Substation)
+        direct_substation = aliased(Substation)
+
+        visible_in_enterprise = or_(
+            and_(
+                Task.urza_id.is_not(None),
+                urza_substation.enterprise_id == enterprise_id,
+            ),
+            and_(
+                Task.substation_id.is_not(None),
+                direct_substation.enterprise_id == enterprise_id,
+            ),
+        )
+
+        query = (
+            select(Task)
+            .options(
+                selectinload(Task.urza),
+                selectinload(Task.substation),
+                selectinload(Task.created_by_user),
+                selectinload(Task.assigned_to_user),
+            )
+            .outerjoin(task_urza, Task.urza_id == task_urza.id)
+            .outerjoin(
+                task_connection,
+                task_urza.connection_id == task_connection.id,
+            )
+            .outerjoin(
+                urza_substation,
+                task_connection.substation_id == urza_substation.id,
+            )
+            .outerjoin(
+                direct_substation,
+                Task.substation_id == direct_substation.id,
+            )
+            .where(
+                Task.deleted_at.is_(None),
+                Task.status.in_(statuses),
+                visible_in_enterprise,
+            )
+            .order_by(
+                Task.deadline_at.asc().nulls_last(),
+                Task.created_at.desc(),
+                Task.id.desc(),
+            )
+        )
+
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+
     async def count_dashboard_statuses(
         self,
         *,
