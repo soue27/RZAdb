@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
-from zoneinfo import ZoneInfo
 from uuid import UUID
-
+from zoneinfo import ZoneInfo
 
 EKATERINBURG_TZ = ZoneInfo("Asia/Yekaterinburg")
 

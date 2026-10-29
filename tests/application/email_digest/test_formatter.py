@@ -9,7 +9,6 @@ from app.application.email_digest.formatter import (
     EmailDigestFormatter,
 )
 
-
 TZ = ZoneInfo("Asia/Yekaterinburg")
 
 

@@ -1,6 +1,6 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
-import logging
 from zoneinfo import ZoneInfo
 
 from app.application.email_digest.formatter import (
@@ -9,7 +9,6 @@ from app.application.email_digest.formatter import (
 )
 from app.application.tasks.repository import TaskRepository
 from app.application.users.repository import UserRepository
-from app.core.config import Settings
 from app.domain.enums import UserRole
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 
@@ -120,12 +119,21 @@ class EmailDigestService:
                         now=current_time,
                     )
 
-                await self.sender.send(
-                    to=recipient.email,
-                    subject=message.subject,
-                    body=message.text_body,
-                    html_body=message.html_body,
-                )
+                try:
+                    await self.sender.send(
+                        to=recipient.email,
+                        subject=message.subject,
+                        body=message.text_body,
+                        html_body=message.html_body,
+                    )
+                except Exception:
+                    failed += 1
+                    logger.exception(
+                        "Email digest delivery failed for user %s",
+                        recipient.id,
+                    )
+                    continue
+
                 sent += 1
 
             except Exception:

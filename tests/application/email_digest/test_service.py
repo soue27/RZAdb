@@ -10,7 +10,6 @@ from app.application.email_digest.formatter import EmailDigestMessage
 from app.application.email_digest.service import EmailDigestService
 from app.domain.enums import UserRole
 
-
 TZ = ZoneInfo("Asia/Yekaterinburg")
 NOW = datetime(2026, 10, 29, 7, 30, tzinfo=TZ)
 
