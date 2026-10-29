@@ -111,4 +111,21 @@ class UserRepository:
         result = await self.session.scalars(query)
         return list(result.all())
 
+    async def list_active_email_digest_recipients(self) -> list[User]:
+        """Возвращает активных инженеров и руководителей с непустым email."""
+        result = await self.session.scalars(
+            select(User)
+            .where(
+                User.role.in_(
+                    [UserRole.ENGINEER, UserRole.MANAGER]
+                ),
+                User.active.is_(True),
+                User.deleted_at.is_(None),
+                User.email.is_not(None),
+                User.email != "",
+            )
+            .order_by(User.role, User.full_name, User.email)
+        )
+        return list(result.all())
+
 

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -277,6 +278,30 @@ async def test_get_all_combines_enterprise_role_and_status_filters(
         assert "filter-combined-manager@test.local" not in emails
 
         await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_email_digest_recipients_query_filters_roles_and_inactive_users():
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+
+    recipients = await UserRepository(
+        session
+    ).list_active_email_digest_recipients()
+
+    assert recipients == []
+
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "users.role IN" in sql
+    assert "engineer" in sql
+    assert "manager" in sql
+    assert "users.active IS true" in sql
+    assert "users.deleted_at IS NULL" in sql
+    assert "users.email !=" in sql
 
 
 
