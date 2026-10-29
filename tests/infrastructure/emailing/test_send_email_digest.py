@@ -3,7 +3,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.application.email_digest.service import DigestRunResult
+
 from app.infrastructure.emailing import send_email_digest as cli
+
 
 
 @pytest.mark.asyncio
