@@ -354,3 +354,32 @@ class TaskRepository:
             )
         )
         return result.scalar_one_or_none()
+
+
+    async def get_assignment_actor(
+        self,
+        *,
+        task_id: UUID,
+        assignee_id: UUID,
+    ) -> UUID | None:
+        """Возвращает автора последнего назначения указанного исполнителя."""
+        result = await self.session.scalar(
+            select(TaskHistory.actor_id)
+            .where(
+                TaskHistory.task_id == task_id,
+                or_(
+                    TaskHistory.event_type == "assigned",
+                    and_(
+                        TaskHistory.event_type == "reassigned",
+                        TaskHistory.new_assignee_id == assignee_id,
+                    ),
+                ),
+            )
+            .order_by(
+                TaskHistory.created_at.desc(),
+                TaskHistory.id.desc(),
+            )
+            .limit(1)
+        )
+        return result
+

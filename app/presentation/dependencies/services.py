@@ -74,6 +74,7 @@ from app.infrastructure.storage.local import LocalObjectStorage
 from app.application.notifications.repository import (
     TaskNotificationRepository,
 )
+from app.application.notifications.repository import TaskNotificationRepository
 from app.application.notifications.service import NotificationService
 
 
@@ -319,6 +320,21 @@ def get_schema_service(
     )
 
 
+def get_notification_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TaskNotificationRepository:
+    return TaskNotificationRepository(session)
+
+
+def get_notification_service(
+    repository: Annotated[
+        TaskNotificationRepository,
+        Depends(get_notification_repository),
+    ],
+) -> NotificationService:
+    return NotificationService(repository=repository)
+
+
 def get_task_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TaskRepository:
@@ -329,11 +345,16 @@ def get_task_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
+    notification_service: Annotated[
+        NotificationService,
+        Depends(get_notification_service),
+    ],
 ) -> TaskService:
     return TaskService(
         task_repository=task_repository,
         access_service=access_service,
         urza_instruction_repository=URZAInstructionRepository(session),
+        notification_service=notification_service,
     )
 
 
@@ -451,18 +472,3 @@ def get_task_statistics_service(
         work_item_service=work_item_service,
         inspection_work_item_source=inspection_work_item_source,
     )
-
-
-def get_notification_repository(
-    session: Annotated[AsyncSession, Depends(get_session)],
-) -> TaskNotificationRepository:
-    return TaskNotificationRepository(session)
-
-
-def get_notification_service(
-    repository: Annotated[
-        TaskNotificationRepository,
-        Depends(get_notification_repository),
-    ],
-) -> NotificationService:
-    return NotificationService(repository=repository)

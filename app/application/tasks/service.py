@@ -15,20 +15,23 @@ from app.domain.enums import (
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.user import User
+from app.application.notifications.service import NotificationService
 
 
 class TaskService:
     """Сценарии работы с заданиями."""
 
     def __init__(
-        self,
-        task_repository: TaskRepository,
-        access_service: AccessService,
-        urza_instruction_repository: URZAInstructionRepository,
+            self,
+            task_repository: TaskRepository,
+            access_service: AccessService,
+            urza_instruction_repository: URZAInstructionRepository,
+            notification_service: NotificationService,
     ) -> None:
         self.task_repository = task_repository
         self.access_service = access_service
         self.urza_instruction_repository = urza_instruction_repository
+        self.notification_service = notification_service
 
 
     @staticmethod
@@ -471,17 +474,23 @@ class TaskService:
         task.completed_at = None
         task.updated_by = actor_id
         await self.task_repository.save(task)
-        self.task_repository.session.add(
-            TaskHistory(
-                task_id=task.id,
-                event_type="review_rejected",
-                old_status=old_status,
-                new_status=TaskStatus.IN_PROGRESS,
-                actor_id=actor_id,
-                comment=comment.strip(),
-                created_at=review_time,
-            )
+        history = TaskHistory(
+            task_id=task.id,
+            event_type="review_rejected",
+            old_status=old_status,
+            new_status=TaskStatus.IN_PROGRESS,
+            actor_id=actor_id,
+            comment=comment.strip(),
+            created_at=review_time,
         )
+
+        self.task_repository.session.add(history)
+
+        if task.assigned_to is not None:
+            await self.notification_service.create_for_history(
+                history=history,
+                recipient_ids=[task.assigned_to],
+            )
         return task
 
     async def assign_task(
@@ -545,6 +554,11 @@ class TaskService:
         )
 
         self.task_repository.session.add(history)
+
+        await self.notification_service.create_for_history(
+            history=history,
+            recipient_ids=[assigned_to],
+        )
 
         return task
 
@@ -803,6 +817,17 @@ class TaskService:
 
         self.task_repository.session.add(history)
 
+        assigning_manager_id = await self.task_repository.get_assignment_actor(
+            task_id=task.id,
+            assignee_id=actor_id,
+        )
+
+        if assigning_manager_id is not None:
+            await self.notification_service.create_for_history(
+                history=history,
+                recipient_ids=[assigning_manager_id],
+            )
+
         return task
 
 
@@ -877,5 +902,14 @@ class TaskService:
         )
 
         self.task_repository.session.add(history)
+
+        await self.notification_service.create_for_history(
+            history=history,
+            recipient_ids=[
+                recipient_id
+                for recipient_id in (previous_assignee, assigned_to)
+                if recipient_id is not None
+            ],
+        )
 
         return task

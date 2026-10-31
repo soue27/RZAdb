@@ -103,6 +103,58 @@ class FakeTaskRepository:
     async def get_substation_instruction_version_by_task_id(self, task_id):
         return self.substation_instruction_versions.get(task_id)
 
+    async def get_assignment_actor(
+        self,
+        *,
+        task_id,
+        assignee_id,
+    ):
+        """Возвращает автора последнего назначения текущего исполнителя."""
+        assignment_events = [
+            history
+            for history in self.history
+            if history.task_id == task_id
+            and history.event_type in {"assigned", "reassigned"}
+        ]
+
+        if not assignment_events:
+            return None
+
+        # История в fake-репозитории добавляется в хронологическом порядке.
+        latest_assignment = assignment_events[-1]
+
+        # При переназначении проверяем, что последним назначен
+        # именно тот исполнитель, который сейчас отклоняет задачу.
+        if (
+            latest_assignment.event_type == "reassigned"
+            and latest_assignment.new_assignee_id != assignee_id
+        ):
+            return None
+
+        return latest_assignment.actor_id
+
+
+class FakeNotificationService:
+    """Собирает вызовы создания уведомлений для проверки TaskService."""
+
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def create_for_history(
+        self,
+        *,
+        history,
+        recipient_ids,
+    ):
+        recipients = list(recipient_ids)
+        self.calls.append(
+            {
+                "history": history,
+                "recipient_ids": recipients,
+            }
+        )
+        return []
+
 
 class FakeUserRepository:
     def __init__(self) -> None:
@@ -228,11 +280,17 @@ def make_task_service(
     repository: FakeTaskRepository,
     access_service: FakeAccessService,
     instruction_repository: FakeURZAInstructionRepository | None = None,
+    notification_service: FakeNotificationService | None = None,
 ) -> TaskService:
     return TaskService(
-        repository,
-        access_service,
-        instruction_repository or FakeURZAInstructionRepository(),
+        task_repository=repository,
+        access_service=access_service,
+        urza_instruction_repository=(
+            instruction_repository or FakeURZAInstructionRepository()
+        ),
+        notification_service=(
+            notification_service or FakeNotificationService()
+        ),
     )
 
 
@@ -533,10 +591,12 @@ async def test_cannot_issue_task_for_archived_urza() -> None:
         async def can_access_urza(self, _user_id, _urza_id):
             return True
 
+    FakeTaskRepository
     service = TaskService(
         task_repository=SimpleNamespace(),
         access_service=_Access(),
         urza_instruction_repository=SimpleNamespace(),
+        notification_service=FakeNotificationService(),
     )
 
     assert not await service.can_issue_task(actor_id=actor_id, urza_id=urza_id)
