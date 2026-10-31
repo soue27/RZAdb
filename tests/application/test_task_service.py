@@ -979,6 +979,10 @@ async def test_assign_task(
     assert history.new_status == TaskStatus.ASSIGNED
     assert history.actor_id == actor_id
     assert history.created_at == assigned_at
+    notification_calls = service.notification_service.calls
+    assert len(notification_calls) == 1
+    assert notification_calls[0]["history"] is history
+    assert notification_calls[0]["recipient_ids"] == [assigned_to]
 
 
 @pytest.mark.asyncio
@@ -1205,6 +1209,12 @@ async def test_reject_task(
     assert history.actor_id == engineer_id
     assert history.comment == "Не могу выполнить задание в установленный срок."
     assert history.created_at == rejected_at
+    notification_calls = service.notification_service.calls
+    assert len(notification_calls) == 2
+
+    rejection_notification = notification_calls[-1]
+    assert rejection_notification["history"] is history
+    assert rejection_notification["recipient_ids"] == [system_user_id]
 
 
 @pytest.mark.asyncio
@@ -1359,6 +1369,16 @@ async def test_reassign_task(
     assert history.actor_id == manager_id
     assert history.created_at == reassigned_at
 
+    notification_calls = service.notification_service.calls
+    assert len(notification_calls) == 2
+
+    reassignment_notification = notification_calls[-1]
+    assert reassignment_notification["history"] is history
+    assert reassignment_notification["recipient_ids"] == [
+        first_engineer_id,
+        second_engineer_id,
+    ]
+
 
 @pytest.mark.asyncio
 async def test_repeated_reassignments_keep_each_pair_of_assignees(
@@ -1425,6 +1445,18 @@ async def test_repeated_reassignments_keep_each_pair_of_assignees(
     assigned_event = next(
         event for event in repository.history if event.event_type == "assigned"
     )
+
+    assignment_actor = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=third_assignee_id,
+    )
+    assert assignment_actor == system_user_id
+
+    wrong_assignee_actor = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=initial_assignee_id,
+    )
+    assert wrong_assignee_actor is None
     assert assigned_event.previous_assignee_id is None
     assert assigned_event.new_assignee_id is None
 
@@ -1660,6 +1692,9 @@ async def test_complete_task(
     assert history.new_status == TaskStatus.COMPLETED
     assert history.actor_id == engineer_id
     assert history.created_at == completed_at
+    # Завершение задания не создаёт дополнительного уведомления.
+    assert len(service.notification_service.calls) == 1
+    assert service.notification_service.calls[0]["history"].event_type == "assigned"
 
 
 @pytest.mark.asyncio
@@ -2759,6 +2794,11 @@ async def test_revision_cycle_clears_previous_completion_and_records_new_date(
         comment="Исправить замечания",
     )
 
+    notification_calls = service.notification_service.calls
+    assert len(notification_calls) == 1
+    assert notification_calls[0]["history"].event_type == "review_rejected"
+    assert notification_calls[0]["recipient_ids"] == [engineer_id]
+
     assert task.status is TaskStatus.IN_PROGRESS
     assert task.completed_at is None
     assert repository.history[0] is original_completion_event
@@ -3431,6 +3471,10 @@ async def test_accept_task_rejects_inactive_or_deleted_assignee(
     assert task.assigned_to == engineer_id
     assert task.updated_by == original_updated_by
     assert len(repository.history) == history_count
+
+    # Принятие задания само по себе не создаёт уведомление.
+    assert len(service.notification_service.calls) == 1
+    assert service.notification_service.calls[0]["history"].event_type == "assigned"
 
 
 

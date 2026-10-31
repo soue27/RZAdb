@@ -35,6 +35,9 @@ from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
 from app.domain.user import User
 
+from app.application.notifications.repository import TaskNotificationRepository
+from app.application.notifications.service import NotificationService
+
 
 @pytest.mark.asyncio
 async def test_database_transaction_is_rolled_back(
@@ -210,10 +213,16 @@ async def test_program_submission_rolls_back_task_and_history(
         user_repository,
         urza_repository,
     )
+    notification_repository = TaskNotificationRepository(db_session)
+    notification_service = NotificationService(
+        repository=notification_repository,
+    )
+
     task_service = TaskService(
         task_repository=task_repository,
         access_service=access_service,
         urza_instruction_repository=None,
+        notification_service=notification_service,
     )
 
     program_service = ProgramService(
