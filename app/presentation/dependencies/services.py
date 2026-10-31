@@ -71,9 +71,6 @@ from app.application.work_items.service import (
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
-from app.application.notifications.repository import (
-    TaskNotificationRepository,
-)
 from app.application.notifications.repository import TaskNotificationRepository
 from app.application.notifications.service import NotificationService
 

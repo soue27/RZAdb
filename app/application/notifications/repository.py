@@ -3,6 +3,10 @@ from uuid import UUID
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.domain.task import Task
+from app.domain.task_history import TaskHistory
 
 from app.domain.task_notification import TaskNotification
 
@@ -41,6 +45,15 @@ class TaskNotificationRepository:
         """Возвращает непрочитанные уведомления конкретного пользователя."""
         result = await self.session.scalars(
             select(TaskNotification)
+            .options(
+                selectinload(TaskNotification.task_history).options(
+                    selectinload(TaskHistory.task).options(
+                        selectinload(Task.urza),
+                        selectinload(Task.substation),
+                    ),
+                    selectinload(TaskHistory.actor),
+                )
+            )
             .where(
                 TaskNotification.recipient_id == recipient_id,
                 TaskNotification.read_at.is_(None),

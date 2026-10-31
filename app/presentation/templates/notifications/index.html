@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Уведомления — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h4 mb-1">Уведомления</h1>
+            <p class="text-body-secondary mb-0">
+                Непрочитанные уведомления: {{ total }}
+            </p>
+        </div>
+    </div>
+
+    {% if notifications %}
+        <div class="d-flex flex-column gap-3">
+            {% for item in notifications %}
+                <article class="rzadb-surface-soft rounded-3 p-3">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                        <div>
+                            <h2 class="h6 mb-2">{{ item.event_label }}</h2>
+                            <div class="fw-medium">
+                                {{ item.task.description or "Задание без описания" }}
+                            </div>
+                            <div class="small text-body-secondary mt-1">
+                                {{ item.object_name }} · {{ item.work_type_label }}
+                            </div>
+                        </div>
+
+                        <div class="small text-body-secondary text-nowrap">
+                            {{ item.history.created_at.strftime("%d.%m.%Y %H:%M") }}
+                        </div>
+                    </div>
+
+                    {% if item.history.comment %}
+                        <p class="mb-0 mt-3">{{ item.history.comment }}</p>
+                    {% endif %}
+
+                    <form
+                        action="/notifications/{{ item.notification.id }}/open"
+                        method="post"
+                        class="mt-3"
+                    >
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="{{ csrf_token }}"
+                        >
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            Открыть задание
+                        </button>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% if total > offset + page_size %}
+            <div class="mt-4 text-center">
+                <a
+                    class="btn btn-outline-primary"
+                    href="/notifications?offset={{ offset + page_size }}"
+                >
+                    Показать следующие
+                </a>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="rzadb-surface-soft rounded-3 p-5 text-center">
+            <span class="material-icons text-body-secondary fs-1">
+                notifications_none
+            </span>
+            <h2 class="h5 mt-3">Новых уведомлений нет</h2>
+            <p class="text-body-secondary mb-0">
+                Когда появятся новые уведомления, они будут отображаться здесь.
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

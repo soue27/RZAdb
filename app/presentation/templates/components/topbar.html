@@ -57,25 +57,21 @@
 
 
             <!-- Notifications -->
-            <button
-                type="button"
-                class="btn btn-light border topbar-icon-control
-                       position-relative"
+            <a
+                href="/notifications"
+                class="btn btn-light border topbar-icon-control position-relative"
                 title="Уведомления"
+                aria-label="Уведомления"
             >
-                <span class="material-icons">
-                    notifications
-                </span>
+                <span class="material-icons">notifications</span>
 
-                {% if notification_count|default(0) > 0 %}
-                    <span
-                        class="position-absolute top-0 start-100
-                               translate-middle badge rounded-pill bg-danger"
-                    >
-                        {{ notification_count }}
-                    </span>
-                {% endif %}
-            </button>
+                <span
+                    id="notification-count"
+                    hx-get="/notifications/count"
+                    hx-trigger="load"
+                    hx-swap="innerHTML"
+                ></span>
+            </a>
 
 
             <!-- Divider -->

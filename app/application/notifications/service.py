@@ -62,6 +62,17 @@ class NotificationService:
             offset=offset,
         )
 
+    async def get_by_id(
+            self,
+            *,
+            notification_id: UUID,
+            recipient_id: UUID,
+    ) -> TaskNotification | None:
+        return await self.repository.get_by_id(
+            notification_id=notification_id,
+            recipient_id=recipient_id,
+        )
+
     async def count_unread(self, *, recipient_id: UUID) -> int:
         return await self.repository.count_unread(
             recipient_id=recipient_id,
@@ -79,3 +90,4 @@ class NotificationService:
             recipient_id=recipient_id,
             read_at=read_at,
         )
+
