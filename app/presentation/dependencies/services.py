@@ -71,6 +71,10 @@ from app.application.work_items.service import (
 from app.infrastructure.database.session import get_session
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
+from app.application.notifications.repository import (
+    TaskNotificationRepository,
+)
+from app.application.notifications.service import NotificationService
 
 
 def get_object_storage() -> ObjectStorage:
@@ -447,3 +451,18 @@ def get_task_statistics_service(
         work_item_service=work_item_service,
         inspection_work_item_source=inspection_work_item_source,
     )
+
+
+def get_notification_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TaskNotificationRepository:
+    return TaskNotificationRepository(session)
+
+
+def get_notification_service(
+    repository: Annotated[
+        TaskNotificationRepository,
+        Depends(get_notification_repository),
+    ],
+) -> NotificationService:
+    return NotificationService(repository=repository)
