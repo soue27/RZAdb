@@ -82,14 +82,18 @@ class TaskNotificationRepository:
         return result or 0
 
     async def get_by_id(
-        self,
-        *,
-        notification_id: UUID,
-        recipient_id: UUID,
+            self,
+            *,
+            notification_id: UUID,
+            recipient_id: UUID,
     ) -> TaskNotification | None:
         """Получает уведомление только в пределах владельца."""
         result = await self.session.scalars(
-            select(TaskNotification).where(
+            select(TaskNotification)
+            .options(
+                selectinload(TaskNotification.task_history),
+            )
+            .where(
                 TaskNotification.id == notification_id,
                 TaskNotification.recipient_id == recipient_id,
             )
