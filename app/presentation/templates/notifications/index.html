@@ -20,6 +20,12 @@
                     <div class="d-flex flex-wrap justify-content-between gap-2">
                         <div>
                             <h2 class="h6 mb-2">{{ item.event_label }}</h2>
+
+                            {% if item.history.event_type == "rejected" and item.actor_name %}
+                                <div class="small text-body-secondary mb-2">
+                                    Исполнитель: {{ item.actor_name }}
+                                </div>
+                            {% endif %}
                             <div class="fw-medium">
                                 {{ item.task.description or "Задание без описания" }}
                             </div>

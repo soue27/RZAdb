@@ -65,6 +65,9 @@ def make_notification(
         task=task,
         event_type=event_type,
         actor_id=uuid7(),
+        actor=SimpleNamespace(full_name="Иванов Иван Иванович"),
+        previous_assignee_id=None,
+        new_assignee_id=None,
         comment="Тестовый комментарий",
         created_at=datetime.now(UTC),
     )
@@ -378,3 +381,67 @@ def test_open_notification_does_not_mark_read_before_csrf_validation(
     assert response.status_code == 403
     service.get_by_id.assert_not_awaited()
     service.mark_as_read.assert_not_awaited()
+
+
+def test_rejected_notification_shows_actor_name(
+    notifications_client,
+):
+    client, user, service = notifications_client
+
+    notification = make_notification(
+        recipient_id=user.id,
+        event_type="rejected",
+    )
+    service.notifications = [notification]
+    service.get_unread.return_value = [notification]
+    service.count_unread.return_value = 1
+
+    response = client.get("/notifications")
+
+    assert response.status_code == 200
+    assert "Исполнитель отказался от задания" in response.text
+    assert "Исполнитель: Иванов Иван Иванович" in response.text
+
+
+def test_reassigned_notification_shows_previous_assignee_message(
+    notifications_client,
+):
+    client, user, service = notifications_client
+
+    notification = make_notification(
+        recipient_id=user.id,
+        event_type="reassigned",
+    )
+    notification.task_history.previous_assignee_id = user.id
+    notification.task_history.new_assignee_id = uuid7()
+
+    service.notifications = [notification]
+    service.get_unread.return_value = [notification]
+    service.count_unread.return_value = 1
+
+    response = client.get("/notifications")
+
+    assert response.status_code == 200
+    assert "Задание снято с вас" in response.text
+
+
+def test_reassigned_notification_shows_new_assignee_message(
+    notifications_client,
+):
+    client, user, service = notifications_client
+
+    notification = make_notification(
+        recipient_id=user.id,
+        event_type="reassigned",
+    )
+    notification.task_history.previous_assignee_id = uuid7()
+    notification.task_history.new_assignee_id = user.id
+
+    service.notifications = [notification]
+    service.get_unread.return_value = [notification]
+    service.count_unread.return_value = 1
+
+    response = client.get("/notifications")
+
+    assert response.status_code == 200
+    assert "Вам назначено задание" in response.text

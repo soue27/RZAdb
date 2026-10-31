@@ -67,12 +67,20 @@ def _notification_context(notification):
         else task.substation.dispatch_name
     )
 
+    event_label = EVENT_LABELS.get(
+        history.event_type,
+        "Изменение задания",
+    )
+
+    if history.event_type == "reassigned":
+        if notification.recipient_id == history.previous_assignee_id:
+            event_label = "Задание снято с вас"
+        elif notification.recipient_id == history.new_assignee_id:
+            event_label = "Вам назначено задание"
+
     return {
         "notification": notification,
-        "event_label": EVENT_LABELS.get(
-            history.event_type,
-            "Изменение задания",
-        ),
+        "event_label": event_label,
         "task": task,
         "object_name": object_name,
         "work_type_label": WORK_TYPE_LABELS.get(
@@ -80,6 +88,11 @@ def _notification_context(notification):
             task.work_type.value,
         ),
         "history": history,
+        "actor_name": (
+            history.actor.full_name
+            if history.actor is not None
+            else None
+        ),
     }
 
 
