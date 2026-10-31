@@ -116,12 +116,9 @@ class UserRepository:
         result = await self.session.scalars(
             select(User)
             .where(
-                User.role.in_(
-                    [UserRole.ENGINEER, UserRole.MANAGER]
-                ),
+                User.role.in_([UserRole.ENGINEER, UserRole.MANAGER]),
                 User.active.is_(True),
                 User.deleted_at.is_(None),
-                User.email.is_not(None),
                 User.email != "",
             )
             .order_by(User.role, User.full_name, User.email)

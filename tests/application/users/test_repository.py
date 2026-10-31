@@ -304,4 +304,207 @@ async def test_email_digest_recipients_query_filters_roles_and_inactive_users():
     assert "users.email !=" in sql
 
 
+@pytest.mark.asyncio
+async def test_email_digest_recipients_returns_only_active_engineers_and_managers(
+    db_session,
+    system_user_id,
+) -> None:
+    users = [
+        User(
+            full_name="Инженер Б",
+            role=UserRole.ENGINEER,
+            email="digest-engineer-b@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Инженер А",
+            role=UserRole.ENGINEER,
+            email="digest-engineer-a@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Руководитель",
+            role=UserRole.MANAGER,
+            email="digest-manager@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Специалист",
+            role=UserRole.SPECIALIST,
+            email="digest-specialist@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Администратор",
+            role=UserRole.ADMIN,
+            email="digest-admin@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Неактивный инженер",
+            role=UserRole.ENGINEER,
+            email="digest-inactive@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=False,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Архивный руководитель",
+            role=UserRole.MANAGER,
+            email="digest-archived@test.local",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            deleted_at=datetime.now(UTC),
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+        User(
+            full_name="Инженер без email",
+            role=UserRole.ENGINEER,
+            email="",
+            password_hash="test-password-hash",
+            enterprise_id=None,
+            access_category=AccessCategory.III,
+            active=True,
+            created_by=system_user_id,
+            updated_by=system_user_id,
+        ),
+    ]
 
+    db_session.add_all(users)
+    await db_session.flush()
+
+    recipients = await UserRepository(
+        db_session
+    ).list_active_email_digest_recipients()
+
+    recipients_by_email = {user.email: user for user in recipients}
+
+    assert set(recipients_by_email) == {
+        "digest-engineer-a@test.local",
+        "digest-engineer-b@test.local",
+        "digest-manager@test.local",
+    }
+
+    engineers = [
+        user.full_name
+        for user in recipients
+        if user.role == UserRole.ENGINEER
+    ]
+    managers = [
+        user.full_name
+        for user in recipients
+        if user.role == UserRole.MANAGER
+    ]
+
+    assert engineers == ["Инженер А", "Инженер Б"]
+    assert managers == ["Руководитель"]
+
+
+@pytest.mark.asyncio
+async def test_email_digest_recipients_returns_only_eligible_users(
+    system_user_id,
+) -> None:
+    async with async_session_factory() as session:
+
+        def make_user(
+            *,
+            role: UserRole,
+            email: str,
+            active: bool = True,
+            deleted_at: datetime | None = None,
+        ) -> User:
+            return User(
+                full_name=f"Тест {email}",
+                role=role,
+                email=email,
+                password_hash="test-password-hash",
+                enterprise_id=None,
+                access_category=AccessCategory.III,
+                active=active,
+                deleted_at=deleted_at,
+                created_by=system_user_id,
+                updated_by=system_user_id,
+            )
+
+        eligible_engineer = make_user(
+            role=UserRole.ENGINEER,
+            email="digest-engineer@test.local",
+        )
+        eligible_manager = make_user(
+            role=UserRole.MANAGER,
+            email="digest-manager@test.local",
+        )
+
+        excluded_users = [
+            make_user(
+                role=UserRole.ENGINEER,
+                email="digest-inactive@test.local",
+                active=False,
+            ),
+            make_user(
+                role=UserRole.MANAGER,
+                email="digest-archived@test.local",
+                deleted_at=datetime.now(UTC),
+            ),
+            make_user(
+                role=UserRole.SPECIALIST,
+                email="digest-specialist@test.local",
+            ),
+            make_user(
+                role=UserRole.ADMIN,
+                email="digest-admin@test.local",
+            ),
+            make_user(
+                role=UserRole.SUPERADMIN,
+                email="digest-superadmin@test.local",
+            ),
+            make_user(
+                role=UserRole.ENGINEER,
+                email="",
+            ),
+        ]
+
+        session.add_all([eligible_engineer, eligible_manager, *excluded_users])
+        await session.flush()
+
+        recipients = await UserRepository(
+            session
+        ).list_active_email_digest_recipients()
+
+        assert {user.email for user in recipients} == {
+            "digest-engineer@test.local",
+            "digest-manager@test.local",
+        }
+
+        await session.rollback()
