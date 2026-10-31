@@ -355,25 +355,18 @@ class TaskRepository:
         )
         return result.scalar_one_or_none()
 
-
     async def get_assignment_actor(
-        self,
-        *,
-        task_id: UUID,
-        assignee_id: UUID,
+            self,
+            *,
+            task_id: UUID,
+            assignee_id: UUID,
     ) -> UUID | None:
-        """Возвращает автора последнего назначения указанного исполнителя."""
-        result = await self.session.scalar(
-            select(TaskHistory.actor_id)
+        """Возвращает автора последнего назначения текущего исполнителя."""
+        latest_assignment = await self.session.scalar(
+            select(TaskHistory)
             .where(
                 TaskHistory.task_id == task_id,
-                or_(
-                    TaskHistory.event_type == "assigned",
-                    and_(
-                        TaskHistory.event_type == "reassigned",
-                        TaskHistory.new_assignee_id == assignee_id,
-                    ),
-                ),
+                TaskHistory.event_type.in_({"assigned", "reassigned"}),
             )
             .order_by(
                 TaskHistory.created_at.desc(),
@@ -381,5 +374,18 @@ class TaskRepository:
             )
             .limit(1)
         )
-        return result
+
+        if latest_assignment is None:
+            return None
+
+        # У события первичного назначения new_assignee_id не заполнен:
+        # текущий исполнитель передаётся из TaskService.
+        # Для переназначения обязательно сверяем нового исполнителя.
+        if (
+                latest_assignment.event_type == "reassigned"
+                and latest_assignment.new_assignee_id != assignee_id
+        ):
+            return None
+
+        return latest_assignment.actor_id
 

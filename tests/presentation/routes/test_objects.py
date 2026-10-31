@@ -5336,6 +5336,9 @@ class _HTTPEmptyTreeService:
 
 
 def test_task_mutation_http_route_rejects_archived_owner():
+    class _HTTPNotificationService:
+        async def create_for_history(self, *, history, recipient_ids):
+            return []
     user = make_user(uuid7())
     user.role = UserRole.ENGINEER
     task_id, urza_id = uuid7(), uuid7()
@@ -5352,7 +5355,12 @@ def test_task_mutation_http_route_rejects_archived_owner():
     access = _HTTPTaskArchiveAccess(user)
     from app.application.tasks.service import TaskService
 
-    task_service = TaskService(repository, access, SimpleNamespace())
+    task_service = TaskService(
+        repository,
+        access,
+        SimpleNamespace(),
+        _HTTPNotificationService(),
+    )
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_task_repository] = lambda: repository
     app.dependency_overrides[get_access_service] = lambda: access
