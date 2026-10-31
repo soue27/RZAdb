@@ -1218,6 +1218,41 @@ async def test_reject_task(
 
 
 @pytest.mark.asyncio
+async def test_reject_task_does_not_notify_when_assignment_actor_not_found(
+    service: TaskService,
+    repository: FakeTaskRepository,
+    system_user_id,
+) -> None:
+    engineer_id = uuid4()
+
+    task = await service.create_task(
+        urza_id=uuid4(),
+        work_type=TaskWorkType.OTD,
+        created_by=system_user_id,
+    )
+
+    configure_available_assignee(
+        service,
+        urza_id=task.urza_id,
+        engineer_id=engineer_id,
+    )
+
+    # Имитируем назначенное задание без истории назначения.
+    task.status = TaskStatus.ASSIGNED
+    task.assigned_to = engineer_id
+
+    await service.reject_task(
+        task=task,
+        actor_id=engineer_id,
+        reason="Не могу выполнить задание.",
+    )
+
+    assert task.status is TaskStatus.REJECTED
+    assert repository.history[-1].event_type == "rejected"
+    assert service.notification_service.calls == []
+
+
+@pytest.mark.asyncio
 async def test_reject_task_requires_reason(
     service: TaskService, system_user_id
 ) -> None:

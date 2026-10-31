@@ -2,9 +2,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.exc import MultipleResultsFound
-from uuid6 import uuid7
+from uuid6 import uuid7, UUID
 
 from app.application.tasks.repository import TaskRepository
+from app.domain.task_history import TaskHistory
 
 from datetime import UTC, datetime
 
@@ -672,3 +673,174 @@ async def test_email_digest_manager_returns_enterprise_tasks_including_own(
     assert {task.id for task in result} == {
         task.id for task in expected_tasks
     }
+
+
+async def create_task_with_assignment_context(
+    db_session,
+    system_user_id,
+):
+    enterprise = Enterprise(
+        type=EnterpriseType.BRANCH,
+        full_name="Предприятие для теста назначений",
+        short_name="ПТН",
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    db_session.add(enterprise)
+    await db_session.flush()
+
+    substation = Substation(
+        enterprise_id=enterprise.id,
+        highest_voltage=HighestVoltage.KV_110,
+        operational_current_type=OperationalCurrentType.PERMANENT,
+        dispatch_name="Подстанция для теста назначений",
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    db_session.add(substation)
+    await db_session.flush()
+
+    task = Task(
+        substation_id=substation.id,
+        work_type=TaskWorkType.INSTRUCTION,
+        status=TaskStatus.ASSIGNED,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+    db_session.add(task)
+    await db_session.flush()
+
+    return task
+
+
+@pytest.mark.asyncio
+async def test_get_assignment_actor_returns_none_without_assignment_history(
+    db_session,
+    system_user_id,
+):
+    task = await create_task_with_assignment_context(
+        db_session, system_user_id
+    )
+    repository = TaskRepository(db_session)
+
+    result = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=system_user_id,
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_assignment_actor_returns_actor_from_assigned_event(
+    db_session,
+    system_user_id,
+):
+    task = await create_task_with_assignment_context(
+        db_session, system_user_id
+    )
+    assignee_id = system_user_id
+    assigned_at = datetime.now(UTC)
+
+    db_session.add(
+        TaskHistory(
+            task_id=task.id,
+            event_type="assigned",
+            old_status=TaskStatus.CREATED,
+            new_status=TaskStatus.ASSIGNED,
+            actor_id=system_user_id,
+            created_at=assigned_at,
+        )
+    )
+    await db_session.flush()
+
+    repository = TaskRepository(db_session)
+
+    result = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=assignee_id,
+    )
+
+    assert result == system_user_id
+
+
+@pytest.mark.asyncio
+async def test_get_assignment_actor_returns_actor_from_matching_reassignment(
+    db_session,
+    system_user_id,
+):
+    task = await create_task_with_assignment_context(
+        db_session, system_user_id
+    )
+    assignee_id = system_user_id
+
+    db_session.add(
+        TaskHistory(
+            task_id=task.id,
+            event_type="reassigned",
+            old_status=TaskStatus.ASSIGNED,
+            new_status=TaskStatus.ASSIGNED,
+            actor_id=system_user_id,
+            previous_assignee_id=system_user_id,
+            new_assignee_id=assignee_id,
+            created_at=datetime.now(UTC),
+        )
+    )
+    await db_session.flush()
+
+    repository = TaskRepository(db_session)
+
+    result = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=assignee_id,
+    )
+
+    assert result == system_user_id
+
+
+@pytest.mark.asyncio
+async def test_get_assignment_actor_returns_none_for_reassignment_to_another_user(
+    db_session,
+    system_user_id,
+):
+    task = await create_task_with_assignment_context(
+        db_session, system_user_id
+    )
+    another_assignee = User(
+        full_name="Другой исполнитель",
+        role=UserRole.ENGINEER,
+        email="another-assignee@test.local",
+        password_hash="test",
+        access_category=AccessCategory.II,
+        active=True,
+        created_by=system_user_id,
+        updated_by=system_user_id,
+    )
+
+    db_session.add(another_assignee)
+    await db_session.flush()
+
+    new_assignee_id = another_assignee.id
+
+    db_session.add(
+        TaskHistory(
+            task_id=task.id,
+            event_type="reassigned",
+            old_status=TaskStatus.ASSIGNED,
+            new_status=TaskStatus.ASSIGNED,
+            actor_id=system_user_id,
+            previous_assignee_id=system_user_id,
+            new_assignee_id=new_assignee_id,
+            created_at=datetime.now(UTC),
+        )
+    )
+    await db_session.flush()
+
+    repository = TaskRepository(db_session)
+
+    result = await repository.get_assignment_actor(
+        task_id=task.id,
+        assignee_id=system_user_id,
+    )
+
+    assert result is None
