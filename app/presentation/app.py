@@ -31,6 +31,7 @@ from app.presentation.routes.urza_instructions import router as urza_instruction
 from app.presentation.routes.urza_objects import router as urza_objects_router
 from app.presentation.routes.users import router as users_router
 from app.presentation.routes.notifications import router as notifications_router
+from app.presentation.routes.feedback import router as feedback_router
 
 
 def _is_api_request(request: Request) -> bool:
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks_router)
     app.include_router(admin_router)
     app.include_router(notifications_router)
+    app.include_router(feedback_router)
 
     return app
 

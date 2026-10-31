@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Обратная связь — RZAdb{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-6">
+
+            <div class="mb-4">
+                <h1 class="h4 mb-2">Обратная связь</h1>
+                <p class="text-body-secondary mb-0">
+                    Здесь можно сообщить о проблеме, предложить улучшение
+                    или оставить замечание по работе RZAdb.
+                    Администратор свяжется с вами отдельно.
+                </p>
+            </div>
+
+            {% if success %}
+
+                <div class="rzadb-feedback-success text-center p-5 rounded-3">
+                    <div class="rzadb-feedback-success-icon mb-3">
+                        <span class="material-icons">check_circle</span>
+                    </div>
+
+                    <h2 class="h5 mb-2">
+                        Сообщение успешно отправлено!
+                    </h2>
+
+                    <p class="text-body-secondary mb-4">
+                        Спасибо за обратную связь.
+                        Ваше сообщение передано администратору.
+                    </p>
+
+                    <a href="/" class="btn rzadb-btn-primary">
+                        Вернуться на главную
+                    </a>
+                </div>
+
+            {% else %}
+
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <div class="rzadb-surface-soft rounded-3 p-4">
+                    <form action="/feedback" method="post">
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="{{ csrf_token }}"
+                        >
+
+                        <div class="mb-3">
+                            <label for="message" class="form-label fw-medium">
+                                Ваше сообщение
+                            </label>
+
+                            <textarea
+                                class="form-control"
+                                id="message"
+                                name="message"
+                                rows="7"
+                                maxlength="{{ max_length }}"
+                                placeholder="Опишите проблему или предложение..."
+                                required
+                            >{{ message }}</textarea>
+
+                            <div class="form-text">
+                                Максимум {{ max_length }} символов.
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">
+                                <span class="material-icons fs-6 align-middle me-1">
+                                    send
+                                </span>
+                                Отправить сообщение
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

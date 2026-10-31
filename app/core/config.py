@@ -24,6 +24,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Feedback
+    # Обратная связь
+    feedback_email: str | None = None
+    app_base_url: str | None = None
+    feedback_max_length: int = 5000
+
+
 
 @lru_cache
 def get_settings() -> Settings:

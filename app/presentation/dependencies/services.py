@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.access.service import AccessService
@@ -73,6 +73,9 @@ from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
 from app.application.notifications.repository import TaskNotificationRepository
 from app.application.notifications.service import NotificationService
+from app.application.feedback.service import FeedbackService
+from app.core.config import get_settings
+from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 
 
 def get_object_storage() -> ObjectStorage:
@@ -469,3 +472,33 @@ def get_task_statistics_service(
         work_item_service=work_item_service,
         inspection_work_item_source=inspection_work_item_source,
     )
+
+
+def get_feedback_service() -> FeedbackService:
+    settings = get_settings()
+
+    if not settings.feedback_email:
+        raise HTTPException(
+            status_code=503,
+            detail="Обратная связь временно недоступна.",
+        )
+
+    try:
+        sender = SMTPEmailSender(settings)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Отправка сообщений временно недоступна.",
+        ) from exc
+
+    return FeedbackService(
+        sender=sender,
+        recipient=settings.feedback_email,
+        app_base_url=settings.app_base_url,
+    )
+
+
+def get_enterprise_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EnterpriseRepository:
+    return EnterpriseRepository(session)

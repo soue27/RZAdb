@@ -79,6 +79,23 @@
 
     </div>
 
+        <footer class="app-footer">
+        <div class="container-fluid px-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="text-body-secondary small">
+                    RZAdb
+                </span>
+
+                {% if current_user|default(none) %}
+                    <a href="/feedback" class="app-footer-link">
+                        <span class="material-icons">feedback</span>
+                        Обратная связь
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </footer>
+
     <script
         src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     ></script>
