@@ -20,6 +20,7 @@ from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 from app.domain.user import User
+from app.domain.task_notification import TaskNotification
 
 __all__ = [
     "OTD",
@@ -49,4 +50,5 @@ __all__ = [
     "URZAInstruction",
     "URZAInstructionVersion",
     "User",
+    "TaskNotification",
 ]
