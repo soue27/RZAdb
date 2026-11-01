@@ -21,6 +21,11 @@ def test_login_page() -> None:
     assert "Вход в систему" in response.text
     assert 'name="email"' in response.text
     assert 'name="password"' in response.text
+    # Страница авторизации не должна подключать основной layout.
+    assert 'class="app-layout"' not in response.text
+    assert 'class="app-content flex-grow-1"' not in response.text
+    assert 'id="task-statistics"' not in response.text
+    assert 'id="equipment-import-modal"' not in response.text
 
 
 def test_login_success() -> None:
