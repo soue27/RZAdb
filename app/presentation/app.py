@@ -118,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router)
     app.include_router(equipment_import_router)
 
+
     return app
 
 
