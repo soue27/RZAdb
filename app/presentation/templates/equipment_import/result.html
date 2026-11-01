@@ -1,0 +1,111 @@
+{% if not result.success %}
+
+    <div class="alert alert-danger mb-3">
+        <div class="fw-semibold mb-2">
+            Файл содержит ошибки. Импорт невозможен.
+        </div>
+
+        <div class="small">
+            Найдено ошибок: {{ result.errors|length }}
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 90px">Строка</th>
+                    <th style="width: 180px">Столбец</th>
+                    <th>Описание ошибки</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for error in result.errors %}
+                <tr>
+                    <td>
+                        {% if error.row is defined %}
+                            {{ error.row }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>{{ error.column|default("—") }}</td>
+                    <td>{{ error.message }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% elif result.created is defined %}
+
+    <div class="alert alert-success">
+        <div class="fw-semibold mb-2">
+            Импорт успешно завершён.
+        </div>
+
+        <ul class="mb-0">
+            <li>Подстанций: {{ result.created.substations }}</li>
+            <li>Присоединений: {{ result.created.connections }}</li>
+            <li>Устройств РЗА: {{ result.created.urzas }}</li>
+        </ul>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <button
+            type="button"
+            class="btn btn-primary"
+            data-bs-dismiss="modal"
+        >
+            Закрыть
+        </button>
+    </div>
+
+{% else %}
+
+    <div class="alert alert-success">
+        <div class="fw-semibold mb-2">
+            Проверка завершена. Ошибок не обнаружено.
+        </div>
+
+        <ul class="mb-0">
+            <li>Подстанций: {{ result.summary.substations }}</li>
+            <li>Присоединений: {{ result.summary.connections }}</li>
+            <li>Устройств РЗА: {{ result.summary.urzas }}</li>
+        </ul>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <button
+            type="button"
+            class="btn btn-outline-secondary"
+            data-bs-dismiss="modal"
+        >
+            Отмена
+        </button>
+
+        <button
+            type="button"
+            class="btn btn-primary"
+            hx-post="/equipment-import/confirm"
+            hx-include="#equipment-import-file"
+            hx-encoding="multipart/form-data"
+            hx-target="#equipment-import-result"
+            hx-swap="innerHTML"
+            hx-indicator="#equipment-import-loading"
+        >
+            <span class="material-icons fs-5 align-middle me-1">
+                check
+            </span>
+            Подтвердить импорт
+        </button>
+    </div>
+
+    <div
+        id="equipment-import-loading"
+        class="htmx-indicator text-body-secondary small mt-2 text-end"
+    >
+        Выполняется импорт…
+    </div>
+
+{% endif %}

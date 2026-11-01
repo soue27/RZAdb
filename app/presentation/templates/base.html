@@ -43,6 +43,44 @@
 <body class="bg-body">
 
     {% include "components/topbar.html" %}
+    {% if current_user and current_user.role.value in ["admin", "superadmin"] %}
+        <!-- Equipment import modal -->
+        <div
+            class="modal fade"
+            id="equipment-import-modal"
+            tabindex="-1"
+            aria-labelledby="equipment-import-modal-label"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h5
+                            class="modal-title"
+                            id="equipment-import-modal-label"
+                        >
+                            Импорт оборудования
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Закрыть"
+                        ></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <p class="text-body-secondary mb-0">
+                            Выберите файл Excel для импорта оборудования.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    {% endif %}
     {% if current_user|default(none) %}
         <section
             id="task-statistics"

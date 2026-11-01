@@ -1,3 +1,4 @@
+
 <nav class="navbar bg-white topbar">
     <div class="container-fluid px-4">
 
@@ -15,46 +16,61 @@
             </span>
         </a>
 
-
         <!-- Right side -->
         <div class="d-flex align-items-center gap-2 ms-auto">
 
             <!-- Tasks -->
             {% if current_user and current_user.role.value != "specialist" %}
-            <a
-                href="/tasks"
-                class="btn rzadb-btn-primary topbar-control
-                       d-flex align-items-center gap-2"
-            >
-                <span class="material-icons fs-5">
-                    assignment
-                </span>
+                <a
+                    href="/tasks"
+                    class="btn rzadb-btn-primary topbar-control
+                           d-flex align-items-center gap-2"
+                >
+                    <span class="material-icons fs-5">
+                        assignment
+                    </span>
 
-                <span>
-                    Задания
-                </span>
-            </a>
+                    <span>
+                        Задания
+                    </span>
+                </a>
             {% endif %}
-
 
             <!-- Admin -->
             {% if current_user and current_user.role.value == "superadmin" %}
-            <a
-                href="/admin"
-                class="btn btn-outline-primary topbar-control
-                       d-flex align-items-center gap-2"
-            >
-                <span class="material-icons fs-5">
-                    admin_panel_settings
-                </span>
+                <a
+                    href="/admin"
+                    class="btn btn-outline-primary topbar-control
+                           d-flex align-items-center gap-2"
+                >
+                    <span class="material-icons fs-5">
+                        admin_panel_settings
+                    </span>
 
-                <span>
-                    Админка
-                </span>
-            </a>
+                    <span>
+                        Админка
+                    </span>
+                </a>
             {% endif %}
 
+            <!-- Equipment import -->
+            {% if current_user and current_user.role.value in ["admin", "superadmin"] %}
+                <button
+                    type="button"
+                    class="btn btn-outline-primary topbar-control
+                           d-flex align-items-center gap-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#equipment-import-modal"
+                >
+                    <span class="material-icons fs-5">
+                        upload_file
+                    </span>
 
+                    <span>
+                        Импорт
+                    </span>
+                </button>
+            {% endif %}
 
             <!-- Notifications -->
             <a
@@ -73,10 +89,8 @@
                 ></span>
             </a>
 
-
             <!-- Divider -->
             <div class="vr mx-2"></div>
-
 
             <!-- User -->
             {% if current_user %}
@@ -90,7 +104,6 @@
                     </div>
                 </div>
             {% endif %}
-
 
             <!-- Theme -->
             <button
@@ -106,7 +119,6 @@
                     dark_mode
                 </span>
             </button>
-
 
             <!-- Logout -->
             <form
