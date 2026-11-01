@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.enterprise import Enterprise
+from app.domain.enums import EnterpriseType
 
 
 class EnterpriseRepository:
@@ -79,3 +80,21 @@ class EnterpriseRepository:
         self.session.add(enterprise)
         await self.session.flush()
         return enterprise
+
+    async def get_by_parent_and_type(
+        self,
+        *,
+        parent_id: UUID | None,
+        enterprise_type: EnterpriseType,
+    ) -> list[Enterprise]:
+        result = await self.session.scalars(
+            select(Enterprise)
+            .where(
+                Enterprise.parent_id == parent_id
+                if parent_id is not None
+                else Enterprise.parent_id.is_(None),
+                Enterprise.type == enterprise_type,
+            )
+            .order_by(Enterprise.full_name)
+        )
+        return list(result)
