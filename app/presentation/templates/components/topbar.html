@@ -72,6 +72,27 @@
                 </button>
             {% endif %}
 
+
+            <!-- Organization import -->
+            {% if current_user and current_user.role.value == "superadmin" %}
+                <button
+                    type="button"
+                    class="btn btn-outline-primary topbar-control
+                           d-flex align-items-center gap-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#organization-import-modal"
+                >
+                    <span class="material-icons fs-5">
+                        account_tree
+                    </span>
+
+                    <span>
+                        Структура
+                    </span>
+                </button>
+            {% endif %}
+
+
             <!-- Notifications -->
             <a
                 href="/notifications"

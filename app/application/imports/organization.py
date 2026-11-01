@@ -43,6 +43,8 @@ FORBIDDEN_PARTS = (
     "customXml/",
 )
 
+SHEET_NAME = "Организационная структура"
+
 
 class OrganizationImportService:
     """Импорт организационной структуры из XLSX."""
@@ -233,6 +235,13 @@ class OrganizationImportService:
             }]
 
         worksheet = workbook.worksheets[0]
+
+        if worksheet.title != SHEET_NAME:
+            return [], [{
+                "message": (
+                    f"Лист должен называться «{SHEET_NAME}»."
+                ),
+            }]
 
         if worksheet.sheet_state != "visible":
             return [], [{
@@ -585,7 +594,10 @@ class OrganizationImportService:
                             })
                             continue
 
-                    if enterprise.short_name.strip() != node["short_name"]:
+                    if (
+                            enterprise.short_name.strip().casefold()
+                            != node["short_name"].strip().casefold()
+                    ):
                         errors.append({
                             "row": node["rows"][0],
                             "column": self._short_column(level),

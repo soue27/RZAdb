@@ -136,6 +136,101 @@
         </div>
     {% endif %}
 
+
+    {% if current_user and current_user.role.value == "superadmin" %}
+        <!-- Organization import modal -->
+        <div
+            class="modal fade"
+            id="organization-import-modal"
+            tabindex="-1"
+            aria-labelledby="organization-import-modal-label"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h5
+                            class="modal-title"
+                            id="organization-import-modal-label"
+                        >
+                            Импорт организационной структуры
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Закрыть"
+                        ></button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <form
+                            id="organization-import-form"
+                            enctype="multipart/form-data"
+                        >
+                            <label
+                                for="organization-import-file"
+                                class="form-label fw-medium"
+                            >
+                                Файл организационной структуры (.xlsx)
+                            </label>
+
+                            <input
+                                type="file"
+                                class="form-control"
+                                id="organization-import-file"
+                                name="file"
+                                accept=".xlsx"
+                                required
+                                hx-post="/organization-import/preview"
+                                hx-trigger="change"
+                                hx-encoding="multipart/form-data"
+                                hx-target="#organization-import-result"
+                                hx-swap="innerHTML"
+                                hx-indicator="#organization-import-loading"
+                            >
+
+                            <div class="form-text">
+                                Используйте шаблон организационной структуры.
+                                Максимальный размер — 5 МБ.
+                                Допускается не более 500 строк данных.
+                            </div>
+                        </form>
+
+                        <div
+                            id="organization-import-loading"
+                            class="htmx-indicator text-body-secondary small mt-3"
+                        >
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            Проверка файла…
+                        </div>
+
+                        <div
+                            id="organization-import-result"
+                            class="mt-3"
+                        ></div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            Закрыть
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+
     {% if current_user|default(none) %}
         <section
             id="task-statistics"

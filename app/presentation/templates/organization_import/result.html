@@ -1,0 +1,128 @@
+
+{% if not result.success %}
+
+    <div class="alert alert-danger mb-3">
+        <div class="fw-semibold mb-2">
+            Файл содержит ошибки. Импорт невозможен.
+        </div>
+
+        <div class="small">
+            Найдено ошибок: {{ result.errors|length }}
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 90px">Строка</th>
+                    <th style="width: 220px">Столбец</th>
+                    <th>Описание ошибки</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for error in result.errors %}
+                <tr>
+                    <td>{{ error.row|default("—") }}</td>
+                    <td>{{ error.column|default("—") }}</td>
+                    <td>{{ error.message }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% elif result.created is defined %}
+
+    <div class="alert alert-success">
+        <div class="fw-semibold mb-2">
+            Организационная структура успешно импортирована.
+        </div>
+
+        <ul class="mb-0">
+            <li>Холдингов: {{ result.created.holdings }}</li>
+            <li>Филиалов: {{ result.created.branches }}</li>
+            <li>ПО: {{ result.created.departments }}</li>
+        </ul>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <button
+            type="button"
+            class="btn btn-primary"
+            data-bs-dismiss="modal"
+        >
+            Закрыть
+        </button>
+    </div>
+
+{% else %}
+
+    <div class="alert alert-success">
+        <div class="fw-semibold mb-2">
+            Проверка завершена. Ошибок не обнаружено.
+        </div>
+        <div class="small">
+            Будут созданы новые предприятия и использованы
+            уже существующие записи.
+        </div>
+    </div>
+
+    {% set labels = {
+        "holdings": "Холдинги",
+        "branches": "Филиалы",
+        "departments": "Производственные отделения"
+    } %}
+
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Уровень</th>
+                    <th class="text-center">Будет создано</th>
+                    <th class="text-center">Будет использовано</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, label in labels.items() %}
+                <tr>
+                    <td>{{ label }}</td>
+                    <td class="text-center">
+                        {{ result.summary[key].create }}
+                    </td>
+                    <td class="text-center">
+                        {{ result.summary[key].reuse }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <button
+            type="button"
+            class="btn btn-outline-secondary"
+            data-bs-dismiss="modal"
+        >
+            Отмена
+        </button>
+
+        <button
+            type="button"
+            class="btn btn-primary"
+            hx-post="/organization-import/confirm"
+            hx-include="#organization-import-file"
+            hx-encoding="multipart/form-data"
+            hx-target="#organization-import-result"
+            hx-swap="innerHTML"
+            hx-indicator="#organization-import-loading"
+        >
+            <span class="material-icons fs-5 align-middle me-1">
+                check
+            </span>
+            Подтвердить импорт
+        </button>
+    </div>
+
+{% endif %}

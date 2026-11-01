@@ -35,6 +35,9 @@ from app.presentation.routes.feedback import router as feedback_router
 from app.presentation.routes.equipment_import import (
     router as equipment_import_router,
 )
+from app.presentation.routes.organization_import import (
+    router as organization_import_router,
+)
 
 
 def _is_api_request(request: Request) -> bool:
@@ -117,7 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(feedback_router)
     app.include_router(equipment_import_router)
-
+    app.include_router(organization_import_router)
 
     return app
 

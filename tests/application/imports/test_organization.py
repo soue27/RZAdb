@@ -7,6 +7,7 @@ from openpyxl import Workbook
 
 from app.application.imports.organization import (
     HEADERS,
+    SHEET_NAME,
     OrganizationImportService,
 )
 from app.domain.enums import EnterpriseType
@@ -43,6 +44,7 @@ class FakeRepository:
 def make_xlsx(rows):
     workbook = Workbook()
     worksheet = workbook.active
+    worksheet.title = SHEET_NAME
 
     worksheet.append(HEADERS)
 
@@ -277,6 +279,7 @@ async def test_preview_rejects_wrong_headers():
 
     workbook = Workbook()
     worksheet = workbook.active
+    worksheet.title = SHEET_NAME
     worksheet.append(["Неверный заголовок", *HEADERS[1:]])
 
     content = BytesIO()
@@ -327,3 +330,60 @@ async def test_preview_rejects_invalid_file():
 
     assert result["success"] is False
     assert result["summary"] is None
+
+
+@pytest.mark.asyncio
+async def test_preview_rejects_wrong_sheet_name():
+    service = make_service()
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Лист1"
+    worksheet.append(HEADERS)
+    worksheet.append([
+        "Холдинг",
+        "Х",
+        "Филиал",
+        "Ф",
+        "ПО",
+        "ПО",
+    ])
+
+    content = BytesIO()
+    workbook.save(content)
+    workbook.close()
+
+    result = await service.preview(content.getvalue())
+
+    assert result["success"] is False
+    assert any(
+        SHEET_NAME in error["message"]
+        for error in result["errors"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_preview_matches_short_name_without_case_sensitivity():
+    holding = FakeEnterprise(
+        full_name="Холдинг",
+        short_name="Х",
+    )
+
+    service = make_service([holding])
+
+    content = make_xlsx([[
+        "Холдинг",
+        "х",
+        "Филиал",
+        "Ф",
+        "ПО",
+        "ПО",
+    ]])
+
+    result = await service.preview(content)
+
+    assert result["success"] is True
+    assert result["summary"]["holdings"] == {
+        "create": 0,
+        "reuse": 1,
+    }

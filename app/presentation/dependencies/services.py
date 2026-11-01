@@ -77,6 +77,7 @@ from app.application.feedback.service import FeedbackService
 from app.core.config import get_settings
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 from app.application.imports.equipment import EquipmentImportService
+from app.application.imports.organization import OrganizationImportService
 
 
 def get_object_storage() -> ObjectStorage:
@@ -129,6 +130,14 @@ def get_access_service(
         enterprise_repository=EnterpriseRepository(session),
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
+    )
+
+
+def get_organization_import_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> OrganizationImportService:
+    return OrganizationImportService(
+        repository=EnterpriseRepository(session),
     )
 
 
