@@ -521,7 +521,10 @@ class OrganizationImportService:
 
                     parent = resolved[parent_key]
 
-                    if isinstance(parent, Enterprise):
+                    if isinstance(parent, dict):
+                        # Родитель новый и ещё не имеет записи в БД.
+                        matches = []
+                    else:
                         # Родитель уже существует в БД.
                         matches = by_parent_and_name[
                             (
@@ -529,10 +532,6 @@ class OrganizationImportService:
                                 self._normalize(node["full_name"]),
                             )
                         ]
-                    else:
-                        # Новый родитель ещё не существует в БД.
-                        # Его дочерние предприятия также будут новыми.
-                        matches = []
 
                 # 4. Проверяем неоднозначность.
                 if len(matches) > 1:
