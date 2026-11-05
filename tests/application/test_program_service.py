@@ -1326,7 +1326,7 @@ async def test_get_available_actions_draft_manager(
         program=program,
     )
 
-    assert actions == set()
+    assert actions == {"delete"}
 
 
 @pytest.mark.asyncio
@@ -1366,7 +1366,7 @@ async def test_get_available_actions_under_review_manager_same_department(
         program=program,
     )
 
-    assert actions == {"approve", "return"}
+    assert actions == {"approve", "return", "delete"}
 
 
 @pytest.mark.asyncio
@@ -1374,7 +1374,9 @@ async def test_get_available_actions_under_review_manager_other_department(
     service,
     user_repository,
     urza_repository,
+    access_service,
 ):
+    access_service.can_modify_urza.return_value = False
     user_id = uuid7()
 
     user_repository.get_by_id.return_value = SimpleNamespace(
@@ -1431,7 +1433,7 @@ async def test_get_available_actions_approved(
         program=program,
     )
 
-    assert actions == set()
+    assert actions == {"delete"}
 
 
 

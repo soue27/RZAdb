@@ -31,6 +31,7 @@ from app.presentation.routes.urza_instructions import router as urza_instruction
 from app.presentation.routes.urza_objects import router as urza_objects_router
 from app.presentation.routes.users import router as users_router
 from app.presentation.routes.notifications import router as notifications_router
+from app.presentation.routes.physical_deletions import router as physical_deletions_router
 from app.presentation.routes.feedback import router as feedback_router
 from app.presentation.routes.equipment_import import (
     router as equipment_import_router,
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks_router)
     app.include_router(admin_router)
     app.include_router(notifications_router)
+    app.include_router(physical_deletions_router)
     app.include_router(feedback_router)
     app.include_router(equipment_import_router)
     app.include_router(organization_import_router)

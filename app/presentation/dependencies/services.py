@@ -16,6 +16,7 @@ from app.application.files.owner_repository import FileOwnerRepository
 from app.application.files.owner_resolver import FileOwnerResolver
 from app.application.files.repository import FileRepository
 from app.application.files.service import FileService
+from app.application.files.physical_deletion import PhysicalDeletionService
 from app.application.inspections.inspection_repository import InspectionRepository
 from app.application.inspections.inspection_service import InspectionService
 from app.application.inspections.repository import InspectionTaskRepository
@@ -130,6 +131,19 @@ def get_access_service(
         enterprise_repository=EnterpriseRepository(session),
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
+    )
+
+
+def get_physical_deletion_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+) -> PhysicalDeletionService:
+    return PhysicalDeletionService(
+        session=session,
+        access_service=access_service,
+        file_owners=FileOwnerRepository(session),
+        storage=storage,
     )
 
 

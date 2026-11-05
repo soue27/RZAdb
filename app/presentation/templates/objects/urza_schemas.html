@@ -150,10 +150,10 @@
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-outline-danger"
-                                            hx-post="/objects/urza/{{ urza_id }}/schemas/{{ record.id }}/delete"
-                                            hx-target="#urza-tab-content"
+                                            hx-post="/objects/urza/schemas/{{ record.id }}/physical-delete"
+                                            hx-target="closest tr"
                                             hx-swap="outerHTML"
-                                            hx-confirm="Удалить запись схемы? Запись будет скрыта из активного списка."
+                                            hx-confirm="Удалить схему {{ record.schema_number }} — {{ record.schema_name }}? Операция необратима. Неиспользуемые связанные файлы будут удалены."
                                         >Удалить</button>
                                     {% endif %}
                                 </div>

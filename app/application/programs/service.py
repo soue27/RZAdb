@@ -83,6 +83,9 @@ class ProgramService:
 
         actions: set[str] = set()
 
+        if user.role in {UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN}:
+            actions.add("delete")
+
         if program.status is DocumentStatus.DRAFT:
             if user.role in {
                 UserRole.ENGINEER,

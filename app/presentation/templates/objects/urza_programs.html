@@ -173,6 +173,15 @@
                                     </form>
                                 {% endif %}
 
+                                {% if "delete" in actions %}
+                                    <form method="post" action="/objects/urza/programs/{{ program.id }}/physical-delete"
+                                          hx-post="/objects/urza/programs/{{ program.id }}/physical-delete"
+                                          hx-target="closest tr" hx-swap="outerHTML"
+                                          onsubmit="return confirm('Удалить программу {{ program.program_number }}? Операция необратима. Неиспользуемые связанные файлы будут удалены. Задание, если оно связано, останется без изменений.');">
+                                        <button class="btn btn-sm btn-outline-danger">Удалить</button>
+                                    </form>
+                                {% endif %}
+
 
                             </div>
                         </td>

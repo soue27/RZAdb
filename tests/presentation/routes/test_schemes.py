@@ -15,6 +15,7 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
+    get_physical_deletion_service,
     get_schema_service,
     get_task_service,
 )
@@ -822,26 +823,35 @@ def test_schema_workflow_access_error_is_403(system_user_id):
         _roles_by_user.pop(user.id, None)
 
 
-@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.SUPERADMIN])
-def test_schema_delete_soft_deletes_and_hides_record(system_user_id, role):
+@pytest.mark.parametrize("role", [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN])
+def test_schema_delete_physically_removes_record(system_user_id, role):
     user = _user(system_user_id, role)
     urza_id = uuid7()
     record = _record(urza_id, DocumentStatus.APPROVED)
     service = FakeSchemaService(urza_id, records=[record], current=record)
     _setup(user, urza_id, service)
+    class FakeDeletion:
+        async def delete(self, **kwargs):
+            assert kwargs["kind"] == "schema"
+            assert kwargs["expected_owner_id"] == urza_id
+            service.records.clear()
+            service.current = None
+            return SimpleNamespace(owner_id=urza_id, file_cleanup_failed=False)
+    app.dependency_overrides[get_physical_deletion_service] = FakeDeletion
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/schemas/{record.id}/delete"
         )
         assert response.status_code == 200
-        assert record.deleted_at is not None
+        assert record.deleted_at is None
+        assert service.records == []
         assert str(record.id) not in response.text
     finally:
         app.dependency_overrides.clear()
         _roles_by_user.pop(user.id, None)
 
 
-@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.MANAGER])
+@pytest.mark.parametrize("role", [UserRole.ENGINEER])
 def test_schema_delete_denies_engineer_and_manager(system_user_id, role):
     user = _user(system_user_id, role)
     urza_id = uuid7()
@@ -852,6 +862,10 @@ def test_schema_delete_denies_engineer_and_manager(system_user_id, role):
         errors={"delete": PermissionError("Удаление запрещено")},
     )
     _setup(user, urza_id, service)
+    class FakeDeletion:
+        async def delete(self, **kwargs):
+            raise PermissionError("Недостаточно прав")
+    app.dependency_overrides[get_physical_deletion_service] = FakeDeletion
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/schemas/{record.id}/delete"

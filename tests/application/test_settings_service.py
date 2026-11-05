@@ -447,14 +447,14 @@ async def test_engineer_and_manager_cannot_delete(role):
     ("role", "status", "expected"),
     [
         (UserRole.ENGINEER, DocumentStatus.DRAFT, {"edit", "submit"}),
-        (UserRole.MANAGER, DocumentStatus.DRAFT, {"edit", "submit"}),
+        (UserRole.MANAGER, DocumentStatus.DRAFT, {"edit", "submit", "delete"}),
         (UserRole.ADMIN, DocumentStatus.DRAFT, {"edit", "submit", "delete"}),
         (UserRole.SUPERADMIN, DocumentStatus.DRAFT, {"edit", "submit", "delete"}),
-        (UserRole.MANAGER, DocumentStatus.UNDER_REVIEW, {"approve", "return"}),
+        (UserRole.MANAGER, DocumentStatus.UNDER_REVIEW, {"approve", "return", "delete"}),
         (UserRole.ENGINEER, DocumentStatus.UNDER_REVIEW, set()),
         (UserRole.ADMIN, DocumentStatus.APPROVED, {"delete"}),
         (UserRole.SUPERADMIN, DocumentStatus.APPROVED, {"delete"}),
-        (UserRole.MANAGER, DocumentStatus.APPROVED, set()),
+        (UserRole.MANAGER, DocumentStatus.APPROVED, {"delete"}),
     ],
 )
 @pytest.mark.asyncio

@@ -161,7 +161,7 @@
 
         </dl>
 
-        {% if versions and (versions|length > 1 or working_versions) %}
+        {% if versions %}
             <details
                 class="mt-4 rzadb-otd-history"
                 {% if history_open %}open{% endif %}
@@ -202,6 +202,15 @@
                                 </span>
                             {% endif %}
 
+                            {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                            <form method="post" action="/objects/urza/instruction/versions/{{ version.id }}/delete"
+                                  hx-post="/objects/urza/instruction/versions/{{ version.id }}/delete"
+                                  hx-target="closest .list-group-item" hx-swap="outerHTML"
+                                  onsubmit="return confirm('Удалить версию {{ version.version_number }} инструкции URZA? Удаляется только эта версия.{% if version.id == current_version.id %} Предыдущая версия станет текущей.{% endif %} Операция необратима. Неиспользуемые файлы будут удалены.');">
+                                <button class="btn btn-sm btn-outline-danger">Удалить версию</button>
+                            </form>
+                            {% endif %}
+
                         </div>
                     {% endfor %}
 
@@ -214,16 +223,26 @@
                 <h3 class="h6">Рабочие редакции</h3>
                 <div class="list-group">
                     {% for version in working_versions %}
-                        <a
-                            class="list-group-item list-group-item-action{% if selected_version and selected_version.id == version.id %} active{% endif %}"
-                            href="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
-                            hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
-                            hx-target="#urza-tab-content"
-                            hx-swap="outerHTML"
-                            hx-push-url="true"
-                        >
-                            Рабочая редакция · {{ version.status.label }} · {{ version.effective_date.strftime("%d.%m.%Y") }}
-                        </a>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <a
+                                class="list-group-item-action{% if selected_version and selected_version.id == version.id %} active{% endif %}"
+                                href="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}"
+                                hx-get="/objects/urza/{{ instruction.urza_id }}/instruction?instruction_version={{ version.id }}{% if is_archived %}&archived=true{% endif %}"
+                                hx-target="#urza-tab-content"
+                                hx-swap="outerHTML"
+                                hx-push-url="true"
+                            >
+                                Рабочая редакция · Версия {{ version.version_number }} · {{ version.status.label }} · {{ version.effective_date.strftime("%d.%m.%Y") }}
+                            </a>
+                            {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                                <form method="post" action="/objects/urza/instruction/versions/{{ version.id }}/delete"
+                                      hx-post="/objects/urza/instruction/versions/{{ version.id }}/delete"
+                                      hx-target="closest .list-group-item" hx-swap="outerHTML"
+                                      onsubmit="return confirm('Удалить рабочую версию {{ version.version_number }} инструкции URZA? Удаляется только эта версия. Операция необратима. Неиспользуемые файлы будут удалены.');">
+                                    <button class="btn btn-sm btn-outline-danger">Удалить</button>
+                                </form>
+                            {% endif %}
+                        </div>
                     {% endfor %}
                 </div>
             </section>

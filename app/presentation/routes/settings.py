@@ -8,6 +8,7 @@ from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.files.physical_deletion import PhysicalDeletionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -21,6 +22,7 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
+    get_physical_deletion_service,
     get_settings_service,
     get_task_service,
 )
@@ -628,7 +630,7 @@ async def _run_workflow_action(
             status_code=403,
             detail=str(exc),
         ) from exc
-    except ValueError as exc:
+    except LookupError as exc:
         raise HTTPException(
             status_code=_settings_value_error_status(exc),
             detail=str(exc),
@@ -739,6 +741,10 @@ async def delete_urza_settings_record(
         TaskService,
         Depends(get_task_service),
     ],
+    deletion_service: Annotated[
+        PhysicalDeletionService,
+        Depends(get_physical_deletion_service),
+    ],
 ):
     await _check_urza_access(
         object_service,
@@ -747,10 +753,9 @@ async def delete_urza_settings_record(
     )
 
     try:
-        await settings_service.delete_record(
-            user_id=current_user.id,
-            urza_id=urza_id,
-            record_id=record_id,
+        deletion_result = await deletion_service.delete(
+            kind="settings", user_id=current_user.id, record_id=record_id,
+            expected_owner_id=urza_id,
         )
     except PermissionError as exc:
         raise HTTPException(
@@ -762,6 +767,8 @@ async def delete_urza_settings_record(
             status_code=404,
             detail=str(exc),
         ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return await _render_settings(
         request,
@@ -769,4 +776,9 @@ async def delete_urza_settings_record(
         current_user,
         settings_service,
         task_service,
+        error_message=(
+            "Запись удалена, но не удалось удалить один из файлов. Обратитесь к администратору."
+            if deletion_result.file_cleanup_failed
+            else None
+        ),
     )

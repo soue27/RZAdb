@@ -1,10 +1,13 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
 
 from app.application.files.service import FileService
+from app.application.files.physical_deletion import PhysicalDeletionService, TARGETS
+from app.domain.enums import UserRole
 from app.domain.file import File
 
 from app.application.files import validation
@@ -12,6 +15,246 @@ from app.application.files.validation import (
     FileTooLargeError,
     UnsupportedFileTypeError,
 )
+
+
+class _DeletionSession:
+    def __init__(self, *scalar_values, files=()):
+        self.scalar_values = iter(scalar_values)
+        self.files = list(files)
+        self.deleted = []
+        self.events = []
+        self.rollback_called = False
+        self.commit_error = None
+
+    async def scalar(self, _query):
+        return next(self.scalar_values)
+
+    async def get(self, _model, _record_id):
+        return next(self.scalar_values)
+
+    async def scalars(self, _query):
+        return MagicMock(all=lambda: self.files)
+
+    async def delete(self, record):
+        self.deleted.append(record)
+
+    async def flush(self):
+        self.events.append("flush")
+
+    async def commit(self):
+        self.events.append("commit")
+        if self.commit_error:
+            raise self.commit_error
+
+    async def rollback(self):
+        self.rollback_called = True
+
+
+class _DeletionAccess:
+    def __init__(self, role=UserRole.MANAGER, allowed=True):
+        self.user_repository = MagicMock()
+        self.user_repository.get_by_id = AsyncMock(
+            return_value=MagicMock(role=role, active=True, deleted_at=None)
+        )
+        self.allowed = allowed
+
+    async def can_access_substation(self, *_args):
+        return self.allowed
+
+    async def can_access_urza(self, *_args):
+        return self.allowed
+
+
+class _FileOwners:
+    def __init__(self, owners=()):
+        self.owners = list(owners)
+
+    async def get_owners_by_file_id(self, _file_id):
+        return self.owners
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", list(TARGETS))
+@pytest.mark.parametrize("role", [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN])
+async def test_physical_delete_commits_each_allowed_category(kind, role):
+    target = TARGETS[kind]
+    parent_field = target.parent_field
+    owner_field = target.parent_owner_field
+    parent_id = uuid7()
+    record_values = {"id": uuid7(), "deleted_at": None}
+    if target.scope == "substation_id":
+        record_values["substation_id"] = parent_id
+        scalar_values = [SimpleNamespace(**record_values)]
+    elif target.scope == "urza_id":
+        record_values["urza_id"] = parent_id
+        scalar_values = [SimpleNamespace(**record_values)]
+    else:
+        record_values[parent_field] = uuid7()
+        record = SimpleNamespace(**record_values)
+        parent = SimpleNamespace(id=record_values[parent_field], **{owner_field: parent_id})
+        if target.scope == "version":
+            scalar_values = [record, parent]
+        else:
+            scalar_values = [record]
+    record = scalar_values[0]
+    for column in target.model.__table__.columns:
+        if any(fk.target_fullname == "files.id" for fk in column.foreign_keys):
+            setattr(record, column.name, None)
+    if target.scope == "urza" and target.scope != "version":
+        scalar_values.append(parent)
+
+    session = _DeletionSession(*scalar_values)
+    storage = MagicMock()
+    storage.delete = AsyncMock()
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(role=role),
+        file_owners=_FileOwners(),
+        storage=storage,
+    )
+
+    result = await service.delete(kind=kind, record_id=record.id, user_id=uuid7())
+
+    assert result.owner_id == parent_id
+    assert session.deleted == [record]
+    assert session.events[-1] == "commit"
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_denies_engineer_before_mutating_record():
+    record = SimpleNamespace(id=uuid7(), deleted_at=None, urza_id=uuid7())
+    session = _DeletionSession(record)
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(role=UserRole.ENGINEER),
+        file_owners=_FileOwners(),
+        storage=MagicMock(),
+    )
+
+    with pytest.raises(PermissionError):
+        await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.deleted == []
+    assert session.events == []
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_keeps_file_with_another_owner():
+    shared_file = SimpleNamespace(id=uuid7(), s3_key="files/shared.pdf")
+    record = SimpleNamespace(
+        id=uuid7(), deleted_at=None, urza_id=uuid7(),
+        scan_file_id=shared_file.id, editable_file_id=None,
+    )
+    session = _DeletionSession(record, files=[shared_file])
+    storage = MagicMock()
+    storage.delete = AsyncMock()
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(),
+        file_owners=_FileOwners(owners=[object()]),
+        storage=storage,
+    )
+
+    await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.deleted == [record]
+    storage.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_removes_unowned_file_only_after_commit():
+    file = SimpleNamespace(id=uuid7(), s3_key="files/unused.pdf")
+    record = SimpleNamespace(
+        id=uuid7(), deleted_at=None, urza_id=uuid7(),
+        scan_file_id=file.id, editable_file_id=None,
+    )
+    session = _DeletionSession(record, files=[file])
+    storage = MagicMock()
+
+    async def delete_object(*, key):
+        assert session.events[-1] == "commit"
+        assert key == file.s3_key
+        session.events.append("storage-delete")
+
+    storage.delete = AsyncMock(side_effect=delete_object)
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(),
+        file_owners=_FileOwners(),
+        storage=storage,
+    )
+
+    await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.deleted == [record, file]
+    assert session.events[-2:] == ["commit", "storage-delete"]
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_does_not_remove_file_when_commit_fails():
+    file = SimpleNamespace(id=uuid7(), s3_key="files/unused.pdf")
+    record = SimpleNamespace(
+        id=uuid7(), deleted_at=None, urza_id=uuid7(),
+        scan_file_id=file.id, editable_file_id=None,
+    )
+    session = _DeletionSession(record, files=[file])
+    session.commit_error = RuntimeError("commit failed")
+    storage = MagicMock()
+    storage.delete = AsyncMock()
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(),
+        file_owners=_FileOwners(),
+        storage=storage,
+    )
+
+    with pytest.raises(RuntimeError, match="Не удалось выполнить удаление"):
+        await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.rollback_called
+    storage.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_reports_file_error_after_committing_record():
+    file = SimpleNamespace(id=uuid7(), s3_key="files/unused.pdf")
+    record = SimpleNamespace(
+        id=uuid7(), deleted_at=None, urza_id=uuid7(),
+        scan_file_id=file.id, editable_file_id=None,
+    )
+    session = _DeletionSession(record, files=[file])
+    storage = MagicMock()
+    storage.delete = AsyncMock(side_effect=OSError("storage unavailable"))
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(),
+        file_owners=_FileOwners(),
+        storage=storage,
+    )
+
+    result = await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.events[-1] == "commit"
+    assert result.file_cleanup_failed is True
+    storage.delete.assert_awaited_once_with(key=file.s3_key)
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_denies_out_of_scope_object():
+    record = SimpleNamespace(id=uuid7(), deleted_at=None, urza_id=uuid7())
+    session = _DeletionSession(record)
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(allowed=False),
+        file_owners=_FileOwners(),
+        storage=MagicMock(),
+    )
+
+    with pytest.raises(PermissionError):
+        await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert session.deleted == []
+    assert session.events == []
 
 
 @pytest.fixture

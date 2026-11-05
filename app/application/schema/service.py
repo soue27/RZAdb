@@ -456,6 +456,6 @@ class SchemaService:
             if await self.repository.get_unfinished(schema_form.id) is None:
                 actions.add("new_record")
 
-        if user.role in {UserRole.ADMIN, UserRole.SUPERADMIN}:
+        if user.role in {UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN}:
             actions.add("delete")
         return actions

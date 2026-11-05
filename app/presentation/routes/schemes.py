@@ -8,6 +8,7 @@ from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.files.physical_deletion import PhysicalDeletionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -25,6 +26,7 @@ from app.presentation.auth.dependencies import (
 from app.presentation.dependencies.services import (
     get_file_service,
     get_object_service,
+    get_physical_deletion_service,
     get_schema_service,
     get_task_service,
 )
@@ -750,23 +752,30 @@ async def delete_urza_schema_record(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
+    deletion_service: Annotated[PhysicalDeletionService, Depends(get_physical_deletion_service)],
 ):
     await _check_urza_access(object_service, current_user.id, urza_id)
     try:
-        await schema_service.delete(
-            user_id=current_user.id,
-            urza_id=urza_id,
-            record_id=record_id,
+        deletion_result = await deletion_service.delete(
+            kind="schema", user_id=current_user.id, record_id=record_id,
+            expected_owner_id=urza_id,
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ValueError as exc:
+    except LookupError as exc:
         raise HTTPException(
             status_code=_record_value_error_status(exc),
             detail=str(exc),
         ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return await _render_schemes(request, urza_id,
         current_user,
         schema_service,
         task_service,
+        notice_message=(
+            "Запись удалена, но не удалось удалить один из файлов. Обратитесь к администратору."
+            if deletion_result.file_cleanup_failed
+            else None
+        ),
     )

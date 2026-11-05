@@ -49,6 +49,7 @@
                         <th>Что изменено</th>
                         <th>Автор</th>
                         <th>Документы</th>
+                        <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -66,7 +67,6 @@
                             <td>
                                 {{ version.number }}
                             </td>
-
                             <td>
                                 {{ version.name }}
                             </td>
@@ -105,6 +105,17 @@
                                         <span class="text-body-secondary">—</span>
                                     {% endif %}
                                 </div>
+                            </td>
+                            <td>
+                                {% set is_current = loop.first %}
+                                {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                                <form method="post" action="/objects/substation/selectivity-schemes/versions/{{ version.version_id }}/delete"
+                                      hx-post="/objects/substation/selectivity-schemes/versions/{{ version.version_id }}/delete"
+                                      hx-target="closest tr" hx-swap="outerHTML"
+                                      onsubmit="return confirm('Удалить версию {{ version.version_number }} схемы {{ version.number }} — {{ version.name }}? Удаляется только эта версия.{% if is_current %} Предыдущая версия станет текущей.{% endif %} Операция необратима. Неиспользуемые файлы будут удалены.');">
+                                    <button class="btn btn-sm btn-outline-danger">Удалить</button>
+                                </form>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}

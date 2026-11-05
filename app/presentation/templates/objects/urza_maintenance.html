@@ -130,7 +130,14 @@
                                           and not record.signed_form_file_id %}
                                         —
                                     {% endif %}
-
+                                    {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                                    <form class="mt-2" method="post" action="/objects/urza/maintenance/{{ record.id }}/physical-delete"
+                                          hx-post="/objects/urza/maintenance/{{ record.id }}/physical-delete"
+                                          hx-target="closest tr" hx-swap="outerHTML"
+                                          onsubmit="return confirm('Удалить запись ТО от {{ record.maintenance_date.strftime('%d.%m.%Y') }}? Операция необратима. Неиспользуемые связанные файлы будут удалены.');">
+                                        <button class="btn btn-sm btn-outline-danger">Удалить запись</button>
+                                    </form>
+                                    {% endif %}
                                 </div>
                             </td>
 

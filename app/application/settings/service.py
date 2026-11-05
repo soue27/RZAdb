@@ -302,6 +302,6 @@ class SettingsService:
                 pass
             else:
                 actions.update({"approve", "return"})
-        if user.role in {UserRole.ADMIN, UserRole.SUPERADMIN}:
+        if user.role in {UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN}:
             actions.add("delete")
         return actions

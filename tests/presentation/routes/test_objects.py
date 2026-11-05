@@ -55,6 +55,7 @@ from app.presentation.dependencies.services import (
     get_inspection_task_service,
     get_inspection_task_repository,
     get_object_service,
+    get_physical_deletion_service,
     get_maintenance_service,
     get_otd_service,
     get_program_service,
@@ -4590,26 +4591,34 @@ def test_post_update_non_draft_is_rejected(system_user_id, document_status):
         app.dependency_overrides.clear()
 
 
-@pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.SUPERADMIN])
-def test_settings_delete_soft_deletes_and_hides_record(system_user_id, role):
+@pytest.mark.parametrize("role", [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN])
+def test_settings_delete_physically_removes_record(system_user_id, role):
     user = make_user(system_user_id)
     user.role = role
     urza_id = uuid7()
     record = settings_record(urza_id, DocumentStatus.APPROVED)
     service = FakeSettingsService(records=[record])
     set_settings_dependencies(user, urza_id, service)
+    class FakeDeletion:
+        async def delete(self, **kwargs):
+            assert kwargs["kind"] == "settings"
+            assert kwargs["expected_owner_id"] == urza_id
+            service.records.clear()
+            return SimpleNamespace(owner_id=urza_id, file_cleanup_failed=False)
+    app.dependency_overrides[get_physical_deletion_service] = FakeDeletion
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/settings/{record.id}/delete"
         )
         assert response.status_code == 200
-        assert record.deleted_at is not None
+        assert record.deleted_at is None
+        assert service.records == []
         assert str(record.id) not in response.text
     finally:
         app.dependency_overrides.clear()
 
 
-@pytest.mark.parametrize("role", [UserRole.ENGINEER, UserRole.MANAGER])
+@pytest.mark.parametrize("role", [UserRole.ENGINEER])
 def test_settings_delete_denies_roles_without_permission(system_user_id, role):
     user = make_user(system_user_id)
     user.role = role
@@ -4620,6 +4629,10 @@ def test_settings_delete_denies_roles_without_permission(system_user_id, role):
         error_by_method={"delete_record": PermissionError("Удаление запрещено")},
     )
     set_settings_dependencies(user, urza_id, service)
+    class FakeDeletion:
+        async def delete(self, **kwargs):
+            raise PermissionError("Недостаточно прав")
+    app.dependency_overrides[get_physical_deletion_service] = FakeDeletion
     try:
         response = TestClient(app).post(
             f"/objects/urza/{urza_id}/settings/{record.id}/delete"

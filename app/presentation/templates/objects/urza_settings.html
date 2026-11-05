@@ -112,9 +112,10 @@
                                     </form>
                                 {% endif %}
                                 {% if "delete" in actions %}
-                                    <form method="post" action="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
-                                          hx-post="/objects/urza/{{ urza_id }}/settings/{{ record.id }}/delete"
-                                          hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                    <form method="post" action="/objects/urza/settings/{{ record.id }}/physical-delete"
+                                          hx-post="/objects/urza/settings/{{ record.id }}/physical-delete"
+                                          hx-target="closest tr" hx-swap="outerHTML"
+                                          onsubmit="return confirm('Удалить запись {{ record.parameter_name }}? Операция необратима. Неиспользуемый связанный файл будет удалён.');">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
                                     </form>
                                 {% endif %}

@@ -505,7 +505,7 @@
                 </div>
 
                 <!-- История версий -->
-                {% if otd.versions|length > 1 %}
+                {% if otd.versions %}
 
                     <details class="mt-4 rzadb-otd-history">
 
@@ -561,6 +561,15 @@
                                             Текущая
                                         </span>
 
+                                    {% endif %}
+
+                                    {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                                    <form method="post" action="/objects/urza/otd/versions/{{ version.id }}/delete"
+                                          hx-post="/objects/urza/otd/versions/{{ version.id }}/delete"
+                                          hx-target="closest .list-group-item" hx-swap="outerHTML"
+                                          onsubmit="return confirm('Удалить версию {{ version.version_number }} ОТД? Удаляется только эта версия.{% if version.id == otd.current_version.id %} Предыдущая версия станет текущей.{% endif %} Операция необратима. Неиспользуемые файлы будут удалены.');">
+                                        <button class="btn btn-sm btn-outline-danger">Удалить версию</button>
+                                    </form>
                                     {% endif %}
 
                                 </div>

@@ -156,6 +156,7 @@ async def get_urza_maintenance(
         request=request,
         template_name="objects/urza_maintenance.html",
         context={
+            "current_user": current_user,
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
             "can_create_maintenance": (
@@ -531,6 +532,7 @@ async def create_urza_maintenance(
         request=request,
         template_name="objects/urza_maintenance.html",
         context={
+            "current_user": current_user,
             "maintenance_records": maintenance_records,
             "can_issue_task": can_issue_task,
             "can_create_maintenance": current_user.role is not UserRole.SPECIALIST,

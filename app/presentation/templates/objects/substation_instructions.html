@@ -142,7 +142,7 @@
 
 
     <!-- История версий -->
-    {% if versions|length > 1 %}
+    {% if versions %}
 
         <details class="mt-4 rzadb-otd-history">
 
@@ -198,6 +198,15 @@
                                 Текущая
                             </span>
 
+                        {% endif %}
+
+                        {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                        <form method="post" action="/objects/substation/instructions/versions/{{ version.id }}/delete"
+                              hx-post="/objects/substation/instructions/versions/{{ version.id }}/delete"
+                              hx-target="closest .list-group-item" hx-swap="outerHTML"
+                              onsubmit="return confirm('Удалить версию {{ version.version_number }} инструкции подстанции? Удаляется только эта версия.{% if loop.first %} Предыдущая версия станет текущей.{% endif %} Операция необратима. Неиспользуемые файлы будут удалены.');">
+                            <button class="btn btn-sm btn-outline-danger">Удалить версию</button>
+                        </form>
                         {% endif %}
 
                     </div>

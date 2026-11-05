@@ -24,6 +24,7 @@
                         <th class="text-center">Дата осмотра</th>
                         <th>Замечания</th>
                         <th>Документы</th>
+                        <th>Действия</th>
                     </tr>
                 </thead>
 
@@ -33,7 +34,6 @@
                             <td>
                                 {{ inspection.inspection_date.strftime("%d.%m.%Y") }}
                             </td>
-
                             <td>
                                 {{ inspection.remarks or "—" }}
                             </td>
@@ -75,6 +75,16 @@
 
                                 {% else %}
                                     —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if current_user is defined and current_user.role.value in ["manager", "admin", "superadmin"] %}
+                                    <form method="post" action="/objects/substation/inspections/{{ inspection.id }}/delete"
+                                          hx-post="/objects/substation/inspections/{{ inspection.id }}/delete"
+                                          hx-target="closest tr" hx-swap="outerHTML"
+                                          onsubmit="return confirm('Удалить осмотр от {{ inspection.inspection_date.strftime('%d.%m.%Y') }}? Операция необратима. Неиспользуемые связанные файлы будут удалены.');">
+                                        <button class="btn btn-sm btn-outline-danger">Удалить</button>
+                                    </form>
                                 {% endif %}
                             </td>
                         </tr>
