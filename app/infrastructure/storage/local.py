@@ -54,6 +54,14 @@ class LocalObjectStorage(ObjectStorage):
         if path.exists():
             path.unlink()
 
+    async def move(self, *, source_key: str, target_key: str) -> None:
+        source = self._get_path(source_key)
+        target = self._get_path(target_key)
+        if not source.is_file():
+            raise FileNotFoundError(source_key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.replace(target)
+
     async def exists(
         self,
         *,

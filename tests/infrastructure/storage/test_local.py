@@ -63,6 +63,21 @@ async def test_delete(
 
 
 @pytest.mark.asyncio
+async def test_move(
+    storage: LocalObjectStorage,
+) -> None:
+    await storage.upload(key="files/example.txt", content=b"content")
+
+    await storage.move(
+        source_key="files/example.txt",
+        target_key=".quarantine/one/example.txt",
+    )
+
+    assert await storage.exists(key="files/example.txt") is False
+    assert await storage.download(key=".quarantine/one/example.txt") == b"content"
+
+
+@pytest.mark.asyncio
 async def test_download_missing_file(
     storage: LocalObjectStorage,
 ) -> None:

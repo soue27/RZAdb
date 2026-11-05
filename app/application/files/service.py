@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -15,6 +16,54 @@ from app.application.files.validation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class QuarantinedObject:
+    original_key: str
+    quarantine_key: str
+
+
+class FileQuarantine:
+    """Moves storage objects aside until the database deletion is committed."""
+
+    def __init__(self, storage: ObjectStorage) -> None:
+        self.storage = storage
+
+    async def prepare(self, keys: list[str]) -> list[QuarantinedObject]:
+        moved: list[QuarantinedObject] = []
+        try:
+            for key in dict.fromkeys(keys):
+                if not await self.storage.exists(key=key):
+                    raise FileNotFoundError("Связанный файл не найден.")
+                target = f".quarantine/{uuid7()}/{PurePosixPath(key).name}"
+                item = QuarantinedObject(key, target)
+                await self.storage.move(source_key=key, target_key=target)
+                moved.append(item)
+        except Exception:
+            await self.restore(moved)
+            raise
+        return moved
+
+    async def restore(self, items: list[QuarantinedObject]) -> None:
+        for item in reversed(items):
+            try:
+                if await self.storage.exists(key=item.quarantine_key):
+                    await self.storage.move(
+                        source_key=item.quarantine_key,
+                        target_key=item.original_key,
+                    )
+            except Exception:
+                logger.exception("Не удалось восстановить файл из карантина.")
+                raise
+
+    async def purge(self, items: list[QuarantinedObject]) -> None:
+        for item in items:
+            try:
+                await self.storage.delete(key=item.quarantine_key)
+            except Exception:
+                logger.exception("Не удалось очистить карантин файла.")
+                raise
 
 class FileService:
     def __init__(

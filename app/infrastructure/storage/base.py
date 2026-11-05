@@ -33,6 +33,11 @@ class ObjectStorage(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def move(self, *, source_key: str, target_key: str) -> None:
+        """Переместить объект без изменения содержимого."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def exists(
         self,
         *,
