@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.access.service import AccessService
@@ -131,6 +132,10 @@ class PhysicalDeletionService:
                     await self.session.delete(file)
                     deletable_files.append(file)
             await self.session.commit()
+        except IntegrityError:
+            await self.session.rollback()
+            logger.exception("Удаление записи заблокировано ограничением целостности.")
+            raise
         except Exception:
             await self.session.rollback()
             logger.exception("Не удалось удалить доменную запись.")

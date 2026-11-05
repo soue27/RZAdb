@@ -1,9 +1,8 @@
 from typing import Annotated
 from uuid import UUID
-from html import escape
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.exc import IntegrityError
 
 from app.application.files.physical_deletion import PhysicalDeletionService
@@ -14,13 +13,8 @@ from app.presentation.dependencies.services import get_physical_deletion_service
 router = APIRouter(prefix="/objects", tags=["physical deletion"])
 
 
-def _error_response(request: Request, message: str, status_code: int):
-    return HTMLResponse(
-        f'<div class="alert alert-danger mb-0">{escape(message)}</div>',
-        status_code=(
-            200 if request.headers.get("HX-Request") == "true" else status_code
-        ),
-    )
+def _error_response(message: str, status_code: int):
+    return JSONResponse(status_code=status_code, content={"detail": message})
 
 
 async def _delete(
@@ -33,14 +27,13 @@ async def _delete(
     try:
         result = await service.delete(kind=kind, record_id=record_id, user_id=user.id)
     except PermissionError as exc:
-        return _error_response(request, str(exc), 403)
+        return _error_response(str(exc), 403)
     except LookupError as exc:
-        return _error_response(request, str(exc), 404)
+        return _error_response(str(exc), 404)
     except RuntimeError as exc:
-        return _error_response(request, str(exc), 409)
+        return _error_response(str(exc), 409)
     except IntegrityError:
         return _error_response(
-            request,
             "Запись нельзя удалить: от неё зависят другие данные.",
             409,
         )
@@ -63,7 +56,12 @@ async def _delete(
         )
     if result.file_cleanup_failed:
         return HTMLResponse(
-            '<div class="alert alert-warning mb-0">Запись удалена, но не удалось удалить один из файлов. Обратитесь к администратору.</div>'
+            '<div id="htmx-error-message" hx-swap-oob="outerHTML" '
+            'class="alert alert-warning alert-dismissible fade show" role="alert" '
+            'aria-live="polite"><span id="htmx-error-text">Запись удалена, но '
+            'не удалось удалить один из файлов. Обратитесь к администратору.'
+            '</span><button type="button" class="btn-close" aria-label="Закрыть" '
+            'onclick="this.parentElement.classList.add(\'d-none\')"></button></div>'
         )
     return Response(status_code=200)
 

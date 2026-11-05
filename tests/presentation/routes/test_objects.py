@@ -10,6 +10,7 @@ from uuid6 import uuid7
 from app.application.connections.schemas import ConnectionListItem
 from app.application.connections.service import ConnectionNameConflictError
 from app.application.files.validation import FileUploadValidationError
+from sqlalchemy.exc import IntegrityError
 from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -4639,6 +4640,94 @@ def test_settings_delete_denies_roles_without_permission(system_user_id, role):
         )
         assert response.status_code == 403
         assert record.deleted_at is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_physical_delete_htmx_error_preserves_row_and_shows_message():
+    user = SimpleNamespace(id=uuid7())
+
+    class FailingDeletion:
+        async def delete(self, **_kwargs):
+            raise RuntimeError("Не удалось выполнить удаление.")
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_physical_deletion_service] = FailingDeletion
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/programs/{uuid7()}/physical-delete",
+                headers={"HX-Request": "true"},
+            )
+        assert response.status_code == 409
+        assert response.json() == {"detail": "Не удалось выполнить удаление."}
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_physical_delete_htmx_success_returns_empty_swap_response():
+    user = SimpleNamespace(id=uuid7())
+
+    class SuccessfulDeletion:
+        async def delete(self, **_kwargs):
+            return SimpleNamespace(owner_id=uuid7(), file_cleanup_failed=False)
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_physical_deletion_service] = SuccessfulDeletion
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/programs/{uuid7()}/physical-delete",
+                headers={"HX-Request": "true"},
+            )
+        assert response.status_code == 200
+        assert response.content == b""
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_physical_delete_htmx_integrity_error_is_sanitized():
+    user = SimpleNamespace(id=uuid7())
+
+    class IntegrityFailingDeletion:
+        async def delete(self, **_kwargs):
+            raise IntegrityError("DELETE", {}, Exception("private constraint"))
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_physical_deletion_service] = IntegrityFailingDeletion
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/programs/{uuid7()}/physical-delete",
+                headers={"HX-Request": "true"},
+            )
+        assert response.status_code == 409
+        assert response.json() == {
+            "detail": "Запись нельзя удалить: от неё зависят другие данные."
+        }
+        assert "private constraint" not in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_physical_delete_htmx_reports_storage_failure_after_success():
+    user = SimpleNamespace(id=uuid7())
+
+    class StorageFailingDeletion:
+        async def delete(self, **_kwargs):
+            return SimpleNamespace(owner_id=uuid7(), file_cleanup_failed=True)
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_physical_deletion_service] = StorageFailingDeletion
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/objects/urza/programs/{uuid7()}/physical-delete",
+                headers={"HX-Request": "true"},
+            )
+        assert response.status_code == 200
+        assert 'hx-swap-oob="outerHTML"' in response.text
+        assert "Запись удалена, но не удалось удалить один из файлов." in response.text
     finally:
         app.dependency_overrides.clear()
 

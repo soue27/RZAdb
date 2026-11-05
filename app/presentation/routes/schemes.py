@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi import File as FastAPIFile
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.exc import IntegrityError
 
 from app.application.files.service import FileService
 from app.application.files.physical_deletion import PhysicalDeletionService
@@ -769,6 +770,11 @@ async def delete_urza_schema_record(
         ) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Запись нельзя удалить: от неё зависят другие данные.",
+        ) from exc
     return await _render_schemes(request, urza_id,
         current_user,
         schema_service,

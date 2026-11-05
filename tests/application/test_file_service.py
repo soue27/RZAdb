@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
+from sqlalchemy.exc import IntegrityError
 
 from app.application.files.service import FileService
 from app.application.files.physical_deletion import PhysicalDeletionService, TARGETS
@@ -213,6 +214,29 @@ async def test_physical_delete_does_not_remove_file_when_commit_fails():
 
     assert session.rollback_called
     storage.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_physical_delete_preserves_integrity_error_type():
+    integrity_error = IntegrityError("DELETE", {}, Exception("constraint"))
+    record = SimpleNamespace(
+        id=uuid7(), deleted_at=None, urza_id=uuid7(),
+        scan_file_id=None, editable_file_id=None,
+    )
+    session = _DeletionSession(record)
+    session.commit_error = integrity_error
+    service = PhysicalDeletionService(
+        session=session,
+        access_service=_DeletionAccess(),
+        file_owners=_FileOwners(),
+        storage=MagicMock(),
+    )
+
+    with pytest.raises(IntegrityError) as error:
+        await service.delete(kind="program", record_id=record.id, user_id=uuid7())
+
+    assert error.value is integrity_error
+    assert session.rollback_called
 
 
 @pytest.mark.asyncio
