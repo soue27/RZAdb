@@ -9,6 +9,10 @@
                 Выдать задание
             </a>
         {% endif %}
+        <a class="btn btn-outline-secondary" href="/objects/substation/{{ substation_id }}/inspection-template{% if is_archived %}?archived=true{% endif %}">
+            <span class="material-icons align-middle me-1">download</span>
+            Скачать шаблон
+        </a>
     </div>
 </section>
 

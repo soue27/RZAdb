@@ -1,7 +1,9 @@
 from datetime import date
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
+from docx import Document
 from fastapi.testclient import TestClient
 from uuid6 import uuid7
 
@@ -88,9 +90,11 @@ class FakeMaintenanceService:
         self,
         *,
         records=None,
+        approved_record=None,
         create_error=None,
     ):
         self.records = list(records or [])
+        self.approved_record = approved_record
         self.create_error = create_error
         self.calls = []
 
@@ -108,6 +112,10 @@ class FakeMaintenanceService:
             )
         )
         return self.records
+
+    async def get_current_approved(self, user_id, urza_id):
+        self.calls.append(("get_current_approved", user_id, urza_id))
+        return self.approved_record
 
     async def create(self, **kwargs):
         self.calls.append(("create", kwargs))
@@ -136,7 +144,7 @@ class FakeMaintenanceService:
 
 
 class FakeTreeService:
-    async def get_tree(self, *, user_id):
+    async def get_tree(self, *, user_id, archive_only=False):
         return []
 
 
@@ -214,6 +222,42 @@ def test_maintenance_routes_are_registered_in_openapi():
     assert "get" in paths[root]
     assert "post" in paths[root]
     assert "get" in paths[f"{root}/new"]
+    assert "get" in paths[f"{root}/form"]
+
+
+def test_get_maintenance_form_returns_docx_without_creating_record(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    service = FakeMaintenanceService()
+    _setup(user, maintenance_service=service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/maintenance/form", follow_redirects=False
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        assert response.headers["content-disposition"].startswith("attachment;")
+        assert Document(BytesIO(response.content)).sections
+        assert service.calls == [("get_current_approved", user.id, urza_id)]
+    finally:
+        _cleanup(user)
+
+
+def test_get_maintenance_form_returns_approved_signed_form(system_user_id):
+    user = _user(system_user_id)
+    urza_id, file_id = uuid7(), uuid7()
+    approved = SimpleNamespace(signed_form_file_id=file_id)
+    _setup(user, maintenance_service=FakeMaintenanceService(approved_record=approved))
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/maintenance/form", follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == f"/files/{file_id}/download"
+    finally:
+        _cleanup(user)
 
 
 def test_get_maintenance_list_returns_records(system_user_id):

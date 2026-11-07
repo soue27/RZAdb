@@ -48,7 +48,7 @@ def test_inspection_template_links_each_present_file_role() -> None:
 
     html = templates.get_template(
         "objects/substation_inspections.html",
-    ).render(inspections=inspections)
+    ).render(inspections=inspections, substation_id=uuid4())
 
     assert_file_actions(html, scan_id)
     assert_file_actions(html, editable_id)
@@ -56,6 +56,8 @@ def test_inspection_template_links_each_present_file_role() -> None:
     assert "inspection.docx" in html
     assert "/files/None/" not in html
     assert html.count('class="rzadb-file-actions"') == 2
+    assert "Скачать шаблон" in html
+    assert "/inspection-template" in html
 
     empty_html = templates.get_template(
         "objects/substation_inspections.html",
@@ -74,6 +76,7 @@ def test_inspections_tab_keeps_results_and_does_not_render_task_list() -> None:
     assert "/inspection-tasks/new" in html
     assert "Задачи осмотра" not in html
     assert "Назначить" not in html
+    assert "Скачать шаблон" in html
     assert "Передать на проверку" not in html
 
 

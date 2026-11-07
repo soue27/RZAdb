@@ -5,10 +5,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi import File as FastAPIFile
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 
 from app.application.files.service import FileService
+from app.application.document_templates.service import (
+    DocumentFormType,
+    DocumentTemplateError,
+    DocumentTemplateService,
+)
 from app.application.files.physical_deletion import PhysicalDeletionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -21,6 +27,7 @@ from app.domain.file import File
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
+    get_document_form_service,
     get_file_service,
     get_object_service,
     get_physical_deletion_service,
@@ -28,12 +35,47 @@ from app.presentation.dependencies.services import (
     get_task_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.presentation.responses import TemporaryFileResponse
 from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/objects", tags=["settings"])
 templates = Jinja2Templates(directory="app/presentation/templates")
+
+
+@router.get("/urza/{urza_id}/settings/form")
+async def get_settings_form_pdf(
+    urza_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    form_service: Annotated[DocumentTemplateService, Depends(get_document_form_service)],
+    archived: bool = Query(default=False),
+):
+    await _check_urza_access(
+        object_service, current_user.id, urza_id, include_archived=archived
+    )
+    record = await settings_service.get_current_approved(current_user.id, urza_id)
+    if record is not None and record.signed_form_file_id:
+        return RedirectResponse(
+            f"/files/{record.signed_form_file_id}/download", status_code=303
+        )
+    hierarchy = await form_service.get_urza_hierarchy(
+        current_user.id, urza_id, archive_only=archived
+    )
+    try:
+        document_path = form_service.create_document(DocumentFormType.SETTINGS, hierarchy)
+    except DocumentTemplateError as exc:
+        logger.exception("Could not create settings DOCX for URZA %s", urza_id)
+        raise HTTPException(
+            status_code=500, detail="Не удалось сформировать DOCX-формуляр."
+        ) from exc
+    return TemporaryFileResponse(
+        document_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=form_service.download_filename(DocumentFormType.SETTINGS, hierarchy),
+    )
 
 
 async def _check_urza_access(

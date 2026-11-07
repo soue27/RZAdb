@@ -5,6 +5,10 @@
     <div class="rzadb-otd-version-title">Схемы</div>
 
         <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="/objects/urza/{{ urza_id }}/schemas/form{% if is_archived %}?archived=true{% endif %}">
+                <span class="material-icons align-middle me-1">picture_as_pdf</span>
+                Заполнить формуляр
+            </a>
             {% if can_issue_task %}
                 <a
                     class="btn btn-outline-primary"

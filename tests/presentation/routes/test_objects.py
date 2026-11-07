@@ -200,7 +200,7 @@ class FakeOTDService:
 
 
 class FakeTreeService:
-    async def get_tree(self, *, user_id):
+    async def get_tree(self, *, user_id, archive_only=False):
         return []
 
 
@@ -2555,6 +2555,45 @@ def test_get_substation_inspections_returns_inspections(system_user_id) -> None:
         app.dependency_overrides.clear()
 
 
+def test_inspection_template_download_requires_substation_access(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(
+            result=SelectedObject(
+                object_type="substation", id=substation_id, name="ПС Центральная"
+            )
+        )
+    )
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/inspection-template"
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert "attachment" in response.headers["content-disposition"]
+        assert response.content.startswith(b"%PDF-")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_inspection_template_download_denies_inaccessible_substation(system_user_id) -> None:
+    user = make_user(system_user_id=system_user_id)
+    substation_id = uuid7()
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(error=ObjectAccessDeniedError())
+    )
+    try:
+        response = TestClient(app).get(
+            f"/objects/substation/{substation_id}/inspection-template"
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_get_urza_programs_returns_programs(system_user_id) -> None:
     user = make_user(system_user_id=system_user_id)
     urza_id = uuid7()
@@ -4175,6 +4214,42 @@ def test_get_urza_settings_renders_records_status_and_current(system_user_id):
         assert response.text.index("Draft параметр") < response.text.index(
             "Approved параметр"
         )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_settings_form_download_generates_docx_without_creating_records(system_user_id):
+    user = make_user(system_user_id)
+    urza_id = uuid7()
+    service = FakeSettingsService()
+    set_settings_dependencies(user, urza_id, service)
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/settings/form")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        assert response.content.startswith(b"PK")
+        assert "attachment" in response.headers["content-disposition"]
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_settings_form_download_redirects_to_approved_signed_form(system_user_id):
+    user = make_user(system_user_id)
+    urza_id, file_id = uuid7(), uuid7()
+    service = FakeSettingsService(
+        current_approved=SimpleNamespace(signed_form_file_id=file_id)
+    )
+    set_settings_dependencies(user, urza_id, service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/settings/form", follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == f"/files/{file_id}/download"
     finally:
         app.dependency_overrides.clear()
 

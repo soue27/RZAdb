@@ -59,6 +59,15 @@ class TORecordService:
             urza_id,
         )
 
+    async def get_current_approved(
+        self,
+        user_id: UUID,
+        urza_id: UUID,
+    ) -> TORecord | None:
+        if not await self.access_service.can_access_urza(user_id, urza_id):
+            raise PermissionError("Доступ к URZA запрещён")
+        return await self.repository.get_current_approved(urza_id)
+
     async def get_by_task(
         self,
         user_id: UUID,

@@ -6,6 +6,7 @@ from app.application.enterprises.repository import EnterpriseRepository
 from app.application.substations.repository import SubstationRepository
 from app.application.tree.schemas import (
     ConnectionTreeNode,
+    EnterpriseTreeAncestor,
     EnterpriseTreeNode,
     SubstationTreeNode,
     TreeSearchPage,
@@ -117,6 +118,7 @@ class TreeService:
         return self._build_tree(
             root_enterprises=root_enterprises,
             enterprises=visible_enterprises,
+            all_enterprises=all_enterprises,
             substations=substations,
             connections=connections,
             urzas=urzas,
@@ -265,6 +267,7 @@ class TreeService:
         *,
         root_enterprises,
         enterprises,
+        all_enterprises,
         substations,
         connections,
         urzas,
@@ -348,9 +351,34 @@ class TreeService:
                 [],
             ).append(enterprise)
 
+        enterprises_by_id = {
+            enterprise.id: enterprise for enterprise in all_enterprises
+        }
+
+        def get_ancestors(enterprise) -> list[EnterpriseTreeAncestor]:
+            ancestors = []
+            parent_id = enterprise.parent_id
+            while parent_id is not None:
+                parent = enterprises_by_id.get(parent_id)
+                if parent is None:
+                    break
+                ancestors.append(
+                    EnterpriseTreeAncestor(
+                        id=parent.id,
+                        type=parent.type.value,
+                        full_name=parent.full_name,
+                    )
+                )
+                parent_id = parent.parent_id
+            ancestors.reverse()
+            return ancestors
+
         def build_enterprise(
             enterprise,
+            ancestors: list[EnterpriseTreeAncestor] | None = None,
         ) -> EnterpriseTreeNode:
+            if ancestors is None:
+                ancestors = get_ancestors(enterprise)
             children = sorted(
                 enterprises_by_parent.get(
                     enterprise.id,
@@ -364,8 +392,19 @@ class TreeService:
                 type=enterprise.type.value,
                 full_name=enterprise.full_name,
                 short_name=enterprise.short_name,
+                ancestors=ancestors,
                 children=[
-                    build_enterprise(child)
+                    build_enterprise(
+                        child,
+                        [
+                            *ancestors,
+                            EnterpriseTreeAncestor(
+                                id=enterprise.id,
+                                type=enterprise.type.value,
+                                full_name=enterprise.full_name,
+                            ),
+                        ],
+                    )
                     for child in children
                 ],
                 substations=sorted(

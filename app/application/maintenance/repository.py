@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.domain.enums import DocumentStatus
 from app.domain.maintenance import TORecord
 
 
@@ -43,6 +44,24 @@ class TORecordRepository:
         result = await self.session.scalars(query)
 
         return list(result.all())
+
+    async def get_current_approved(self, urza_id: UUID) -> TORecord | None:
+        statement = (
+            select(TORecord)
+            .options(selectinload(TORecord.signed_form_file))
+            .where(
+                TORecord.urza_id == urza_id,
+                TORecord.deleted_at.is_(None),
+                TORecord.status == DocumentStatus.APPROVED,
+            )
+            .order_by(
+                TORecord.maintenance_date.desc(),
+                TORecord.created_at.desc(),
+                TORecord.id.desc(),
+            )
+            .limit(1)
+        )
+        return await self.session.scalar(statement)
 
     async def get_by_task_id(
         self,

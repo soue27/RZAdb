@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -10,7 +11,7 @@ from fastapi import (
     Request,
     status,
 )
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
@@ -490,6 +491,47 @@ async def get_substation_inspections(
             ),
             "is_archived": archived,
         },
+    )
+
+
+@router.get("/substation/{substation_id}/inspection-template")
+async def download_substation_inspection_template(
+    substation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    archived: bool = Query(default=False),
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="substation",
+            object_id=substation_id,
+            include_archived=archived,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+
+    template_path = (
+        Path(__file__).resolve().parents[2]
+        / "application/document_templates/assets/inspection_template.pdf"
+    )
+    if not template_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Шаблон осмотра недоступен.",
+        )
+    return FileResponse(
+        template_path,
+        media_type="application/pdf",
+        filename="inspection_template.pdf",
     )
 
 

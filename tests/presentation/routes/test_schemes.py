@@ -18,6 +18,7 @@ from app.presentation.dependencies.services import (
     get_physical_deletion_service,
     get_schema_service,
     get_task_service,
+    get_tree_service,
 )
 
 
@@ -99,6 +100,11 @@ class FakeTaskService:
         work_type=None,
     ):
         return False
+
+
+class FakeTreeService:
+    async def get_tree(self, *, user_id, archive_only=False):
+        return []
 
 
 class FakeSchemaService:
@@ -241,6 +247,7 @@ def _setup(
     app.dependency_overrides[get_object_service] = lambda: object_service
     app.dependency_overrides[get_schema_service] = lambda: schema_service
     app.dependency_overrides[get_task_service] = lambda: task_service
+    app.dependency_overrides[get_tree_service] = lambda: FakeTreeService()
 
     if file_service is not None:
         app.dependency_overrides[get_file_service] = lambda: file_service
@@ -269,10 +276,47 @@ def test_schemes_routes_are_registered_in_openapi():
     assert "get" in paths[root]
     assert "post" in paths[root]
     assert "get" in paths[f"{root}/new"]
+    assert "get" in paths[f"{root}/form"]
     assert "get" in paths[f"{root}/{{record_id}}/edit"]
     assert "post" in paths[f"{root}/{{record_id}}"]
     for action in ("submit", "approve", "return", "delete"):
         assert "post" in paths[f"{root}/{{record_id}}/{action}"]
+
+
+def test_schemes_form_download_generates_blank_docx_without_creating_record(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    service = FakeSchemaService(urza_id)
+    _setup(user, urza_id, service)
+    try:
+        response = TestClient(app).get(f"/objects/urza/{urza_id}/schemas/form")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        assert response.content.startswith(b"PK")
+        assert "attachment" in response.headers["content-disposition"]
+        assert service.calls == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_schemes_form_download_redirects_to_approved_signed_form(system_user_id):
+    user = _user(system_user_id)
+    urza_id, file_id = uuid7(), uuid7()
+    service = FakeSchemaService(
+        urza_id,
+        current=SimpleNamespace(signed_form_file_id=file_id),
+    )
+    _setup(user, urza_id, service)
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/schemas/form", follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == f"/files/{file_id}/download"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_get_schemes_list_shows_status_current_files_and_hides_deleted(system_user_id):

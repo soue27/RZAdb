@@ -15,6 +15,18 @@ def test_smtp_settings_have_safe_defaults() -> None:
     assert settings.smtp_from_email is None
     assert settings.smtp_starttls is True
     assert settings.smtp_use_ssl is False
+    assert str(settings.document_templates_dir) == "data/document_templates"
+
+
+def test_document_templates_directory_can_be_configured() -> None:
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
+        session_secret="test-secret",
+        document_templates_dir="/opt/rzadb/templates",
+    )
+
+    assert str(settings.document_templates_dir) == "/opt/rzadb/templates"
 
 
 def test_smtp_settings_can_be_configured() -> None:

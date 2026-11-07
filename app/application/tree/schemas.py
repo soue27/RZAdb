@@ -32,6 +32,14 @@ class SubstationTreeNode(BaseModel):
     )
 
 
+class EnterpriseTreeAncestor(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    type: str
+    full_name: str
+
+
 class EnterpriseTreeNode(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,6 +47,7 @@ class EnterpriseTreeNode(BaseModel):
     type: str
     full_name: str
     short_name: str
+    ancestors: list[EnterpriseTreeAncestor] = Field(default_factory=list)
     children: list["EnterpriseTreeNode"] = Field(
         default_factory=list,
     )

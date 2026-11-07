@@ -85,6 +85,26 @@ async def test_get_by_task_id_returns_record():
 
 
 @pytest.mark.asyncio
+async def test_get_current_approved_filters_orders_limits_and_loads_signed_file():
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=None)
+    urza_id = uuid7()
+
+    assert await TORecordRepository(session).get_current_approved(urza_id) is None
+    statement = session.scalar.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "to_records.urza_id" in sql
+    assert "to_records.deleted_at IS NULL" in sql
+    assert "to_records.status" in sql
+    assert "to_records.maintenance_date DESC" in sql
+    assert "to_records.created_at DESC" in sql
+    assert "to_records.id DESC" in sql
+    assert "LIMIT" in sql
+    assert statement._with_options
+    assert "signed_form_file" in str(statement._with_options[0].path)
+
+
+@pytest.mark.asyncio
 async def test_add():
     session = MagicMock()
     session.flush = AsyncMock()

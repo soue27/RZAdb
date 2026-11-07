@@ -261,6 +261,8 @@ def test_settings_template_links_signed_form_file() -> None:
     assert "Изменить" in html
     assert "Направить на согласование" in html
     assert "Удалить" not in html
+    assert "Заполнить формуляр" in html
+    assert "/settings/form" in html
     assert_file_actions(html, file_id)
 
     empty_html = templates.get_template("objects/urza_settings.html").render(
@@ -273,6 +275,7 @@ def test_settings_template_links_signed_form_file() -> None:
     )
 
     assert_no_file_actions(empty_html)
+    assert "Заполнить формуляр" in empty_html
 
 
 def test_settings_template_shows_current_approved_and_available_actions():
@@ -422,6 +425,8 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
     assert "Утверждено" in html
     assert "Изменить" not in html
     assert "Новое изменение" in html
+    assert "Заполнить формуляр" in html
+    assert "/schemas/form" in html
     assert_file_actions(html, scan_id)
     assert_file_actions(html, signed_id)
     assert "/files/None/" not in html
@@ -436,6 +441,7 @@ def test_schemas_template_keeps_each_file_role_separate() -> None:
     )
 
     assert_no_file_actions(empty_html)
+    assert "Заполнить формуляр" in empty_html
 
 
 def test_schemes_template_shows_only_available_workflow_and_delete_actions():
@@ -551,6 +557,9 @@ def test_maintenance_template_links_protocol_and_signed_form_roles() -> None:
     assert "Скан протокола" in html
     assert "Редактируемый протокол" in html
     assert "Подписанная форма" in html
+    assert "Заполнить формуляр" in html
+    assert "/maintenance/form" in html
+    assert "Скачать шаблон" not in html
     for file_id in (scan_id, editable_id, signed_id):
         assert_file_actions(html, file_id)
 
@@ -558,6 +567,8 @@ def test_maintenance_template_links_protocol_and_signed_form_roles() -> None:
         maintenance_records=[],
     )
     assert_no_file_actions(empty_html)
+    assert "Заполнить формуляр" in empty_html
+    assert "Скачать шаблон" not in empty_html
 
 
 def test_programs_template_links_scan_and_optional_editable_file() -> None:

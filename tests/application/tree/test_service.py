@@ -305,6 +305,14 @@ async def test_tree_service_starts_from_specialist_branch(
     assert department_node.id == department.id
     assert department_node.type == EnterpriseType.DEPARTMENT.value
     assert department_node.full_name == "ПО инженера"
+    assert [ancestor.full_name for ancestor in department_node.ancestors] == [
+        "Холдинг инженера",
+        "Филиал инженера",
+    ]
+    assert [ancestor.type for ancestor in department_node.ancestors] == [
+        EnterpriseType.HOLDING.value,
+        EnterpriseType.BRANCH.value,
+    ]
 
     assert len(department_node.children) == 0
     assert len(department_node.substations) == 1
@@ -477,6 +485,9 @@ async def test_tree_service_starts_from_specialist_branch(
     assert branch_node.id == branch_a.id
     assert branch_node.type == EnterpriseType.BRANCH.value
     assert branch_node.full_name == "Филиал А"
+    assert [ancestor.full_name for ancestor in branch_node.ancestors] == [
+        "Холдинг специалиста",
+    ]
 
     assert len(branch_node.children) == 2
 

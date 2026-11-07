@@ -20,6 +20,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.document_templates.service import (
+    DocumentTemplateService,
+    DocumentFormType,
+    DocumentTemplateError,
+)
 from app.domain.file import File
 from app.application.maintenance.service import TORecordService
 from app.application.objects.exceptions import (
@@ -36,6 +41,7 @@ from app.presentation.auth.dependencies import (
     require_non_specialist,
 )
 from app.presentation.dependencies.services import (
+    get_document_form_service,
     get_file_service,
     get_maintenance_service,
     get_object_service,
@@ -43,6 +49,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
+from app.presentation.responses import TemporaryFileResponse
 from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
@@ -52,6 +59,49 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="app/presentation/templates")
+
+
+@router.get("/urza/{urza_id}/maintenance/form")
+async def get_maintenance_form(
+    urza_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    form_service: Annotated[DocumentTemplateService, Depends(get_document_form_service)],
+    archived: bool = Query(default=False),
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+            include_archived=archived,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+
+    record = await maintenance_service.get_current_approved(current_user.id, urza_id)
+    if record is not None and record.signed_form_file_id:
+        return RedirectResponse(
+            f"/files/{record.signed_form_file_id}/download", status_code=303
+        )
+    hierarchy = await form_service.get_urza_hierarchy(
+        current_user.id, urza_id, archive_only=archived
+    )
+    try:
+        document_path = form_service.create_document(
+            DocumentFormType.MAINTENANCE, hierarchy
+        )
+    except DocumentTemplateError as exc:
+        logger.exception("Could not create maintenance DOCX for URZA %s", urza_id)
+        raise HTTPException(status_code=500, detail="Не удалось сформировать DOCX-формуляр.") from exc
+    return TemporaryFileResponse(
+        document_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=form_service.download_filename(DocumentFormType.MAINTENANCE, hierarchy),
+    )
 
 
 async def _render_maintenance_template(

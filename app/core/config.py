@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,6 +9,7 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str
     session_secret: str
+    document_templates_dir: Path = Path("data/document_templates")
 
     # SMTP — email digest
     smtp_host: str | None = None

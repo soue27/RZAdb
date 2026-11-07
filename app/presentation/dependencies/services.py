@@ -23,6 +23,7 @@ from app.application.inspections.repository import InspectionTaskRepository
 from app.application.inspections.service import InspectionTaskService
 from app.application.maintenance.repository import TORecordRepository
 from app.application.maintenance.service import TORecordService
+from app.application.document_templates.service import DocumentTemplateService
 from app.application.objects.archive_repository import ArchiveRepository
 from app.application.objects.archive_service import ArchiveService
 from app.application.objects.resolver import ObjectResolver
@@ -186,6 +187,15 @@ def get_tree_service(
         connection_repository=ConnectionRepository(session),
         urza_repository=URZARepository(session),
         access_service=access_service,
+    )
+
+
+def get_document_form_service(
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+) -> DocumentTemplateService:
+    return DocumentTemplateService(
+        tree_service=tree_service,
+        templates_dir=get_settings().document_templates_dir,
     )
 
 
