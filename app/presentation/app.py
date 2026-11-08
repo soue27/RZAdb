@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.logging_config import configure_logging
 from app.infrastructure.database import models  # noqa: F401
 from app.presentation.auth.dependencies import PasswordChangeRequired
+from app.presentation.middleware.request_context import RequestContextMiddleware
 from app.presentation.routes.admin import router as admin_router
 from app.presentation.routes.archive import router as archive_router
 from app.presentation.routes.auth import router as auth_router
@@ -100,6 +101,9 @@ def create_app() -> FastAPI:
         https_only=False,
         same_site="lax",
     )
+    # Starlette inserts each newly-added middleware at the front of the stack.
+    # This keeps request context available while SessionMiddleware runs.
+    app.add_middleware(RequestContextMiddleware)
 
     app.include_router(health_router)
     app.include_router(users_router)

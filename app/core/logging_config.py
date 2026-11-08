@@ -5,6 +5,8 @@ import traceback
 from datetime import UTC, datetime
 from typing import Any
 
+from app.core.request_context import get_request_context
+
 
 _JSON_HANDLER_MARKER = "_rzadb_json_stdout_handler"
 _SUPPORTED_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -28,6 +30,14 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
             "message": message,
         }
+        request_context = get_request_context()
+        if request_context is not None:
+            payload["request_id"] = request_context.request_id
+            if request_context.user_id is not None:
+                payload["user_id"] = request_context.user_id
+        for field_name in ("method", "path", "status_code", "duration_ms"):
+            if hasattr(record, field_name):
+                payload[field_name] = getattr(record, field_name)
         if record.exc_info:
             exc_type, exc_value, exc_traceback = record.exc_info
             if exc_type is not None:

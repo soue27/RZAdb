@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import json
 import logging
 import os
@@ -464,8 +465,8 @@ async def start_admin_backup(
     try:
         _write_backup_status(settings, state)
         thread = threading.Thread(
-            target=_run_backup_in_thread,
-            args=(settings, lock),
+            target=contextvars.Context().run,
+            args=(_run_backup_in_thread, settings, lock),
             name="admin-postgres-backup",
             daemon=True,
         )

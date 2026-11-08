@@ -5,6 +5,12 @@ from fastapi import HTTPException
 from starlette.requests import Request
 from uuid6 import uuid7
 
+from app.core.request_context import (
+    bind_user_id,
+    get_request_context,
+    reset_request_context,
+    set_request_context,
+)
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
@@ -139,6 +145,38 @@ async def test_get_current_user_success(system_user_id) -> None:
 
     assert result is user
     repository.get_by_id.assert_awaited_once_with(user.id)
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_binds_id_only_after_success() -> None:
+    user = make_user(system_user_id=uuid7())
+    token = set_request_context("request-auth")
+    repository = AsyncMock()
+    repository.get_by_id.return_value = user
+    try:
+        assert get_request_context().user_id is None
+        with patch(
+            "app.presentation.auth.dependencies.UserRepository",
+            return_value=repository,
+        ):
+            await get_current_user(
+                make_request({"user_id": str(user.id)}),
+                AsyncMock(),
+            )
+        assert get_request_context().user_id == str(user.id)
+    finally:
+        reset_request_context(token)
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_failure_does_not_bind_id() -> None:
+    token = set_request_context("request-auth-failure")
+    try:
+        with pytest.raises(HTTPException):
+            await get_current_user(make_request({}), AsyncMock())
+        assert get_request_context().user_id is None
+    finally:
+        reset_request_context(token)
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,11 @@ import pytest
 import uvicorn
 
 from app.core.logging_config import configure_logging
+from app.core.request_context import (
+    bind_user_id,
+    reset_request_context,
+    set_request_context,
+)
 
 
 _LOGGER_NAMES = ("app", "uvicorn", "uvicorn.error", "uvicorn.access")
@@ -119,6 +124,29 @@ def test_json_escapes_multiline_unicode_and_ignores_extra_objects(
     record = _records(output)[0]
     assert record["message"] == 'Кавычки " и строка\nвторая'
     assert "unserializable" not in record
+
+
+def test_json_formatter_includes_only_present_request_context(
+    capsys,
+    restore_logging_state,
+) -> None:
+    configure_logging("INFO")
+    token = set_request_context("request-123")
+    try:
+        logging.getLogger("app.logging_test").info("with request")
+        bind_user_id("user-456")
+        logging.getLogger("app.logging_test").info("with user")
+    finally:
+        reset_request_context(token)
+    logging.getLogger("app.logging_test").info("outside request")
+
+    records = _records(capsys.readouterr().out)
+    assert records[0]["request_id"] == "request-123"
+    assert "user_id" not in records[0]
+    assert records[1]["request_id"] == "request-123"
+    assert records[1]["user_id"] == "user-456"
+    assert "request_id" not in records[2]
+    assert "user_id" not in records[2]
 
 
 def test_exception_contains_type_and_full_traceback(

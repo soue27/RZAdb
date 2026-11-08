@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.request_context import bind_user_id, get_request_context
 from app.domain.enums import AccessCategory, EnterpriseType, UserRole
 from app.domain.user import User
 from app.infrastructure.backup.coordinator import (
@@ -91,6 +92,56 @@ def test_admin_requires_authentication(client):
 
     assert response.status_code == 303
     assert response.headers["location"] == "/auth/login"
+
+
+def test_admin_backup_worker_does_not_inherit_request_context(client, tmp_path):
+    observed_contexts = []
+
+    async def authenticated_user():
+        bind_user_id("authenticated-user")
+        return make_user(UserRole.SUPERADMIN)
+
+    app.dependency_overrides[get_current_user] = authenticated_user
+
+    class FakeLock:
+        def __init__(self, directory):
+            self.directory = directory
+
+        def acquire(self):
+            return None
+
+        def release(self):
+            return None
+
+    class InlineThread:
+        def __init__(self, *, target, args, **kwargs):
+            self.target = target
+            self.args = args
+
+        def start(self):
+            self.target(*self.args)
+
+    def observe_worker_context(settings, lock):
+        observed_contexts.append(get_request_context())
+
+    with (
+        patch(
+            "app.presentation.routes.admin.get_settings",
+            return_value=backup_settings(tmp_path),
+        ),
+        patch("app.presentation.routes.admin.BackupRunLock", FakeLock),
+        patch("app.presentation.routes.admin.threading.Thread", InlineThread),
+        patch("app.presentation.routes.admin._write_backup_status"),
+        patch(
+            "app.presentation.routes.admin._run_backup_in_thread",
+            observe_worker_context,
+        ),
+    ):
+        response = client.post("/admin/backup")
+
+    assert response.status_code == 200
+    assert len(observed_contexts) == 1
+    assert observed_contexts[0] is None
 
 
 def test_admin_rejects_engineer(client):
