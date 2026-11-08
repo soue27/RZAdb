@@ -123,6 +123,7 @@ class EmailBackupChannel:
         started_at: str,
         size_bytes: int,
         sha256: str,
+        dump_name: str,
     ) -> ChannelResult:
         if self.sender is None:
             self.validate()
@@ -140,8 +141,9 @@ class EmailBackupChannel:
             subject=subject,
             body=body,
             attachments=(dump_path,),
+            attachment_name=dump_name,
         )
-        return ChannelResult(status="success", path=dump_path.name)
+        return ChannelResult(status="success", path=dump_name)
 
 
 class YandexDiskBackupChannel:

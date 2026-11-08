@@ -106,6 +106,39 @@ async def test_channels_run_sequentially_and_one_delivery_error_does_not_block_o
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("local_enabled", [True, False])
+async def test_email_receives_logical_dump_name_regardless_of_local_channel(
+    tmp_path, monkeypatch, local_enabled
+):
+    install_dump(monkeypatch)
+    settings = make_settings(
+        tmp_path,
+        backup_local_enabled=local_enabled,
+        backup_email_enabled=True,
+        backup_email_to="superadmin@example.com",
+    )
+    captured = {}
+
+    async def send_email(self, **kwargs):
+        captured.update(kwargs)
+        assert kwargs["dump_path"].is_file()
+        return ChannelResult("success", path=kwargs["dump_name"])
+
+    monkeypatch.setattr(
+        "app.infrastructure.backup.coordinator.EmailBackupChannel.send", send_email
+    )
+
+    result = await BackupCoordinator(settings).run()
+
+    assert result["channels"]["email"]["status"] == "success"
+    assert captured["dump_name"] == Path(result["manifest_path"]).stem + ".dump"
+    if local_enabled:
+        assert captured["dump_path"].name == captured["dump_name"]
+    else:
+        assert captured["dump_path"].name != captured["dump_name"]
+
+
+@pytest.mark.asyncio
 async def test_retention_failure_is_manifested_without_losing_local_dump(
     tmp_path, monkeypatch
 ):

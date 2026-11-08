@@ -135,11 +135,15 @@ async def test_email_channel_includes_backup_metadata_and_attachment(tmp_path, m
         started_at="2026-11-08T10:11:12+00:00",
         size_bytes=4,
         sha256="deadbeef",
+        dump_name="rzadb_20261108T101112000000Z_0123456789abcdef0123456789abcdef.dump",
     )
 
     assert result.status == "success"
     assert captured["to"] == "superadmin@example.com"
     assert dump_path in captured["attachments"]
+    assert captured["attachment_name"] == (
+        "rzadb_20261108T101112000000Z_0123456789abcdef0123456789abcdef.dump"
+    )
     assert "2026-11-08T10:11:12+00:00" in captured["subject"]
     for value in ("run-123", "4 bytes", "deadbeef"):
         assert value in captured["body"]

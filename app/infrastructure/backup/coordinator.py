@@ -154,6 +154,7 @@ class BackupCoordinator:
                         started_at=started_at.isoformat(),
                         size_bytes=artifact.size_bytes,
                         sha256=artifact.sha256,
+                        dump_name=dump_name,
                     )
                     self._set_channel_result(manifest, "email", result)
                 except Exception as exc:

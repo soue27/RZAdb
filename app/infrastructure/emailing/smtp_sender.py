@@ -39,15 +39,20 @@ class SMTPEmailSender:
         body: str,
         html_body: str | None = None,
         attachments: Sequence[Path] | None = None,
+        attachment_name: str | None = None,
     ) -> None:
         """Отправляет письмо; SMTP-вызовы выполняются в отдельном потоке."""
+        attachment_paths = tuple(attachments or ())
+        if attachment_name is not None and len(attachment_paths) != 1:
+            raise ValueError("attachment_name requires exactly one attachment")
         await asyncio.to_thread(
             self._build_and_send_sync,
             to,
             subject,
             body,
             html_body,
-            tuple(attachments or ()),
+            attachment_paths,
+            attachment_name,
         )
 
     def _build_and_send_sync(
@@ -57,6 +62,7 @@ class SMTPEmailSender:
         body: str,
         html_body: str | None,
         attachments: Sequence[Path],
+        attachment_name: str | None,
     ) -> None:
         message = EmailMessage()
         message["From"] = self.settings.smtp_from_email
@@ -72,7 +78,7 @@ class SMTPEmailSender:
                 attachment_path.read_bytes(),
                 maintype="application",
                 subtype="octet-stream",
-                filename=attachment_path.name,
+                filename=attachment_name or attachment_path.name,
             )
 
         self._send_sync(message)
