@@ -1055,6 +1055,7 @@ body {
 
 .rzadb-maintenance-table {
     width: 100%;
+    min-width: 1320px;
     table-layout: fixed;
     margin-bottom: 0;
     font-size: 0.875rem;
@@ -1075,8 +1076,14 @@ body {
     text-align: left;
     vertical-align: middle;
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
     border-top: 1px solid #dee2e6;
+}
+
+.rzadb-maintenance-table tbody tr,
+.rzadb-maintenance-table tbody td {
+    height: auto;
 }
 
 .rzadb-maintenance-table th + th,
@@ -1101,40 +1108,85 @@ body {
 .rzadb-maintenance-table td:nth-child(2) {
     width: 7%;
     text-align: center;
+    white-space: nowrap;
 }
 
 /* Выявленные отклонения */
 .rzadb-maintenance-table th:nth-child(3),
 .rzadb-maintenance-table td:nth-child(3) {
-    width: 20%;
+    width: 15%;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 /* Принятые меры */
 .rzadb-maintenance-table th:nth-child(4),
 .rzadb-maintenance-table td:nth-child(4) {
-    width: 22%;
+    width: 16%;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 /* Исторические данные */
 .rzadb-maintenance-table th:nth-child(5),
 .rzadb-maintenance-table td:nth-child(5) {
-    width: 11%;
+    width: 9%;
     text-align: center;
+    white-space: nowrap;
 }
 
 /* Кто выполнил */
 .rzadb-maintenance-table th:nth-child(6),
 .rzadb-maintenance-table td:nth-child(6) {
-    width: 13%;
+    width: 11%;
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+/* Статус */
+.rzadb-maintenance-table th:nth-child(7),
+.rzadb-maintenance-table td:nth-child(7) {
+    width: 10%;
+    text-align: center;
 }
 
 /* Документы ТО */
-.rzadb-maintenance-table th:nth-child(7),
-.rzadb-maintenance-table td:nth-child(7) {
-    width: 18%;
+.rzadb-maintenance-table th:nth-child(8),
+.rzadb-maintenance-table td:nth-child(8) {
+    width: 23%;
+    min-width: 300px;
     text-align: left;
+}
+
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.4rem !important;
+}
+
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column > div,
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column > a,
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column > form {
+    flex: 1 1 calc(50% - 0.4rem);
+    min-width: 0;
+    margin-top: 0 !important;
+}
+
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column > form[action$="/return"],
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column > form[action$="/physical-delete"] {
+    flex-basis: 100%;
+}
+
+.rzadb-maintenance-table tbody td:nth-child(8) > .d-flex.flex-column .btn {
+    max-width: 100%;
+    white-space: normal;
+}
+
+.rzadb-maintenance-table tbody td:nth-child(8) .rzadb-document-label {
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 .rzadb-programs-table {
