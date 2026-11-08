@@ -190,12 +190,22 @@ def _read_backup_status(settings: Settings) -> dict[str, Any]:
         except BackupAlreadyRunning:
             pass
         else:
-            state["status"] = "failed"
-            state["error"] = "Процесс резервного копирования был прерван."
             try:
-                _write_backup_status(settings, state)
-            except OSError:
-                logger.warning("Could not persist interrupted backup status")
+                try:
+                    latest_state = json.loads(path.read_text(encoding="utf-8"))
+                    if not isinstance(latest_state, dict):
+                        raise ValueError("status must be an object")
+                except (OSError, ValueError, TypeError):
+                    logger.warning("Could not reread admin backup status under lock")
+                else:
+                    state = latest_state
+                    if state.get("status") == "running":
+                        state["status"] = "failed"
+                        state["error"] = "Процесс резервного копирования был прерван."
+                        try:
+                            _write_backup_status(settings, state)
+                        except OSError:
+                            logger.warning("Could not persist interrupted backup status")
             finally:
                 lock.release()
     return _sanitize_backup_state(state)

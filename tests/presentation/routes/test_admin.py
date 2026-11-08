@@ -1,4 +1,5 @@
 
+import json
 import re
 import time
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ from app.infrastructure.backup.coordinator import (
     BackupManifestError,
 )
 from app.infrastructure.backup.run_lock import BackupRunLock
+from app.presentation.routes.admin import _read_backup_status
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 
@@ -278,6 +280,46 @@ def test_running_backup_rejects_duplicate_request(client, tmp_path, monkeypatch)
     assert response.status_code == 409
     assert response.json()["error"] == "Резервное копирование уже выполняется."
     assert calls == []
+
+
+def test_status_rereads_state_after_lock_before_marking_interrupted(
+    tmp_path, monkeypatch
+):
+    settings = backup_settings(tmp_path)
+    state_path = tmp_path / ".admin-backup-status.json"
+    running_state = {
+        "run_id": "run-123",
+        "status": "running",
+        "started_at": "2026-11-08T10:00:00+00:00",
+        "channels": {},
+    }
+    state_path.write_text(json.dumps(running_state), encoding="utf-8")
+
+    class FinishingBackupLock:
+        def __init__(self, backup_dir):
+            self.lock = BackupRunLock(backup_dir)
+
+        def acquire(self):
+            self.lock.acquire()
+            state_path.write_text(
+                json.dumps({**running_state, "status": "success", "error": None}),
+                encoding="utf-8",
+            )
+            return self
+
+        def release(self):
+            self.lock.release()
+
+    monkeypatch.setattr(
+        "app.presentation.routes.admin.BackupRunLock", FinishingBackupLock
+    )
+
+    result = _read_backup_status(settings)
+    persisted = json.loads(state_path.read_text(encoding="utf-8"))
+
+    assert result["status"] == "success"
+    assert result["error"] is None
+    assert persisted["status"] == "success"
 
 
 @pytest.mark.parametrize(
