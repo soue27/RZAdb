@@ -1149,6 +1149,7 @@ body {
 .rzadb-maintenance-table td:nth-child(7) {
     width: 10%;
     text-align: center;
+    white-space: nowrap;
 }
 
 /* Документы ТО */
