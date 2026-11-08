@@ -42,6 +42,12 @@ def test_backup_settings_have_safe_local_defaults() -> None:
     assert settings.backup_local_enabled is True
     assert settings.backup_local_dir == Path("data/backups")
     assert settings.backup_local_retention_count == 7
+    assert settings.backup_email_enabled is False
+    assert settings.backup_email_to is None
+    assert settings.backup_yandex_disk_enabled is False
+    assert settings.backup_yandex_disk_token is None
+    assert settings.backup_yandex_disk_folder == "/RZAdb/backups"
+    assert settings.backup_yandex_disk_retention_count == 7
 
 
 def test_smtp_settings_can_be_configured() -> None:

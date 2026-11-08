@@ -1,19 +1,15 @@
-"""Local PostgreSQL backup utilities."""
+"""PostgreSQL backup creation, delivery channels, and run coordination."""
 
-from app.infrastructure.backup.service import (
-    BackupConfigurationError,
+from app.infrastructure.backup.coordinator import (
+    BackupCoordinator,
     BackupDisabledError,
     BackupError,
-    BackupOperationError,
-    BackupResult,
-    LocalPostgresBackupService,
+    BackupManifestError,
 )
 
 __all__ = [
-    "BackupConfigurationError",
+    "BackupCoordinator",
     "BackupDisabledError",
     "BackupError",
-    "BackupOperationError",
-    "BackupResult",
-    "LocalPostgresBackupService",
+    "BackupManifestError",
 ]

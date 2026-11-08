@@ -11,6 +11,7 @@ dependencies = [
     "alembic>=1.19.2",
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
     "jinja2>=3.1.6",
     "openpyxl>=3.1.5",
@@ -34,7 +35,6 @@ module-root = ""
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.6",

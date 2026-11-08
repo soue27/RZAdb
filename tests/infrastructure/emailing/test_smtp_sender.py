@@ -69,6 +69,40 @@ async def test_send_uses_starttls_and_authentication() -> None:
     assert message.get_body(preferencelist=("html",)) is not None
 
 
+@pytest.mark.asyncio
+async def test_send_supports_attachment_without_changing_existing_send_calls(
+    tmp_path,
+) -> None:
+    attachment_path = tmp_path / "database.dump"
+    attachment_path.write_bytes(b"custom-format-dump")
+    sender = SMTPEmailSender(make_settings())
+
+    with (
+        patch(
+            "app.infrastructure.emailing.smtp_sender.smtplib.SMTP"
+        ) as smtp_factory,
+        patch(
+            "app.infrastructure.emailing.smtp_sender.asyncio.to_thread"
+        ) as to_thread,
+    ):
+        client = smtp_factory.return_value.__enter__.return_value
+        to_thread.side_effect = lambda func, *args: func(*args)
+
+        await sender.send(
+            to="recipient@example.com",
+            subject="Backup",
+            body="Backup metadata",
+            attachments=(attachment_path,),
+        )
+
+    message = client.send_message.call_args.args[0]
+    attachments = list(message.iter_attachments())
+    assert len(attachments) == 1
+    assert attachments[0].get_filename() == "database.dump"
+    assert attachments[0].get_content_type() == "application/octet-stream"
+    assert attachments[0].get_payload(decode=True) == b"custom-format-dump"
+
+
 def test_sender_rejects_missing_smtp_host() -> None:
     with pytest.raises(ValueError, match="SMTP_HOST"):
         SMTPEmailSender(make_settings(smtp_host=None))

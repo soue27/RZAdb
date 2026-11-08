@@ -3,6 +3,8 @@ import asyncio
 import smtplib
 import ssl
 from email.message import EmailMessage
+from pathlib import Path
+from collections.abc import Sequence
 
 from app.core.config import Settings
 
@@ -36,8 +38,26 @@ class SMTPEmailSender:
         subject: str,
         body: str,
         html_body: str | None = None,
+        attachments: Sequence[Path] | None = None,
     ) -> None:
         """Отправляет письмо; SMTP-вызовы выполняются в отдельном потоке."""
+        await asyncio.to_thread(
+            self._build_and_send_sync,
+            to,
+            subject,
+            body,
+            html_body,
+            tuple(attachments or ()),
+        )
+
+    def _build_and_send_sync(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        html_body: str | None,
+        attachments: Sequence[Path],
+    ) -> None:
         message = EmailMessage()
         message["From"] = self.settings.smtp_from_email
         message["To"] = to
@@ -47,7 +67,15 @@ class SMTPEmailSender:
         if html_body is not None:
             message.add_alternative(html_body, subtype="html")
 
-        await asyncio.to_thread(self._send_sync, message)
+        for attachment_path in attachments:
+            message.add_attachment(
+                attachment_path.read_bytes(),
+                maintype="application",
+                subtype="octet-stream",
+                filename=attachment_path.name,
+            )
+
+        self._send_sync(message)
 
     def _send_sync(self, message: EmailMessage) -> None:
         host = self.settings.smtp_host

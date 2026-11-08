@@ -1,0 +1,348 @@
+from __future__ import annotations
+
+import json
+import logging
+import os
+import tempfile
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
+
+import httpx
+
+from app.core.config import Settings
+from app.infrastructure.backup.channels import (
+    ChannelConfigurationError,
+    ChannelResult,
+    EmailBackupChannel,
+    LocalBackupChannel,
+    YandexDiskBackupChannel,
+)
+from app.infrastructure.backup.dump import DumpArtifact, DumpCreationError, PostgresDumpService
+
+logger = logging.getLogger(__name__)
+
+
+class BackupError(RuntimeError):
+    """Base error for a backup run that could not be completed."""
+
+
+class BackupDisabledError(BackupError):
+    """Raised when the global backup switch is off."""
+
+
+class BackupManifestError(BackupError):
+    """The final run manifest could not be committed to disk."""
+
+
+class BackupCoordinator:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.dump_service = PostgresDumpService(settings)
+        self.local_channel = LocalBackupChannel(settings)
+        self.email_channel = EmailBackupChannel(settings)
+        self.yandex_disk_channel = YandexDiskBackupChannel(settings)
+
+    async def run(self) -> dict[str, Any]:
+        if not self.settings.backup_enabled:
+            raise BackupDisabledError("Database backup is disabled")
+
+        backup_dir = self.settings.backup_local_dir
+        run_id = uuid4()
+        started_at = datetime.now(UTC)
+        started_clock = time.monotonic()
+        timestamp = started_at.strftime("%Y%m%dT%H%M%S%fZ")
+        stem = f"rzadb_{timestamp}_{run_id.hex}"
+        dump_name = f"{stem}.dump"
+        manifest_path = backup_dir / f"{stem}.json"
+        artifact: DumpArtifact | None = None
+
+        manifest: dict[str, Any] = {
+            "run_id": str(run_id),
+            "started_at": started_at.isoformat(),
+            "dump_filename": dump_name,
+            "dump_created": False,
+            "pg_restore_list_validation": "not_run",
+            "size_bytes": None,
+            "sha256": None,
+            "duration_seconds": 0.0,
+            "channels": {
+                "local": self._channel_pending(self.settings.backup_local_enabled),
+                "email": self._channel_pending(self.settings.backup_email_enabled),
+                "yandex_disk": self._channel_pending(
+                    self.settings.backup_yandex_disk_enabled
+                ),
+            },
+            "local_storage": {
+                "enabled": self.settings.backup_local_enabled,
+                "status": "disabled"
+                if not self.settings.backup_local_enabled
+                else "pending",
+            },
+            "status": "running",
+            "error": None,
+        }
+
+        try:
+            try:
+                backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+                os.chmod(backup_dir, 0o700)
+            except Exception as exc:
+                self._manifest_write_error(run_id, exc)
+
+            channel_ready = self._validate_enabled_channels(manifest)
+            if not any(channel_ready.values()):
+                manifest["error"] = "No enabled backup channel is ready"
+                manifest["status"] = "failed"
+                return await self._save_manifest_and_result(
+                    manifest,
+                    manifest_path,
+                    backup_dir,
+                    run_id,
+                    started_clock,
+                    artifact,
+                )
+
+            try:
+                artifact = self.dump_service.create_dump(
+                    backup_dir=backup_dir,
+                    stem=stem,
+                )
+            except DumpCreationError as exc:
+                manifest["error"] = str(exc)
+                manifest["dump_created"] = exc.dump_created
+                manifest["pg_restore_list_validation"] = exc.validation_status
+                for name, ready in channel_ready.items():
+                    if ready:
+                        outcome = manifest["channels"][name]
+                        outcome["status"] = "not_attempted"
+                        outcome["error"] = "Dump creation or validation failed"
+                manifest["status"] = "failed"
+                return await self._save_manifest_and_result(
+                    manifest,
+                    manifest_path,
+                    backup_dir,
+                    run_id,
+                    started_clock,
+                    artifact,
+                )
+
+            manifest["dump_created"] = True
+            manifest["pg_restore_list_validation"] = "passed"
+            manifest["size_bytes"] = artifact.size_bytes
+            manifest["sha256"] = artifact.sha256
+
+            delivery_path = artifact.path
+            if channel_ready.get("local"):
+                try:
+                    local_path = self.local_channel.publish(artifact, dump_name)
+                    delivery_path = local_path
+                    self._set_channel_result(
+                        manifest, "local", ChannelResult("success", path=dump_name)
+                    )
+                except Exception as exc:
+                    self._set_channel_failure(manifest, "local", exc)
+            self._sync_legacy_local_status(manifest)
+
+            if channel_ready.get("email"):
+                try:
+                    result = await self.email_channel.send(
+                        dump_path=delivery_path,
+                        run_id=str(run_id),
+                        started_at=started_at.isoformat(),
+                        size_bytes=artifact.size_bytes,
+                        sha256=artifact.sha256,
+                    )
+                    self._set_channel_result(manifest, "email", result)
+                except Exception as exc:
+                    self._set_channel_failure(manifest, "email", exc)
+
+            if channel_ready.get("yandex_disk"):
+                try:
+                    result = self.yandex_disk_channel.upload(delivery_path, dump_name)
+                    self._set_channel_result(manifest, "yandex_disk", result)
+                except Exception as exc:
+                    self._set_channel_failure(manifest, "yandex_disk", exc)
+
+            self._sync_legacy_local_status(manifest)
+            manifest["status"] = self._overall_status(manifest)
+            return await self._save_manifest_and_result(
+                manifest,
+                manifest_path,
+                backup_dir,
+                run_id,
+                started_clock,
+                artifact,
+            )
+        finally:
+            if artifact is not None:
+                try:
+                    artifact.cleanup()
+                except OSError as exc:
+                    logger.warning(
+                        "Backup run %s temporary dump cleanup failed (%s)",
+                        run_id,
+                        type(exc).__name__,
+                    )
+
+    def _validate_enabled_channels(self, manifest: dict[str, Any]) -> dict[str, bool]:
+        readiness = {
+            "local": self.settings.backup_local_enabled,
+            "email": self.settings.backup_email_enabled,
+            "yandex_disk": self.settings.backup_yandex_disk_enabled,
+        }
+        validators = {
+            "email": self.email_channel.validate,
+            "yandex_disk": self.yandex_disk_channel.validate,
+        }
+        for name, validate in validators.items():
+            if not readiness[name]:
+                continue
+            try:
+                validate()
+            except Exception as exc:
+                readiness[name] = False
+                self._set_channel_failure(manifest, name, exc)
+        return readiness
+
+    async def _save_manifest_and_result(
+        self,
+        manifest: dict[str, Any],
+        manifest_path: Path,
+        backup_dir: Path,
+        run_id: UUID,
+        started_clock: float,
+        artifact: DumpArtifact | None,
+    ) -> dict[str, Any]:
+        manifest["duration_seconds"] = round(time.monotonic() - started_clock, 6)
+        self._sync_legacy_local_status(manifest)
+        try:
+            self._write_manifest_atomic(manifest_path, manifest)
+        except Exception as exc:
+            self._manifest_write_error(run_id, exc)
+
+        if manifest["channels"]["local"]["status"] == "success":
+            try:
+                self.local_channel.apply_retention()
+            except Exception as exc:
+                logger.warning(
+                    "Backup run %s local retention failed (%s)",
+                    run_id,
+                    type(exc).__name__,
+                )
+
+        return {
+            "run_id": str(run_id),
+            "status": manifest["status"],
+            "dump_path": str(backup_dir / manifest["dump_filename"])
+            if manifest["channels"]["local"]["status"] == "success"
+            else None,
+            "manifest_path": str(manifest_path),
+            "size_bytes": artifact.size_bytes if artifact else manifest["size_bytes"],
+            "sha256": artifact.sha256 if artifact else manifest["sha256"],
+            "channels": manifest["channels"],
+        }
+
+    @staticmethod
+    def _channel_pending(enabled: bool) -> dict[str, Any]:
+        return {
+            "enabled": enabled,
+            "status": "pending" if enabled else "disabled",
+            "error": None,
+            "path": None,
+            "retention_status": None,
+            "retention_error": None,
+        }
+
+    @staticmethod
+    def _set_channel_result(
+        manifest: dict[str, Any], name: str, result: ChannelResult
+    ) -> None:
+        manifest["channels"][name].update(result.to_dict())
+
+    @classmethod
+    def _set_channel_failure(
+        cls,
+        manifest: dict[str, Any],
+        name: str,
+        error: Exception,
+    ) -> None:
+        if isinstance(error, ChannelConfigurationError):
+            safe_error = str(error)
+        elif isinstance(error, ValueError) and name == "email":
+            safe_error = str(error)
+        elif isinstance(error, httpx.HTTPStatusError):
+            safe_error = f"HTTP request failed with status {error.response.status_code}"
+        else:
+            safe_error = f"{name} channel failed ({type(error).__name__})"
+        manifest["channels"][name].update(
+            {"status": "failed", "error": safe_error}
+        )
+        logger.error(
+            "Backup channel %s failed (%s)", name, type(error).__name__
+        )
+
+    @staticmethod
+    def _sync_legacy_local_status(manifest: dict[str, Any]) -> None:
+        local = manifest["channels"]["local"]
+        manifest["local_storage"] = {
+            "enabled": local["enabled"],
+            "status": local["status"],
+        }
+
+    @staticmethod
+    def _overall_status(manifest: dict[str, Any]) -> str:
+        enabled = [
+            channel
+            for channel in manifest["channels"].values()
+            if channel["enabled"]
+        ]
+        successes = sum(channel["status"] == "success" for channel in enabled)
+        failures = sum(channel["status"] == "failed" for channel in enabled)
+        retention_failures = sum(
+            channel.get("retention_status") == "failed" for channel in enabled
+        )
+        if successes == len(enabled) and not retention_failures:
+            return "success"
+        if successes:
+            return "partial_success"
+        if failures or enabled:
+            return "failed"
+        return "failed"
+
+    @staticmethod
+    def _write_manifest_atomic(path: Path, manifest: dict[str, Any]) -> None:
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                prefix=f".{path.stem}.",
+                suffix=".json.tmp",
+                dir=path.parent,
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                os.chmod(temporary_path, 0o600)
+                json.dump(manifest, temporary, ensure_ascii=False, indent=2)
+                temporary.write("\n")
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_path, path)
+            os.chmod(path, 0o600)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _manifest_write_error(run_id: UUID, error: Exception) -> None:
+        logger.error(
+            "Backup run %s manifest write failed (%s)",
+            run_id,
+            type(error).__name__,
+        )
+        raise BackupManifestError(
+            f"Backup manifest write failed ({type(error).__name__}); run_id={run_id}"
+        ) from None

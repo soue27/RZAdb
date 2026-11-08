@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     backup_local_enabled: bool = True
     backup_local_dir: Path = Path("data/backups")
     backup_local_retention_count: int = Field(default=7, ge=1, le=365)
+    backup_email_enabled: bool = False
+    backup_email_to: str | None = None
+    backup_yandex_disk_enabled: bool = False
+    backup_yandex_disk_token: SecretStr | None = None
+    backup_yandex_disk_folder: str = "/RZAdb/backups"
+    backup_yandex_disk_retention_count: int = Field(default=7, ge=1, le=365)
 
     # SMTP — email digest
     smtp_host: str | None = None
