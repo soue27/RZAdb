@@ -23,6 +23,8 @@ ERROR_EMAIL_QUEUE_SIZE = 100
 ERROR_EMAIL_SHUTDOWN_TIMEOUT_SECONDS = 35.0
 _INTERNAL_LOGGER_PREFIX = "app.infrastructure.emailing.error_notifications"
 _HANDLER_MARKER = "_rzadb_error_email_handler"
+_LOCAL_PART_ATOM = re.compile(r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+")
+_DOMAIN_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 
 
 class ErrorEmailConfigurationError(ValueError):
@@ -39,27 +41,24 @@ class _Notification:
 
 
 def _validate_address(value: str | None, setting_name: str) -> None:
-    if not value or value != value.strip() or any(char.isspace() for char in value):
+    if not value or len(value) > 254 or value != value.strip():
         raise ErrorEmailConfigurationError(
             f"{setting_name} должен содержать корректный email-адрес."
         )
-    if value.count("@") != 1:
-        raise ErrorEmailConfigurationError(
-            f"{setting_name} должен содержать корректный email-адрес."
-        )
-    local_part, domain = value.split("@", 1)
+
+    local_part, separator, domain = value.partition("@")
+    local_atoms = local_part.split(".")
     domain_labels = domain.split(".")
     if (
-        not local_part
-        or local_part.startswith(".")
-        or local_part.endswith(".")
-        or ".." in local_part
+        not separator
+        or "@" in domain
+        or not local_part
+        or len(local_part) > 64
+        or any(not _LOCAL_PART_ATOM.fullmatch(atom) for atom in local_atoms)
+        or len(domain) > 253
         or len(domain_labels) < 2
         or any(
-            not label
-            or len(label) > 63
-            or label.startswith("-")
-            or label.endswith("-")
+            len(label) > 63 or not _DOMAIN_LABEL.fullmatch(label)
             for label in domain_labels
         )
     ):

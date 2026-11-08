@@ -10,6 +10,7 @@ from app.infrastructure.emailing.error_notifications import (
     ERROR_EMAIL_COOLDOWN_SECONDS,
     ErrorEmailConfigurationError,
     ErrorEmailNotificationHandler,
+    _validate_address,
     validate_error_email_settings,
 )
 
@@ -76,6 +77,53 @@ def test_alert_configuration_requires_complete_encrypted_smtp_settings():
     assert validate_error_email_settings(
         make_settings(smtp_starttls=False, smtp_use_ssl=True)
     ) == "alerts@example.com"
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "alerts@example.com",
+        "alerts+rzadb@example.com",
+        "first.last@example.com",
+        "alerts@mail.example.org",
+        "alerts_1@example-domain.com",
+    ],
+)
+def test_email_address_validation_accepts_common_addresses(address):
+    _validate_address(address, "ERROR_EMAIL_TO")
+    _validate_address(address, "SMTP_FROM_EMAIL")
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "alerts@exa$mple.com",
+        "alerts@example!.com",
+        "alerts@exa_mple.com",
+        "alerts..test@example.com",
+        ".alerts@example.com",
+        "alerts.@example.com",
+        "alerts@example",
+        "alerts@example..com",
+        "alerts@.example.com",
+        "alerts@example.com.",
+        "alerts@-example.com",
+        "alerts@example-.com",
+        "alerts @example.com",
+        "alerts@example .com",
+        "alerts@@example.com",
+        "",
+        "alerts@example.com\x00",
+        f"{'a' * 65}@example.com",
+        f"alerts@{'a' * 64}.example.com",
+        f"{'a' * 64}@{'b' * 63}.{'c' * 63}.{'d' * 63}.com",
+    ],
+)
+def test_email_address_validation_rejects_invalid_addresses(address):
+    with pytest.raises(ErrorEmailConfigurationError, match="ERROR_EMAIL_TO"):
+        _validate_address(address, "ERROR_EMAIL_TO")
+    with pytest.raises(ErrorEmailConfigurationError, match="SMTP_FROM_EMAIL"):
+        _validate_address(address, "SMTP_FROM_EMAIL")
 
 
 @pytest.mark.parametrize(
