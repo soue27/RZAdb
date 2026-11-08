@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
+from app.core.logging_config import configure_logging
 from app.infrastructure.database import models  # noqa: F401
 from app.presentation.auth.dependencies import PasswordChangeRequired
 from app.presentation.routes.admin import router as admin_router
@@ -79,6 +80,7 @@ async def _handle_auth_http_exception(
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings.log_level)
 
     app = FastAPI(
         title=settings.app_name,

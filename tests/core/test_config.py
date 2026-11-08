@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from app.core.config import Settings
 
 
@@ -18,6 +21,38 @@ def test_smtp_settings_have_safe_defaults() -> None:
     assert settings.smtp_starttls is True
     assert settings.smtp_use_ssl is False
     assert str(settings.document_templates_dir) == "data/document_templates"
+    assert settings.log_level == "INFO"
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("DEBUG", "DEBUG"),
+        ("info", "INFO"),
+        ("Warning", "WARNING"),
+        ("error", "ERROR"),
+        ("CRITICAL", "CRITICAL"),
+    ],
+)
+def test_log_level_is_normalized(configured: str, expected: str) -> None:
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
+        session_secret="test-secret",
+        log_level=configured,
+    )
+
+    assert settings.log_level == expected
+
+
+def test_invalid_log_level_has_clear_configuration_error() -> None:
+    with pytest.raises(ValidationError, match="LOG_LEVEL must be one of"):
+        Settings(
+            _env_file=None,
+            database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
+            session_secret="test-secret",
+            log_level="verbose",
+        )
 
 
 def test_document_templates_directory_can_be_configured() -> None:
