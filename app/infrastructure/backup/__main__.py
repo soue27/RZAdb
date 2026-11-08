@@ -9,12 +9,18 @@ from app.infrastructure.backup.coordinator import (
     BackupCoordinator,
     BackupError,
 )
+from app.infrastructure.backup.run_lock import BackupAlreadyRunning, BackupRunLock
 
 
 async def run() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    settings = get_settings()
     try:
-        result = await BackupCoordinator(get_settings()).run()
+        with BackupRunLock(settings.backup_local_dir):
+            result = await BackupCoordinator(settings).run()
+    except BackupAlreadyRunning:
+        logging.error("Another PostgreSQL backup is already running")
+        return 1
     except BackupError as exc:
         logging.error("Database backup failed: %s", exc)
         return 1

@@ -19,6 +19,9 @@
         <a href="/admin/users/new" class="btn btn-primary">Создать пользователя</a>
     </div>
 
+    {% set backup = backup_status %}
+    {% include "admin/_backup_status.html" %}
+
     <div class="card border-0 shadow-sm">
         <div class="card-body">
 

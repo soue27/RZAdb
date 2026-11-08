@@ -1,0 +1,100 @@
+{% set status_labels = {
+    'idle': 'Не запускалось',
+    'running': 'Выполняется',
+    'success': 'Успешно',
+    'partial_success': 'Частично успешно',
+    'failed': 'Ошибка',
+    'pending': 'Ожидает',
+    'disabled': 'Отключён',
+    'not_attempted': 'Не запускался',
+} %}
+{% set channel_labels = {'local': 'Local', 'email': 'Email', 'yandex_disk': 'Яндекс Диск'} %}
+<section
+    id="backup-status"
+    {% if backup.status == 'running' %}
+        hx-get="/admin/backup/status"
+        hx-trigger="every 2s"
+        hx-swap="outerHTML"
+    {% endif %}
+>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <h2 class="h5 mb-1">Резервное копирование PostgreSQL</h2>
+                    <p class="text-body-secondary mb-0">
+                        Создание и проверка дампа с доставкой во включённые каналы.
+                    </p>
+                </div>
+                <form method="post" action="/admin/backup"
+                      hx-post="/admin/backup" hx-target="#backup-status" hx-swap="outerHTML">
+                    <button class="btn btn-primary" type="submit"
+                            {% if backup.status == 'running' or not backup_enabled %}disabled{% endif %}>
+                        {% if backup.status == 'running' %}
+                            Резервная копия создаётся…
+                        {% else %}
+                            Создать резервную копию
+                        {% endif %}
+                    </button>
+                </form>
+            </div>
+
+            {% if not backup_enabled %}
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                    Резервное копирование отключено настройкой BACKUP_ENABLED.
+                </div>
+            {% endif %}
+            {% if backup.error %}
+                <div class="alert alert-danger mt-3 mb-0" role="alert">{{ backup.error }}</div>
+            {% endif %}
+
+            <dl class="row mt-3 mb-0">
+                <dt class="col-sm-3">Статус</dt>
+                <dd class="col-sm-9">
+                    <span class="badge {% if backup.status == 'success' %}text-bg-success{% elif backup.status == 'running' %}text-bg-primary{% elif backup.status == 'partial_success' %}text-bg-warning{% elif backup.status == 'failed' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+                        {{ status_labels.get(backup.status, backup.status) }}
+                    </span>
+                </dd>
+                {% if backup.started_at %}
+                    <dt class="col-sm-3">Время запуска</dt>
+                    <dd class="col-sm-9">{{ backup.started_at }}</dd>
+                {% endif %}
+                {% if backup.duration_seconds is not none %}
+                    <dt class="col-sm-3">Длительность</dt>
+                    <dd class="col-sm-9">{{ backup.duration_seconds }} с</dd>
+                {% endif %}
+                {% if backup.size_bytes is not none %}
+                    <dt class="col-sm-3">Размер дампа</dt>
+                    <dd class="col-sm-9">{{ backup.size_bytes }} байт</dd>
+                {% endif %}
+                {% if backup.sha256 %}
+                    <dt class="col-sm-3">SHA-256</dt>
+                    <dd class="col-sm-9"><code>{{ backup.sha256 }}</code></dd>
+                {% endif %}
+                {% if backup.run_id %}
+                    <dt class="col-sm-3">Идентификатор запуска</dt>
+                    <dd class="col-sm-9"><code>{{ backup.run_id }}</code></dd>
+                {% endif %}
+            </dl>
+
+            <h3 class="h6 mt-3">Каналы</h3>
+            <ul class="list-group list-group-flush">
+                {% for name, channel in backup.channels.items() %}
+                    <li class="list-group-item px-0">
+                        <div class="d-flex flex-wrap justify-content-between gap-2">
+                            <strong>{{ channel_labels.get(name, name) }}</strong>
+                            <span>{{ status_labels.get(channel.status, channel.status) }}</span>
+                        </div>
+                        {% if channel.error %}<div class="small text-danger">{{ channel.error }}</div>{% endif %}
+                        {% if channel.retention_status %}
+                            <div class="small text-body-secondary">
+                                Очистка старых копий: {{ status_labels.get(channel.retention_status, channel.retention_status) }}
+                            </div>
+                        {% endif %}
+                        {% if channel.retention_error %}<div class="small text-danger">{{ channel.retention_error }}</div>{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>

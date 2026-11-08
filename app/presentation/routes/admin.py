@@ -1,16 +1,32 @@
-from typing import Annotated
+import asyncio
+import json
+import logging
+import os
+import tempfile
+import threading
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.enterprises.repository import EnterpriseRepository
 from app.application.users.repository import UserRepository
 from app.application.users.service import UserOperationError, UserService
+from app.core.config import Settings, get_settings
 from app.domain.enums import AccessCategory, UserRole
 from app.domain.user import User
+from app.infrastructure.backup.coordinator import (
+    BackupCoordinator,
+    BackupDisabledError,
+    BackupError,
+    BackupManifestError,
+)
+from app.infrastructure.backup.run_lock import BackupAlreadyRunning, BackupRunLock
 from app.infrastructure.database.session import get_session
 from app.presentation.auth.dependencies import require_superadmin
 from app.presentation.dependencies.services import get_user_service
@@ -23,6 +39,276 @@ router = APIRouter(
 templates = Jinja2Templates(
     directory="app/presentation/templates",
 )
+logger = logging.getLogger(__name__)
+
+_BACKUP_STATUS_FILENAME = ".admin-backup-status.json"
+_CHANNEL_NAMES = ("local", "email", "yandex_disk")
+_BACKUP_STATUSES = {
+    "idle",
+    "running",
+    "success",
+    "partial_success",
+    "failed",
+    "pending",
+    "disabled",
+    "not_attempted",
+}
+_SAFE_BACKUP_ERRORS = {
+    "Резервное копирование отключено настройкой BACKUP_ENABLED.",
+    "Не удалось сохранить манифест резервной копии.",
+    "Резервное копирование завершилось ошибкой.",
+    "Внутренняя ошибка резервного копирования.",
+    "Не удалось создать или проверить дамп. Подробности доступны в журнале приложения.",
+    "Процесс резервного копирования был прерван.",
+    "Резервное копирование уже выполняется.",
+    "Не удалось запустить резервное копирование.",
+    "Не удалось прочитать состояние резервного копирования.",
+}
+
+
+def _backup_status_path(settings: Settings) -> Path:
+    return settings.backup_local_dir / _BACKUP_STATUS_FILENAME
+
+
+def _write_backup_status(settings: Settings, state: dict[str, Any]) -> None:
+    path = _backup_status_path(settings)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=".admin-backup-status.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            os.chmod(temporary_path, 0o600)
+            json.dump(state, temporary, ensure_ascii=False)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+        os.chmod(path, 0o600)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _safe_channel_error(name: str, error: object) -> str | None:
+    if not error:
+        return None
+    message = str(error)
+    if name == "email":
+        if "BACKUP_EMAIL_TO" in message:
+            return "Не настроен адрес получателя резервной копии."
+        return "Ошибка отправки резервной копии по электронной почте."
+    if name == "yandex_disk":
+        if "BACKUP_YANDEX_DISK_TOKEN" in message:
+            return "Не настроен токен Яндекс Диска."
+        return "Ошибка загрузки резервной копии на Яндекс Диск."
+    return "Ошибка сохранения резервной копии локально."
+
+
+def _public_backup_state(result: dict[str, Any]) -> dict[str, Any]:
+    channels = {}
+    for name in _CHANNEL_NAMES:
+        channel = result.get("channels", {}).get(name, {})
+        channels[name] = {
+            "enabled": bool(channel.get("enabled", False)),
+            "status": channel.get("status", "unknown"),
+            "error": _safe_channel_error(name, channel.get("error")),
+            "retention_status": channel.get("retention_status"),
+            "retention_error": (
+                _safe_channel_error(name, channel.get("retention_error"))
+                if channel.get("retention_error")
+                else None
+            ),
+        }
+    result_status = result.get("status", "failed")
+    return {
+        "run_id": result.get("run_id"),
+        "status": result_status,
+        "started_at": result.get("started_at"),
+        "duration_seconds": result.get("duration_seconds"),
+        "size_bytes": result.get("size_bytes"),
+        "sha256": result.get("sha256"),
+        "channels": channels,
+        "error": (
+            "Не удалось создать или проверить дамп. Подробности доступны в журнале приложения."
+            if result_status == "failed"
+            else None
+        ),
+    }
+
+
+def _idle_backup_state(settings: Settings) -> dict[str, Any]:
+    return {
+        "run_id": None,
+        "status": "idle",
+        "started_at": None,
+        "duration_seconds": None,
+        "size_bytes": None,
+        "sha256": None,
+        "channels": {
+            name: {
+                "enabled": bool(getattr(settings, f"backup_{name}_enabled")),
+                "status": "pending"
+                if getattr(settings, f"backup_{name}_enabled")
+                else "disabled",
+                "error": None,
+                "retention_status": None,
+                "retention_error": None,
+            }
+            for name in _CHANNEL_NAMES
+        },
+        "error": None,
+    }
+
+
+def _read_backup_status(settings: Settings) -> dict[str, Any]:
+    path = _backup_status_path(settings)
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            raise ValueError("status must be an object")
+    except FileNotFoundError:
+        return _idle_backup_state(settings)
+    except (OSError, ValueError, TypeError):
+        logger.warning("Could not read admin backup status")
+        state = _idle_backup_state(settings)
+        state["status"] = "failed"
+        state["error"] = "Не удалось прочитать состояние резервного копирования."
+        return state
+
+    # A persisted running state with an available lock means its worker exited.
+    if state.get("status") == "running":
+        lock = BackupRunLock(settings.backup_local_dir)
+        try:
+            lock.acquire()
+        except BackupAlreadyRunning:
+            pass
+        else:
+            state["status"] = "failed"
+            state["error"] = "Процесс резервного копирования был прерван."
+            try:
+                _write_backup_status(settings, state)
+            except OSError:
+                logger.warning("Could not persist interrupted backup status")
+            finally:
+                lock.release()
+    return _sanitize_backup_state(state)
+
+
+def _sanitize_backup_state(state: dict[str, Any]) -> dict[str, Any]:
+    raw_channels = state.get("channels")
+    if not isinstance(raw_channels, dict):
+        raw_channels = {}
+    channels = {}
+    for name in _CHANNEL_NAMES:
+        channel = raw_channels.get(name)
+        if not isinstance(channel, dict):
+            channel = {}
+        channel_status = channel.get("status")
+        if channel_status not in _BACKUP_STATUSES:
+            channel_status = "failed"
+        channels[name] = {
+            "enabled": bool(channel.get("enabled", False)),
+            "status": channel_status,
+            "error": _safe_channel_error(name, channel.get("error")),
+            "retention_status": (
+                channel.get("retention_status")
+                if channel.get("retention_status") in _BACKUP_STATUSES
+                else None
+            ),
+            "retention_error": (
+                _safe_channel_error(name, channel.get("retention_error"))
+                if channel.get("retention_error")
+                else None
+            ),
+        }
+    result_status = state.get("status")
+    if result_status not in _BACKUP_STATUSES:
+        result_status = "failed"
+    error = state.get("error")
+    if error and error not in _SAFE_BACKUP_ERRORS:
+        error = "Не удалось выполнить резервное копирование."
+    return {
+        "run_id": state.get("run_id") if result_status != "idle" else None,
+        "status": result_status,
+        "started_at": state.get("started_at"),
+        "duration_seconds": state.get("duration_seconds"),
+        "size_bytes": state.get("size_bytes"),
+        "sha256": state.get("sha256"),
+        "channels": channels,
+        "error": error,
+    }
+
+
+def _render_backup_status(
+    request: Request, state: dict[str, Any], *, backup_enabled: bool
+) -> Response:
+    state = _sanitize_backup_state(state)
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="admin/_backup_status.html",
+            context={"backup": state, "backup_enabled": backup_enabled},
+        )
+    return JSONResponse(state)
+
+
+def _run_backup_in_thread(settings: Settings, lock: BackupRunLock) -> None:
+    try:
+        try:
+            result = asyncio.run(BackupCoordinator(settings).run())
+            state = _public_backup_state(result)
+        except BackupDisabledError:
+            state = _idle_backup_state(settings)
+            state.update(
+                {
+                    "status": "failed",
+                    "error": "Резервное копирование отключено настройкой BACKUP_ENABLED.",
+                }
+            )
+        except BackupManifestError:
+            state = _idle_backup_state(settings)
+            state.update(
+                {
+                    "status": "failed",
+                    "error": "Не удалось сохранить манифест резервной копии.",
+                }
+            )
+        except BackupError:
+            state = _idle_backup_state(settings)
+            state.update(
+                {"status": "failed", "error": "Резервное копирование завершилось ошибкой."}
+            )
+        except Exception as exc:
+            logger.exception(
+                "Unexpected admin backup failure (%s)", type(exc).__name__
+            )
+            state = _idle_backup_state(settings)
+            state.update(
+                {"status": "failed", "error": "Внутренняя ошибка резервного копирования."}
+            )
+        try:
+            _write_backup_status(settings, state)
+        except OSError as exc:
+            logger.error("Could not persist admin backup status (%s)", type(exc).__name__)
+    finally:
+        lock.release()
+
+
+def _backup_status_response(
+    request: Request, state: dict[str, Any], settings: Settings
+) -> Response:
+    return _render_backup_status(
+        request,
+        state,
+        backup_enabled=settings.backup_enabled,
+    )
 
 
 def _role_labels() -> dict[str, str]:
@@ -64,6 +350,7 @@ async def admin_dashboard(
     status_filter: str | None = None,
     enterprise_filter: str | None = None,
 ):
+    settings = get_settings()
 
     allowed_statuses = {"active", "inactive", "archived"}
     status_filter = status_filter or None
@@ -122,8 +409,77 @@ async def admin_dashboard(
             "role_labels": role_labels,
             "enterprises": enterprises,
             "enterprise_filter": enterprise_filter,
+            "backup_status": _read_backup_status(settings),
+            "backup_enabled": settings.backup_enabled,
         },
     )
+
+
+@router.post("/backup")
+async def start_admin_backup(
+    request: Request,
+    current_user: Annotated[User, Depends(require_superadmin)],
+):
+    settings = get_settings()
+    lock = BackupRunLock(settings.backup_local_dir)
+    try:
+        lock.acquire()
+    except BackupAlreadyRunning:
+        state = _read_backup_status(settings)
+        state["status"] = "running"
+        state["error"] = "Резервное копирование уже выполняется."
+        if request.headers.get("HX-Request") == "true":
+            return _backup_status_response(request, state, settings)
+        return JSONResponse(state, status_code=status.HTTP_409_CONFLICT)
+    except OSError as exc:
+        logger.error("Could not acquire admin backup lock (%s)", type(exc).__name__)
+        state = _idle_backup_state(settings)
+        state.update(
+            {
+                "status": "failed",
+                "error": "Не удалось запустить резервное копирование.",
+            }
+        )
+        return _backup_status_response(request, state, settings)
+
+    state = _idle_backup_state(settings)
+    state.update(
+        {
+            "run_id": None,
+            "status": "running",
+            "started_at": datetime.now(UTC).isoformat(),
+            "error": None,
+        }
+    )
+    try:
+        _write_backup_status(settings, state)
+        thread = threading.Thread(
+            target=_run_backup_in_thread,
+            args=(settings, lock),
+            name="admin-postgres-backup",
+            daemon=True,
+        )
+        thread.start()
+    except Exception as exc:
+        lock.release()
+        logger.error("Could not start admin backup worker (%s)", type(exc).__name__)
+        state.update(
+            {"status": "failed", "error": "Не удалось запустить резервное копирование."}
+        )
+        try:
+            _write_backup_status(settings, state)
+        except OSError:
+            logger.warning("Could not persist failed admin backup status")
+    return _backup_status_response(request, state, settings)
+
+
+@router.get("/backup/status")
+async def admin_backup_status(
+    request: Request,
+    current_user: Annotated[User, Depends(require_superadmin)],
+):
+    settings = get_settings()
+    return _backup_status_response(request, _read_backup_status(settings), settings)
 
 
 @router.get("/users/new")

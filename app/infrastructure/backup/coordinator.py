@@ -251,10 +251,13 @@ class BackupCoordinator:
         return {
             "run_id": str(run_id),
             "status": manifest["status"],
+            "started_at": manifest["started_at"],
+            "duration_seconds": manifest["duration_seconds"],
             "dump_path": str(backup_dir / manifest["dump_filename"])
             if manifest["channels"]["local"]["status"] == "success"
             else None,
             "manifest_path": str(manifest_path),
+            "error": manifest["error"],
             "size_bytes": artifact.size_bytes if artifact else manifest["size_bytes"],
             "sha256": artifact.sha256 if artifact else manifest["sha256"],
             "channels": manifest["channels"],
