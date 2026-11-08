@@ -13,6 +13,7 @@ wheels/
 # Virtual environments
 .venv
 /data/uploads
+/data/backups/
 
 # Test
 .pytest_cache

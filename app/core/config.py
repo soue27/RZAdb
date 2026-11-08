@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,11 @@ class Settings(BaseSettings):
     database_url: str
     session_secret: str
     document_templates_dir: Path = Path("data/document_templates")
+
+    backup_enabled: bool = False
+    backup_local_enabled: bool = True
+    backup_local_dir: Path = Path("data/backups")
+    backup_local_retention_count: int = Field(default=7, ge=1, le=365)
 
     # SMTP — email digest
     smtp_host: str | None = None
