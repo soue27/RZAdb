@@ -106,6 +106,117 @@ async def test_channels_run_sequentially_and_one_delivery_error_does_not_block_o
 
 
 @pytest.mark.asyncio
+async def test_yandex_failure_does_not_block_successful_local_and_email(
+    tmp_path, monkeypatch
+):
+    install_dump(monkeypatch)
+    settings = make_settings(
+        tmp_path,
+        backup_email_enabled=True,
+        backup_email_to="superadmin@example.com",
+        backup_yandex_disk_enabled=True,
+    )
+    calls = []
+    original_publish = LocalBackupChannel.publish
+
+    def publish_local(self, artifact, dump_name):
+        calls.append("local")
+        return original_publish(self, artifact, dump_name)
+
+    async def send_email(self, **kwargs):
+        calls.append("email")
+        assert kwargs["dump_path"].is_file()
+        return ChannelResult("success", path=kwargs["dump_name"])
+
+    def fail_yandex(self, dump_path, dump_name):
+        calls.append("yandex_disk")
+        assert dump_path.is_file()
+        raise RuntimeError("Yandex API unavailable")
+
+    monkeypatch.setattr(LocalBackupChannel, "publish", publish_local)
+    monkeypatch.setattr(
+        "app.infrastructure.backup.coordinator.EmailBackupChannel.send", send_email
+    )
+    monkeypatch.setattr(
+        "app.infrastructure.backup.coordinator.YandexDiskBackupChannel.upload",
+        fail_yandex,
+    )
+
+    result = await BackupCoordinator(settings).run()
+
+    assert calls == ["local", "email", "yandex_disk"]
+    assert result["status"] == "partial_success"
+    assert result["channels"]["local"]["status"] == "success"
+    assert result["channels"]["email"]["status"] == "success"
+    assert result["channels"]["yandex_disk"]["status"] == "failed"
+    dump_path = Path(result["dump_path"])
+    assert dump_path.is_file()
+    manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["status"] == "partial_success"
+    assert manifest["channels"]["local"]["status"] == "success"
+    assert manifest["channels"]["email"]["status"] == "success"
+    assert manifest["channels"]["yandex_disk"]["status"] == "failed"
+    assert manifest["dump_filename"] == dump_path.name
+
+
+@pytest.mark.asyncio
+async def test_local_failure_does_not_block_successful_email_and_yandex(
+    tmp_path, monkeypatch
+):
+    install_dump(monkeypatch)
+    settings = make_settings(
+        tmp_path,
+        backup_email_enabled=True,
+        backup_email_to="superadmin@example.com",
+        backup_yandex_disk_enabled=True,
+    )
+    calls = []
+    temporary_paths = []
+
+    def fail_local(self, artifact, dump_name):
+        calls.append("local")
+        temporary_paths.append(artifact.path)
+        raise OSError("local storage unavailable")
+
+    async def send_email(self, **kwargs):
+        calls.append("email")
+        assert kwargs["dump_path"].is_file()
+        assert kwargs["dump_path"].read_bytes() == b"verified dump"
+        return ChannelResult("success", path=kwargs["dump_name"])
+
+    def upload_to_yandex(self, dump_path, dump_name):
+        calls.append("yandex_disk")
+        assert dump_path.is_file()
+        assert dump_path.read_bytes() == b"verified dump"
+        return ChannelResult("success", path=f"/RZAdb/backups/{dump_name}")
+
+    monkeypatch.setattr(LocalBackupChannel, "publish", fail_local)
+    monkeypatch.setattr(
+        "app.infrastructure.backup.coordinator.EmailBackupChannel.send", send_email
+    )
+    monkeypatch.setattr(
+        "app.infrastructure.backup.coordinator.YandexDiskBackupChannel.upload",
+        upload_to_yandex,
+    )
+
+    result = await BackupCoordinator(settings).run()
+
+    assert calls == ["local", "email", "yandex_disk"]
+    assert result["status"] == "partial_success"
+    assert result["channels"]["local"]["status"] == "failed"
+    assert result["channels"]["email"]["status"] == "success"
+    assert result["channels"]["yandex_disk"]["status"] == "success"
+    assert result["dump_path"] is None
+    manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["status"] == "partial_success"
+    assert manifest["channels"]["local"]["status"] == "failed"
+    assert manifest["channels"]["email"]["status"] == "success"
+    assert manifest["channels"]["yandex_disk"]["status"] == "success"
+    assert len(temporary_paths) == 1
+    assert not temporary_paths[0].exists()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("local_enabled", [True, False])
 async def test_email_receives_logical_dump_name_regardless_of_local_channel(
     tmp_path, monkeypatch, local_enabled
