@@ -92,16 +92,18 @@ class FakeMaintenanceService:
         records=None,
         approved_record=None,
         create_error=None,
+        transition_error=None,
     ):
         self.records = list(records or [])
         self.approved_record = approved_record
         self.create_error = create_error
+        self.transition_error = transition_error
         self.calls = []
 
     async def validate_task_for_result(self, user_id, urza_id, task_id):
         self.calls.append(("validate_task_for_result", task_id))
 
-    async def get_by_urza(self, *, user_id, urza_id):
+    async def get_by_urza(self, user_id, urza_id):
         self.calls.append(
             (
                 "get_by_urza",
@@ -116,6 +118,24 @@ class FakeMaintenanceService:
     async def get_current_approved(self, user_id, urza_id):
         self.calls.append(("get_current_approved", user_id, urza_id))
         return self.approved_record
+
+    async def get_available_actions(self, user_id, record):
+        return getattr(record, "available_actions", set())
+
+    async def submit_for_review(self, user_id, record_id, urza_id):
+        self.calls.append(("submit_for_review", user_id, record_id, urza_id))
+        if self.transition_error:
+            raise self.transition_error
+
+    async def approve(self, user_id, record_id, urza_id):
+        self.calls.append(("approve", user_id, record_id, urza_id))
+        if self.transition_error:
+            raise self.transition_error
+
+    async def return_to_draft(self, user_id, record_id, urza_id, comment):
+        self.calls.append(("return_to_draft", user_id, record_id, urza_id, comment))
+        if self.transition_error:
+            raise self.transition_error
 
     async def create(self, **kwargs):
         self.calls.append(("create", kwargs))
@@ -317,6 +337,7 @@ def test_get_maintenance_list_returns_records(system_user_id):
 def test_specialist_can_view_maintenance_but_not_create(system_user_id):
     urza_id = uuid7()
     record = SimpleNamespace(
+        id=uuid7(),
         maintenance_date=date(2026, 9, 17),
         maintenance_type=MaintenanceType.K,
         detected_deviations="Нет",
@@ -409,6 +430,51 @@ def test_maintenance_get_returns_fragment_for_htmx(system_user_id):
         assert response.status_code == 200
         assert "<!doctype html>" not in response.text.lower()
         assert 'id="urza-tab-content"' in response.text
+    finally:
+        _cleanup(user)
+
+
+def test_submit_draft_maintenance_uses_service_and_returns_htmx_fragment(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    record_id = uuid7()
+    service = FakeMaintenanceService()
+    _setup(user, maintenance_service=service)
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/maintenance/{record_id}/submit",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert 'id="urza-tab-content"' in response.text
+        assert service.calls[0] == (
+            "submit_for_review",
+            user.id,
+            record_id,
+            urza_id,
+        )
+    finally:
+        _cleanup(user)
+
+
+def test_maintenance_transition_errors_render_safe_message(system_user_id):
+    user = _user(system_user_id)
+    urza_id = uuid7()
+    record_id = uuid7()
+    service = FakeMaintenanceService(transition_error=ValueError("Недопустимый статус"))
+    _setup(user, maintenance_service=service)
+
+    try:
+        response = TestClient(app).post(
+            f"/objects/urza/{urza_id}/maintenance/{record_id}/approve",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        assert "Недопустимый статус" in response.text
+        assert service.calls[0][0] == "approve"
     finally:
         _cleanup(user)
 

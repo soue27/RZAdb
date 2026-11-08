@@ -6,6 +6,7 @@ from uuid import UUID
 from app.application.access.service import AccessService
 from app.application.inspections.repository import InspectionTaskRepository
 from app.application.inspections.service import InspectionTaskService
+from app.application.maintenance.service import TORecordService
 from app.application.otd.service import OTDService
 from app.application.programs.service import ProgramService
 from app.application.rza_instructions.service import RZAInstructionService
@@ -323,6 +324,43 @@ class ProgramWorkItemSource:
                             program.status is DocumentStatus.UNDER_REVIEW
                             and bool(actions.intersection({"approve", "return"}))
                     ),
+                )
+            )
+        return items
+
+
+class MaintenanceWorkItemSource:
+    def __init__(self, service: TORecordService) -> None:
+        self.service = service
+
+    async def list_for_user(
+        self,
+        user_id: UUID,
+        prior_items: tuple[WorkItem, ...] = (),
+    ) -> list[WorkItem]:
+        items = []
+        for record in await self.service.list_standalone_work_items(user_id):
+            actions = await self.service.get_available_actions(user_id, record)
+            items.append(
+                WorkItem(
+                    item_type="Самостоятельное ТО",
+                    title=f"ТО · {record.maintenance_type.value} · "
+                    f"{record.maintenance_date:%d.%m.%Y}",
+                    status=record.status.label,
+                    status_class=record.status.badge_class,
+                    tab=_document_tab(record.status),
+                    created_at=record.created_at,
+                    author=record.creator.full_name if record.creator else "—",
+                    assignee="—",
+                    parent=record.urza.dispatch_name,
+                    parent_id=record.urza_id,
+                    url=f"/objects/urza/{record.urza_id}?tab=maintenance",
+                    actions=_action_labels(actions),
+                    can_approve=(
+                        record.status is DocumentStatus.UNDER_REVIEW
+                        and bool(actions.intersection({"approve", "return"}))
+                    ),
+                    status_code=record.status.value,
                 )
             )
         return items

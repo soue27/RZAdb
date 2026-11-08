@@ -62,6 +62,7 @@ from app.application.users.service import UserService
 from app.application.work_items.service import (
     InspectionTaskWorkItemSource,
     InstructionWorkItemSource,
+    MaintenanceWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
     RZAInstructionWorkItemSource,
@@ -343,17 +344,6 @@ def get_settings_service(
     )
 
 
-def get_maintenance_service(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    access_service: Annotated[AccessService, Depends(get_access_service)],
-) -> TORecordService:
-    return TORecordService(
-        repository=TORecordRepository(session),
-        access_service=access_service,
-        task_repository=TaskRepository(session),
-    )
-
-
 def get_schema_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
@@ -362,34 +352,6 @@ def get_schema_service(
         repository=SchemaRepository(session),
         access_service=access_service,
         task_repository=TaskRepository(session),
-    )
-
-
-def get_passport_protocol_service(
-    otd_service: Annotated[OTDService, Depends(get_otd_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
-    schema_service: Annotated[SchemaService, Depends(get_schema_service)],
-    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
-    urza_service: Annotated[URZAService, Depends(get_urza_service)],
-    document_template_service: Annotated[
-        DocumentTemplateService,
-        Depends(get_document_form_service),
-    ],
-    file_access_service: Annotated[
-        FileAccessService,
-        Depends(get_file_access_service),
-    ],
-    file_service: Annotated[FileService, Depends(get_file_service)],
-) -> PassportProtocolService:
-    return PassportProtocolService(
-        otd_service=otd_service,
-        settings_service=settings_service,
-        schema_service=schema_service,
-        maintenance_service=maintenance_service,
-        urza_service=urza_service,
-        document_template_service=document_template_service,
-        file_access_service=file_access_service,
-        file_service=file_service,
     )
 
 
@@ -431,6 +393,50 @@ def get_task_service(
     )
 
 
+def get_maintenance_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    access_service: Annotated[AccessService, Depends(get_access_service)],
+    task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> TORecordService:
+    return TORecordService(
+        repository=TORecordRepository(session),
+        access_service=access_service,
+        task_repository=task_repository,
+        user_repository=UserRepository(session),
+        urza_repository=URZARepository(session),
+        task_service=task_service,
+    )
+
+
+def get_passport_protocol_service(
+    otd_service: Annotated[OTDService, Depends(get_otd_service)],
+    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    urza_service: Annotated[URZAService, Depends(get_urza_service)],
+    document_template_service: Annotated[
+        DocumentTemplateService,
+        Depends(get_document_form_service),
+    ],
+    file_access_service: Annotated[
+        FileAccessService,
+        Depends(get_file_access_service),
+    ],
+    file_service: Annotated[FileService, Depends(get_file_service)],
+) -> PassportProtocolService:
+    return PassportProtocolService(
+        otd_service=otd_service,
+        settings_service=settings_service,
+        schema_service=schema_service,
+        maintenance_service=maintenance_service,
+        urza_service=urza_service,
+        document_template_service=document_template_service,
+        file_access_service=file_access_service,
+        file_service=file_service,
+    )
+
+
 def get_program_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
@@ -464,6 +470,10 @@ def get_work_item_service(
     task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     program_service: Annotated[ProgramService, Depends(get_program_service)],
+    maintenance_service: Annotated[
+        TORecordService,
+        Depends(get_maintenance_service),
+    ],
 ) -> WorkItemService:
     settings_service = SettingsService(
         repository=SettingsRepository(session),
@@ -498,6 +508,7 @@ def get_work_item_service(
             TaskWorkItemSource(task_repository, access_service, task_service),
             OTDWorkItemSource(otd_service),
             ProgramWorkItemSource(program_service),
+            MaintenanceWorkItemSource(maintenance_service),
             SettingsWorkItemSource(settings_service),
             SchemaWorkItemSource(schema_service),
             InstructionWorkItemSource(instruction_service),

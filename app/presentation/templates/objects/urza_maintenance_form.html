@@ -1,9 +1,10 @@
 {% from "components/_form_fields.html" import required_marker %}
+{% from "objects/_file_actions.html" import file_actions %}
 <div id="urza-tab-content">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="rzadb-otd-version-title">
-            Новая запись технического обслуживания
+            {% if record %}Редактирование записи технического обслуживания{% else %}Новая запись технического обслуживания{% endif %}
         </div>
 
         <a
@@ -31,8 +32,8 @@
 
     <form
         method="post"
-        action="/objects/urza/{{ urza_id }}/maintenance"
-        hx-post="/objects/urza/{{ urza_id }}/maintenance"
+        action="{% if record %}/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/edit{% else %}/objects/urza/{{ urza_id }}/maintenance{% endif %}"
+        hx-post="{% if record %}/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/edit{% else %}/objects/urza/{{ urza_id }}/maintenance{% endif %}"
         hx-target="#urza-tab-content"
         hx-swap="outerHTML"
         hx-encoding="multipart/form-data"
@@ -200,6 +201,10 @@
 
             <!-- Скан протокола -->
             <div class="col-12">
+                {% if record and record.scan_protocol_id %}
+                    <div class="small text-secondary mb-1">Текущий скан протокола</div>
+                    {{ file_actions(record.scan_protocol_id) }}
+                {% endif %}
 
                 <label
                     for="scan-protocol"
@@ -232,6 +237,10 @@
 
             <!-- Редактируемый протокол -->
             <div class="col-12">
+                {% if record and record.editable_protocol_id %}
+                    <div class="small text-secondary mb-1">Текущий редактируемый протокол</div>
+                    {{ file_actions(record.editable_protocol_id) }}
+                {% endif %}
 
                 <label
                     for="editable-protocol"
@@ -256,6 +265,10 @@
 
             <!-- Подписанная форма -->
             <div class="col-12">
+                {% if record and record.signed_form_file_id %}
+                    <div class="small text-secondary mb-1">Текущая подписанная форма</div>
+                    {{ file_actions(record.signed_form_file_id) }}
+                {% endif %}
 
                 <label
                     for="signed-form"
@@ -269,7 +282,7 @@
                     name="signed_form_file"
                     type="file"
                     class="form-control"
-                    required
+                    {% if not record %}required{% endif %}
                     accept=".pdf,.jpg,.jpeg,.png"
                 >
 
@@ -290,7 +303,7 @@
                         <span class="material-icons align-middle me-1">
                             save
                         </span>
-                        Сохранить запись
+                        {% if record %}Сохранить изменения{% else %}Сохранить запись{% endif %}
                     </button>
 
                     <a

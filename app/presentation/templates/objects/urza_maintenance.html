@@ -2,6 +2,10 @@
 
 <div id="urza-tab-content">
 
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-center mb-3">
 
         <div class="rzadb-otd-version-title">
@@ -59,6 +63,7 @@
                         <th>Принятые меры</th>
                         <th class="text-center">Исторические данные</th>
                         <th class="text-center">Кто выполнил</th>
+                        <th class="text-center">Статус</th>
                         <th>Документы ТО</th>
                     </tr>
                 </thead>
@@ -100,6 +105,16 @@
                                 {{ record.creator.full_name if record.creator else "—" }}
                             </td>
 
+                            <td class="text-center">
+                                {% if record.status %}
+                                    <span class="badge {{ record.status.badge_class }}">
+                                        {{ record.status.label }}
+                                    </span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
                             <td>
                                 <div class="d-flex flex-column gap-2">
 
@@ -128,6 +143,43 @@
                                             </div>
                                             {{ file_actions(record.signed_form_file_id) }}
                                         </div>
+                                    {% endif %}
+
+                                    {% set actions = (maintenance_actions|default({})).get(record.id, []) if record.id is defined else [] %}
+                                    {% if "edit" in actions %}
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           href="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/edit"
+                                           hx-get="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/edit"
+                                           hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                            Редактировать
+                                        </a>
+                                    {% endif %}
+                                    {% if "submit" in actions %}
+                                        <form method="post"
+                                              action="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/submit"
+                                              hx-post="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/submit"
+                                              hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                            <button class="btn btn-sm btn-outline-primary">Отправить на согласование</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if "approve" in actions %}
+                                        <form method="post"
+                                              action="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/approve"
+                                              hx-post="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/approve"
+                                              hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                            <button class="btn btn-sm btn-success">Утвердить</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if "return" in actions %}
+                                        <form class="border rounded p-2"
+                                              method="post"
+                                              action="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/return"
+                                              hx-post="/objects/urza/{{ urza_id }}/maintenance/{{ record.id }}/return"
+                                              hx-target="#urza-tab-content" hx-swap="outerHTML">
+                                            <label class="form-label small mb-1" for="return-reason-{{ record.id }}">Причина возврата</label>
+                                            <textarea id="return-reason-{{ record.id }}" class="form-control form-control-sm mb-2" name="comment" required></textarea>
+                                            <button class="btn btn-sm btn-outline-warning">Вернуть на доработку</button>
+                                        </form>
                                     {% endif %}
 
                                     {% if not record.scan_protocol_id

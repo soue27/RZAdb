@@ -7,6 +7,7 @@ import pytest
 from app.application.work_items.service import (
     InspectionTaskWorkItemSource,
     InstructionWorkItemSource,
+    MaintenanceWorkItemSource,
     OTDWorkItemSource,
     ProgramWorkItemSource,
     RZAInstructionWorkItemSource,
@@ -270,6 +271,40 @@ async def test_closed_maintenance_task_remains_in_work_items():
     assert result[0].status == "Закрыто"
     assert result[0].url == f"/tasks/{task.id}"
     assert result[0].tab == "completed"
+
+
+@pytest.mark.asyncio
+async def test_maintenance_document_work_item_shows_status_author_and_urza_link():
+    user_id, urza_id = uuid4(), uuid4()
+    record = SimpleNamespace(
+        id=uuid4(),
+        urza_id=urza_id,
+        urza=SimpleNamespace(dispatch_name="УРЗА-ТО"),
+        status=DocumentStatus.DRAFT,
+        maintenance_type=SimpleNamespace(value="К"),
+        maintenance_date=datetime(2026, 10, 3).date(),
+        created_at=datetime(2026, 10, 4, tzinfo=UTC),
+        creator=SimpleNamespace(full_name="Инженер Иванов"),
+    )
+
+    class Service:
+        async def list_standalone_work_items(self, actor_id):
+            assert actor_id == user_id
+            return [record]
+
+        async def get_available_actions(self, actor_id, candidate):
+            assert candidate is record
+            return {"edit", "submit"}
+
+    items = await MaintenanceWorkItemSource(Service()).list_for_user(user_id)
+
+    assert len(items) == 1
+    assert items[0].status == "Черновик"
+    assert items[0].author == "Инженер Иванов"
+    assert items[0].parent == "УРЗА-ТО"
+    assert items[0].parent_id == urza_id
+    assert items[0].url == f"/objects/urza/{urza_id}?tab=maintenance"
+    assert items[0].actions == ("Редактировать", "Отправить на согласование")
 
 
 @pytest.mark.asyncio

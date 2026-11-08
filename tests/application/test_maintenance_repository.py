@@ -105,6 +105,42 @@ async def test_get_current_approved_filters_orders_limits_and_loads_signed_file(
 
 
 @pytest.mark.asyncio
+async def test_standalone_under_review_query_excludes_tasks_and_archived_records():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+
+    await TORecordRepository(session).list_standalone_under_review()
+
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "to_records.task_id IS NULL" in sql
+    assert "to_records.deleted_at IS NULL" in sql
+    assert "to_records.status" in sql
+    assert "under_review" in sql
+    assert statement._with_options
+
+
+@pytest.mark.asyncio
+async def test_standalone_work_item_query_includes_only_document_statuses():
+    session = MagicMock()
+    session.scalars = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    session.scalars.return_value = result
+
+    await TORecordRepository(session).list_standalone_work_items()
+
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "to_records.task_id IS NULL" in sql
+    assert "to_records.deleted_at IS NULL" in sql
+    assert "to_records.status IN" in sql
+
+
+@pytest.mark.asyncio
 async def test_add():
     session = MagicMock()
     session.flush = AsyncMock()

@@ -154,6 +154,74 @@ async def _discard_uploaded_files(
             )
 
 
+async def _upload_form_file(
+    file_service: FileService,
+    actor_id: UUID,
+    upload: UploadFile | None,
+) -> File | None:
+    if upload is None or not upload.filename:
+        return None
+    content = await read_upload_content(upload)
+    extension = (
+        "." + upload.filename.rsplit(".", 1)[1]
+        if "." in upload.filename
+        else ""
+    )
+    return await file_service.upload(
+        actor_id=actor_id,
+        content=content,
+        original_name=upload.filename,
+        display_name=upload.filename,
+        extension=extension,
+        mime_type=upload.content_type or "application/octet-stream",
+    )
+
+
+async def _render_maintenance_list(
+    *,
+    request: Request,
+    urza_id: UUID,
+    current_user: User,
+    maintenance_service: TORecordService,
+    task_service: TaskService,
+    tree_service: TreeService,
+    error_message: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+    archived: bool = False,
+):
+    records = await maintenance_service.get_by_urza(current_user.id, urza_id)
+    actions = {
+        record.id: await maintenance_service.get_available_actions(
+            current_user.id,
+            record,
+        )
+        for record in records
+    }
+    can_issue_task = False if archived else await task_service.can_issue_task(
+        actor_id=current_user.id,
+        urza_id=urza_id,
+    )
+    return await _render_maintenance_template(
+        request=request,
+        template_name="objects/urza_maintenance.html",
+        context={
+            "current_user": current_user,
+            "maintenance_records": records,
+            "maintenance_actions": actions,
+            "can_issue_task": can_issue_task,
+            "can_create_maintenance": (
+                not archived and current_user.role is not UserRole.SPECIALIST
+            ),
+            "is_archived": archived,
+            "urza_id": urza_id,
+            "error_message": error_message,
+        },
+        current_user=current_user,
+        tree_service=tree_service,
+        status_code=status_code,
+    )
+
+
 @router.get("/urza/{urza_id}/maintenance")
 async def get_urza_maintenance(
     request: Request,
@@ -192,31 +260,14 @@ async def get_urza_maintenance(
             detail="Объект не найден.",
         ) from exc
 
-    maintenance_records = await maintenance_service.get_by_urza(
-        user_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    can_issue_task = False if archived else await task_service.can_issue_task(
-        actor_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    return await _render_maintenance_template(
+    return await _render_maintenance_list(
         request=request,
-        template_name="objects/urza_maintenance.html",
-        context={
-            "current_user": current_user,
-            "maintenance_records": maintenance_records,
-            "can_issue_task": can_issue_task,
-            "can_create_maintenance": (
-                not archived and current_user.role is not UserRole.SPECIALIST
-            ),
-            "is_archived": archived,
-            "urza_id": urza_id,
-        },
+        urza_id=urza_id,
         current_user=current_user,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
         tree_service=tree_service,
+        archived=archived,
     )
 
 
@@ -285,6 +336,66 @@ async def get_new_urza_maintenance_form(
             "maintenance_types": list(MaintenanceType),
             "form_values": {},
             "task_id": task_id,
+            "error_message": None,
+        },
+        current_user=current_user,
+        tree_service=tree_service,
+    )
+
+
+@router.get(
+    "/urza/{urza_id}/maintenance/{record_id}/edit",
+    dependencies=[Depends(require_non_specialist)],
+)
+async def get_edit_urza_maintenance_form(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+        record = await maintenance_service.get_by_id(
+            current_user.id,
+            record_id,
+            urza_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Запись ТО не найдена.")
+    if "edit" not in await maintenance_service.get_available_actions(
+        current_user.id,
+        record,
+    ):
+        raise HTTPException(status_code=403, detail="Редактирование записи ТО запрещено.")
+    form_values = {
+        "maintenance_date": record.maintenance_date.isoformat(),
+        "maintenance_type": record.maintenance_type.value,
+        "historical_data": record.historical_data,
+        "detected_deviations": record.detected_deviations,
+        "measures_taken": record.measures_taken,
+    }
+    return await _render_maintenance_template(
+        request=request,
+        template_name="objects/urza_maintenance_form.html",
+        context={
+            "urza_id": urza_id,
+            "maintenance_types": list(MaintenanceType),
+            "form_values": form_values,
+            "task_id": record.task_id,
+            "record": record,
             "error_message": None,
         },
         current_user=current_user,
@@ -568,26 +679,344 @@ async def create_urza_maintenance(
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
-    maintenance_records = await maintenance_service.get_by_urza(
-        user_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    can_issue_task = await task_service.can_issue_task(
-        actor_id=current_user.id,
-        urza_id=urza_id,
-    )
-
-    return await _render_maintenance_template(
+    return await _render_maintenance_list(
         request=request,
-        template_name="objects/urza_maintenance.html",
-        context={
-            "current_user": current_user,
-            "maintenance_records": maintenance_records,
-            "can_issue_task": can_issue_task,
-            "can_create_maintenance": current_user.role is not UserRole.SPECIALIST,
-            "urza_id": urza_id,
-        },
+        urza_id=urza_id,
         current_user=current_user,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
         tree_service=tree_service,
+    )
+
+
+@router.post(
+    "/urza/{urza_id}/maintenance/{record_id}/edit",
+    dependencies=[Depends(require_non_specialist)],
+)
+async def update_urza_maintenance(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    maintenance_date: Annotated[date, Form()],
+    maintenance_type: Annotated[MaintenanceType, Form()],
+    detected_deviations: Annotated[str, Form()],
+    measures_taken: Annotated[str, Form()],
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    file_service: Annotated[FileService, Depends(get_file_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    historical_data: Annotated[bool, Form()] = False,
+    signed_form_file: Annotated[UploadFile | None, FastAPIFile()] = None,
+    scan_protocol_file: Annotated[UploadFile | None, FastAPIFile()] = None,
+    editable_protocol_file: Annotated[UploadFile | None, FastAPIFile()] = None,
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+        record = await maintenance_service.get_by_id(
+            current_user.id,
+            record_id,
+            urza_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Запись ТО не найдена.")
+
+    form_values = {
+        "maintenance_date": maintenance_date.isoformat(),
+        "maintenance_type": maintenance_type.value,
+        "historical_data": historical_data,
+        "detected_deviations": detected_deviations,
+        "measures_taken": measures_taken,
+    }
+    original_file_ids = {
+        record.signed_form_file_id,
+        record.scan_protocol_id,
+        record.editable_protocol_id,
+    }
+    uploaded_files: list[File] = []
+    try:
+        new_signed = await _upload_form_file(
+            file_service, current_user.id, signed_form_file
+        )
+        if new_signed is not None:
+            uploaded_files.append(new_signed)
+        new_scan = await _upload_form_file(
+            file_service, current_user.id, scan_protocol_file
+        )
+        if new_scan is not None:
+            uploaded_files.append(new_scan)
+        new_editable = await _upload_form_file(
+            file_service, current_user.id, editable_protocol_file
+        )
+        if new_editable is not None:
+            uploaded_files.append(new_editable)
+        updated_record = await maintenance_service.update(
+            user_id=current_user.id,
+            urza_id=urza_id,
+            record_id=record_id,
+            maintenance_date=maintenance_date,
+            maintenance_type=maintenance_type,
+            signed_form_file_id=new_signed.id if new_signed else None,
+            scan_protocol_id=new_scan.id if new_scan else None,
+            editable_protocol_id=new_editable.id if new_editable else None,
+            detected_deviations=detected_deviations,
+            measures_taken=measures_taken,
+            historical_data=historical_data,
+        )
+    except PermissionError as exc:
+        await _discard_uploaded_files(file_service, uploaded_files)
+        return await _render_maintenance_template(
+            request=request,
+            template_name="objects/urza_maintenance_form.html",
+            context={
+                "urza_id": urza_id,
+                "maintenance_types": list(MaintenanceType),
+                "form_values": form_values,
+                "record": record,
+                "error_message": str(exc),
+            },
+            current_user=current_user,
+            tree_service=tree_service,
+            status_code=403,
+        )
+    except FileUploadValidationError as exc:
+        await _discard_uploaded_files(file_service, uploaded_files)
+        return await _render_maintenance_template(
+            request=request,
+            template_name="objects/urza_maintenance_form.html",
+            context={
+                "urza_id": urza_id,
+                "maintenance_types": list(MaintenanceType),
+                "form_values": form_values,
+                "record": record,
+                "error_message": str(exc),
+            },
+            current_user=current_user,
+            tree_service=tree_service,
+            status_code=exc.status_code,
+        )
+    except ValueError as exc:
+        await _discard_uploaded_files(file_service, uploaded_files)
+        return await _render_maintenance_template(
+            request=request,
+            template_name="objects/urza_maintenance_form.html",
+            context={
+                "urza_id": urza_id,
+                "maintenance_types": list(MaintenanceType),
+                "form_values": form_values,
+                "record": record,
+                "error_message": str(exc),
+            },
+            current_user=current_user,
+            tree_service=tree_service,
+            status_code=400,
+        )
+    except Exception:
+        await _discard_uploaded_files(file_service, uploaded_files)
+        logger.exception("Failed to update maintenance record %s", record_id)
+        return await _render_maintenance_template(
+            request=request,
+            template_name="objects/urza_maintenance_form.html",
+            context={
+                "urza_id": urza_id,
+                "maintenance_types": list(MaintenanceType),
+                "form_values": form_values,
+                "record": record,
+                "error_message": "Не удалось сохранить изменения записи ТО.",
+            },
+            current_user=current_user,
+            tree_service=tree_service,
+            status_code=500,
+        )
+
+    current_ids = {
+        updated_record.signed_form_file_id,
+        updated_record.scan_protocol_id,
+        updated_record.editable_protocol_id,
+    }
+    for file_id in original_file_ids - current_ids:
+        try:
+            await file_service.archive(file_id=file_id, user_id=current_user.id)
+        except Exception:
+            logger.exception("Failed to archive replaced maintenance file %s", file_id)
+
+    if request.headers.get("HX-Request") != "true":
+        return RedirectResponse(
+            url=f"/objects/urza/{urza_id}/maintenance",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return await _render_maintenance_list(
+        request=request,
+        urza_id=urza_id,
+        current_user=current_user,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
+        tree_service=tree_service,
+    )
+
+
+async def _run_maintenance_transition(
+    *,
+    request: Request,
+    urza_id: UUID,
+    current_user: User,
+    object_service: ObjectService,
+    maintenance_service: TORecordService,
+    task_service: TaskService,
+    tree_service: TreeService,
+    record_id: UUID,
+    action: str,
+    comment: str | None = None,
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail="Доступ к объекту запрещён.") from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Объект не найден.") from exc
+
+    try:
+        if action == "submit":
+            await maintenance_service.submit_for_review(
+                current_user.id, record_id, urza_id
+            )
+        elif action == "approve":
+            await maintenance_service.approve(
+                current_user.id, record_id, urza_id
+            )
+        else:
+            await maintenance_service.return_to_draft(
+                current_user.id, record_id, urza_id, comment or ""
+            )
+    except PermissionError as exc:
+        return await _render_maintenance_list(
+            request=request,
+            urza_id=urza_id,
+            current_user=current_user,
+            maintenance_service=maintenance_service,
+            task_service=task_service,
+            tree_service=tree_service,
+            error_message=str(exc),
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    except ValueError as exc:
+        return await _render_maintenance_list(
+            request=request,
+            urza_id=urza_id,
+            current_user=current_user,
+            maintenance_service=maintenance_service,
+            task_service=task_service,
+            tree_service=tree_service,
+            error_message=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception:
+        logger.exception("Failed to %s maintenance record %s", action, record_id)
+        return await _render_maintenance_list(
+            request=request,
+            urza_id=urza_id,
+            current_user=current_user,
+            maintenance_service=maintenance_service,
+            task_service=task_service,
+            tree_service=tree_service,
+            error_message="Не удалось выполнить действие с записью ТО.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return await _render_maintenance_list(
+        request=request,
+        urza_id=urza_id,
+        current_user=current_user,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
+        tree_service=tree_service,
+    )
+
+
+@router.post("/urza/{urza_id}/maintenance/{record_id}/submit")
+async def submit_maintenance_for_review(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    return await _run_maintenance_transition(
+        request=request,
+        urza_id=urza_id,
+        record_id=record_id,
+        current_user=current_user,
+        object_service=object_service,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="submit",
+    )
+
+
+@router.post("/urza/{urza_id}/maintenance/{record_id}/approve")
+async def approve_maintenance(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    return await _run_maintenance_transition(
+        request=request,
+        urza_id=urza_id,
+        record_id=record_id,
+        current_user=current_user,
+        object_service=object_service,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="approve",
+    )
+
+
+@router.post("/urza/{urza_id}/maintenance/{record_id}/return")
+async def return_maintenance_for_revision(
+    request: Request,
+    urza_id: UUID,
+    record_id: UUID,
+    comment: Annotated[str, Form()],
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    tree_service: Annotated[TreeService, Depends(get_tree_service)],
+):
+    return await _run_maintenance_transition(
+        request=request,
+        urza_id=urza_id,
+        record_id=record_id,
+        current_user=current_user,
+        object_service=object_service,
+        maintenance_service=maintenance_service,
+        task_service=task_service,
+        tree_service=tree_service,
+        action="return",
+        comment=comment,
     )

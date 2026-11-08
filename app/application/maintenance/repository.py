@@ -20,8 +20,32 @@ class TORecordRepository:
             select(TORecord).where(
                 TORecord.id == record_id,
                 TORecord.deleted_at.is_(None),
+            ).options(
+                selectinload(TORecord.creator),
+                selectinload(TORecord.signed_form_file),
+                selectinload(TORecord.scan_protocol),
+                selectinload(TORecord.editable_protocol),
+                selectinload(TORecord.task),
             )
         )
+
+    async def get_by_id_for_update(self, record_id: UUID) -> TORecord | None:
+        statement = (
+            select(TORecord)
+            .options(
+                selectinload(TORecord.creator),
+                selectinload(TORecord.signed_form_file),
+                selectinload(TORecord.scan_protocol),
+                selectinload(TORecord.editable_protocol),
+                selectinload(TORecord.task),
+            )
+            .where(
+                TORecord.id == record_id,
+                TORecord.deleted_at.is_(None),
+            )
+            .with_for_update()
+        )
+        return await self.session.scalar(statement)
 
     async def get_by_urza_id(
         self,
@@ -31,6 +55,7 @@ class TORecordRepository:
             select(TORecord)
             .options(
                 selectinload(TORecord.creator),
+                selectinload(TORecord.signed_form_file),
             )
             .where(
                 TORecord.urza_id == urza_id,
@@ -43,6 +68,52 @@ class TORecordRepository:
 
         result = await self.session.scalars(query)
 
+        return list(result.all())
+
+    async def list_standalone_under_review(self) -> list[TORecord]:
+        statement = (
+            select(TORecord)
+            .options(
+                selectinload(TORecord.creator),
+                selectinload(TORecord.urza),
+            )
+            .where(
+                TORecord.deleted_at.is_(None),
+                TORecord.task_id.is_(None),
+                TORecord.status == DocumentStatus.UNDER_REVIEW,
+            )
+            .order_by(
+                TORecord.created_at.desc(),
+                TORecord.id.desc(),
+            )
+        )
+        result = await self.session.scalars(statement)
+        return list(result.all())
+
+    async def list_standalone_work_items(self) -> list[TORecord]:
+        statement = (
+            select(TORecord)
+            .options(
+                selectinload(TORecord.creator),
+                selectinload(TORecord.urza),
+            )
+            .where(
+                TORecord.deleted_at.is_(None),
+                TORecord.task_id.is_(None),
+                TORecord.status.in_(
+                    (
+                        DocumentStatus.DRAFT,
+                        DocumentStatus.UNDER_REVIEW,
+                        DocumentStatus.APPROVED,
+                    )
+                ),
+            )
+            .order_by(
+                TORecord.created_at.desc(),
+                TORecord.id.desc(),
+            )
+        )
+        result = await self.session.scalars(statement)
         return list(result.all())
 
     async def get_current_approved(self, urza_id: UUID) -> TORecord | None:
@@ -81,4 +152,8 @@ class TORecordRepository:
         self.session.add(record)
         await self.session.flush()
 
+        return record
+
+    async def save(self, record: TORecord) -> TORecord:
+        await self.session.flush()
         return record
