@@ -101,7 +101,63 @@ async def test_channels_run_sequentially_and_one_delivery_error_does_not_block_o
     manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
     assert manifest["channels"]["email"]["status"] == "failed"
     assert manifest["channels"]["yandex_disk"]["status"] == "success"
+    assert manifest["channels"]["local"]["retention_status"] == "success"
     assert manifest["local_storage"]["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_retention_failure_is_manifested_without_losing_local_dump(
+    tmp_path, monkeypatch
+):
+    install_dump(monkeypatch)
+    settings = make_settings(tmp_path)
+
+    def fail_retention(self):
+        raise OSError("private filesystem detail")
+
+    monkeypatch.setattr(LocalBackupChannel, "apply_retention", fail_retention)
+
+    result = await BackupCoordinator(settings).run()
+
+    assert result["status"] == "partial_success"
+    assert result["channels"]["local"]["status"] == "success"
+    assert result["channels"]["local"]["retention_status"] == "failed"
+    assert result["channels"]["local"]["retention_error"] == (
+        "Local retention failed (OSError)"
+    )
+    dump_path = Path(result["dump_path"])
+    assert dump_path.is_file()
+    manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["status"] == "partial_success"
+    assert manifest["channels"]["local"]["retention_status"] == "failed"
+    assert dump_path.is_file()
+
+
+@pytest.mark.asyncio
+async def test_second_manifest_write_error_is_reported(tmp_path, monkeypatch):
+    install_dump(monkeypatch)
+    settings = make_settings(tmp_path)
+    original_write = BackupCoordinator._write_manifest_atomic
+    writes = 0
+
+    def fail_second_write(path, manifest):
+        nonlocal writes
+        writes += 1
+        if writes == 2:
+            raise OSError("filesystem failed on updated manifest")
+        original_write(path, manifest)
+
+    monkeypatch.setattr(
+        BackupCoordinator,
+        "_write_manifest_atomic",
+        staticmethod(fail_second_write),
+    )
+
+    with pytest.raises(BackupManifestError, match="manifest write failed"):
+        await BackupCoordinator(settings).run()
+
+    assert writes == 2
+    assert len(list(tmp_path.glob("rzadb_*.dump"))) == 1
 
 
 @pytest.mark.asyncio

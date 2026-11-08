@@ -226,12 +226,26 @@ class BackupCoordinator:
         if manifest["channels"]["local"]["status"] == "success":
             try:
                 self.local_channel.apply_retention()
+                manifest["channels"]["local"]["retention_status"] = "success"
             except Exception as exc:
+                manifest["channels"]["local"].update(
+                    {
+                        "retention_status": "failed",
+                        "retention_error": (
+                            f"Local retention failed ({type(exc).__name__})"
+                        ),
+                    }
+                )
                 logger.warning(
                     "Backup run %s local retention failed (%s)",
                     run_id,
                     type(exc).__name__,
                 )
+            manifest["status"] = self._overall_status(manifest)
+            try:
+                self._write_manifest_atomic(manifest_path, manifest)
+            except Exception as exc:
+                self._manifest_write_error(run_id, exc)
 
         return {
             "run_id": str(run_id),
