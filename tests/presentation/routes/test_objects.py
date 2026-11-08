@@ -59,6 +59,7 @@ from app.presentation.dependencies.services import (
     get_physical_deletion_service,
     get_maintenance_service,
     get_otd_service,
+    get_passport_protocol_service,
     get_program_service,
     get_rza_instruction_service,
     get_schema_service,
@@ -2300,6 +2301,7 @@ def test_urza_route_returns_full_page_or_htmx_fragment(
 
         assert response.status_code == 200
         assert "УРЗА тестовая" in response.text
+        assert "Скачать паспорт-протокол" in response.text
         assert 'data-tab="otd"' in response.text
         if headers:
             assert "<!doctype html>" not in response.text.lower()
@@ -2309,6 +2311,74 @@ def test_urza_route_returns_full_page_or_htmx_fragment(
             assert "<!doctype html>" in response.text.lower()
             assert 'id="app-sidebar"' in response.text
             assert 'id="object-content"' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_passport_protocol_route_returns_four_file_zip_and_safe_filename():
+    from io import BytesIO
+    from zipfile import ZipFile
+
+    urza_id = uuid7()
+    user = make_user(uuid7())
+    urza = SimpleNamespace(
+        substation=SimpleNamespace(dispatch_name="ПС Центральная"),
+        dispatch_name="ДЗШ-110",
+    )
+
+    class FakePassportService:
+        async def prepare(self, *, user_id, urza_id):
+            return SimpleNamespace(documents=tuple(
+                SimpleNamespace(filename=name, content=name.encode())
+                for name in (
+                    "01_ОТД.docx", "02_Уставки.pdf", "03_Схемы.docx", "04_ТО.pdf"
+                )
+            ))
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(result=SelectedObject(
+            object_type="urza", id=urza_id, name="ДЗШ-110"
+        ))
+    )
+    app.dependency_overrides[get_urza_service] = lambda: FakeURZAService(urza)
+    app.dependency_overrides[get_passport_protocol_service] = FakePassportService
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/passport-protocol"
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/zip")
+        assert "filename*=UTF-8''" in response.headers["content-disposition"]
+        with ZipFile(BytesIO(response.content)) as archive:
+            assert archive.namelist() == [
+                "01_ОТД.docx", "02_Уставки.pdf", "03_Схемы.docx", "04_ТО.pdf"
+            ]
+            assert len(archive.namelist()) == 4
+            assert all("/" not in name for name in archive.namelist())
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_passport_protocol_route_checks_urza_access_before_preparing():
+    urza_id = uuid7()
+    user = make_user(uuid7())
+
+    class MustNotPrepare:
+        async def prepare(self, **kwargs):
+            pytest.fail("package preparation must not run without object access")
+
+    app.dependency_overrides[get_current_user] = override_user(user)
+    app.dependency_overrides[get_object_service] = override_object_service(
+        FakeObjectService(error=ObjectAccessDeniedError)
+    )
+    app.dependency_overrides[get_passport_protocol_service] = MustNotPrepare
+    try:
+        response = TestClient(app).get(
+            f"/objects/urza/{urza_id}/passport-protocol"
+        )
+        assert response.status_code == 403
+        assert "traceback" not in response.text.lower()
     finally:
         app.dependency_overrides.clear()
 

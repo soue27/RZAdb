@@ -1,6 +1,9 @@
+import logging
+import re
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
+from urllib.parse import quote
 
 from fastapi import (
     APIRouter,
@@ -29,6 +32,10 @@ from app.application.objects.exceptions import (
 )
 from app.application.objects.service import ObjectService
 from app.application.otd.service import OTDService
+from app.application.passport_protocol.service import (
+    PassportProtocolNotReadyError,
+    PassportProtocolService,
+)
 from app.application.rza_instructions.service import RZAInstructionService
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
@@ -60,6 +67,7 @@ from app.presentation.dependencies.services import (
     get_inspection_service,
     get_object_service,
     get_otd_service,
+    get_passport_protocol_service,
     get_rza_instruction_service,
     get_selectivity_scheme_service,
     get_settings_service,
@@ -67,6 +75,9 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
     get_urza_service,
+)
+from app.infrastructure.passport_protocol.zip_exporter import (
+    PassportProtocolZipExporter,
 )
 
 router = APIRouter(
@@ -77,6 +88,7 @@ router = APIRouter(
 templates = Jinja2Templates(
     directory="app/presentation/templates",
 )
+logger = logging.getLogger(__name__)
 
 CONNECTION_CREATE_ROLES = {
     UserRole.ADMIN,
@@ -390,6 +402,69 @@ async def get_object(
         context={
             "object": selected_object,
         },
+    )
+
+
+@router.get("/urza/{urza_id}/passport-protocol")
+async def download_passport_protocol(
+    urza_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    object_service: Annotated[ObjectService, Depends(get_object_service)],
+    urza_service: Annotated[URZAService, Depends(get_urza_service)],
+    passport_service: Annotated[
+        PassportProtocolService,
+        Depends(get_passport_protocol_service),
+    ],
+):
+    try:
+        await object_service.get_object(
+            user_id=current_user.id,
+            object_type="urza",
+            object_id=urza_id,
+        )
+        package = await passport_service.prepare(
+            user_id=current_user.id,
+            urza_id=urza_id,
+        )
+        archive = PassportProtocolZipExporter().export(package)
+        urza = await urza_service.get_details(urza_id)
+    except ObjectAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ к объекту запрещён.",
+        ) from exc
+    except ObjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Объект не найден.",
+        ) from exc
+    except PassportProtocolNotReadyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Проект документов не готов. Заполните и утвердите ОТД "
+                "для этого устройства РЗА."
+            ),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed to prepare passport-protocol for URZA %s", urza_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось сформировать комплект документов.",
+        ) from exc
+
+    object_name = re.sub(
+        r'[\\/:*?"<>|\x00-\x1f]',
+        "_",
+        f"{urza.substation.dispatch_name}_{urza.dispatch_name}",
+    )
+    object_name = re.sub(r"\s+", "_", object_name).strip("._ ") or "УРЗА"
+    filename = f"Паспорт-протокол_{object_name}.zip"
+    disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
+    return Response(
+        content=archive,
+        media_type="application/zip",
+        headers={"Content-Disposition": disposition},
     )
 
 

@@ -19,6 +19,12 @@
 
         <div class="d-flex gap-2 flex-shrink-0">
 
+            {% if not is_archived %}
+            <a class="btn btn-primary" href="/objects/urza/{{ urza.id }}/passport-protocol">
+                Скачать паспорт-протокол
+            </a>
+            {% endif %}
+
             {% if can_edit_urza and not is_archived %}
             <button
                 type="button"

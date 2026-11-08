@@ -30,6 +30,7 @@ from app.application.objects.resolver import ObjectResolver
 from app.application.objects.service import ObjectService
 from app.application.otd.repository import OTDRepository
 from app.application.otd.service import OTDService
+from app.application.passport_protocol.service import PassportProtocolService
 from app.application.programs.repository import ProgramRepository
 from app.application.programs.service import ProgramService
 from app.application.rza_instructions.repository import RZAInstructionRepository
@@ -361,6 +362,34 @@ def get_schema_service(
         repository=SchemaRepository(session),
         access_service=access_service,
         task_repository=TaskRepository(session),
+    )
+
+
+def get_passport_protocol_service(
+    otd_service: Annotated[OTDService, Depends(get_otd_service)],
+    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    schema_service: Annotated[SchemaService, Depends(get_schema_service)],
+    maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
+    urza_service: Annotated[URZAService, Depends(get_urza_service)],
+    document_template_service: Annotated[
+        DocumentTemplateService,
+        Depends(get_document_form_service),
+    ],
+    file_access_service: Annotated[
+        FileAccessService,
+        Depends(get_file_access_service),
+    ],
+    file_service: Annotated[FileService, Depends(get_file_service)],
+) -> PassportProtocolService:
+    return PassportProtocolService(
+        otd_service=otd_service,
+        settings_service=settings_service,
+        schema_service=schema_service,
+        maintenance_service=maintenance_service,
+        urza_service=urza_service,
+        document_template_service=document_template_service,
+        file_access_service=file_access_service,
+        file_service=file_service,
     )
 
 
