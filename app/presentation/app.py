@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import RedirectResponse, Response
@@ -7,6 +9,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import get_settings
 from app.core.logging_config import configure_logging
 from app.infrastructure.database import models  # noqa: F401
+from app.infrastructure.emailing.error_notifications import (
+    acquire_error_email_handler,
+    release_error_email_handler,
+)
 from app.presentation.auth.dependencies import PasswordChangeRequired
 from app.presentation.middleware.request_context import RequestContextMiddleware
 from app.presentation.routes.admin import router as admin_router
@@ -83,9 +89,19 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        error_email_handler = acquire_error_email_handler(settings)
+        app.state.error_email_handler = error_email_handler
+        try:
+            yield
+        finally:
+            await release_error_email_handler(error_email_handler)
+
     app = FastAPI(
         title=settings.app_name,
         debug=settings.debug,
+        lifespan=lifespan,
     )
     app.add_exception_handler(HTTPException, _handle_auth_http_exception)
 

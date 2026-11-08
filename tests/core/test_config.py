@@ -20,6 +20,7 @@ def test_smtp_settings_have_safe_defaults() -> None:
     assert settings.smtp_from_email is None
     assert settings.smtp_starttls is True
     assert settings.smtp_use_ssl is False
+    assert settings.error_email_to is None
     assert str(settings.document_templates_dir) == "data/document_templates"
     assert settings.log_level == "INFO"
 
@@ -106,3 +107,23 @@ def test_smtp_settings_can_be_configured() -> None:
     assert settings.smtp_from_email == "sender@example.com"
     assert settings.smtp_starttls is True
     assert settings.smtp_use_ssl is False
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, None),
+        ("", None),
+        ("   ", None),
+        (" alerts@example.com ", "alerts@example.com"),
+    ],
+)
+def test_error_email_recipient_is_normalized(value, expected) -> None:
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
+        session_secret="test-secret",
+        error_email_to=value,
+    )
+
+    assert settings.error_email_to == expected

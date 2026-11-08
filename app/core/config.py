@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_starttls: bool = True
     smtp_use_ssl: bool = False
+    error_email_to: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -51,6 +52,14 @@ class Settings(BaseSettings):
                 "LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL"
             )
         return normalized
+
+    @field_validator("error_email_to", mode="before")
+    @classmethod
+    def normalize_error_email_to(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
     # Feedback
     # Обратная связь
