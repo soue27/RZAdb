@@ -79,7 +79,7 @@ class TaskService:
             task: Загруженная задача.
 
         Returns:
-        Актуальная модель задачи.
+            Актуальная модель задачи.
 
         Raises:
             PermissionError: Если владелец неактивен или связь задачи изменилась.
@@ -252,7 +252,7 @@ class TaskService:
             substation_id: Идентификатор подстанции для подстаночной задачи.
 
         Returns:
-        True для активного MANAGER/SUPERADMIN с доступом к объекту.
+            True для активного MANAGER/SUPERADMIN с доступом к объекту.
         """
         if (urza_id is None) == (substation_id is None):
             return False
@@ -299,7 +299,7 @@ class TaskService:
             substation_id: Идентификатор подстанции или None.
 
         Returns:
-        Список активных инженеров предприятия.
+            Список активных инженеров предприятия.
 
         Raises:
             PermissionError: Если инициатор не может выдавать задачи для объекта.
@@ -361,7 +361,7 @@ class TaskService:
             now: Время создания, передаваемое явно при необходимости.
 
         Returns:
-        Созданная задача.
+            Созданная задача.
 
         Raises:
             PermissionError: Если инициатор не имеет права выдавать задачу.
@@ -463,7 +463,7 @@ class TaskService:
             comment: Необязательный комментарий.
 
         Returns:
-        Задача в статусе UNDER_REVIEW.
+            Задача в статусе UNDER_REVIEW.
         """
         task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
@@ -615,7 +615,7 @@ class TaskService:
             assigned_at: Время назначения или текущее время.
 
         Returns:
-        Задача в статусе ASSIGNED.
+            Задача в статусе ASSIGNED.
 
         Raises:
             PermissionError: Если инициатор не может выдавать задачи.
@@ -700,7 +700,7 @@ class TaskService:
             accepted_at: Время принятия или текущее время.
 
         Returns:
-        Задача в статусе IN_PROGRESS.
+            Задача в статусе IN_PROGRESS.
         """
         # Принять задачу может только назначенный ей инженер.
         task = await self._lock_task_owner(task)
@@ -924,7 +924,7 @@ class TaskService:
             rejected_at: Время отклонения или текущее время.
 
         Returns:
-        Задача в статусе REJECTED.
+            Задача в статусе REJECTED.
         """
         # Отклонить задачу может только назначенный инженер.
         task = await self._lock_task_owner(task)
@@ -997,7 +997,7 @@ class TaskService:
             assigned_at: Время переназначения или текущее время.
 
         Returns:
-        Обновлённая задача в статусе ASSIGNED.
+            Обновлённая задача в статусе ASSIGNED.
         """
         # Переназначение допустимо только для уже назначенной задачи.
         task = await self._lock_task_owner(task)
