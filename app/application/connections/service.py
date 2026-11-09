@@ -23,6 +23,10 @@ class ConnectionService:
     """Бизнес-логика работы с присоединениями."""
 
     def __init__(self, repository: ConnectionRepository) -> None:
+        """Сохраняет репозиторий присоединений.
+        
+        Args:
+            repository: Репозиторий для чтения и сохранения присоединений."""
         self.repository = repository
 
     async def create(
@@ -32,6 +36,23 @@ class ConnectionService:
         actor_id: UUID,
         data: ConnectionCreate,
     ) -> ConnectionDetails:
+        """Создаёт присоединение в активной подстанции.
+        
+        Перед добавлением блокирует подстанцию и проверяет уникальность
+        диспетчерского имени в её пределах. Конфликт уникального ограничения,
+        возникший при конкурентном создании, преобразуется в доменную ошибку.
+        
+        Args:
+            substation_id: Идентификатор подстанции-владельца.
+            actor_id: Идентификатор пользователя, создающего запись.
+            data: Проверенные поля присоединения.
+        
+        Returns:
+            DTO созданного присоединения.
+        
+        Raises:
+            ObjectNotFoundError: Если подстанция отсутствует или архивирована.
+            ConnectionNameConflictError: Если имя уже занято."""
         if not await self.repository.lock_active_substation(substation_id):
             raise ObjectNotFoundError
         if await self.repository.exists_by_name(
@@ -77,6 +98,15 @@ class ConnectionService:
         *,
         include_archived: bool = False,
     ) -> ConnectionDetails | None:
+        """Возвращает присоединение по идентификатору.
+        
+        Args:
+            connection_id: Идентификатор присоединения.
+            include_archived: Включать ли архивированную запись.
+        
+        Returns:
+            DTO присоединения или None, если запись не найдена либо скрыта
+            из-за архивирования."""
         connection = await self.repository.get_by_id(connection_id)
 
         if connection is None or (
@@ -97,6 +127,13 @@ class ConnectionService:
         self,
         substation_id: UUID,
     ) -> list[ConnectionListItem]:
+        """Возвращает активные присоединения подстанции для списка.
+        
+        Args:
+            substation_id: Идентификатор подстанции.
+        
+        Returns:
+            Краткие DTO присоединений, отсортированные репозиторием."""
         connections = await self.repository.get_by_substation_ids(
             {substation_id},
         )
@@ -119,6 +156,24 @@ class ConnectionService:
             actor_id: UUID,
             data: ConnectionUpdate,
     ) -> ConnectionDetails:
+        """Обновляет диспетчерское имя и атрибуты присоединения.
+        
+        Проверяет активность присоединения и подстанции, а также уникальность
+        диспетчерского имени. Конфликт ограничения уникальности преобразуется
+        в ConnectionNameConflictError.
+        
+        Args:
+            connection_id: Идентификатор изменяемого присоединения.
+            actor_id: Идентификатор пользователя, выполняющего изменение.
+            data: Проверенные новые значения полей.
+        
+        Returns:
+            DTO обновлённого присоединения.
+        
+        Raises:
+            ObjectNotFoundError: Если присоединение или его подстанция отсутствуют
+                либо архивированы.
+            ConnectionNameConflictError: Если имя уже используется в этой подстанции."""
         connection = await self.repository.get_by_id(connection_id)
 
         if connection is None or connection.deleted_at is not None:
