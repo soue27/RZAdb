@@ -1,3 +1,5 @@
+"""Центральные настройки приложения и их валидация."""
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -7,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Центральная конфигурация приложения, загружаемая из переменных окружения и .env.
+    """
     app_name: str = "RZAdb"
     debug: bool = False
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
@@ -44,6 +48,17 @@ class Settings(BaseSettings):
     @field_validator("log_level", mode="before")
     @classmethod
     def normalize_log_level(cls, value: object) -> object:
+        """Нормализует уровень логирования и проверяет его принадлежность поддерживаемому набору.
+
+        Args:
+            value: Исходное значение LOG_LEVEL.
+
+        Returns:
+            Значение уровня в верхнем регистре или исходное значение для последующей валидации.
+
+        Raises:
+            ValueError: Если строковое значение не поддерживается.
+        """
         if not isinstance(value, str):
             return value
         normalized = value.strip().upper()
@@ -56,6 +71,14 @@ class Settings(BaseSettings):
     @field_validator("error_email_to", mode="before")
     @classmethod
     def normalize_error_email_to(cls, value: object) -> object:
+        """Очищает адрес получателя email-уведомлений; пустую строку преобразует в None.
+
+        Args:
+            value: Исходное значение ERROR_EMAIL_TO.
+
+        Returns:
+            Очищенный адрес или None.
+        """
         if isinstance(value, str):
             normalized = value.strip()
             return normalized or None
@@ -71,4 +94,9 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Возвращает единственный кэшированный экземпляр настроек приложения.
+
+    Returns:
+        Валидированный объект Settings.
+    """
     return Settings()
