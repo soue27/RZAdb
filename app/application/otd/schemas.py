@@ -8,7 +8,7 @@ from app.domain.enums import DocumentStatus, OTDPurpose
 
 class OTDVersionDetails(BaseModel):
     """Данные версии ОТД для отображения технических характеристик и истории.
-"""
+    """
     id: UUID
     version_number: int
     status: DocumentStatus
@@ -31,7 +31,7 @@ class OTDVersionDetails(BaseModel):
 
 class OTDDetails(BaseModel):
     """Сводные данные формуляра ОТД, включая текущую, выбранную и исторические версии.
-"""
+    """
     id: UUID
     current_version: OTDVersionDetails | None
     selected_version: OTDVersionDetails | None
