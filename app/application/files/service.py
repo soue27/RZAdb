@@ -27,14 +27,13 @@ class QuarantinedObject:
 
 
 class FileQuarantine:
-    """Moves storage objects aside until the database deletion is committed."""
+    """Временно изолирует объекты хранилища до фиксации удаления в базе данных."""
 
     def __init__(self, storage: ObjectStorage) -> None:
-        """Сохраняет репозиторий метаданных и адаптер объектного хранилища.
+        """Сохраняет адаптер объектного хранилища.
 
         Args:
-            repository: Репозиторий файлов.
-            storage: Объектное хранилище бинарного содержимого.
+            storage: Хранилище, поддерживающее проверку, перемещение и удаление объектов.
         """
         self.storage = storage
 
@@ -104,6 +103,12 @@ class FileService:
         repository: FileRepository,
         storage: ObjectStorage,
     ) -> None:
+        """Сохраняет репозиторий метаданных и адаптер объектного хранилища.
+
+        Args:
+            repository: Репозиторий файлов.
+            storage: Объектное хранилище бинарного содержимого.
+        """
         self.repository = repository
         self.storage = storage
 
