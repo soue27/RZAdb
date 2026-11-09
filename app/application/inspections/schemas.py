@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 
 class InspectionListItem(BaseModel):
+    """Данные результата осмотра подстанции для отображения в списке.
+    """
     id: UUID
     substation_id: UUID
     inspection_date: date
