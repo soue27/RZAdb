@@ -1,14 +1,11 @@
-
 import asyncio
 import smtplib
 import ssl
+from collections.abc import Sequence
 from email.message import EmailMessage
 from pathlib import Path
-from collections.abc import Sequence
 
 from app.core.config import Settings
-
-
 class SMTPEmailSender:
     """Отправка email через SMTP без блокировки event loop."""
 
