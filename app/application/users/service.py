@@ -10,16 +10,25 @@ from app.domain.user import User
 
 
 class UserOperationError(Exception):
-    """User operation rejected by domain or access rules."""
+    """Операция с пользователем отклонена правилами доступа или предметной области."""
 
 
 class UserService:
+    """Выполняет административные операции с учётными записями пользователей."""
+
     def __init__(
         self,
         repository: UserRepository,
         enterprise_repository: EnterpriseRepository,
         password_service: PasswordService,
     ) -> None:
+        """Сохраняет репозитории и сервис хеширования паролей.
+
+        Args:
+            repository: Репозиторий пользователей.
+            enterprise_repository: Репозиторий для проверки предприятия.
+            password_service: Сервис создания и проверки хешей паролей.
+        """
         self.repository = repository
         self.enterprise_repository = enterprise_repository
         self.password_service = password_service
@@ -35,6 +44,27 @@ class UserService:
         access_category: AccessCategory,
         temporary_password: str,
     ) -> User:
+        """Создаёт учётную запись и помечает временный пароль для смены.
+
+        Операция доступна только суперадминистратору. Email проверяется на
+        уникальность, а пароль сохраняется только в виде хеша.
+
+        Args:
+            actor: Пользователь, выполняющий операцию.
+            full_name: ФИО нового пользователя.
+            email: Email новой учётной записи.
+            role: Системная роль пользователя.
+            enterprise_id: Предприятие пользователя или None.
+            access_category: Категория допуска к работам.
+            temporary_password: Временный пароль для первого входа.
+
+        Returns:
+            Созданная учётная запись.
+
+        Raises:
+            UserOperationError: Если у инициатора недостаточно прав,
+                поля некорректны, предприятие не найдено или email занят.
+        """
         self._require_superadmin(actor)
         full_name = full_name.strip()
         email = email.strip()
@@ -68,6 +98,27 @@ class UserService:
         enterprise_id: UUID | None,
         access_category: AccessCategory,
     ) -> User:
+        """Изменяет основные сведения и область ответственности пользователя.
+
+        Изменять собственную учётную запись через эту операцию запрещено.
+
+        Args:
+            actor: Суперадминистратор, выполняющий изменение.
+            user_id: Идентификатор изменяемого пользователя.
+            full_name: Новое ФИО.
+            email: Новый email.
+            role: Новая системная роль.
+            enterprise_id: Новое предприятие или None.
+            access_category: Новая категория допуска.
+
+        Returns:
+            Обновлённая учётная запись.
+
+        Raises:
+            UserOperationError: При недостатке прав, попытке изменить себя,
+                отсутствии пользователя/предприятия, некорректных данных
+                или занятом email.
+        """
         self._require_superadmin(actor)
         if user_id == actor.id:
             raise UserOperationError("Нельзя изменять собственную учётную запись.")
@@ -92,6 +143,22 @@ class UserService:
     async def reset_password(
         self, *, actor: User, user_id: UUID, temporary_password: str
     ) -> User:
+        """Устанавливает пользователю временный пароль с обязательной сменой.
+
+        Суперадминистратор не может сбросить пароль собственной учётной записи.
+
+        Args:
+            actor: Суперадминистратор, выполняющий сброс.
+            user_id: Идентификатор пользователя.
+            temporary_password: Новый временный пароль.
+
+        Returns:
+            Обновлённая учётная запись.
+
+        Raises:
+            UserOperationError: При недостатке прав, попытке сбросить свой
+                пароль, отсутствии пользователя или некорректном пароле.
+        """
         self._require_superadmin(actor)
         if user_id == actor.id:
             raise UserOperationError("Нельзя сбросить собственный пароль через админку.")
@@ -104,6 +171,23 @@ class UserService:
         return user
 
     async def set_active(self, *, actor: User, user_id: UUID, active: bool) -> User:
+        """Включает или отключает учётную запись пользователя.
+
+        Нельзя отключить собственную учётную запись через административную
+        операцию.
+
+        Args:
+            actor: Суперадминистратор, выполняющий операцию.
+            user_id: Идентификатор пользователя.
+            active: Новое состояние активности.
+
+        Returns:
+            Обновлённая учётная запись.
+
+        Raises:
+            UserOperationError: При недостатке прав, попытке изменить себя
+                или отсутствии пользователя.
+        """
         self._require_superadmin(actor)
         if user_id == actor.id:
             raise UserOperationError("Нельзя отключить собственную учётную запись.")
@@ -114,6 +198,22 @@ class UserService:
         return user
 
     async def archive(self, *, actor: User, user_id: UUID) -> User:
+        """Архивирует учётную запись без физического удаления.
+
+        Сохраняет время и инициатора архивирования. Архивировать самого себя
+        через эту операцию нельзя.
+
+        Args:
+            actor: Суперадминистратор, выполняющий архивирование.
+            user_id: Идентификатор пользователя.
+
+        Returns:
+            Архивированная учётная запись.
+
+        Raises:
+            UserOperationError: При недостатке прав, попытке архивировать себя
+                или отсутствии пользователя.
+        """
         self._require_superadmin(actor)
         if user_id == actor.id:
             raise UserOperationError("Нельзя архивировать собственную учётную запись.")
@@ -131,6 +231,23 @@ class UserService:
         current_password: str | None,
         new_password: str,
     ) -> None:
+        """Изменяет пароль текущего пользователя.
+
+        При первом входе допускается смена временного пароля без проверки
+        старого; в остальных случаях требуется корректный текущий пароль.
+        Новый пароль должен содержать не менее 12 символов и отличаться
+        от сохранённого.
+
+        Args:
+            user: Учётная запись, пароль которой изменяется.
+            current_password: Текущий пароль или None при обязательной
+                первоначальной смене.
+            new_password: Новый пароль.
+
+        Raises:
+            UserOperationError: Если новый пароль слишком короткий, текущий
+                пароль неверен или новый пароль совпадает с текущим.
+        """
         if len(new_password) < 12:
             raise UserOperationError("Пароль должен содержать не менее 12 символов.")
         if not user.must_change_password and (
