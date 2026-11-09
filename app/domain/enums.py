@@ -2,12 +2,16 @@ from enum import StrEnum
 
 
 class EnterpriseType(StrEnum):
+"""Определяет уровни организационной структуры предприятия."""
+
     HOLDING = "holding"
     BRANCH = "branch"
     DEPARTMENT = "department"
 
 
 class HighestVoltage(StrEnum):
+"""Содержит допустимые классы высшего напряжения подстанции."""
+
     KV_500 = "500"
     KV_220 = "220"
     KV_110 = "110"
@@ -18,6 +22,8 @@ class HighestVoltage(StrEnum):
 
 
 class OperationalCurrentType(StrEnum):
+"""Определяет тип оперативного тока на подстанции."""
+
     PERMANENT = "permanent"
     RECTIFIED = "rectified"
     ALTERNATING = "alternating"
@@ -32,6 +38,8 @@ class OperationalCurrentType(StrEnum):
 
 
 class URZAStatus(StrEnum):
+"""Описывает эксплуатационное состояние устройства РЗА."""
+
     IN_OPERATION = "in_operation"
     IN_REPAIR = "in_repair"
     DECOMMISSIONED = "decommissioned"
@@ -57,6 +65,8 @@ class URZAStatus(StrEnum):
 
 
 class ElementBase(StrEnum):
+"""Определяет элементную базу устройства РЗА."""
+
     ELECTROMECHANICAL = "electromechanical"
     MICROELECTRONIC = "microelectronic"
     MICROPROCESSOR = "microprocessor"
@@ -71,6 +81,8 @@ class ElementBase(StrEnum):
 
 
 class URZACategory(StrEnum):
+"""Задаёт категорию устройства РЗА."""
+
     I = "I"
     II = "II"
     III = "III"
@@ -82,6 +94,8 @@ class URZACategory(StrEnum):
 
 
 class RoomCategory(StrEnum):
+"""Задаёт категорию помещения, в котором установлено устройство."""
+
     I = "I"
     II = "II"
     III = "III"
@@ -92,6 +106,8 @@ class RoomCategory(StrEnum):
 
 
 class OTDPurpose(StrEnum):
+"""Определяет назначение устройства, указываемое в формуляре ОТД."""
+
     RZA = "rza"
     SA = "sa"
     PA = "pa"
@@ -108,6 +124,8 @@ class OTDPurpose(StrEnum):
 
 
 class AccessCategory(StrEnum):
+"""Задаёт категорию допуска пользователя к работам."""
+
     I = "I"
     II = "II"
     III = "III"
@@ -115,6 +133,8 @@ class AccessCategory(StrEnum):
 
 
 class UserRole(StrEnum):
+"""Определяет системную роль пользователя и его уровень полномочий."""
+
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     SPECIALIST = "specialist"
@@ -123,6 +143,8 @@ class UserRole(StrEnum):
 
 
 class TaskWorkType(StrEnum):
+"""Определяет вид работы, для выполнения которой создана задача."""
+
     OTD = "otd"
     SETTINGS = "settings"
     SCHEMES = "schemes"
@@ -143,6 +165,8 @@ class TaskWorkType(StrEnum):
 
 
 class MaintenanceType(StrEnum):
+"""Содержит обозначения видов технического обслуживания РЗА."""
+
     V = "В"
     K = "К"
     K1 = "К1"
@@ -156,6 +180,8 @@ class MaintenanceType(StrEnum):
 
 
 class TaskStatus(StrEnum):
+"""Определяет состояние рабочей задачи в её жизненном цикле."""
+
     CREATED = "created"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
@@ -166,11 +192,15 @@ class TaskStatus(StrEnum):
 
 
 class ArchiveEventType(StrEnum):
+"""Определяет тип события в истории архивирования объектов."""
+
     ARCHIVED = "archived"
     RESTORED = "restored"
 
 
 class DocumentStatus(StrEnum):
+"""Определяет состояние документа в процессе подготовки и согласования."""
+
     DRAFT = "draft"
     UNDER_REVIEW = "under_review"
     APPROVED = "approved"
@@ -193,6 +223,8 @@ class DocumentStatus(StrEnum):
 
 
 class ProgramType(StrEnum):
+"""Определяет назначение программы работ для устройства РЗА."""
+
     COMMISSIONING = "commissioning"
     DECOMMISSIONING = "decommissioning"
     WORK = "work"
