@@ -43,7 +43,7 @@ _LIBPQ_QUERY_KEYS = {
 
 
 class DumpCreationError(RuntimeError):
-    """Safe diagnostic for a dump that could not be created and validated."""
+    """Безопасная диагностическая ошибка создания или проверки дампа."""
 
     def __init__(
         self,
@@ -86,7 +86,7 @@ class _ConnectionInfo:
 
 
 class PostgresDumpService:
-    """Create a private temporary Custom Format dump and validate it."""
+    """Создаёт временный дамп PostgreSQL в Custom Format и проверяет его."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
