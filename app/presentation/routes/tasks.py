@@ -1,3 +1,5 @@
+"""Маршруты создания задач, просмотра их истории и выполнения действий жизненного цикла."""
+
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
@@ -278,6 +280,8 @@ async def get_task_create_form(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     return_url: str | None = None,
 ):
+    """Отображает форму создания задачи для выбранного объекта.
+    """
     if not await task_service.can_issue_task(
         actor_id=current_user.id,
         urza_id=urza_id,
@@ -337,6 +341,8 @@ async def create_task(
     description: Annotated[str, Form()] = "",
     return_url: Annotated[str, Form()] = "",
 ):
+    """Создаёт задачу для УРЗА или подстанции.
+    """
     tree = await tree_service.get_tree(
         user_id=current_user.id,
     )
@@ -567,6 +573,8 @@ async def get_tasks(
     ],
     stat: str | None = None,
 ):
+    """Отображает список задач, доступных текущему пользователю.
+    """
     if stat not in {None, "work", "review", "overdue", "closed"}:
         raise HTTPException(status_code=400, detail="Неизвестный фильтр заданий.")
 
@@ -683,6 +691,8 @@ async def get_task_detail(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает подробности задачи, историю и доступные действия.
+    """
     task = await _get_accessible_task(
         repository,
         access_service,
@@ -905,6 +915,8 @@ async def accept_task(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Принимает назначенную задачу от имени исполнителя.
+    """
     return await _run_executor_action(
         request=request,
         task_id=task_id,
@@ -927,6 +939,8 @@ async def complete_task(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Завершает выполнение задачи после проверки результата.
+    """
     return await _run_executor_action(
         request=request,
         task_id=task_id,
@@ -950,6 +964,8 @@ async def reject_task(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     reason: Annotated[str, Form()],
 ):
+    """Отклоняет назначенную задачу с указанием причины.
+    """
     return await _run_executor_action(
         request=request,
         task_id=task_id,
@@ -975,6 +991,8 @@ async def submit_task_for_review(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     comment: Annotated[str | None, Form()] = None,
 ):
+    """Передаёт выполненную задачу руководителю на проверку.
+    """
     return await _run_review_action(
         request=request,
         task_id=task_id,
@@ -999,6 +1017,8 @@ async def close_task(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     comment: Annotated[str | None, Form()] = None,
 ):
+    """Закрывает задачу после одобрения результата руководителем.
+    """
     return await _run_review_action(
         request=request,
         task_id=task_id,
@@ -1023,6 +1043,8 @@ async def return_task_for_revision(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     comment: Annotated[str | None, Form()] = None,
 ):
+    """Возвращает задачу исполнителю на доработку.
+    """
     return await _run_review_action(
         request=request,
         task_id=task_id,
@@ -1048,6 +1070,8 @@ async def reassign_task(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     engineer_id: Annotated[str, Form()],
 ):
+    """Переназначает задачу другому активному инженеру.
+    """
     task = await _get_accessible_task(
         repository,
         access_service,
