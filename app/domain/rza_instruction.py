@@ -18,6 +18,11 @@ from app.infrastructure.database.mixins import (
 
 
 class RZAInstruction(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Объединяет версии инструкции по РЗА для подстанции.
+
+    Для одной подстанции предусмотрена одна запись инструкции;
+    содержание и история изменений размещаются в версиях.
+    """
     __tablename__ = "rza_instructions"
 
     substation_id: Mapped[UUID] = mapped_column(
@@ -35,6 +40,11 @@ class RZAInstructionVersion(
     SoftDeleteMixin,
     Base,
 ):
+    """Хранит отдельную версию инструкции по РЗА подстанции.
+
+    Содержит срок действия, описание и обоснование изменений,
+    статус, скан документа и необязательный редактируемый файл.
+    """
     __tablename__ = "rza_instruction_versions"
 
     rza_instruction_id: Mapped[UUID] = mapped_column(
