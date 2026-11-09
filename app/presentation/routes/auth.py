@@ -1,3 +1,5 @@
+"""Маршруты входа, выхода и смены пароля пользователя."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -21,6 +23,8 @@ templates = Jinja2Templates(
 
 @router.get("/login")
 async def login_page(request: Request):
+    """Отображает страницу входа.
+    """
     return templates.TemplateResponse(
         request=request,
         name="auth/login.html",
@@ -33,6 +37,10 @@ async def login(
     password: Annotated[str, Form()],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> RedirectResponse:
+    """Проверяет учётные данные и создаёт пользовательскую сессию.
+
+    При первом входе перенаправляет пользователя на обязательную смену временного пароля.
+    """
     try:
         user = await auth_service.authenticate(
             email=email,
@@ -57,6 +65,8 @@ async def change_password_page(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
 ):
+    """Отображает форму смены пароля текущего пользователя.
+    """
     return templates.TemplateResponse(
         request=request,
         name="auth/change_password.html",
@@ -73,6 +83,8 @@ async def change_password(
     confirm_password: Annotated[str, Form()],
     current_password: Annotated[str | None, Form()] = None,
 ):
+    """Изменяет пароль текущего пользователя и снимает признак обязательной смены.
+    """
     error = None
     if new_password != confirm_password:
         error = "Новый пароль и подтверждение не совпадают."
@@ -95,6 +107,8 @@ async def change_password(
 
 @router.post("/logout")
 async def logout(request: Request) -> RedirectResponse:
+    """Завершает пользовательскую сессию и перенаправляет на страницу входа.
+    """
     request.session.clear()
 
     response = RedirectResponse(
