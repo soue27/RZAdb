@@ -38,7 +38,14 @@ class BackupManifestError(BackupError):
 
 
 class BackupCoordinator:
+    """Координирует создание дампа, независимые каналы хранения и итоговый манифест запуска.
+    """
     def __init__(self, settings: Settings) -> None:
+        """Создаёт сервис дампа и адаптеры всех каналов резервного копирования.
+
+        Args:
+            settings: Настройки БД, каталогов и каналов резервирования.
+        """
         self.settings = settings
         self.dump_service = PostgresDumpService(settings)
         self.local_channel = LocalBackupChannel(settings)
@@ -46,6 +53,20 @@ class BackupCoordinator:
         self.yandex_disk_channel = YandexDiskBackupChannel(settings)
 
     async def run(self) -> dict[str, Any]:
+        """Выполняет полный цикл резервного копирования PostgreSQL.
+
+        Создаёт и проверяет дамп, последовательно обрабатывает включённые каналы,
+        сохраняет результат каждого канала и общий статус в манифесте. Ошибка одного
+        канала не отменяет остальные.
+
+        Returns:
+            Итоговый манифест запуска с run_id, статусами каналов и путём к файлу.
+
+        Raises:
+            BackupDisabledError: Если резервирование отключено.
+            BackupError: Если создание дампа не удалось.
+            BackupManifestError: Если итоговый манифест не удалось записать.
+        """
         if not self.settings.backup_enabled:
             raise BackupDisabledError("Database backup is disabled")
 
@@ -189,6 +210,14 @@ class BackupCoordinator:
                     )
 
     def _validate_enabled_channels(self, manifest: dict[str, Any]) -> dict[str, bool]:
+        """Проверяет конфигурацию всех включённых каналов и возвращает их состояние.
+
+        Args:
+            manifest: Текущий манифест запуска.
+
+        Returns:
+            Словарь признаков включения локального, email- и Yandex Disk-каналов.
+        """
         readiness = {
             "local": self.settings.backup_local_enabled,
             "email": self.settings.backup_email_enabled,
@@ -217,6 +246,8 @@ class BackupCoordinator:
         started_clock: float,
         artifact: DumpArtifact | None,
     ) -> dict[str, Any]:
+        """Атомарно сохраняет манифест и формирует итоговый результат запуска.
+        """
         manifest["duration_seconds"] = round(time.monotonic() - started_clock, 6)
         self._sync_legacy_local_status(manifest)
         try:
@@ -265,6 +296,14 @@ class BackupCoordinator:
 
     @staticmethod
     def _channel_pending(enabled: bool) -> dict[str, Any]:
+        """Создаёт начальное состояние канала до начала его обработки.
+
+        Args:
+            enabled: Включён ли канал.
+
+        Returns:
+            Словарь начального статуса канала.
+        """
         return {
             "enabled": enabled,
             "status": "pending" if enabled else "disabled",
@@ -278,6 +317,8 @@ class BackupCoordinator:
     def _set_channel_result(
         manifest: dict[str, Any], name: str, result: ChannelResult
     ) -> None:
+        """Записывает результат выполнения канала в манифест.
+        """
         manifest["channels"][name].update(result.to_dict())
 
     @classmethod
@@ -287,6 +328,8 @@ class BackupCoordinator:
         name: str,
         error: Exception,
     ) -> None:
+        """Записывает ошибку канала, не прерывая обработку остальных каналов.
+        """
         if isinstance(error, ChannelConfigurationError):
             safe_error = str(error)
         elif isinstance(error, ValueError) and name == "email":
@@ -304,6 +347,8 @@ class BackupCoordinator:
 
     @staticmethod
     def _sync_legacy_local_status(manifest: dict[str, Any]) -> None:
+        """Синхронизирует устаревшие поля локального статуса для совместимости манифеста.
+        """
         local = manifest["channels"]["local"]
         manifest["local_storage"] = {
             "enabled": local["enabled"],
@@ -312,6 +357,11 @@ class BackupCoordinator:
 
     @staticmethod
     def _overall_status(manifest: dict[str, Any]) -> str:
+        """Вычисляет общий статус запуска по результатам включённых каналов.
+
+        Returns:
+            success, partial_success или failed.
+        """
         enabled = [
             channel
             for channel in manifest["channels"].values()
@@ -332,6 +382,8 @@ class BackupCoordinator:
 
     @staticmethod
     def _write_manifest_atomic(path: Path, manifest: dict[str, Any]) -> None:
+        """Записывает JSON-манифест через временный файл и атомарную замену.
+        """
         temporary_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -356,6 +408,8 @@ class BackupCoordinator:
 
     @staticmethod
     def _manifest_write_error(run_id: UUID, error: Exception) -> None:
+        """Логирует ошибку сохранения манифеста с идентификатором запуска.
+        """
         logger.error(
             "Backup run %s manifest write failed (%s)",
             run_id,
