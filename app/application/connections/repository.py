@@ -13,8 +13,8 @@ class ConnectionRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет сессию для запросов к присоединениям.
-
-        Args:
+            
+            Args:
             session: Асинхронная SQLAlchemy-сессия текущей транзакции.
         """
         self.session = session
@@ -24,11 +24,11 @@ class ConnectionRepository:
         connection_id: UUID,
     ) -> Connection | None:
         """Находит присоединение по идентификатору, включая архивные записи.
-
-        Args:
+            
+            Args:
             connection_id: Идентификатор присоединения.
-
-        Returns:
+            
+            Returns:
             Присоединение или None, если запись отсутствует.
         """
         return await self.session.get(Connection, connection_id)
@@ -41,16 +41,16 @@ class ConnectionRepository:
             exclude_connection_id: UUID | None = None,
     ) -> bool:
         """Проверяет занятость диспетчерского имени в пределах подстанции.
-
-        Сравнение выполняется после удаления пробелов по краям. При обновлении
-        можно исключить из проверки текущее присоединение.
-
-        Args:
+            
+            Сравнение выполняется после удаления пробелов по краям. При обновлении
+            можно исключить из проверки текущее присоединение.
+            
+            Args:
             substation_id: Идентификатор подстанции.
             dispatch_name: Проверяемое диспетчерское наименование.
             exclude_connection_id: Идентификатор записи, исключаемой из поиска.
-
-        Returns:
+            
+            Returns:
             True, если такое имя уже используется, иначе False.
         """
         query = select(Connection.id).where(
@@ -66,11 +66,11 @@ class ConnectionRepository:
 
     async def has_active_substation(self, substation_id: UUID) -> bool:
         """Проверяет наличие неархивированной подстанции.
-
-        Args:
+            
+            Args:
             substation_id: Идентификатор подстанции.
-
-        Returns:
+            
+            Returns:
             True, если активная подстанция существует.
         """
         result = await self.session.scalar(
@@ -83,11 +83,11 @@ class ConnectionRepository:
 
     async def lock_active_substation(self, substation_id: UUID) -> bool:
         """Блокирует подстанцию и проверяет её активность перед созданием связи.
-
-        Args:
+            
+            Args:
             substation_id: Идентификатор подстанции.
-
-        Returns:
+            
+            Returns:
             True, если подстанция существует, не архивирована и заблокирована.
         """
         substation = await lock_owner_row(
@@ -99,14 +99,14 @@ class ConnectionRepository:
 
     async def add(self, connection: Connection) -> Connection:
         """Добавляет присоединение в отдельной вложенной транзакции.
-
-        Выполняет flush до выхода из savepoint, но не фиксирует внешнюю
-        транзакцию.
-
-        Args:
+            
+            Выполняет flush до выхода из savepoint, но не фиксирует внешнюю
+            транзакцию.
+            
+            Args:
             connection: Создаваемая модель присоединения.
-
-        Returns:
+            
+            Returns:
             Добавленная модель присоединения.
         """
         async with self.session.begin_nested():
@@ -131,12 +131,12 @@ class ConnectionRepository:
         include_archived: bool = False,
     ) -> list[Connection]:
         """Возвращает присоединения выбранных подстанций.
-
-        Args:
+            
+            Args:
             substation_ids: Идентификаторы подстанций.
             include_archived: Включать ли архивированные присоединения.
-
-        Returns:
+            
+            Returns:
             Присоединения, отсортированные по диспетчерскому наименованию.
             При пустом наборе идентификаторов возвращает пустой список.
         """
@@ -158,13 +158,13 @@ class ConnectionRepository:
 
     async def update(self, connection: Connection) -> Connection:
         """Синхронизирует изменения присоединения с базой данных.
-
-        Транзакция не фиксируется.
-
-        Args:
+            
+            Транзакция не фиксируется.
+            
+            Args:
             connection: Изменённая модель присоединения.
-
-        Returns:
+            
+            Returns:
             Та же модель присоединения.
         """
         await self.session.flush()
