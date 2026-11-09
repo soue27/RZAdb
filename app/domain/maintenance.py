@@ -18,6 +18,12 @@ from app.infrastructure.database.mixins import (
 
 
 class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Представляет запись о техническом обслуживании устройства РЗА.
+
+    Хранит дату и вид обслуживания, выявленные отклонения,
+    принятые меры, протоколы и обязательный подписанный формуляр.
+    Поддерживает исторические записи и связь с задачей ТО.
+    """
     __tablename__ = "to_records"
 
     urza_id: Mapped[UUID] = mapped_column(
