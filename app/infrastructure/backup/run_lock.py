@@ -6,11 +6,11 @@ from pathlib import Path
 
 
 class BackupAlreadyRunning(RuntimeError):
-    """Another process currently owns the PostgreSQL backup lock."""
+    """Другой процесс уже удерживает блокировку резервного копирования PostgreSQL."""
 
 
 class BackupRunLock:
-    """A process-wide advisory lock shared by the CLI and web interface."""
+    """Межпроцессная advisory-блокировка, общая для CLI и веб-интерфейса."""
 
     def __init__(self, backup_dir: Path) -> None:
         """Формирует путь lock-файла в каталоге резервных копий.
