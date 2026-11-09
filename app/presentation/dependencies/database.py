@@ -1,3 +1,5 @@
+"""database: зависимости и DTO presentation-слоя."""
+
 from typing import Annotated
 
 from fastapi import Depends
