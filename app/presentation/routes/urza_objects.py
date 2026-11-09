@@ -1,3 +1,5 @@
+"""Маршруты просмотра и изменения характеристик устройств РЗА."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -115,6 +117,8 @@ async def get_urza_edit_form(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     urza_service: Annotated[URZAService, Depends(get_urza_service)],
 ):
+    """Отображает форму редактирования характеристик устройства РЗА.
+    """
     _require_urza_edit_role(current_user)
     await _check_urza_access(object_service, current_user, urza_id)
 
@@ -149,6 +153,8 @@ async def post_urza_edit_form(
     rdu_subordination: Annotated[str, Form()] = "",
     complexity: Annotated[str, Form()] = "",
 ):
+    """Сохраняет изменения характеристик устройства РЗА.
+    """
     _require_urza_edit_role(current_user)
     await _check_urza_access(object_service, current_user, urza_id)
 
