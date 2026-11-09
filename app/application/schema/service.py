@@ -21,17 +21,35 @@ _TASK_RECORD_INDEX = "uq_schema_records_one_active_per_task"
 
 
 class SchemaService:
+    """Управляет формуляром схем УРЗА, записями схем и процессом согласования.
+    """
     def __init__(
         self,
         repository: SchemaRepository,
         access_service: AccessService,
         task_repository: TaskRepository,
     ) -> None:
+        """Сохраняет репозиторий схем, сервис проверки доступа и репозиторий задач.
+
+        Args:
+        repository: Репозиторий формуляров и записей схем.
+        access_service: Централизованный сервис проверки доступа.
+        task_repository: Репозиторий задач.
+        """
         self.repository = repository
         self.access_service = access_service
         self.task_repository = task_repository
 
     async def _get_user(self, user_id: UUID):
+        """Возвращает активного пользователя.
+
+        Args:
+        user_id: Идентификатор пользователя.
+
+        Raises:
+        ValueError: Если пользователь не найден.
+        PermissionError: Если пользователь неактивен.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None:
             raise ValueError("Пользователь не найден.")
@@ -40,6 +58,8 @@ class SchemaService:
         return user
 
     async def _ensure_access(self, user_id: UUID, urza_id: UUID) -> None:
+        """Проверяет право пользователя изменять схемы указанного УРЗА.
+        """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено")
 
@@ -49,6 +69,20 @@ class SchemaService:
         urza_id: UUID,
         task_id: UUID,
     ) -> Task:
+        """Проверяет, что задача может быть связана с создаваемым результатом схем.
+
+        Args:
+        user_id: Идентификатор исполнителя.
+        urza_id: Идентификатор устройства.
+        task_id: Идентификатор задачи.
+
+        Returns:
+            Проверенная задача.
+
+        Raises:
+        ValueError: Если задача не подходит по типу, владельцу или статусу.
+        PermissionError: Если пользователь не является назначенным исполнителем.
+        """
         task = await self.task_repository.get_by_id(task_id)
         if task is None or task.deleted_at is not None:
             raise ValueError("Активная задача не найдена.")
@@ -85,6 +119,8 @@ class SchemaService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SchemaRecord:
+        """Находит запись схем и проверяет принадлежность формуляра указанному УРЗА.
+        """
         await self._ensure_access(user_id, urza_id)
         record = await self.repository.get_by_id(record_id)
         if record is None:
@@ -101,6 +137,8 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> None:
+        """Проверяет, что согласование выполняет активный MANAGER с доступом к УРЗА.
+        """
         user = await self._get_user(user_id)
         if user.role is not UserRole.MANAGER:
             raise PermissionError("Согласовывать схемы может только MANAGER.")
@@ -108,6 +146,14 @@ class SchemaService:
 
     @staticmethod
     def _is_unfinished_conflict(error: IntegrityError) -> bool:
+        """Определяет, вызвана ли ошибка целостности ограничением одной незавершённой записи на формуляр.
+
+        Args:
+        error: Ошибка SQLAlchemy IntegrityError.
+
+        Returns:
+            True, если нарушено ограничение незавершённой записи.
+        """
         original = error.orig
         constraint_name = getattr(original, "constraint_name", None)
         return (
@@ -120,6 +166,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SchemaForm | None:
+        """Возвращает формуляр схем устройства при наличии права чтения.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Формуляр схем или None.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return None
         return await self.repository.get_form_by_urza_id(urza_id)
@@ -129,6 +184,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SchemaForm | None:
+        """Возвращает формуляр схем устройства после проверки доступа.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Формуляр схем или None.
+        """
         await self._ensure_access(user_id, urza_id)
         return await self.repository.get_form_by_urza_id(urza_id)
 
@@ -137,6 +201,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> list[SchemaRecord]:
+        """Возвращает активные записи схем устройства.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Список записей схем.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return []
         schema_form = await self.repository.get_form_by_urza_id(urza_id)
@@ -149,6 +222,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SchemaRecord | None:
+        """Возвращает текущую утверждённую запись схем устройства.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Последняя утверждённая запись или None.
+        """
         await self._ensure_access(user_id, urza_id)
         schema_form = await self.repository.get_form_by_urza_id(urza_id)
         if schema_form is None:
@@ -160,6 +242,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SchemaRecord | None:
+        """Возвращает незавершённую запись формуляра схем.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Запись в статусе DRAFT или UNDER_REVIEW либо None.
+        """
         await self._ensure_access(user_id, urza_id)
         schema_form = await self.repository.get_form_by_urza_id(urza_id)
         if schema_form is None:
@@ -171,6 +262,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> tuple[SchemaForm | None, list[SchemaRecord]]:
+        """Возвращает формуляр схем и список его записей.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Пара из формуляра (или None) и списка записей.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return None, []
         schema_form = await self.repository.get_form_by_urza_id(urza_id)
@@ -184,6 +284,15 @@ class SchemaService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SchemaForm:
+        """Создаёт формуляр схем для устройства.
+
+        Args:
+        user_id: Идентификатор инициатора.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Созданный формуляр схем.
+        """
         await self._ensure_access(user_id, urza_id)
         existing_form = await self.repository.get_form_by_urza_id(urza_id)
         if existing_form is not None:
@@ -210,6 +319,27 @@ class SchemaService:
         editable_file_id: UUID | None = None,
         task_id: UUID | None = None,
     ) -> SchemaRecord:
+        """Создаёт запись изменения схем в формуляре УРЗА.
+
+        Для записи обязателен подписанный формуляр; скан и редактируемый файл
+        передаются дополнительно. При наличии task_id проверяется задача.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        schema_number: Номер схемы.
+        schema_name: Наименование схемы.
+        change_description: Описание изменений.
+        change_justification: Обоснование изменений.
+        upload_date: Дата загрузки.
+        signed_form_file_id: Идентификатор подписанного формуляра.
+        scan_file_id: Необязательный скан схемы.
+        editable_file_id: Необязательный редактируемый файл.
+        task_id: Необязательная связанная задача.
+
+        Returns:
+            Созданная запись схем.
+        """
         await self._ensure_access(user_id, urza_id)
         user = await self._get_user(user_id)
         if user.role not in _RECORD_ROLES:
@@ -294,6 +424,8 @@ class SchemaService:
         editable_file_id: UUID | None = None,
         task_id: UUID | None = None,
     ) -> SchemaRecord:
+        """Создаёт запись схем через основной сценарий create с теми же параметрами.
+        """
         return await self.create(
             user_id=user_id,
             urza_id=urza_id,
@@ -322,6 +454,24 @@ class SchemaService:
         scan_file_id: UUID | None = None,
         editable_file_id: UUID | None = None,
     ) -> SchemaRecord:
+        """Обновляет запись схем в допустимом для редактирования состоянии.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+        schema_number: Номер схемы.
+        schema_name: Наименование схемы.
+        change_description: Описание изменений.
+        change_justification: Обоснование изменений.
+        upload_date: Дата загрузки.
+        signed_form_file_id: Новый подписанный формуляр или None.
+        scan_file_id: Новый скан или None.
+        editable_file_id: Новый редактируемый файл или None.
+
+        Returns:
+            Обновлённая запись схем.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in _RECORD_ROLES:
@@ -359,6 +509,16 @@ class SchemaService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SchemaRecord:
+        """Отправляет черновик схем на согласование.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Запись схем в статусе UNDER_REVIEW.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in _RECORD_ROLES:
@@ -386,6 +546,16 @@ class SchemaService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SchemaRecord:
+        """Утверждает запись схем руководителем.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Утверждённая запись схем.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         if record.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Утвердить можно только схему на согласовании.")
@@ -403,6 +573,16 @@ class SchemaService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SchemaRecord:
+        """Возвращает запись схем с согласования на доработку.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Запись схем в статусе DRAFT.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         if record.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Вернуть в черновик можно только схему на согласовании.")
@@ -418,6 +598,16 @@ class SchemaService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SchemaRecord:
+        """Архивирует запись схем после проверки прав и принадлежности УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Архивированная запись.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN}:
@@ -431,6 +621,15 @@ class SchemaService:
         user_id: UUID,
         record: SchemaRecord,
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для записи схем.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        record: Проверяемая запись.
+
+        Returns:
+            Множество кодов действий с учётом статуса, роли и доступа.
+        """
         if record.deleted_at is not None:
             return set()
         try:
