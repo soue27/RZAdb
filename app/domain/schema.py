@@ -18,6 +18,11 @@ from app.infrastructure.database.mixins import (
 
 
 class SchemaForm(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Объединяет версии схем устройства РЗА.
+
+    Для одного устройства предусмотрена одна запись формуляра,
+    к которой относятся отдельные записи SchemaRecord.
+    """
     __tablename__ = "schema_forms"
 
     urza_id: Mapped[UUID] = mapped_column(
@@ -30,6 +35,11 @@ class SchemaForm(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 
 class SchemaRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Представляет отдельную запись об изменении схемы устройства РЗА.
+
+    Хранит номер и наименование схемы, сведения об изменениях,
+    дату загрузки, статус, файлы документа и связанную задачу.
+    """
     __tablename__ = "schema_records"
     __table_args__ = (
         Index(
