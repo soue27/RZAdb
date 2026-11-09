@@ -1,3 +1,5 @@
+"""Маршруты создания задач, непосредственно связанных с подстанциями."""
+
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
@@ -41,6 +43,8 @@ async def new_substation_task(
     service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму создания задачи для подстанции.
+    """
     if work_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Тип задания для подстанции не поддерживается.")
     substation = await _substation(objects, current_user, substation_id)
@@ -82,6 +86,8 @@ async def create_substation_task(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     description: Annotated[str, Form()] = "",
 ):
+    """Создаёт задачу, связанную непосредственно с подстанцией.
+    """
     if work_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Тип задания для подстанции не поддерживается.")
     substation = await _substation(objects, current_user, substation_id)
