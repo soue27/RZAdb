@@ -15,6 +15,11 @@ class TaskNotificationRepository:
     """Работа с внутренними уведомлениями пользователей."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def create(
