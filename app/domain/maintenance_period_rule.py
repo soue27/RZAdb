@@ -7,6 +7,11 @@ from app.infrastructure.database.mixins import UUIDMixin
 
 
 class MaintenancePeriodRule(UUIDMixin, Base):
+    """Определяет периодичность технического обслуживания РЗА.
+
+    Правило задаёт период в годах для сочетания категории
+    помещения и элементной базы устройства.
+    """
     __tablename__ = "maintenance_period_rules"
 
     room_category: Mapped[RoomCategory] = mapped_column(
