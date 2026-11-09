@@ -18,6 +18,12 @@ from app.infrastructure.database.mixins import UUIDMixin
 
 
 class TaskNotification(UUIDMixin, Base):
+    """Хранит уведомление пользователя об изменении рабочей задачи.
+
+    Уведомление связано с записью истории задачи и получателем.
+    Время прочтения позволяет отличать непрочитанные уведомления
+    от уже просмотренных.
+    """
     __tablename__ = "task_notifications"
 
     __table_args__ = (
