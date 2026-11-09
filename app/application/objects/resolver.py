@@ -8,6 +8,8 @@ from app.application.urzas.repository import URZARepository
 
 
 class ObjectResolver:
+    """Разрешает выбранный пользователем тип и идентификатор в краткое представление доменного объекта.
+    """
     def __init__(
         self,
         substation_repository: SubstationRepository,
@@ -15,6 +17,14 @@ class ObjectResolver:
         urza_repository: URZARepository,
         enterprise_repository: EnterpriseRepository,
     ) -> None:
+        """Сохраняет репозитории поддерживаемых объектов и предприятий.
+
+        Args:
+            substation_repository: Репозиторий подстанций.
+            connection_repository: Репозиторий присоединений.
+            urza_repository: Репозиторий устройств РЗА.
+            enterprise_repository: Репозиторий организационной структуры.
+        """
         self.substation_repository = substation_repository
         self.connection_repository = connection_repository
         self.urza_repository = urza_repository
@@ -27,6 +37,16 @@ class ObjectResolver:
         *,
         include_archived: bool = False,
     ) -> SelectedObject | None:
+        """Разрешает объект по типу и идентификатору.
+
+        Args:
+            object_type: Тип объекта интерфейса.
+            object_id: Идентификатор объекта.
+            include_archived: Разрешает возвращать архивные подстанции, присоединения и УРЗА.
+
+        Returns:
+            Краткое представление объекта или None, если объект не найден либо скрыт.
+        """
         if object_type == "department":
             enterprise = await self.enterprise_repository.get_by_id(object_id)
 
