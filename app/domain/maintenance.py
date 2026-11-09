@@ -15,10 +15,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-    SoftDeleteMixin,
-    TimestampMixin,
-    UUIDMixin,
-)
 
 
 class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -28,6 +24,7 @@ class TORecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     принятые меры, протоколы и обязательный подписанный формуляр.
     Поддерживает исторические записи и связь с задачей ТО.
     """
+
     __tablename__ = "to_records"
 
     urza_id: Mapped[UUID] = mapped_column(
