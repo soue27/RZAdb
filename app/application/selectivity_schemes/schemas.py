@@ -6,6 +6,8 @@ from app.domain.enums import DocumentStatus
 
 
 class SelectivitySchemeDetails(BaseModel):
+    """Сводные данные схемы селективности и выбранной версии для отображения.
+    """
     scheme_id: UUID
     version_id: UUID
     version_number: int
@@ -23,6 +25,8 @@ class SelectivitySchemeDetails(BaseModel):
 
 
 class SelectivitySchemeVersionListItem(BaseModel):
+    """Данные версии схемы селективности для списка истории.
+    """
     version_id: UUID
     version_number: int
     number: str
