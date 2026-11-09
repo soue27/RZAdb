@@ -37,7 +37,7 @@ class TaskRepository:
             task: Создаваемая задача.
 
         Returns:
-        Сохранённая модель задачи. Транзакция остаётся открытой.
+            Сохранённая модель задачи. Транзакция остаётся открытой.
         """
         # Репозиторий только сохраняет сущность; бизнес-правила находятся в сервисе.
         self.session.add(task)
@@ -52,7 +52,7 @@ class TaskRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        Задача или None.
+            Задача или None.
         """
         return await self.session.get(Task, task_id)
 
@@ -68,7 +68,7 @@ class TaskRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        Задача с загруженными связями или None.
+            Задача с загруженными связями или None.
         """
         result = await self.session.execute(
             select(Task)
@@ -86,7 +86,7 @@ class TaskRepository:
         """Возвращает все неархивированные задачи с основными связанными объектами.
 
         Returns:
-        Список задач в порядке убывания даты создания.
+            Список задач в порядке убывания даты создания.
         """
         result = await self.session.execute(
             select(Task)
@@ -219,7 +219,7 @@ class TaskRepository:
             now: Момент времени для определения просрочки.
 
         Returns:
-        Пара из словаря количества задач по статусам и числа просроченных задач.
+            Пара из словаря количества задач по статусам и числа просроченных задач.
         """
         if not enterprise_ids:
             return {}, 0
@@ -292,7 +292,7 @@ class TaskRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        События истории в обратном хронологическом порядке.
+            События истории в обратном хронологическом порядке.
         """
         result = await self.session.execute(
             select(TaskHistory)
@@ -314,7 +314,7 @@ class TaskRepository:
             actor_id: Идентификатор проверяющего.
 
         Returns:
-        Множество идентификаторов задач с событиями одобрения или возврата.
+            Множество идентификаторов задач с событиями одобрения или возврата.
         """
         result = await self.session.scalars(
             select(TaskHistory.task_id)
@@ -338,7 +338,7 @@ class TaskRepository:
             task: Изменённая модель задачи.
 
         Returns:
-        Та же модель задачи.
+            Та же модель задачи.
         """
         # flush фиксирует изменения в текущей транзакции, но commit остаётся за сервисом.
         await self.session.flush()
@@ -416,7 +416,7 @@ class TaskRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        Версия инструкции или None.
+            Версия инструкции или None.
         """
         result = await self.session.execute(
             select(RZAInstructionVersion).where(
@@ -435,7 +435,7 @@ class TaskRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        Версия схемы селективности или None.
+            Версия схемы селективности или None.
         """
         result = await self.session.execute(
             select(SelectivitySchemeVersion).where(
