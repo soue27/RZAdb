@@ -16,6 +16,11 @@ class NotificationService:
         self,
         repository: TaskNotificationRepository,
     ) -> None:
+        """Сохраняет репозиторий внутренних уведомлений.
+
+        Args:
+            repository: Репозиторий уведомлений.
+        """
         self.repository = repository
 
     async def create_for_history(
@@ -56,6 +61,16 @@ class NotificationService:
         limit: int = 20,
         offset: int = 0,
     ) -> list[TaskNotification]:
+        """Возвращает непрочитанные уведомления пользователя с пагинацией.
+
+        Args:
+            recipient_id: Идентификатор получателя.
+            limit: Максимальное количество записей.
+            offset: Смещение.
+
+        Returns:
+            Список непрочитанных уведомлений.
+        """
         return await self.repository.get_unread(
             recipient_id=recipient_id,
             limit=limit,
@@ -68,12 +83,29 @@ class NotificationService:
             notification_id: UUID,
             recipient_id: UUID,
     ) -> TaskNotification | None:
+        """Возвращает уведомление только в области указанного получателя.
+
+        Args:
+            notification_id: Идентификатор уведомления.
+            recipient_id: Идентификатор получателя.
+
+        Returns:
+            Уведомление или None.
+        """
         return await self.repository.get_by_id(
             notification_id=notification_id,
             recipient_id=recipient_id,
         )
 
     async def count_unread(self, *, recipient_id: UUID) -> int:
+        """Возвращает количество непрочитанных уведомлений пользователя.
+
+        Args:
+            recipient_id: Идентификатор получателя.
+
+        Returns:
+            Количество уведомлений.
+        """
         return await self.repository.count_unread(
             recipient_id=recipient_id,
         )
@@ -85,6 +117,16 @@ class NotificationService:
         recipient_id: UUID,
         read_at: datetime | None = None,
     ) -> bool:
+        """Помечает уведомление прочитанным в области указанного получателя.
+
+        Args:
+            notification_id: Идентификатор уведомления.
+            recipient_id: Идентификатор получателя.
+            read_at: Время прочтения или None.
+
+        Returns:
+            True, если уведомление найдено и обновлено.
+        """
         return await self.repository.mark_as_read(
             notification_id=notification_id,
             recipient_id=recipient_id,
