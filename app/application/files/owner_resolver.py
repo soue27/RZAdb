@@ -6,7 +6,14 @@ from app.application.files.owners import FileOwner
 
 
 class FileOwnerResolver:
+    """Определяет единственного доменного владельца файла по существующим FK-связям.
+"""
     def __init__(self, repository: FileOwnerRepository) -> None:
+        """Сохраняет репозиторий для поиска ссылок на файл.
+
+    Args:
+        repository: Репозиторий владельцев файлов.
+    """
         self.repository = repository
 
     async def resolve(self, file_id: UUID) -> FileOwner | None:
