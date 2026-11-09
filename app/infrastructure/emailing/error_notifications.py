@@ -33,6 +33,8 @@ class ErrorEmailConfigurationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class _Notification:
+    """Минимальные безопасные данные события ошибки, передаваемые в очередь уведомлений.
+    """
     timestamp: str
     level: str
     component: str
@@ -41,6 +43,15 @@ class _Notification:
 
 
 def _validate_address(value: str | None, setting_name: str) -> None:
+    """Проверяет синтаксис email-адреса для настройки уведомлений.
+
+    Args:
+        value: Проверяемый адрес.
+        setting_name: Имя настройки для диагностического сообщения.
+
+    Raises:
+        ErrorEmailConfigurationError: Если адрес отсутствует или некорректен.
+    """
     if not value or len(value) > 254 or value != value.strip():
         raise ErrorEmailConfigurationError(
             f"{setting_name} должен содержать корректный email-адрес."
@@ -110,6 +121,14 @@ class ErrorEmailNotificationHandler(logging.Handler):
         queue_size: int = ERROR_EMAIL_QUEUE_SIZE,
         clock=time.monotonic,
     ) -> None:
+        """Создаёт обработчик с ограниченной очередью и отдельным рабочим потоком.
+
+        Args:
+            recipient: Адрес получателя уведомлений.
+            sender: SMTP-адаптер.
+            queue_size: Максимальный размер очереди.
+            clock: Монотонные часы для контроля cooldown.
+        """
         super().__init__(level=logging.ERROR)
         if queue_size < 1:
             raise ValueError("queue_size must be positive")
@@ -132,22 +151,32 @@ class ErrorEmailNotificationHandler(logging.Handler):
 
     @property
     def dropped_notifications(self) -> int:
+        """Возвращает количество уведомлений, отброшенных из-за переполнения очереди.
+        """
         with self.lock:
             return self._dropped_notifications
 
     @property
     def delivery_failures(self) -> int:
+        """Возвращает количество неудачных попыток SMTP-доставки.
+        """
         with self.lock:
             return self._delivery_failures
 
     @property
     def pending_notifications(self) -> int:
+        """Возвращает текущее количество уведомлений в очереди.
+        """
         return self._queue.qsize()
 
     def start(self) -> None:
+        """Запускает фоновый поток и асинхронный worker доставки.
+        """
         self._thread.start()
 
     def _thread_main(self) -> None:
+        """Создаёт event loop рабочего потока и запускает worker уведомлений.
+        """
         try:
             asyncio.run(self._run_worker())
         except Exception as exc:
@@ -159,6 +188,10 @@ class ErrorEmailNotificationHandler(logging.Handler):
             )
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Принимает ERROR/CRITICAL запись и помещает безопасную сводку в ограниченную очередь.
+
+        Не выполняет сетевых операций и не блокирует вызывающий поток ожиданием SMTP.
+        """
         if record.levelno not in (logging.ERROR, logging.CRITICAL):
             return
         if record.name.startswith(_INTERNAL_LOGGER_PREFIX) or self._stopping.is_set():
@@ -191,6 +224,14 @@ class ErrorEmailNotificationHandler(logging.Handler):
         self,
         record: logging.LogRecord,
     ) -> tuple[_Notification, bytes]:
+        """Формирует безопасную сводку ошибки и fingerprint для подавления повторов.
+
+        Args:
+            record: Запись стандартного logging.
+
+        Returns:
+            Пара из уведомления и fingerprint-данных для контроля повторов.
+        """
         exception_type = None
         if record.exc_info and record.exc_info[0] is not None:
             exception_type = self._sanitize_field(record.exc_info[0].__name__)
@@ -231,12 +272,25 @@ class ErrorEmailNotificationHandler(logging.Handler):
 
     @staticmethod
     def _sanitize_field(value: str) -> str:
+        """Удаляет управляющие символы и ограничивает длину поля письма.
+
+        Args:
+            value: Исходное значение.
+
+        Returns:
+            Безопасный однострочный текст.
+        """
         return "".join(
             character if character.isprintable() else " "
             for character in value
         )
 
     def _expire_fingerprints(self, now: float) -> None:
+        """Удаляет истёкшие fingerprint из окна подавления повторных уведомлений.
+
+        Args:
+            now: Текущее монотонное время.
+        """
         while self._fingerprints:
             _, accepted_at = next(iter(self._fingerprints.items()))
             if now - accepted_at < ERROR_EMAIL_COOLDOWN_SECONDS:
@@ -244,6 +298,8 @@ class ErrorEmailNotificationHandler(logging.Handler):
             self._fingerprints.popitem(last=False)
 
     async def _run_worker(self) -> None:
+        """Последовательно отправляет уведомления из очереди через SMTP.
+        """
         while True:
             if self._stopping.is_set():
                 deadline = self._shutdown_deadline
@@ -278,6 +334,14 @@ class ErrorEmailNotificationHandler(logging.Handler):
 
     @staticmethod
     def _format_email(notification: _Notification) -> tuple[str, str]:
+        """Формирует тему и текст письма по безопасной сводке ошибки.
+
+        Args:
+            notification: Данные уведомления.
+
+        Returns:
+            Тема и текст письма.
+        """
         subject = f"[RZAdb] {notification.level} error notification"
         fields = [
             f"Timestamp UTC: {notification.timestamp}",
@@ -291,6 +355,8 @@ class ErrorEmailNotificationHandler(logging.Handler):
         return subject, "RZAdb error notification\n\n" + "\n".join(fields) + "\n"
 
     def _discard_pending(self) -> None:
+        """Удаляет оставшиеся в очереди уведомления при завершении worker.
+        """
         while True:
             try:
                 self._queue.get_nowait()
@@ -302,6 +368,8 @@ class ErrorEmailNotificationHandler(logging.Handler):
                     self._dropped_notifications += 1
 
     async def stop(self) -> None:
+        """Останавливает worker, ожидает завершения ограниченное время и освобождает ресурсы.
+        """
         with self.lock:
             self._shutdown_deadline = (
                 self._clock() + ERROR_EMAIL_SHUTDOWN_TIMEOUT_SECONDS
