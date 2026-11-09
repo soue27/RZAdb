@@ -1,3 +1,5 @@
+"""dependencies: зависимости и DTO presentation-слоя."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -16,7 +18,11 @@ PASSWORD_CHANGE_REQUIRED_DETAIL = (
 
 
 class PasswordChangeRequired(HTTPException):
+    """HTTP 403, используемый для ограничения доступа до обязательной смены временного пароля.
+    """
     def __init__(self) -> None:
+        """Создаёт HTTP 403 с единым сообщением о необходимости сменить временный пароль.
+        """
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=PASSWORD_CHANGE_REQUIRED_DETAIL,
@@ -27,6 +33,22 @@ async def get_current_user(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> User:
+    """Получает активного пользователя из сессии и привязывает его ID к request context.
+
+    Разрешает доступ к маршруту смены пароля, если для пользователя установлено
+    must_change_password; остальные маршруты блокируются.
+
+    Args:
+        request: HTTP-запрос с сессионными данными.
+        session: Асинхронная SQLAlchemy-сессия.
+
+    Returns:
+        Активная учётная запись пользователя.
+
+    Raises:
+        HTTPException: Если сессия недействительна или пользователь неактивен.
+        PasswordChangeRequired: Если пользователь должен сменить временный пароль.
+    """
     user_id = request.session.get("user_id")
 
     if user_id is None:
@@ -63,6 +85,17 @@ async def get_current_user(
 async def require_non_specialist(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
+    """Запрещает доступ пользователям с ролью SPECIALIST.
+
+    Args:
+        current_user: Пользователь, полученный через get_current_user.
+
+    Returns:
+        Текущий пользователь, если его роль не SPECIALIST.
+
+    Raises:
+        HTTPException: Если текущая роль — SPECIALIST.
+    """
     if current_user.role is UserRole.SPECIALIST:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
