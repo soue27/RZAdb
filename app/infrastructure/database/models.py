@@ -1,3 +1,5 @@
+"""Импорт ORM-моделей для регистрации в metadata и работы Alembic."""
+
 from app.domain.archive_event import ArchiveEvent
 from app.domain.connection import Connection
 from app.domain.enterprise import Enterprise
