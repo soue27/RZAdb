@@ -1,3 +1,5 @@
+"""Защищённые маршруты загрузки, просмотра и скачивания файлов."""
+
 import logging
 from typing import Annotated
 from urllib.parse import quote
@@ -36,6 +38,8 @@ async def upload_file(
     file_service: Annotated[FileService, Depends(get_file_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> FileResponse:
+    """Принимает файл, проверяет его размер и тип, сохраняет бинарное содержимое и метаданные.
+    """
     try:
         content = await read_upload_content(file)
 
@@ -135,6 +139,8 @@ async def view_file(
     ],
     file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> Response:
+    """Возвращает содержимое файла для просмотра после проверки доступа через владельца.
+    """
     return await _get_file_response(
         file_id=file_id,
         current_user=current_user,
@@ -154,6 +160,8 @@ async def download_file(
     ],
     file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> Response:
+    """Возвращает файл как вложение после проверки доступа через его доменного владельца.
+    """
     return await _get_file_response(
         file_id=file_id,
         current_user=current_user,
