@@ -2,9 +2,8 @@ from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel
+
 from app.domain.enums import DocumentStatus
-
-
 class RZAInstructionDetails(BaseModel):
     """Сводные данные инструкции РЗА подстанции и выбранной версии.
     """
