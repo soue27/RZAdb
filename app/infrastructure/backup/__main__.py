@@ -13,6 +13,14 @@ from app.infrastructure.backup.run_lock import BackupAlreadyRunning, BackupRunLo
 
 
 async def run() -> int:
+    """Выполняет один CLI-запуск резервного копирования PostgreSQL.
+
+    Получает настройки, захватывает общий lock и запускает BackupCoordinator.
+    Возвращает код завершения, соответствующий итоговому статусу каналов.
+
+    Returns:
+        0 при полном успехе, 2 при частичном успехе, 1 при ошибке или занятом lock.
+    """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     settings = get_settings()
     try:
@@ -30,6 +38,11 @@ async def run() -> int:
 
 
 def main() -> int:
+    """Точка входа CLI: запускает асинхронный сценарий резервного копирования.
+
+    Returns:
+        Код завершения, возвращённый run().
+    """
     return asyncio.run(run())
 
 
