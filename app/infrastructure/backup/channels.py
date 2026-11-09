@@ -25,7 +25,7 @@ _CHUNK_SIZE = 1024 * 1024
 
 
 class ChannelConfigurationError(ValueError):
-    """An enabled backup channel is missing required configuration."""
+    """Включённый канал резервного копирования не имеет обязательных настроек."""
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ class ChannelResult:
 
 
 class LocalBackupChannel:
-    """Atomically publish a validated dump and retain successful local pairs."""
+    """Атомарно публикует проверенный дамп и сохраняет заданное число успешных локальных копий."""
 
     def __init__(self, settings: Settings) -> None:
         """Сохраняет каталог локальных копий и лимит хранения.
@@ -198,6 +198,11 @@ class YandexDiskBackupChannel:
         self.retention_count = settings.backup_yandex_disk_retention_count
 
     def validate(self) -> None:
+        """Проверяет обязательные настройки Яндекс Диска.
+
+        Raises:
+            ChannelConfigurationError: Если включённый канал не настроен.
+        """
         if self.token is None or not self.token.get_secret_value():
             raise ChannelConfigurationError(
                 "BACKUP_YANDEX_DISK_TOKEN is not configured"
