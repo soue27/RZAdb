@@ -57,7 +57,7 @@ class TaskRepository:
         return await self.session.get(Task, task_id)
 
     async def refresh_for_mutation(self, task: Task) -> Task:
-        """Reload task state after its owner row has been locked."""
+        """Обновляет состояние задачи после блокировки строки её владельца."""
         await self.session.refresh(task)
         return task
 
@@ -106,7 +106,16 @@ class TaskRepository:
         self,
         user_id: UUID,
     ) -> list[Task]:
-        """Возвращает активные задачи инженера для email-сводки."""
+        """Возвращает активные задачи инженера для email-сводки.
+
+        Учитываются задачи в статусах ASSIGNED, IN_PROGRESS и UNDER_REVIEW.
+
+        Args:
+            user_id: Идентификатор инженера.
+
+        Returns:
+            Задачи с загруженными основными связями, отсортированные по сроку выполнения.
+        """
         statuses = (
             TaskStatus.ASSIGNED,
             TaskStatus.IN_PROGRESS,
@@ -139,7 +148,17 @@ class TaskRepository:
         self,
         enterprise_id: UUID,
     ) -> list[Task]:
-        """Возвращает активные задачи предприятия для email-сводки руководителя."""
+        """Возвращает активные задачи предприятия для email-сводки руководителя.
+
+        В выборку попадают задачи, связанные с УРЗА предприятия или непосредственно
+        с его подстанциями.
+
+        Args:
+            enterprise_id: Идентификатор предприятия.
+
+        Returns:
+            Задачи в рабочих статусах с загруженными основными связями.
+        """
         statuses = (
             TaskStatus.ASSIGNED,
             TaskStatus.IN_PROGRESS,
