@@ -1,3 +1,5 @@
+"""Маршруты просмотра и согласования версий формуляра ОТД."""
+
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -94,6 +96,8 @@ async def get_otd_form(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     task_id: UUID | None = None,
 ):
+    """Отображает формуляр ОТД устройства с текущей и историческими версиями.
+    """
     await _ensure_urza_access(object_service, current_user, urza_id)
     otd = await otd_service.get_by_urza(current_user.id, urza_id)
     if task_id is not None:
@@ -139,6 +143,8 @@ async def save_otd_version(
     urza_scheme_designation: Annotated[str | None, Form()] = None,
     task_id: Annotated[UUID | None, Form()] = None,
 ):
+    """Создаёт первую или следующую версию формуляра ОТД.
+    """
     await _ensure_urza_access(object_service, current_user, urza_id)
     form_values = {
         "effective_date": effective_date.isoformat(),
@@ -251,6 +257,8 @@ async def submit_otd_version(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     service: Annotated[OTDService, Depends(get_otd_service)],
 ):
+    """Отправляет версию ОТД на согласование.
+    """
     return await _transition(request, user, object_service, service, urza_id, version_id, "submit")
 
 
@@ -263,6 +271,8 @@ async def approve_otd_version(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     service: Annotated[OTDService, Depends(get_otd_service)],
 ):
+    """Утверждает версию ОТД от имени руководителя.
+    """
     return await _transition(request, user, object_service, service, urza_id, version_id, "approve")
 
 
@@ -275,4 +285,6 @@ async def return_otd_version(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     service: Annotated[OTDService, Depends(get_otd_service)],
 ):
+    """Возвращает версию ОТД на доработку.
+    """
     return await _transition(request, user, object_service, service, urza_id, version_id, "return")
