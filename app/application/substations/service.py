@@ -14,6 +14,11 @@ class SubstationService:
     """Бизнес-логика работы с подстанциями."""
 
     def __init__(self, repository: SubstationRepository) -> None:
+        """Сохраняет репозиторий подстанций.
+
+        Args:
+            repository: Репозиторий для чтения и сохранения подстанций.
+        """
         self.repository = repository
 
 
@@ -23,6 +28,19 @@ class SubstationService:
         actor_id: UUID,
         data: SubstationUpdate,
     ) -> SubstationDetails:
+        """Обновляет основные сведения существующей активной подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+            actor_id: Идентификатор пользователя, выполнившего изменение.
+            data: Проверенные новые значения полей.
+
+        Returns:
+            Обновлённые сведения о подстанции.
+
+        Raises:
+            ObjectNotFoundError: Если подстанция отсутствует или архивирована.
+        """
         substation = await self.repository.get_by_id(substation_id)
         if substation is None or substation.deleted_at is not None:
             raise ObjectNotFoundError
@@ -39,6 +57,19 @@ class SubstationService:
     async def get_details(
         self, substation_id: UUID, *, include_archived: bool = False
     ) -> SubstationDetails:
+        """Возвращает сведения о подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+            include_archived: Разрешает получить сведения об архивной записи.
+
+        Returns:
+            DTO с основными сведениями и техническими характеристиками.
+
+        Raises:
+            ObjectNotFoundError: Если подстанция не найдена или архивирована,
+                а include_archived не установлен.
+        """
         substation = await self.repository.get_by_id(substation_id)
 
         if substation is None or (substation.deleted_at is not None and not include_archived):
@@ -62,6 +93,16 @@ class SubstationService:
             actor_id: UUID,
             data: SubstationCreate,
     ) -> SubstationDetails:
+        """Создаёт подстанцию в указанном предприятии.
+
+        Args:
+            enterprise_id: Идентификатор предприятия-владельца.
+            actor_id: Идентификатор пользователя, создающего запись.
+            data: Проверенные поля новой подстанции.
+
+        Returns:
+            DTO созданной подстанции.
+        """
         substation = Substation(
             enterprise_id=enterprise_id,
             created_by=actor_id,
