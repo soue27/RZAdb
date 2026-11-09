@@ -1,3 +1,5 @@
+"""Маршруты предварительной проверки и подтверждения импорта оборудования РЗА."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
@@ -55,6 +57,8 @@ async def preview_equipment_import(
     ],
     file: Annotated[UploadFile, File()],
 ):
+    """Проверяет загруженный XLSX оборудования и отображает план импорта без записи в БД.
+    """
     await _check_import_access(current_user)
 
     content = await read_upload_content(file)
@@ -82,6 +86,8 @@ async def confirm_equipment_import(
     ],
     file: Annotated[UploadFile, File()],
 ):
+    """Повторно проверяет XLSX и подтверждает импорт оборудования РЗА.
+    """
     await _check_import_access(current_user)
 
     content = await read_upload_content(file)
