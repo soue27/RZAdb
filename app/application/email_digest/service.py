@@ -41,6 +41,14 @@ class EmailDigestService:
         formatter: EmailDigestFormatter,
         sender: SMTPEmailSender,
     ) -> None:
+        """Сохраняет репозитории, форматтер и SMTP-отправитель.
+
+        Args:
+            user_repository: Репозиторий получателей сводки.
+            task_repository: Репозиторий задач для персональных выборок.
+            formatter: Форматтер текстовых и HTML-сводок.
+            sender: SMTP-адаптер отправки писем.
+        """
         self.user_repository = user_repository
         self.task_repository = task_repository
         self.formatter = formatter
