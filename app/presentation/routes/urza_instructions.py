@@ -1,3 +1,5 @@
+"""Маршруты управления версиями инструкций устройств РЗА."""
+
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -191,6 +193,8 @@ async def get_urza_instruction(
     instruction_version: UUID | None = Query(default=None),
     archived: bool = Query(default=False),
 ):
+    """Отображает текущую инструкцию УРЗА и историю её версий.
+    """
     await _ensure_access(
         object_service,
         current_user,
@@ -220,6 +224,8 @@ async def get_new_instruction_form(
         Depends(get_object_service),
     ],
 ):
+    """Отображает форму создания инструкции УРЗА.
+    """
     await _ensure_access(
         object_service,
         current_user,
@@ -261,6 +267,8 @@ async def get_new_instruction_version_form(
         Depends(get_urza_instruction_service),
     ],
 ):
+    """Отображает форму создания новой версии инструкции УРЗА.
+    """
     await _ensure_access(
         object_service,
         current_user,
@@ -355,6 +363,8 @@ async def create_instruction(
         FastAPIFile(),
     ] = None,
 ):
+    """Создаёт инструкцию УРЗА и сохраняет связанные файлы.
+    """
     await _ensure_access(
         object_service,
         current_user,
@@ -473,6 +483,8 @@ async def create_instruction_version(
         FastAPIFile(),
     ] = None,
 ):
+    """Создаёт новую рабочую версию инструкции УРЗА.
+    """
     await _ensure_access(
         object_service,
         current_user,
@@ -615,6 +627,8 @@ async def submit_instruction(
         Depends(get_task_service),
     ],
 ):
+    """Отправляет версию инструкции УРЗА на согласование.
+    """
     return await _transition(
         request,
         urza_id,
@@ -643,6 +657,8 @@ async def approve_instruction(
         Depends(get_task_service),
     ],
 ):
+    """Утверждает версию инструкции УРЗА.
+    """
     return await _transition(
         request,
         urza_id,
@@ -671,6 +687,8 @@ async def return_instruction(
         Depends(get_task_service),
     ],
 ):
+    """Возвращает версию инструкции УРЗА на доработку.
+    """
     return await _transition(
         request,
         urza_id,
