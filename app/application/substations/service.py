@@ -17,8 +17,7 @@ class SubstationService:
         """Сохраняет репозиторий подстанций.
 
         Args:
-        repository: Репозиторий для чтения и сохранения подстанций.
-
+            repository: Репозиторий для чтения и сохранения подстанций.
         """
         self.repository = repository
 
@@ -32,16 +31,15 @@ class SubstationService:
         """Обновляет основные сведения существующей активной подстанции.
 
         Args:
-        substation_id: Идентификатор подстанции.
-        actor_id: Идентификатор пользователя, выполнившего изменение.
-        data: Проверенные новые значения полей.
+            substation_id: Идентификатор подстанции.
+            actor_id: Идентификатор пользователя, выполнившего изменение.
+            data: Проверенные новые значения полей.
 
         Returns:
-        Обновлённые сведения о подстанции.
+            Обновлённые сведения о подстанции.
 
         Raises:
-        ObjectNotFoundError: Если подстанция отсутствует или архивирована.
-
+            ObjectNotFoundError: Если подстанция отсутствует или архивирована.
         """
         substation = await self.repository.get_by_id(substation_id)
         if substation is None or substation.deleted_at is not None:
@@ -62,16 +60,15 @@ class SubstationService:
         """Возвращает сведения о подстанции.
 
         Args:
-        substation_id: Идентификатор подстанции.
-        include_archived: Разрешает получить сведения об архивной записи.
+            substation_id: Идентификатор подстанции.
+            include_archived: Разрешает получить сведения об архивной записи.
 
         Returns:
-        DTO с основными сведениями и техническими характеристиками.
+            DTO с основными сведениями и техническими характеристиками.
 
         Raises:
-        ObjectNotFoundError: Если подстанция не найдена или архивирована,
-            а include_archived не установлен.
-
+            ObjectNotFoundError: Если подстанция не найдена или архивирована,
+                а include_archived не установлен.
         """
         substation = await self.repository.get_by_id(substation_id)
 
@@ -99,13 +96,12 @@ class SubstationService:
         """Создаёт подстанцию в указанном предприятии.
 
         Args:
-        enterprise_id: Идентификатор предприятия-владельца.
-        actor_id: Идентификатор пользователя, создающего запись.
-        data: Проверенные поля новой подстанции.
+            enterprise_id: Идентификатор предприятия-владельца.
+            actor_id: Идентификатор пользователя, создающего запись.
+            data: Проверенные поля новой подстанции.
 
         Returns:
-        DTO созданной подстанции.
-
+            DTO созданной подстанции.
         """
         substation = Substation(
             enterprise_id=enterprise_id,
