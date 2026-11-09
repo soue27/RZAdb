@@ -132,6 +132,11 @@ class EmailBackupChannel:
     """Отправляет проверенный дамп вложением на настроенный email-адрес.
     """
     def __init__(self, settings: Settings) -> None:
+        """Сохраняет настройки SMTP и отправителя резервных копий.
+
+        Args:
+            settings: Настройки приложения.
+        """
         self.settings = settings
         self.recipient = settings.backup_email_to
         self.sender: SMTPEmailSender | None = None
@@ -192,6 +197,11 @@ class YandexDiskBackupChannel:
     """Загружает дампы на Яндекс Диск и выполняет ротацию удалённых копий.
     """
     def __init__(self, settings: Settings) -> None:
+        """Сохраняет настройки доступа к Яндекс Диску и ротации копий.
+
+        Args:
+            settings: Настройки приложения.
+        """
         self.settings = settings
         self.token = settings.backup_yandex_disk_token
         self.folder = settings.backup_yandex_disk_folder.rstrip("/")
