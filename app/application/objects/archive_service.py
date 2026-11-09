@@ -20,6 +20,8 @@ _ALLOWED_ROLES = {UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.MANAGER}
 
 @dataclass(frozen=True)
 class ArchiveBlocker:
+    """Описывает незавершённую задачу или осмотр, препятствующие архивированию.
+    """
     process_type: Literal["task", "inspection"]
     process_id: UUID
     status: TaskStatus
@@ -27,6 +29,8 @@ class ArchiveBlocker:
 
 @dataclass(frozen=True)
 class ArchivePreview:
+    """Результат предварительной проверки архивирования: целевые объекты и блокирующие процессы.
+    """
     object_type: ArchiveObjectType
     object_id: UUID
     object_ids: tuple[tuple[ArchiveObjectType, UUID], ...]
@@ -34,7 +38,18 @@ class ArchivePreview:
 
 
 class ArchiveBlockedError(ValueError):
+    """Архивирование невозможно из-за незавершённых задач или процессов осмотра.
+    """
     def __init__(self, blockers: tuple[ArchiveBlocker, ...]) -> None:
+        """Сохраняет репозиторий архива и сервис доступа.
+
+        Проверяет, что репозиторий архива и репозитории AccessService используют
+        одну SQLAlchemy-сессию, чтобы блокировки и проверки выполнялись в одной транзакции.
+
+        Args:
+            repository: Репозиторий архивируемых объектов и событий.
+            access_service: Централизованный сервис проверки доступа.
+        """
         self.blockers = blockers
         super().__init__("Архивирование невозможно: есть незавершённые процессы.")
 
@@ -72,6 +87,23 @@ class ArchiveService:
         object_type: ArchiveObjectType,
         object_id: UUID,
     ) -> ArchivePreview:
+        """Проверяет возможность архивирования и возвращает состав каскада.
+
+        Проверяет права пользователя, блокирует цепочку владельцев и собирает
+        незавершённые процессы, которые могут запретить операцию.
+
+        Args:
+            actor_id: Идентификатор пользователя.
+            object_type: Тип целевого объекта.
+            object_id: Идентификатор объекта.
+
+        Returns:
+            Состав объектов каскада и список блокирующих процессов.
+
+        Raises:
+            ObjectNotFoundError: Если объект не найден.
+            ObjectAccessDeniedError: Если пользователь не имеет права архивирования.
+        """
         await self._ensure_access(actor_id, object_type, object_id)
         target = await self._get_object(object_type, object_id)
         if target.deleted_at is not None:
@@ -94,6 +126,26 @@ class ArchiveService:
         reason: str,
         occurred_at: datetime | None = None,
     ) -> ArchivePreview:
+        """Архивирует объект и его активных потомков, записывая отдельное событие для каждого.
+
+        Операция выполняется в одной транзакции. При наличии блокирующих процессов
+        архивирование не выполняется.
+
+        Args:
+            actor_id: Идентификатор пользователя.
+            object_type: Тип целевого объекта.
+            object_id: Идентификатор объекта.
+            reason: Обязательная причина архивирования.
+            occurred_at: Необязательное время события.
+
+        Returns:
+            Предварительная структура каскада после успешного архивирования.
+
+        Raises:
+            ArchiveBlockedError: Если существуют незавершённые процессы.
+            ObjectNotFoundError: Если объект не найден.
+            ObjectAccessDeniedError: Если нет прав на архивирование.
+        """
         normalized_reason = reason.strip() if reason is not None else ""
         if not normalized_reason:
             raise ValueError("Укажите причину архивирования.")
@@ -148,6 +200,18 @@ class ArchiveService:
         reason: str | None = None,
         occurred_at: datetime | None = None,
     ) -> ArchiveEvent | None:
+        """Восстанавливает объект и допустимые связанные записи, создавая события истории.
+
+        Args:
+            actor_id: Идентификатор пользователя.
+            object_type: Тип объекта.
+            object_id: Идентификатор объекта.
+            reason: Необязательная причина восстановления.
+            occurred_at: Необязательное время события.
+
+        Returns:
+            Событие восстановления или None, если объект не требовал восстановления.
+        """
         normalized_reason = reason.strip() if reason is not None else None
         if normalized_reason is not None and len(normalized_reason) > 2000:
             raise ValueError(
@@ -182,6 +246,16 @@ class ArchiveService:
         object_type: ArchiveObjectType,
         object_id: UUID,
     ) -> list[ArchiveEvent]:
+        """Возвращает историю архивирования объекта после проверки доступа.
+
+        Args:
+            actor_id: Идентификатор пользователя.
+            object_type: Тип объекта.
+            object_id: Идентификатор объекта.
+
+        Returns:
+            События архивирования и восстановления в хронологическом порядке.
+        """
         await self._ensure_access(actor_id, object_type, object_id)
         await self._get_object(object_type, object_id)
         return await self.repository.get_history(object_type, object_id)
@@ -192,6 +266,8 @@ class ArchiveService:
         object_type: ArchiveObjectType,
         object_id: UUID,
     ) -> None:
+        """Проверяет роль и область доступа пользователя к архивируемому объекту.
+        """
         actor = await self.access_service.user_repository.get_by_id(actor_id)
         if actor is None or actor.role not in _ALLOWED_ROLES:
             raise ObjectAccessDeniedError
@@ -204,12 +280,16 @@ class ArchiveService:
             raise ObjectAccessDeniedError
 
     async def _get_object(self, object_type: ArchiveObjectType, object_id: UUID):
+        """Находит объект и выбрасывает исключение, если он отсутствует.
+        """
         item = await self.repository.get_object(object_type, object_id)
         if item is None:
             raise ObjectNotFoundError
         return item
 
     async def _lock_archive_chain(self, object_type: ArchiveObjectType, target):
+        """Блокирует целевой объект и всех его родителей в установленном порядке.
+        """
         if object_type == "substation":
             substation = await self.repository.lock_object("substation", target.id)
             if substation is None:
@@ -246,6 +326,8 @@ class ArchiveService:
         return locked
 
     async def _locked_cascade(self, object_type: ArchiveObjectType, target):
+        """Получает каскад потомков после блокировки цепочки владельцев.
+        """
         if object_type == "urza":
             return [("urza", target)]
         if object_type == "connection":
@@ -278,6 +360,8 @@ class ArchiveService:
         )
 
     async def _cascade_objects(self, object_type: ArchiveObjectType, target):
+        """Строит список объектов, которые должны архивироваться или восстанавливаться вместе с целью.
+        """
         if object_type == "urza":
             return [("urza", target)] if target.deleted_at is None else []
         if object_type == "connection":
@@ -296,6 +380,8 @@ class ArchiveService:
         )
 
     async def _blockers(self, object_type: ArchiveObjectType, target, objects):
+        """Определяет незавершённые процессы, блокирующие архивирование каскада.
+        """
         urza_ids = [item.id for kind, item in objects if kind == "urza"]
         rows = await self.repository.get_blocking_processes(
             substation_id=(target.id if object_type == "substation" else None),
@@ -306,6 +392,8 @@ class ArchiveService:
 
     @staticmethod
     def _ensure_parents_active(object_type: ArchiveObjectType, locked) -> None:
+        """Проверяет, что все родители объекта активны перед восстановлением.
+        """
         if object_type == "substation":
             return
         substation = next(item for kind, item in locked if kind == "substation")
