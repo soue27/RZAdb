@@ -18,6 +18,11 @@ from app.infrastructure.database.mixins import (
 
 
 class SelectivityScheme(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Объединяет версии схемы селективности подстанции.
+
+    Для одной подстанции предусмотрена одна запись схемы;
+    документы и их изменения хранятся в SelectivitySchemeVersion.
+    """
     __tablename__ = "selectivity_schemes"
 
     substation_id: Mapped[UUID] = mapped_column(
@@ -35,6 +40,11 @@ class SelectivitySchemeVersion(
     SoftDeleteMixin,
     Base,
 ):
+    """Хранит отдельную версию схемы селективности подстанции.
+
+    Содержит номер, наименование, дату начала действия,
+    сведения об изменениях, статус и файлы документа.
+    """
     __tablename__ = "selectivity_scheme_versions"
 
     selectivity_scheme_id: Mapped[UUID] = mapped_column(
