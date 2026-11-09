@@ -29,6 +29,15 @@ class TreeService:
         urza_repository: URZARepository,
         access_service: AccessService,
     ) -> None:
+        """Сохраняет репозитории и сервис проверки доступа.
+
+        Args:
+            enterprise_repository: Репозиторий организационной структуры.
+            substation_repository: Репозиторий подстанций.
+            connection_repository: Репозиторий присоединений.
+            urza_repository: Репозиторий устройств РЗА.
+            access_service: Централизованный сервис определения области доступа.
+        """
         self.enterprise_repository = enterprise_repository
         self.substation_repository = substation_repository
         self.connection_repository = connection_repository
