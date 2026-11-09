@@ -41,7 +41,7 @@ class TaskStatisticsService:
             user_id: Идентификатор пользователя.
 
         Returns:
-        Словарь агрегированных счётчиков по статусам и просроченным задачам.
+            Словарь агрегированных счётчиков по статусам и просроченным задачам.
         """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
