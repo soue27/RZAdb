@@ -1,3 +1,26 @@
+from datetime import datetime
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from app.application.objects.exceptions import (
+    ObjectAccessDeniedError,
+    ObjectNotFoundError,
+)
+from app.application.objects.service import ObjectService
+from app.application.tasks.service import TaskService
+from app.application.tree.service import TreeService
+from app.domain.enums import TaskWorkType
+from app.domain.user import User
+from app.presentation.auth.dependencies import get_current_user
+from app.presentation.dependencies.services import (
+    get_object_service,
+    get_task_service,
+    get_tree_service,
+)
 """Маршруты создания задач, непосредственно связанных с подстанциями."""
 
 from datetime import datetime
