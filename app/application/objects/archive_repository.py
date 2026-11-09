@@ -20,18 +20,49 @@ class ArchiveRepository:
     """Database queries used by archive application use cases."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def get_object(self, object_type: str, object_id: UUID):
+        """Возвращает модель объекта по типу и идентификатору.
+
+        Args:
+            object_type: Тип архивируемого объекта.
+            object_id: Идентификатор объекта.
+
+        Returns:
+            Найденная модель или None.
+        """
         model = self._model_for(object_type)
         return await self.session.get(model, object_id)
 
     async def lock_object(self, object_type: str, object_id: UUID):
+        """Блокирует строку объекта для безопасного архивирования или восстановления.
+
+        Args:
+            object_type: Тип объекта.
+            object_id: Идентификатор объекта.
+
+        Returns:
+            Заблокированная модель или None.
+        """
         return await lock_owner_row(
             self.session, self._model_for(object_type), object_id
         )
 
     async def get_active_connections(self, substation_id: UUID) -> list[Connection]:
+        """Возвращает активные присоединения подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Присоединения, отсортированные по идентификатору.
+        """
         result = await self.session.scalars(
             select(Connection)
             .where(
@@ -43,6 +74,14 @@ class ArchiveRepository:
         return list(result.all())
 
     async def get_active_urzas(self, connection_ids: list[UUID]) -> list[URZA]:
+        """Возвращает активные устройства выбранных присоединений.
+
+        Args:
+            connection_ids: Идентификаторы присоединений.
+
+        Returns:
+            Устройства РЗА; при пустом наборе возвращает пустой список.
+        """
         if not connection_ids:
             return []
         result = await self.session.scalars(
@@ -62,6 +101,16 @@ class ArchiveRepository:
         urza_ids: list[UUID] | None = None,
         include_inspections: bool = False,
     ) -> list[tuple[str, UUID, TaskStatus]]:
+        """Находит незавершённые задачи и процессы осмотра, блокирующие архивирование.
+
+        Args:
+            substation_id: Необязательный идентификатор подстанции.
+            urza_ids: Необязательные идентификаторы устройств.
+            include_inspections: Учитывать ли процессы осмотра подстанций.
+
+        Returns:
+            Список пар типа процесса, идентификатора и текущего статуса.
+        """
         predicates = []
         if substation_id is not None:
             predicates.append(Task.substation_id == substation_id)
@@ -95,6 +144,11 @@ class ArchiveRepository:
         return blockers
 
     async def add_events(self, events: list[ArchiveEvent]) -> None:
+        """Добавляет события архивирования/восстановления в текущую транзакцию.
+
+        Args:
+            events: События append-only истории.
+        """
         self.session.add_all(events)
         await self.session.flush()
 
@@ -103,6 +157,15 @@ class ArchiveRepository:
         object_type: str,
         object_id: UUID,
     ) -> list[ArchiveEvent]:
+        """Возвращает историю архивных событий указанного объекта.
+
+        Args:
+            object_type: Тип объекта.
+            object_id: Идентификатор объекта.
+
+        Returns:
+            События истории в хронологическом порядке.
+        """
         fk_column = {
             "substation": ArchiveEvent.substation_id,
             "connection": ArchiveEvent.connection_id,
@@ -118,6 +181,17 @@ class ArchiveRepository:
 
     @staticmethod
     def _model_for(object_type: str):
+        """Возвращает ORM-модель для поддерживаемого типа архивируемого объекта.
+
+        Args:
+            object_type: Строковый тип объекта.
+
+        Returns:
+            Класс ORM-модели.
+
+        Raises:
+            ValueError: Если тип объекта не поддерживается.
+        """
         return {
             "substation": Substation,
             "connection": Connection,
