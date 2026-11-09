@@ -30,6 +30,8 @@ class ChannelConfigurationError(ValueError):
 
 @dataclass(frozen=True)
 class ChannelResult:
+    """Результат работы одного канала резервного копирования и его ротации.
+    """
     status: str
     error: str | None = None
     path: str | None = None
@@ -37,6 +39,14 @@ class ChannelResult:
     retention_error: str | None = None
 
     def to_dict(self, *, enabled: bool = True) -> dict[str, Any]:
+        """Преобразует результат канала в сериализуемый словарь манифеста.
+
+        Args:
+            enabled: Был ли канал включён в конфигурации.
+
+        Returns:
+            Словарь статуса, ошибки, пути и результата ротации.
+        """
         return {
             "enabled": enabled,
             "status": self.status,
@@ -51,15 +61,31 @@ class LocalBackupChannel:
     """Atomically publish a validated dump and retain successful local pairs."""
 
     def __init__(self, settings: Settings) -> None:
+        """Сохраняет каталог локальных копий и лимит хранения.
+
+        Args:
+            settings: Настройки резервного копирования.
+        """
         self.backup_dir = settings.backup_local_dir
         self.retention_count = settings.backup_local_retention_count
 
     def publish(self, artifact: DumpArtifact, dump_name: str) -> Path:
+        """Атомарно перемещает проверенный временный дамп в локальный каталог копий.
+
+        Args:
+            artifact: Проверенный артефакт дампа.
+            dump_name: Имя итогового файла.
+
+        Returns:
+            Путь к опубликованному дампу.
+        """
         target = self.backup_dir / dump_name
         os.replace(artifact.path, target)
         return target
 
     def apply_retention(self) -> None:
+        """Удаляет старые успешные локальные пары дамп/манифест с учётом лимита хранения.
+        """
         successful: list[tuple[str, Path, Path]] = []
         for manifest_path in self.backup_dir.glob("rzadb_*.json"):
             try:
@@ -103,12 +129,19 @@ class LocalBackupChannel:
 
 
 class EmailBackupChannel:
+    """Отправляет проверенный дамп вложением на настроенный email-адрес.
+    """
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.recipient = settings.backup_email_to
         self.sender: SMTPEmailSender | None = None
 
     def validate(self) -> None:
+        """Проверяет обязательные настройки email-канала до начала резервирования.
+
+        Raises:
+            ChannelConfigurationError: Если включённый канал не настроен.
+        """
         if not self.recipient:
             raise ChannelConfigurationError("BACKUP_EMAIL_TO is not configured")
         if self.recipient.strip() != self.recipient or "@" not in self.recipient:
@@ -125,6 +158,15 @@ class EmailBackupChannel:
         sha256: str,
         dump_name: str,
     ) -> ChannelResult:
+        """Отправляет дамп как вложение письма.
+
+        Args:
+            dump_path: Путь к файлу дампа.
+            dump_name: Имя вложения.
+
+        Returns:
+            Результат отправки канала.
+        """
         if self.sender is None:
             self.validate()
         assert self.sender is not None
@@ -147,6 +189,8 @@ class EmailBackupChannel:
 
 
 class YandexDiskBackupChannel:
+    """Загружает дампы на Яндекс Диск и выполняет ротацию удалённых копий.
+    """
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.token = settings.backup_yandex_disk_token
@@ -164,6 +208,15 @@ class YandexDiskBackupChannel:
             )
 
     def upload(self, dump_path: Path, dump_name: str) -> ChannelResult:
+        """Загружает дамп на Яндекс Диск и применяет retention после подтверждения загрузки.
+
+        Args:
+            dump_path: Путь к дампу.
+            dump_name: Имя файла на диске.
+
+        Returns:
+            Результат загрузки и очистки старых копий.
+        """
         self.validate()
         assert self.token is not None
         headers = {"Authorization": f"OAuth {self.token.get_secret_value()}"}
@@ -212,6 +265,8 @@ class YandexDiskBackupChannel:
         )
 
     def _ensure_folder(self, client: httpx.Client, headers: dict[str, str]) -> None:
+        """Создаёт каталог резервных копий на Яндекс Диске, если его ещё нет.
+        """
         current = ""
         for segment in (item for item in self.folder.split("/") if item):
             current += f"/{segment}"
@@ -239,6 +294,8 @@ class YandexDiskBackupChannel:
         headers: dict[str, str],
         current_dump_name: str,
     ) -> None:
+        """Удаляет устаревшие резервные копии на Яндекс Диске после успешной загрузки.
+        """
         files = self._list_backup_files(client, headers)
         if not any(item["name"] == current_dump_name for item in files):
             files.append({"name": current_dump_name})
@@ -259,6 +316,8 @@ class YandexDiskBackupChannel:
         client: httpx.Client,
         headers: dict[str, str],
     ) -> list[dict[str, str]]:
+        """Получает список файлов резервных копий в удалённом каталоге.
+        """
         files: list[dict[str, str]] = []
         offset = 0
         while True:
@@ -290,5 +349,13 @@ class YandexDiskBackupChannel:
 
     @staticmethod
     def _file_chunks(dump_file):
+        """Последовательно читает файл блоками для потоковой загрузки.
+
+        Args:
+            dump_file: Открытый бинарный файл.
+
+        Yields:
+            Блоки бинарных данных фиксированного размера.
+        """
         while block := dump_file.read(_CHUNK_SIZE):
             yield block
