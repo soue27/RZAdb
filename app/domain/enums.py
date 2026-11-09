@@ -2,7 +2,7 @@ from enum import StrEnum
 
 
 class EnterpriseType(StrEnum):
-"""Определяет уровни организационной структуры предприятия."""
+    """Определяет уровни организационной структуры предприятия."""
 
     HOLDING = "holding"
     BRANCH = "branch"
@@ -10,7 +10,7 @@ class EnterpriseType(StrEnum):
 
 
 class HighestVoltage(StrEnum):
-"""Содержит допустимые классы высшего напряжения подстанции."""
+    """Содержит допустимые классы высшего напряжения подстанции."""
 
     KV_500 = "500"
     KV_220 = "220"
@@ -22,7 +22,7 @@ class HighestVoltage(StrEnum):
 
 
 class OperationalCurrentType(StrEnum):
-"""Определяет тип оперативного тока на подстанции."""
+    """Определяет тип оперативного тока на подстанции."""
 
     PERMANENT = "permanent"
     RECTIFIED = "rectified"
@@ -38,7 +38,7 @@ class OperationalCurrentType(StrEnum):
 
 
 class URZAStatus(StrEnum):
-"""Описывает эксплуатационное состояние устройства РЗА."""
+    """Описывает эксплуатационное состояние устройства РЗА."""
 
     IN_OPERATION = "in_operation"
     IN_REPAIR = "in_repair"
@@ -65,7 +65,7 @@ class URZAStatus(StrEnum):
 
 
 class ElementBase(StrEnum):
-"""Определяет элементную базу устройства РЗА."""
+    """Определяет элементную базу устройства РЗА."""
 
     ELECTROMECHANICAL = "electromechanical"
     MICROELECTRONIC = "microelectronic"
@@ -81,7 +81,7 @@ class ElementBase(StrEnum):
 
 
 class URZACategory(StrEnum):
-"""Задаёт категорию устройства РЗА."""
+    """Задаёт категорию устройства РЗА."""
 
     I = "I"
     II = "II"
@@ -94,7 +94,7 @@ class URZACategory(StrEnum):
 
 
 class RoomCategory(StrEnum):
-"""Задаёт категорию помещения, в котором установлено устройство."""
+    """Задаёт категорию помещения, в котором установлено устройство."""
 
     I = "I"
     II = "II"
@@ -106,7 +106,7 @@ class RoomCategory(StrEnum):
 
 
 class OTDPurpose(StrEnum):
-"""Определяет назначение устройства, указываемое в формуляре ОТД."""
+    """Определяет назначение устройства, указываемое в формуляре ОТД."""
 
     RZA = "rza"
     SA = "sa"
@@ -124,7 +124,7 @@ class OTDPurpose(StrEnum):
 
 
 class AccessCategory(StrEnum):
-"""Задаёт категорию допуска пользователя к работам."""
+    """Задаёт категорию допуска пользователя к работам."""
 
     I = "I"
     II = "II"
@@ -133,7 +133,7 @@ class AccessCategory(StrEnum):
 
 
 class UserRole(StrEnum):
-"""Определяет системную роль пользователя и его уровень полномочий."""
+    """Определяет системную роль пользователя и его уровень полномочий."""
 
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
@@ -143,7 +143,7 @@ class UserRole(StrEnum):
 
 
 class TaskWorkType(StrEnum):
-"""Определяет вид работы, для выполнения которой создана задача."""
+    """Определяет вид работы, для выполнения которой создана задача."""
 
     OTD = "otd"
     SETTINGS = "settings"
@@ -165,7 +165,7 @@ class TaskWorkType(StrEnum):
 
 
 class MaintenanceType(StrEnum):
-"""Содержит обозначения видов технического обслуживания РЗА."""
+    """Содержит обозначения видов технического обслуживания РЗА."""
 
     V = "В"
     K = "К"
@@ -180,7 +180,7 @@ class MaintenanceType(StrEnum):
 
 
 class TaskStatus(StrEnum):
-"""Определяет состояние рабочей задачи в её жизненном цикле."""
+    """Определяет состояние рабочей задачи в её жизненном цикле."""
 
     CREATED = "created"
     ASSIGNED = "assigned"
@@ -192,14 +192,14 @@ class TaskStatus(StrEnum):
 
 
 class ArchiveEventType(StrEnum):
-"""Определяет тип события в истории архивирования объектов."""
+    """Определяет тип события в истории архивирования объектов."""
 
     ARCHIVED = "archived"
     RESTORED = "restored"
 
 
 class DocumentStatus(StrEnum):
-"""Определяет состояние документа в процессе подготовки и согласования."""
+    """Определяет состояние документа в процессе подготовки и согласования."""
 
     DRAFT = "draft"
     UNDER_REVIEW = "under_review"
@@ -223,7 +223,7 @@ class DocumentStatus(StrEnum):
 
 
 class ProgramType(StrEnum):
-"""Определяет назначение программы работ для устройства РЗА."""
+    """Определяет назначение программы работ для устройства РЗА."""
 
     COMMISSIONING = "commissioning"
     DECOMMISSIONING = "decommissioning"
