@@ -16,7 +16,7 @@ _NAME_INDEX = "uq_connections_substation_dispatch_name"
 
 
 class ConnectionNameConflictError(ValueError):
-    """Raised when the dispatch name is already reserved in a substation."""
+    """Диспетчерское наименование уже занято в пределах подстанции."""
 
 
 class ConnectionService:
