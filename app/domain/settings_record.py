@@ -18,6 +18,12 @@ from app.infrastructure.database.mixins import (
 
 
 class SettingsRecord(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Представляет отдельное изменение уставки устройства РЗА.
+
+    Хранит дату изменения, наименование параметра, исходное
+    и новое значения, причину, статус и подписанный формуляр.
+    Может быть связано с задачей.
+    """
     __tablename__ = "settings_records"
     __table_args__ = (
         Index(
