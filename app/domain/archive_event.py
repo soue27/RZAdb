@@ -14,6 +14,12 @@ from app.infrastructure.database.mixins import UUIDMixin
 
 
 class ArchiveEvent(UUIDMixin, Base):
+    """Фиксирует событие архивирования или восстановления объекта.
+
+    Событие относится ровно к одной подстанции, присоединению
+    или устройству РЗА и содержит сведения об инициаторе,
+    времени, причине и общей операции архивирования.
+    """
     __tablename__ = "archive_events"
     __table_args__ = (
         CheckConstraint(
