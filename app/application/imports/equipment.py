@@ -8,10 +8,6 @@ from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
-from openpyxl.utils.exceptions import InvalidFileException
-
-from sqlalchemy import select
-
 from app.application.access.service import AccessService
 from app.application.connections.repository import ConnectionRepository
 from app.application.enterprises.repository import EnterpriseRepository
