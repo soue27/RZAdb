@@ -12,13 +12,28 @@ from app.domain.urza_instruction import (
 
 
 class URZAInstructionRepository:
+    """Выполняет запросы к инструкциям УРЗА, версиям и операциям публикации.
+    """
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def get_by_id(
         self,
         instruction_id: UUID,
     ) -> URZAInstruction | None:
+        """Находит активную инструкцию УРЗА по идентификатору.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Инструкция или None.
+        """
         return await self.session.scalar(
             select(URZAInstruction).where(
                 URZAInstruction.id == instruction_id,
@@ -30,6 +45,14 @@ class URZAInstructionRepository:
         self,
         urza_id: UUID,
     ) -> URZAInstruction | None:
+        """Находит активную инструкцию указанного УРЗА.
+
+        Args:
+            urza_id: Идентификатор устройства.
+
+        Returns:
+            Инструкция или None.
+        """
         query = select(URZAInstruction).where(
             URZAInstruction.urza_id == urza_id,
             URZAInstruction.deleted_at.is_(None),
@@ -40,6 +63,14 @@ class URZAInstructionRepository:
         self,
         version_id: UUID,
     ) -> URZAInstructionVersion | None:
+        """Находит активную версию инструкции УРЗА.
+
+        Args:
+            version_id: Идентификатор версии.
+
+        Returns:
+            Версия или None.
+        """
         query = select(URZAInstructionVersion).where(
             URZAInstructionVersion.id == version_id,
             URZAInstructionVersion.deleted_at.is_(None),
@@ -50,6 +81,14 @@ class URZAInstructionRepository:
         self,
         instruction: URZAInstruction,
     ) -> URZAInstruction:
+        """Добавляет инструкцию УРЗА и выполняет flush без commit.
+
+        Args:
+            instruction: Создаваемая инструкция.
+
+        Returns:
+            Добавленная модель инструкции.
+        """
         self.session.add(instruction)
         await self.session.flush()
         return instruction
@@ -58,6 +97,14 @@ class URZAInstructionRepository:
         self,
         version: URZAInstructionVersion,
     ) -> URZAInstructionVersion:
+        """Добавляет версию инструкции УРЗА и выполняет flush без commit.
+
+        Args:
+            version: Создаваемая версия.
+
+        Returns:
+            Добавленная версия.
+        """
         self.session.add(version)
         await self.session.flush()
         return version
@@ -66,6 +113,14 @@ class URZAInstructionRepository:
         self,
         version: URZAInstructionVersion,
     ) -> URZAInstructionVersion:
+        """Синхронизирует изменения версии инструкции с базой данных без commit.
+
+        Args:
+            version: Изменённая версия.
+
+        Returns:
+            Та же модель версии.
+        """
         self.session.add(version)
         await self.session.flush()
         return version
@@ -74,6 +129,14 @@ class URZAInstructionRepository:
             self,
             instruction_id: UUID,
     ) -> URZAInstructionVersion | None:
+        """Возвращает текущую опубликованную версию инструкции УРЗА.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Последняя утверждённая версия или None.
+        """
         query = (
             select(URZAInstructionVersion)
             .options(
@@ -96,6 +159,14 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> int | None:
+        """Возвращает максимальный номер версии инструкции.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Максимальный номер версии или None.
+        """
         query = select(func.max(URZAInstructionVersion.version_number)).where(
             URZAInstructionVersion.urza_instruction_id == instruction_id,
         )
@@ -105,6 +176,14 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> int | None:
+        """Возвращает максимальный номер опубликованной версии инструкции.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Максимальный опубликованный номер или None.
+        """
         query = select(func.max(URZAInstructionVersion.version_number)).where(
             URZAInstructionVersion.urza_instruction_id == instruction_id,
             URZAInstructionVersion.status == DocumentStatus.APPROVED,
@@ -115,6 +194,11 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> None:
+        """Блокирует инструкцию на время создания или нумерации новой версии.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+        """
         await self.session.scalar(
             select(URZAInstruction.id)
             .where(URZAInstruction.id == instruction_id)
@@ -125,6 +209,11 @@ class URZAInstructionRepository:
         self,
         version: URZAInstructionVersion,
     ) -> None:
+        """Блокирует и перечитывает версию перед изменением её статуса или номера.
+
+        Args:
+            version: Загруженная версия инструкции.
+        """
         await self.lock_instruction_for_versioning(
             version.urza_instruction_id,
         )
@@ -134,6 +223,14 @@ class URZAInstructionRepository:
         self,
         version: URZAInstructionVersion,
     ) -> int:
+        """Назначает версии следующий номер публикации с учётом текущих опубликованных версий.
+
+        Args:
+            version: Версия, которую требуется опубликовать.
+
+        Returns:
+            Назначенный номер публикации.
+        """
         instruction_id = version.urza_instruction_id
         await self.lock_instruction_for_versioning(instruction_id)
         published_max = await self.get_max_published_version_number(
@@ -159,6 +256,14 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> URZAInstructionVersion | None:
+        """Возвращает последнюю рабочую версию инструкции, не обязательно опубликованную.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Последняя рабочая версия или None.
+        """
         query = (
             select(URZAInstructionVersion)
             .options(selectinload(URZAInstructionVersion.creator))
@@ -175,6 +280,14 @@ class URZAInstructionRepository:
         self,
         instruction_id: UUID,
     ) -> list[URZAInstructionVersion]:
+        """Возвращает рабочие версии инструкции, доступные в процессе подготовки.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Список рабочих версий.
+        """
         query = (
             select(URZAInstructionVersion)
             .options(
@@ -201,6 +314,14 @@ class URZAInstructionRepository:
             self,
             instruction_id: UUID,
     ) -> list[URZAInstructionVersion]:
+        """Возвращает историю версий инструкции УРЗА.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Список версий в порядке, заданном репозиторием.
+        """
         query = (
             select(URZAInstructionVersion)
             .options(
@@ -224,6 +345,8 @@ class URZAInstructionRepository:
         return list(result.all())
 
     async def list_standalone_work_items(self) -> list[URZAInstructionVersion]:
+        """Возвращает версии инструкций УРЗА, не связанные с задачами, для рабочего списка.
+        """
         query = (
             select(URZAInstructionVersion)
             .options(
