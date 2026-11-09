@@ -9,6 +9,8 @@ from app.domain.maintenance import TORecord
 
 
 class TORecordRepository:
+    """Выполняет запросы к записям технического обслуживания УРЗА."""
+
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет асинхронную SQLAlchemy-сессию для работы с записями ТО.
 
