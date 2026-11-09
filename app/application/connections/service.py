@@ -26,8 +26,7 @@ class ConnectionService:
         """Сохраняет репозиторий присоединений.
 
         Args:
-        repository: Репозиторий для чтения и сохранения присоединений.
-
+            repository: Репозиторий для чтения и сохранения присоединений.
         """
         self.repository = repository
 
@@ -45,17 +44,16 @@ class ConnectionService:
         возникший при конкурентном создании, преобразуется в доменную ошибку.
 
         Args:
-        substation_id: Идентификатор подстанции-владельца.
-        actor_id: Идентификатор пользователя, создающего запись.
-        data: Проверенные поля присоединения.
+            substation_id: Идентификатор подстанции-владельца.
+            actor_id: Идентификатор пользователя, создающего запись.
+            data: Проверенные поля присоединения.
 
         Returns:
-        DTO созданного присоединения.
+            DTO созданного присоединения.
 
         Raises:
-        ObjectNotFoundError: Если подстанция отсутствует или архивирована.
-        ConnectionNameConflictError: Если имя уже занято.
-
+            ObjectNotFoundError: Если подстанция отсутствует или архивирована.
+            ConnectionNameConflictError: Если имя уже занято.
         """
         if not await self.repository.lock_active_substation(substation_id):
             raise ObjectNotFoundError
@@ -105,13 +103,12 @@ class ConnectionService:
         """Возвращает присоединение по идентификатору.
 
         Args:
-        connection_id: Идентификатор присоединения.
-        include_archived: Включать ли архивированную запись.
+            connection_id: Идентификатор присоединения.
+            include_archived: Включать ли архивированную запись.
 
         Returns:
-        DTO присоединения или None, если запись не найдена либо скрыта
-        из-за архивирования.
-
+            DTO присоединения или None, если запись не найдена либо скрыта
+            из-за архивирования.
         """
         connection = await self.repository.get_by_id(connection_id)
 
@@ -136,11 +133,10 @@ class ConnectionService:
         """Возвращает активные присоединения подстанции для списка.
 
         Args:
-        substation_id: Идентификатор подстанции.
+            substation_id: Идентификатор подстанции.
 
         Returns:
-        Краткие DTO присоединений, отсортированные репозиторием.
-
+            Краткие DTO присоединений, отсортированные репозиторием.
         """
         connections = await self.repository.get_by_substation_ids(
             {substation_id},
@@ -171,18 +167,17 @@ class ConnectionService:
         в ConnectionNameConflictError.
 
         Args:
-        connection_id: Идентификатор изменяемого присоединения.
-        actor_id: Идентификатор пользователя, выполняющего изменение.
-        data: Проверенные новые значения полей.
+            connection_id: Идентификатор изменяемого присоединения.
+            actor_id: Идентификатор пользователя, выполняющего изменение.
+            data: Проверенные новые значения полей.
 
         Returns:
-        DTO обновлённого присоединения.
+            DTO обновлённого присоединения.
 
         Raises:
-        ObjectNotFoundError: Если присоединение или его подстанция отсутствуют
-            либо архивированы.
-        ConnectionNameConflictError: Если имя уже используется в этой подстанции.
-
+            ObjectNotFoundError: Если присоединение или его подстанция отсутствуют
+                либо архивированы.
+            ConnectionNameConflictError: Если имя уже используется в этой подстанции.
         """
         connection = await self.repository.get_by_id(connection_id)
 
