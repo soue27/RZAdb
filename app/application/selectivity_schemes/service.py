@@ -17,15 +17,35 @@ from app.domain.selectivity_scheme import (
 
 
 class SelectivitySchemeService:
+    """Управляет схемой селективности подстанции, версиями и согласованием.
+    """
     def __init__(
         self,
         repository: SelectivitySchemeRepository,
         access_service: AccessService,
     ) -> None:
+        """Сохраняет репозиторий схем и сервис проверки доступа.
+
+        Args:
+            repository: Репозиторий схем селективности.
+            access_service: Централизованный сервис проверки доступа.
+        """
         self.repository = repository
         self.access_service = access_service
 
     async def _status_for_creator(self, user_id: UUID) -> DocumentStatus:
+        """Определяет начальный статус версии по роли автора.
+
+        Args:
+            user_id: Идентификатор пользователя.
+
+        Returns:
+            APPROVED для руководителя или DRAFT для разрешённых авторов.
+
+        Raises:
+            ValueError: Если пользователь отсутствует или неактивен.
+            PermissionError: Если роль не допускает создание схемы.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             raise ValueError("Пользователь не найден или неактивен.")
@@ -40,6 +60,15 @@ class SelectivitySchemeService:
         user_id: UUID,
         substation_id: UUID,
     ) -> SelectivityScheme | None:
+        """Возвращает схему селективности подстанции после проверки доступа.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Схема селективности или None.
+        """
         if not await self.access_service.can_access_substation(
             user_id,
             substation_id,
@@ -63,6 +92,23 @@ class SelectivitySchemeService:
         change_justification: str | None = None,
         task_id: UUID | None = None,
     ) -> SelectivityScheme:
+        """Создаёт схему селективности подстанции и её первую версию.
+
+        Args:
+            user_id: Идентификатор автора.
+            substation_id: Идентификатор подстанции.
+            number: Номер схемы.
+            name: Наименование схемы.
+            effective_date: Дата вступления версии в силу.
+            scan_file_id: Идентификатор обязательного скана.
+            editable_file_id: Необязательный редактируемый файл.
+            change_description: Описание изменений.
+            change_justification: Обоснование изменений.
+            task_id: Необязательная связанная задача.
+
+        Returns:
+            Созданная схема селективности.
+        """
         if not await self.access_service.can_modify_substation(
             user_id,
             substation_id,
@@ -112,6 +158,15 @@ class SelectivitySchemeService:
         user_id: UUID,
         substation_id: UUID,
     ) -> SelectivitySchemeVersion | None:
+        """Возвращает текущую версию схемы селективности подстанции.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Текущая версия или None.
+        """
         if not await self.access_service.can_access_substation(
             user_id,
             substation_id,
@@ -134,6 +189,15 @@ class SelectivitySchemeService:
         user_id: UUID,
         substation_id: UUID,
     ) -> list[SelectivitySchemeVersion]:
+        """Возвращает историю версий схемы селективности подстанции.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Список версий.
+        """
         if not await self.access_service.can_access_substation(
             user_id,
             substation_id,
@@ -164,6 +228,23 @@ class SelectivitySchemeService:
         change_justification: str | None = None,
         task_id: UUID | None = None,
     ) -> SelectivitySchemeVersion:
+        """Создаёт следующую версию существующей схемы селективности.
+
+        Args:
+            user_id: Идентификатор автора.
+            scheme_id: Идентификатор схемы.
+            number: Номер новой версии схемы.
+            name: Наименование схемы.
+            effective_date: Дата вступления версии в силу.
+            scan_file_id: Идентификатор обязательного скана.
+            editable_file_id: Необязательный редактируемый файл.
+            change_description: Описание изменений.
+            change_justification: Обоснование изменений.
+            task_id: Необязательная связанная задача.
+
+        Returns:
+            Созданная версия схемы.
+        """
         scheme = await self.repository.get_by_id(
             scheme_id,
         )
@@ -216,6 +297,15 @@ class SelectivitySchemeService:
         user_id: UUID,
         substation_id: UUID,
     ) -> SelectivitySchemeDetails | None:
+        """Возвращает сводные данные схемы селективности и текущей версии.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            DTO схемы или None.
+        """
         scheme = await self.get_by_substation(
             user_id=user_id,
             substation_id=substation_id,
@@ -265,6 +355,15 @@ class SelectivitySchemeService:
         user_id: UUID,
         substation_id: UUID,
     ) -> list[SelectivitySchemeVersionListItem]:
+        """Возвращает список версий схемы селективности для истории.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Список DTO версий.
+        """
         versions = await self.get_versions(
             user_id=user_id,
             substation_id=substation_id,
@@ -305,6 +404,8 @@ class SelectivitySchemeService:
     async def _get_accessible_version(
         self, user_id: UUID, substation_id: UUID, version_id: UUID
     ) -> SelectivitySchemeVersion:
+        """Находит версию и проверяет её принадлежность доступной схеме подстанции.
+        """
         version = await self.repository.get_version_by_id(version_id)
         if version is None or version.deleted_at is not None:
             raise ValueError("Версия схемы селективности не найдена.")
@@ -316,6 +417,8 @@ class SelectivitySchemeService:
         return version
 
     async def _check_reviewer(self, user_id: UUID, substation_id: UUID) -> None:
+        """Проверяет право руководителя согласовывать схему селективности подстанции.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         substation = await self.access_service.substation_repository.get_by_id(substation_id)
         if user is None or not user.active or user.deleted_at is not None:
@@ -332,6 +435,16 @@ class SelectivitySchemeService:
     async def submit_for_review(
         self, user_id: UUID, substation_id: UUID, version_id: UUID
     ) -> SelectivitySchemeVersion:
+        """Отправляет версию схемы селективности на согласование.
+
+        Args:
+            user_id: Идентификатор автора.
+            substation_id: Идентификатор подстанции.
+            version_id: Идентификатор версии.
+
+        Returns:
+            Версия в статусе UNDER_REVIEW.
+        """
         version = await self._get_accessible_version(user_id, substation_id, version_id)
         user = await self.access_service.user_repository.get_by_id(user_id)
         if version.status is not DocumentStatus.DRAFT:
@@ -349,6 +462,17 @@ class SelectivitySchemeService:
     async def review(
         self, user_id: UUID, substation_id: UUID, version_id: UUID, *, approve: bool
     ) -> SelectivitySchemeVersion:
+        """Принимает решение по версии схемы: утверждает её или возвращает на доработку.
+
+        Args:
+            user_id: Идентификатор руководителя.
+            substation_id: Идентификатор подстанции.
+            version_id: Идентификатор версии.
+            approve: True для утверждения, False для возврата в черновик.
+
+        Returns:
+            Обновлённая версия схемы.
+        """
         version = await self._get_accessible_version(user_id, substation_id, version_id)
         if version.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Решение доступно только для версии на согласовании.")
@@ -360,6 +484,15 @@ class SelectivitySchemeService:
     async def get_available_actions(
         self, user_id: UUID, version: SelectivitySchemeVersion
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для версии схемы селективности.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            version: Проверяемая версия.
+
+        Returns:
+            Множество кодов действий.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return set()
