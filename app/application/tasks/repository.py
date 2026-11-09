@@ -25,20 +25,20 @@ class TaskRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет асинхронную SQLAlchemy-сессию для работы с задачами.
 
-    Args:
-        session: Сессия текущей транзакции.
-    """
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def create(self, task: Task) -> Task:
         """Добавляет задачу, выполняет flush и обновляет её серверные поля.
 
-    Args:
-        task: Создаваемая задача.
+        Args:
+            task: Создаваемая задача.
 
-    Returns:
-    Сохранённая модель задачи. Транзакция остаётся открытой.
-    """
+        Returns:
+        Сохранённая модель задачи. Транзакция остаётся открытой.
+        """
         # Репозиторий только сохраняет сущность; бизнес-правила находятся в сервисе.
         self.session.add(task)
         await self.session.flush()
@@ -48,12 +48,12 @@ class TaskRepository:
     async def get_by_id(self, task_id: UUID) -> Task | None:
         """Находит задачу по идентификатору без фильтрации по архивному статусу.
 
-    Args:
-        task_id: Идентификатор задачи.
+        Args:
+            task_id: Идентификатор задачи.
 
-    Returns:
-    Задача или None.
-    """
+        Returns:
+        Задача или None.
+        """
         return await self.session.get(Task, task_id)
 
     async def refresh_for_mutation(self, task: Task) -> Task:
@@ -64,12 +64,12 @@ class TaskRepository:
     async def get_active_by_id(self, task_id: UUID) -> Task | None:
         """Находит неархивированную задачу и загружает связанные объекты и пользователей.
 
-    Args:
-        task_id: Идентификатор задачи.
+        Args:
+            task_id: Идентификатор задачи.
 
-    Returns:
-    Задача с загруженными связями или None.
-    """
+        Returns:
+        Задача с загруженными связями или None.
+        """
         result = await self.session.execute(
             select(Task)
             .options(
@@ -85,9 +85,9 @@ class TaskRepository:
     async def list_active(self) -> list[Task]:
         """Возвращает все неархивированные задачи с основными связанными объектами.
 
-    Returns:
-    Список задач в порядке убывания даты создания.
-    """
+        Returns:
+        Список задач в порядке убывания даты создания.
+        """
         result = await self.session.execute(
             select(Task)
             .options(
@@ -209,18 +209,18 @@ class TaskRepository:
     ) -> tuple[dict[TaskStatus, int], int]:
         """Подсчитывает задачи по статусам и количество просроченных задач для панели.
 
-    Область выборки ограничивается предприятиями и дополнительно зависит
-    от роли и идентификатора пользователя.
+        Область выборки ограничивается предприятиями и дополнительно зависит
+        от роли и идентификатора пользователя.
 
-    Args:
-        user_id: Идентификатор пользователя.
-        role: Роль пользователя.
-        enterprise_ids: Доступные идентификаторы предприятий.
-        now: Момент времени для определения просрочки.
+        Args:
+            user_id: Идентификатор пользователя.
+            role: Роль пользователя.
+            enterprise_ids: Доступные идентификаторы предприятий.
+            now: Момент времени для определения просрочки.
 
-    Returns:
-    Пара из словаря количества задач по статусам и числа просроченных задач.
-    """
+        Returns:
+        Пара из словаря количества задач по статусам и числа просроченных задач.
+        """
         if not enterprise_ids:
             return {}, 0
 
@@ -288,12 +288,12 @@ class TaskRepository:
     async def get_history(self, task_id: UUID) -> list[TaskHistory]:
         """Возвращает историю задачи вместе с пользователями — участниками событий.
 
-    Args:
-        task_id: Идентификатор задачи.
+        Args:
+            task_id: Идентификатор задачи.
 
-    Returns:
-    События истории в обратном хронологическом порядке.
-    """
+        Returns:
+        События истории в обратном хронологическом порядке.
+        """
         result = await self.session.execute(
             select(TaskHistory)
             .options(
@@ -310,12 +310,12 @@ class TaskRepository:
     async def list_reviewed_task_ids(self, actor_id: UUID) -> set[UUID]:
         """Возвращает идентификаторы задач, по которым пользователь принимал решение проверки.
 
-    Args:
-        actor_id: Идентификатор проверяющего.
+        Args:
+            actor_id: Идентификатор проверяющего.
 
-    Returns:
-    Множество идентификаторов задач с событиями одобрения или возврата.
-    """
+        Returns:
+        Множество идентификаторов задач с событиями одобрения или возврата.
+        """
         result = await self.session.scalars(
             select(TaskHistory.task_id)
             .where(
@@ -332,14 +332,14 @@ class TaskRepository:
     async def save(self, task: Task) -> Task:
         """Синхронизирует изменения задачи с базой данных и обновляет серверные поля.
 
-    Commit не выполняется: фиксация транзакции остаётся за внешним уровнем.
+        Commit не выполняется: фиксация транзакции остаётся за внешним уровнем.
 
-    Args:
-        task: Изменённая модель задачи.
+        Args:
+            task: Изменённая модель задачи.
 
-    Returns:
-    Та же модель задачи.
-    """
+        Returns:
+        Та же модель задачи.
+        """
         # flush фиксирует изменения в текущей транзакции, но commit остаётся за сервисом.
         await self.session.flush()
         await self.session.refresh(task)
@@ -412,12 +412,12 @@ class TaskRepository:
     ) -> RZAInstructionVersion | None:
         """Находит активную версию инструкции РЗА, связанную с задачей.
 
-    Args:
-        task_id: Идентификатор задачи.
+        Args:
+            task_id: Идентификатор задачи.
 
-    Returns:
-    Версия инструкции или None.
-    """
+        Returns:
+        Версия инструкции или None.
+        """
         result = await self.session.execute(
             select(RZAInstructionVersion).where(
                 RZAInstructionVersion.task_id == task_id,
@@ -431,12 +431,12 @@ class TaskRepository:
     ) -> SelectivitySchemeVersion | None:
         """Находит активную версию схемы селективности, связанную с задачей.
 
-    Args:
-        task_id: Идентификатор задачи.
+        Args:
+            task_id: Идентификатор задачи.
 
-    Returns:
-    Версия схемы селективности или None.
-    """
+        Returns:
+        Версия схемы селективности или None.
+        """
         result = await self.session.execute(
             select(SelectivitySchemeVersion).where(
                 SelectivitySchemeVersion.task_id == task_id,
