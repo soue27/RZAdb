@@ -16,12 +16,6 @@ from app.domain.enums import (
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.user import User
-    DocumentStatus,
-    MaintenanceType,
-    TaskStatus,
-    TaskWorkType,
-    UserRole,
-)
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.user import User

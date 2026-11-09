@@ -22,14 +22,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-    Date,
-    Enum,
-    ForeignKey,
-    Integer,
-    SmallInteger,
-    String,
-    UniqueConstraint,
-)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enums import OTDPurpose, DocumentStatus

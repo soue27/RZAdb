@@ -15,10 +15,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-    SoftDeleteMixin,
-    TimestampMixin,
-    UUIDMixin,
-)
 
 
 class SelectivityScheme(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):

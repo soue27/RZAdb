@@ -14,11 +14,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-    SoftDeleteMixin,
-    TimestampMixin,
-    UUIDMixin,
-)
-
 
 class Task(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Представляет рабочую задачу по обслуживанию или документации.
