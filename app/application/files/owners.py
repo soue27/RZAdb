@@ -4,6 +4,8 @@ from uuid import UUID
 
 
 class FileOwnerType(StrEnum):
+    """Тип доменной записи, которая непосредственно ссылается на файл.
+"""
     SETTINGS_RECORD = "settings_record"
     SCHEMA_RECORD = "schema_record"
     TO_RECORD = "to_record"
@@ -15,12 +17,16 @@ class FileOwnerType(StrEnum):
 
 
 class FileAccessTargetType(StrEnum):
+    """Тип объекта, по которому проверяется область доступа к файлу.
+"""
     URZA = "urza"
     SUBSTATION = "substation"
 
 
 @dataclass(frozen=True)
 class FileOwner:
+    """Связь между файлом, доменной записью-владельцем и объектом проверки доступа.
+"""
     owner_type: FileOwnerType
     owner_id: UUID
     access_target_type: FileAccessTargetType
