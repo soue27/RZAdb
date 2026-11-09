@@ -4,6 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.domain.enums import DocumentStatus
+
+
 class SelectivitySchemeDetails(BaseModel):
     """Сводные данные схемы селективности и выбранной версии для отображения.
     """

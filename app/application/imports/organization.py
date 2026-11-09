@@ -9,7 +9,6 @@ from app.application.enterprises.repository import EnterpriseRepository
 from app.domain.enterprise import Enterprise
 from app.domain.enums import EnterpriseType
 
-
 MAX_FILE_SIZE = 5 * 1024 * 1024
 MAX_DATA_ROWS = 500
 MAX_UNCOMPRESSED_SIZE = 30 * 1024 * 1024

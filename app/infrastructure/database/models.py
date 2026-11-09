@@ -21,31 +21,9 @@ from app.domain.task_notification import TaskNotification
 from app.domain.urza import URZA
 from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
 from app.domain.user import User
+
 """Импорт ORM-моделей для регистрации в metadata и работы Alembic."""
 
-from app.domain.archive_event import ArchiveEvent
-from app.domain.connection import Connection
-from app.domain.enterprise import Enterprise
-from app.domain.file import File
-from app.domain.inspection import Inspection
-from app.domain.inspection_history import InspectionHistory
-from app.domain.inspection_task import InspectionTask
-from app.domain.maintenance import TORecord
-from app.domain.maintenance_period_rule import MaintenancePeriodRule
-from app.domain.otd import OTD, OTDVersion
-from app.domain.program import Program
-from app.domain.rza_instruction import RZAInstruction, RZAInstructionVersion
-from app.domain.rza_settings import SettingsForm
-from app.domain.schema import SchemaForm, SchemaRecord
-from app.domain.selectivity_scheme import SelectivityScheme, SelectivitySchemeVersion
-from app.domain.settings_record import SettingsRecord
-from app.domain.substation import Substation
-from app.domain.task import Task
-from app.domain.task_history import TaskHistory
-from app.domain.urza import URZA
-from app.domain.urza_instruction import URZAInstruction, URZAInstructionVersion
-from app.domain.user import User
-from app.domain.task_notification import TaskNotification
 
 __all__ = [
     "OTD",
@@ -72,8 +50,8 @@ __all__ = [
     "TORecord",
     "Task",
     "TaskHistory",
+    "TaskNotification",
     "URZAInstruction",
     "URZAInstructionVersion",
     "User",
-    "TaskNotification",
 ]

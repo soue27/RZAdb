@@ -82,92 +82,11 @@ from app.infrastructure.database.session import get_session
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
+
 """services: зависимости и DTO presentation-слоя."""
 
-from pathlib import Path
-from typing import Annotated
 
-from fastapi import Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.access.service import AccessService
-from app.application.auth.password import PasswordService
-from app.application.auth.service import AuthService
-from app.application.connections.repository import ConnectionRepository
-from app.application.connections.service import ConnectionService
-from app.application.enterprises.repository import EnterpriseRepository
-from app.application.enterprises.service import EnterpriseService
-from app.application.files.access_service import FileAccessService
-from app.application.files.owner_repository import FileOwnerRepository
-from app.application.files.owner_resolver import FileOwnerResolver
-from app.application.files.repository import FileRepository
-from app.application.files.service import FileService
-from app.application.files.physical_deletion import PhysicalDeletionService
-from app.application.inspections.inspection_repository import InspectionRepository
-from app.application.inspections.inspection_service import InspectionService
-from app.application.inspections.repository import InspectionTaskRepository
-from app.application.inspections.service import InspectionTaskService
-from app.application.maintenance.repository import TORecordRepository
-from app.application.maintenance.service import TORecordService
-from app.application.document_templates.service import DocumentTemplateService
-from app.application.objects.archive_repository import ArchiveRepository
-from app.application.objects.archive_service import ArchiveService
-from app.application.objects.resolver import ObjectResolver
-from app.application.objects.service import ObjectService
-from app.application.otd.repository import OTDRepository
-from app.application.otd.service import OTDService
-from app.application.passport_protocol.service import PassportProtocolService
-from app.application.programs.repository import ProgramRepository
-from app.application.programs.service import ProgramService
-from app.application.rza_instructions.repository import RZAInstructionRepository
-from app.application.rza_instructions.service import RZAInstructionService
-from app.application.schema.repository import SchemaRepository
-from app.application.schema.service import SchemaService
-from app.application.selectivity_schemes.repository import (
-    SelectivitySchemeRepository,
-)
-from app.application.selectivity_schemes.service import (
-    SelectivitySchemeService,
-)
-from app.application.settings.repository import SettingsRepository
-from app.application.settings.service import SettingsService
-from app.application.substations.repository import SubstationRepository
-from app.application.substations.service import SubstationService
-from app.application.tasks.repository import TaskRepository
-from app.application.tasks.service import TaskService
-from app.application.tasks.statistics import TaskStatisticsService
-from app.application.tree.service import TreeService
-from app.application.urza_instructions.repository import (
-    URZAInstructionRepository,
-)
-from app.application.urza_instructions.service import URZAInstructionService
-from app.application.urzas.repository import URZARepository
-from app.application.urzas.service import URZAService
-from app.application.users.repository import UserRepository
-from app.application.users.service import UserService
-from app.application.work_items.service import (
-    InspectionTaskWorkItemSource,
-    InstructionWorkItemSource,
-    MaintenanceWorkItemSource,
-    OTDWorkItemSource,
-    ProgramWorkItemSource,
-    RZAInstructionWorkItemSource,
-    SchemaWorkItemSource,
-    SelectivitySchemeWorkItemSource,
-    SettingsWorkItemSource,
-    TaskWorkItemSource,
-    WorkItemService,
-)
-from app.infrastructure.database.session import get_session
-from app.infrastructure.storage.base import ObjectStorage
-from app.infrastructure.storage.local import LocalObjectStorage
-from app.application.notifications.repository import TaskNotificationRepository
-from app.application.notifications.service import NotificationService
-from app.application.feedback.service import FeedbackService
-from app.core.config import get_settings
-from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
-from app.application.imports.equipment import EquipmentImportService
-from app.application.imports.organization import OrganizationImportService
 
 
 def get_object_storage() -> ObjectStorage:

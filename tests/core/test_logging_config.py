@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 import pytest
 import uvicorn
@@ -11,7 +11,6 @@ from app.core.request_context import (
     reset_request_context,
     set_request_context,
 )
-
 
 _LOGGER_NAMES = ("app", "uvicorn", "uvicorn.error", "uvicorn.access")
 _HANDLER_MARKER = "_rzadb_json_stdout_handler"

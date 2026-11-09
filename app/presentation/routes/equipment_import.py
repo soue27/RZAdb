@@ -9,19 +9,11 @@ from app.domain.user import User
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import get_equipment_import_service
 from app.presentation.file_uploads import read_upload_content
+
 """Маршруты предварительной проверки и подтверждения импорта оборудования РЗА."""
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.templating import Jinja2Templates
 
-from app.application.imports.equipment import EquipmentImportService
-from app.domain.enums import UserRole
-from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import get_equipment_import_service
-from app.presentation.file_uploads import read_upload_content
 
 
 router = APIRouter(prefix="/equipment-import", tags=["equipment-import"])

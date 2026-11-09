@@ -5,10 +5,9 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
+import app.presentation.app as app_module
 from app.core.config import Settings
 from app.infrastructure.emailing.error_notifications import ErrorEmailConfigurationError
-
-import app.presentation.app as app_module
 from app.presentation.app import app, create_app
 
 

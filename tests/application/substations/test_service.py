@@ -4,8 +4,12 @@ import pytest
 from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
+from app.application.substations.schemas import (
+    SubstationCreate,
+    SubstationDetails,
+    SubstationUpdate,
+)
 from app.application.substations.service import SubstationService
-from app.application.substations.schemas import SubstationCreate, SubstationUpdate, SubstationDetails
 from app.domain.enums import HighestVoltage, OperationalCurrentType
 from app.domain.substation import Substation
 

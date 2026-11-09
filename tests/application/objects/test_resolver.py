@@ -1,8 +1,6 @@
+
 import pytest
 from uuid6 import uuid7
-
-from types import SimpleNamespace
-from app.application.enterprises.repository import EnterpriseRepository
 
 from app.application.objects.resolver import ObjectResolver
 from app.domain.connection import Connection

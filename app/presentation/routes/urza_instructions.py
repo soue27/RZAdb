@@ -1,9 +1,9 @@
 """Маршруты управления версиями инструкций устройств РЗА."""
 
+import logging
 from datetime import date
 from typing import Annotated
 from uuid import UUID
-import logging
 
 from fastapi import (
     APIRouter,
@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -37,8 +38,6 @@ from app.presentation.dependencies.services import (
     get_urza_instruction_service,
 )
 from app.presentation.file_uploads import read_upload_content
-from app.application.files.validation import FileUploadValidationError
-
 
 logger = logging.getLogger(__name__)
 

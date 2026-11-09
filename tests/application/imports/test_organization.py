@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from io import BytesIO
-from uuid6 import uuid7
 
 import pytest
 from openpyxl import Workbook
+from uuid6 import uuid7
 
 from app.application.imports.organization import (
     HEADERS,

@@ -12,7 +12,6 @@ from app.application.users.repository import UserRepository
 from app.domain.enums import UserRole
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 
-
 logger = logging.getLogger(__name__)
 
 EKATERINBURG_TZ = ZoneInfo("Asia/Yekaterinburg")

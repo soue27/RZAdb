@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from app.core.config import Settings
 from app.core.request_context import get_request_context
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
+
 logger = logging.getLogger(__name__)
 
 ERROR_EMAIL_COOLDOWN_SECONDS = 300.0

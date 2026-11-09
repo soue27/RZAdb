@@ -4,6 +4,8 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.application.notifications.repository import TaskNotificationRepository
+from app.application.notifications.service import NotificationService
 from app.application.programs.repository import ProgramRepository
 from app.application.programs.service import ProgramService
 from app.application.tasks.repository import TaskRepository
@@ -34,9 +36,6 @@ from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
 from app.domain.user import User
-
-from app.application.notifications.repository import TaskNotificationRepository
-from app.application.notifications.service import NotificationService
 
 
 @pytest.mark.asyncio

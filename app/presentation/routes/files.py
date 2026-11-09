@@ -23,33 +23,11 @@ from app.presentation.dependencies.services import (
 )
 from app.presentation.file_uploads import read_upload_content
 from app.presentation.schemas.files import FileResponse
+
 """Защищённые маршруты загрузки, просмотра и скачивания файлов."""
 
-import logging
-from typing import Annotated
-from urllib.parse import quote
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
-from fastapi import File as FastAPIFile
-from fastapi.responses import Response
 
-from app.application.files.access_service import FileAccessService
-from app.application.files.exceptions import AmbiguousFileOwnershipError
-from app.application.files.service import FileService
-from app.application.objects.exceptions import (
-    ObjectAccessDeniedError,
-    ObjectNotFoundError,
-)
-from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import (
-    get_file_access_service,
-    get_file_service,
-)
-from app.presentation.schemas.files import FileResponse
-from app.application.files.validation import FileUploadValidationError
-from app.presentation.file_uploads import read_upload_content
 
 router = APIRouter(prefix="/files", tags=["files"])
 logger = logging.getLogger(__name__)

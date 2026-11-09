@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -40,7 +41,6 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
-from app.application.files.validation import FileUploadValidationError
 
 router = APIRouter(prefix="/objects/substation", tags=["substation documents"])
 templates = Jinja2Templates(directory="app/presentation/templates")

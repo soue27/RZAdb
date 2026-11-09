@@ -1,12 +1,12 @@
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from io import BytesIO
 from types import SimpleNamespace
-from uuid6 import uuid7
 
 import pytest
 from openpyxl import Workbook
 from openpyxl.comments import Comment
+from uuid6 import uuid7
 
 from app.application.imports import equipment as equipment_module
 from app.application.imports.equipment import (
@@ -15,13 +15,8 @@ from app.application.imports.equipment import (
     EquipmentImportService,
 )
 from app.domain.enums import (
-    ElementBase,
     EnterpriseType,
     HighestVoltage,
-    OperationalCurrentType,
-    RoomCategory,
-    URZACategory,
-    URZAStatus,
     UserRole,
 )
 

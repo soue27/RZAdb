@@ -5,19 +5,29 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi import File as FastAPIFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 
-from app.application.files.service import FileService
 from app.application.document_templates.service import (
     DocumentFormType,
     DocumentTemplateError,
     DocumentTemplateService,
 )
 from app.application.files.physical_deletion import PhysicalDeletionService
+from app.application.files.service import FileService
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -42,7 +52,6 @@ from app.presentation.dependencies.services import (
 )
 from app.presentation.file_uploads import read_upload_content
 from app.presentation.responses import TemporaryFileResponse
-from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/objects", tags=["schemes"])

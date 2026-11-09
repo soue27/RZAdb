@@ -4,8 +4,8 @@ import logging
 import re
 from pathlib import Path
 from typing import Annotated
-from uuid import UUID
 from urllib.parse import quote
+from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -62,6 +62,9 @@ from app.domain.enums import (
     UserRole,
 )
 from app.domain.user import User
+from app.infrastructure.passport_protocol.zip_exporter import (
+    PassportProtocolZipExporter,
+)
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
@@ -77,9 +80,6 @@ from app.presentation.dependencies.services import (
     get_task_service,
     get_tree_service,
     get_urza_service,
-)
-from app.infrastructure.passport_protocol.zip_exporter import (
-    PassportProtocolZipExporter,
 )
 
 router = APIRouter(

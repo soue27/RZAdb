@@ -7,13 +7,16 @@ import pytest
 from pydantic import SecretStr
 
 from app.core.config import Settings
-from app.infrastructure.backup.channels import ChannelResult
+from app.infrastructure.backup.channels import ChannelResult, LocalBackupChannel
 from app.infrastructure.backup.coordinator import (
     BackupCoordinator,
     BackupManifestError,
 )
-from app.infrastructure.backup.dump import DumpArtifact, DumpCreationError, PostgresDumpService
-from app.infrastructure.backup.channels import LocalBackupChannel
+from app.infrastructure.backup.dump import (
+    DumpArtifact,
+    DumpCreationError,
+    PostgresDumpService,
+)
 
 
 def make_settings(tmp_path: Path, **overrides) -> Settings:

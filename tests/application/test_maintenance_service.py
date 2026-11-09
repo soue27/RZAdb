@@ -3,11 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-from docx import Document
 import pytest
+from docx import Document
 from uuid6 import uuid7
 
-from app.application.maintenance.service import TORecordService
 from app.application.document_templates.service import (
     DocumentFormHierarchy,
     DocumentFormType,
@@ -15,6 +14,7 @@ from app.application.document_templates.service import (
     DocumentTemplateService,
     DocxProcessor,
 )
+from app.application.maintenance.service import TORecordService
 from app.application.tree.schemas import (
     ConnectionTreeNode,
     EnterpriseTreeAncestor,

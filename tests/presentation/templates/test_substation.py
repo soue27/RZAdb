@@ -117,7 +117,7 @@ def test_substation_document_forms_support_upload_and_preserve_text_values():
     assert 'value="С-110"' in html
     assert 'value="Схема"' in html
     assert 'name="task_id"' in html
-    assert f"hx-target=\"#substation-tab-content\"" in html
+    assert "hx-target=\"#substation-tab-content\"" in html
 
 
 def test_substation_instruction_actions_and_task_button_are_gated():

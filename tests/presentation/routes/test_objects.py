@@ -5,29 +5,29 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.connections.service import ConnectionNameConflictError
-from app.application.files.validation import FileUploadValidationError
-from sqlalchemy.exc import IntegrityError
 from app.application.enterprises.schemas import EnterpriseDetails
+from app.application.files.access_service import FileAccessService
+from app.application.files.owners import FileAccessTargetType, FileOwner, FileOwnerType
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
 )
 from app.application.objects.schemas import SelectedObject
 from app.application.objects.service import ObjectService
-from app.application.files.access_service import FileAccessService
-from app.application.files.owners import FileAccessTargetType, FileOwner, FileOwnerType
-from app.application.rza_instructions.service import RZAInstructionService
-from app.application.selectivity_schemes.service import SelectivitySchemeService
 from app.application.programs.service import ProgramService
+from app.application.rza_instructions.service import RZAInstructionService
 from app.application.schema.service import SchemaService
+from app.application.selectivity_schemes.service import SelectivitySchemeService
 from app.application.settings.service import SettingsService
-from app.application.urza_instructions.service import URZAInstructionService
 from app.application.substations.schemas import SubstationDetails
 from app.application.tree.service import TreeService
+from app.application.urza_instructions.service import URZAInstructionService
 from app.application.urzas.service import URZANameConflictError
 from app.domain.enums import (
     AccessCategory,
@@ -47,27 +47,27 @@ from app.domain.user import User
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
-    get_connection_service,
     get_access_service,
+    get_connection_service,
     get_enterprise_service,
-    get_file_service,
     get_file_access_service,
+    get_file_service,
     get_inspection_service,
-    get_inspection_task_service,
     get_inspection_task_repository,
-    get_object_service,
-    get_physical_deletion_service,
+    get_inspection_task_service,
     get_maintenance_service,
+    get_object_service,
     get_otd_service,
     get_passport_protocol_service,
+    get_physical_deletion_service,
     get_program_service,
     get_rza_instruction_service,
     get_schema_service,
     get_selectivity_scheme_service,
     get_settings_service,
     get_substation_service,
-    get_task_service,
     get_task_repository,
+    get_task_service,
     get_tree_service,
     get_urza_instruction_service,
     get_urza_service,

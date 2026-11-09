@@ -1,13 +1,9 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.exc import MultipleResultsFound
-from uuid6 import uuid7, UUID
-
-from app.application.tasks.repository import TaskRepository
-from app.domain.task_history import TaskHistory
-
-from datetime import UTC, datetime
+from uuid6 import uuid7
 
 from app.application.tasks.repository import TaskRepository
 from app.domain.connection import Connection
@@ -22,12 +18,15 @@ from app.domain.enums import (
     TaskStatus,
     TaskWorkType,
     URZACategory,
-    URZAStatus, UserRole,
+    URZAStatus,
+    UserRole,
 )
 from app.domain.substation import Substation
 from app.domain.task import Task
-from app.domain.user import User
+from app.domain.task_history import TaskHistory
 from app.domain.urza import URZA
+from app.domain.user import User
+
 
 @pytest.mark.asyncio
 async def test_get_schema_record_by_task_id_returns_active_record_only() -> None:

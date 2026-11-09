@@ -6,13 +6,15 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
-    File as FastAPIFile,
     Form,
     HTTPException,
     Query,
     Request,
     UploadFile,
     status,
+)
+from fastapi import (
+    File as FastAPIFile,
 )
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -49,61 +51,11 @@ from app.presentation.dependencies.services import (
 )
 from app.presentation.file_uploads import read_upload_content
 from app.presentation.responses import TemporaryFileResponse
+
 """Маршруты просмотра, создания, изменения и согласования записей технического обслуживания."""
 
-import logging
-from datetime import date
-from typing import Annotated
-from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    Form,
-    HTTPException,
-    Query,
-    Request,
-    UploadFile,
-    status,
-)
-from fastapi import (
-    File as FastAPIFile,
-)
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
-from app.application.files.service import FileService
-from app.application.document_templates.service import (
-    DocumentTemplateService,
-    DocumentFormType,
-    DocumentTemplateError,
-)
-from app.domain.file import File
-from app.application.maintenance.service import TORecordService
-from app.application.objects.exceptions import (
-    ObjectAccessDeniedError,
-    ObjectNotFoundError,
-)
-from app.application.objects.service import ObjectService
-from app.application.tasks.service import TaskService
-from app.application.tree.service import TreeService
-from app.domain.enums import MaintenanceType, UserRole
-from app.domain.user import User
-from app.presentation.auth.dependencies import (
-    get_current_user,
-    require_non_specialist,
-)
-from app.presentation.dependencies.services import (
-    get_document_form_service,
-    get_file_service,
-    get_maintenance_service,
-    get_object_service,
-    get_task_service,
-    get_tree_service,
-)
-from app.presentation.file_uploads import read_upload_content
-from app.presentation.responses import TemporaryFileResponse
-from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(

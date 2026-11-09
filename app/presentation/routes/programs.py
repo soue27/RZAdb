@@ -4,12 +4,22 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi import File as FastAPIFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.application.files.service import FileService
+from app.application.files.validation import FileUploadValidationError
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
     ObjectNotFoundError,
@@ -29,7 +39,6 @@ from app.presentation.dependencies.services import (
     get_tree_service,
 )
 from app.presentation.file_uploads import read_upload_content
-from app.application.files.validation import FileUploadValidationError
 
 logger = logging.getLogger(__name__)
 

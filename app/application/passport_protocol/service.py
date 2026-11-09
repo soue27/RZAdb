@@ -10,11 +10,11 @@ from zipfile import BadZipFile, ZipFile
 from docx import Document
 
 from app.application.document_templates.service import (
-    DocxProcessor,
     DocumentFormHierarchy,
     DocumentFormType,
     DocumentTemplateError,
     DocumentTemplateService,
+    DocxProcessor,
 )
 from app.application.files.access_service import FileAccessService
 from app.application.files.service import FileService

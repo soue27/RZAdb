@@ -6,16 +6,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.core.request_context import get_request_context
+
 """Конфигурация структурированного JSON-логирования приложения."""
 
-import json
-import logging
-import sys
-import traceback
-from datetime import UTC, datetime
-from typing import Any
 
-from app.core.request_context import get_request_context
 
 
 _JSON_HANDLER_MARKER = "_rzadb_json_stdout_handler"

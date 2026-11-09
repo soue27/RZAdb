@@ -15,25 +15,11 @@ from app.presentation.dependencies.services import (
     get_enterprise_repository,
     get_feedback_service,
 )
+
 """Маршруты отправки обратной связи с CSRF-защитой."""
 
-import logging
-import secrets
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
-from app.application.feedback.service import FeedbackService
-from app.application.enterprises.repository import EnterpriseRepository
-from app.core.config import get_settings
-from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import (
-    get_enterprise_repository,
-    get_feedback_service,
-)
 
 logger = logging.getLogger(__name__)
 

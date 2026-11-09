@@ -18,9 +18,9 @@ from app.infrastructure.backup.coordinator import (
     BackupManifestError,
 )
 from app.infrastructure.backup.run_lock import BackupRunLock
-from app.presentation.routes.admin import _read_backup_status
 from app.presentation.app import app
 from app.presentation.auth.dependencies import get_current_user
+from app.presentation.routes.admin import _read_backup_status
 
 
 def make_user(role: UserRole) -> User:

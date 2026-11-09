@@ -12,11 +12,14 @@ from app.application.work_items.service import (
     ProgramWorkItemSource,
     RZAInstructionWorkItemSource,
     SchemaWorkItemSource,
-    SettingsWorkItemSource,
     SelectivitySchemeWorkItemSource,
+    SettingsWorkItemSource,
     TaskWorkItemSource,
     WorkItem,
-    WorkItemService, _document_tab, _task_tab, _action_labels
+    WorkItemService,
+    _action_labels,
+    _document_tab,
+    _task_tab,
 )
 from app.domain.enums import (
     DocumentStatus,

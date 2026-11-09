@@ -8,7 +8,6 @@ from app.core.logging_config import configure_logging
 from app.core.request_context import (
     bind_user_id,
     get_request_context,
-    reset_request_context,
 )
 from app.presentation.middleware.request_context import RequestContextMiddleware
 

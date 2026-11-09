@@ -5,7 +5,11 @@ import threading
 import pytest
 
 from app.core.config import Settings
-from app.core.request_context import bind_user_id, reset_request_context, set_request_context
+from app.core.request_context import (
+    bind_user_id,
+    reset_request_context,
+    set_request_context,
+)
 from app.infrastructure.emailing.error_notifications import (
     ERROR_EMAIL_COOLDOWN_SECONDS,
     ErrorEmailConfigurationError,

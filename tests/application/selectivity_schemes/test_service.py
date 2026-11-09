@@ -8,11 +8,11 @@ from uuid6 import uuid7
 from app.application.selectivity_schemes.service import (
     SelectivitySchemeService,
 )
+from app.domain.enums import DocumentStatus, UserRole
 from app.domain.selectivity_scheme import (
     SelectivityScheme,
     SelectivitySchemeVersion,
 )
-from app.domain.enums import DocumentStatus, UserRole
 
 
 @pytest.fixture

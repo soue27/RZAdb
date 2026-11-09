@@ -1,6 +1,5 @@
 from pathlib import PurePosixPath
 
-
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 MIME_TYPES_BY_EXTENSION: dict[str, str] = {

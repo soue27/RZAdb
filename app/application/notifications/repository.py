@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.task_notification import TaskNotification
+
+
 class TaskNotificationRepository:
     """Работа с внутренними уведомлениями пользователей."""
 

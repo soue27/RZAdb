@@ -31,7 +31,6 @@ from app.domain.enums import (
 from app.domain.substation import Substation
 from app.domain.urza import URZA
 
-
 MAX_FILE_SIZE = 5 * 1024 * 1024
 MAX_DATA_ROWS = 10_000
 MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024

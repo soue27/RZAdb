@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.application.access.service import AccessService
+from app.application.files import validation
 from app.application.files.access_service import FileAccessService
 from app.application.files.exceptions import AmbiguousFileOwnershipError
 from app.application.files.owner_resolver import FileOwnerResolver
@@ -29,7 +30,6 @@ from app.presentation.dependencies.services import (
     get_file_service,
 )
 from app.presentation.schemas.files import FileResponse
-from app.application.files import validation
 
 
 @pytest.fixture

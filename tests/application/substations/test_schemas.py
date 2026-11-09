@@ -2,10 +2,13 @@ from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
-
 from uuid6 import uuid7
 
-from app.application.substations.schemas import SubstationDetails, SubstationUpdate, SubstationCreate
+from app.application.substations.schemas import (
+    SubstationCreate,
+    SubstationDetails,
+    SubstationUpdate,
+)
 from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
@@ -67,8 +70,8 @@ def test_substation_update_validates_and_cleans_optional_fields() -> None:
         sap_code="", asureo_code="  ", address="", latitude="90", longitude="-180",
     )
     assert result.sap_code is result.asureo_code is result.address is None
-    assert result.latitude == Decimal("90")
-    assert result.longitude == Decimal("-180")
+    assert result.latitude == Decimal(90)
+    assert result.longitude == Decimal(-180)
 
 
 @pytest.mark.parametrize("field,value", [("dispatch_name", "  "), ("latitude", "90.01"), ("latitude", "-90.01"), ("longitude", "180.01"), ("longitude", "-180.01")])

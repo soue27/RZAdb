@@ -6,6 +6,8 @@ from email.message import EmailMessage
 from pathlib import Path
 
 from app.core.config import Settings
+
+
 class SMTPEmailSender:
     """Отправка email через SMTP без блокировки event loop."""
 

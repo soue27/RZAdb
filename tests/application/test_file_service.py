@@ -3,19 +3,18 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from uuid6 import uuid7
 from sqlalchemy.exc import IntegrityError
-
-from app.application.files.service import FileService
-from app.application.files.physical_deletion import PhysicalDeletionService, TARGETS
-from app.domain.enums import UserRole
-from app.domain.file import File
+from uuid6 import uuid7
 
 from app.application.files import validation
+from app.application.files.physical_deletion import TARGETS, PhysicalDeletionService
+from app.application.files.service import FileService
 from app.application.files.validation import (
     FileTooLargeError,
     UnsupportedFileTypeError,
 )
+from app.domain.enums import UserRole
+from app.domain.file import File
 
 
 class _DeletionSession:

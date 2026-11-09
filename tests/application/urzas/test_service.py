@@ -6,7 +6,7 @@ from uuid6 import uuid7
 
 from app.application.objects.exceptions import ObjectNotFoundError
 from app.application.urzas.schemas import URZACreate, URZADetails
-from app.application.urzas.service import URZAService, URZANameConflictError
+from app.application.urzas.service import URZANameConflictError, URZAService
 from app.domain.enums import ElementBase, RoomCategory, URZACategory, URZAStatus
 from app.domain.urza import URZA
 

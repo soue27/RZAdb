@@ -6,7 +6,6 @@ from starlette.requests import Request
 from uuid6 import uuid7
 
 from app.core.request_context import (
-    bind_user_id,
     get_request_context,
     reset_request_context,
     set_request_context,

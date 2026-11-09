@@ -37,7 +37,9 @@ from app.presentation.routes.organization_import import (
     router as organization_import_router,
 )
 from app.presentation.routes.otd import router as otd_router
-from app.presentation.routes.physical_deletions import router as physical_deletions_router
+from app.presentation.routes.physical_deletions import (
+    router as physical_deletions_router,
+)
 from app.presentation.routes.programs import router as programs_router
 from app.presentation.routes.schemes import router as schemes_router
 from app.presentation.routes.settings import router as settings_router
@@ -49,55 +51,6 @@ from app.presentation.routes.tasks import router as tasks_router
 from app.presentation.routes.urza_instructions import router as urza_instructions_router
 from app.presentation.routes.urza_objects import router as urza_objects_router
 from app.presentation.routes.users import router as users_router
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
-
-from app.core.config import get_settings
-from app.core.logging_config import configure_logging
-from app.infrastructure.database import models  # noqa: F401
-from app.infrastructure.emailing.error_notifications import (
-    acquire_error_email_handler,
-    release_error_email_handler,
-)
-from app.presentation.auth.dependencies import PasswordChangeRequired
-from app.presentation.middleware.request_context import RequestContextMiddleware
-from app.presentation.routes.admin import router as admin_router
-from app.presentation.routes.archive import router as archive_router
-from app.presentation.routes.auth import router as auth_router
-from app.presentation.routes.files import router as files_router
-from app.presentation.routes.health import router as health_router
-from app.presentation.routes.home import router as home_router
-from app.presentation.routes.inspection_tasks import router as inspection_tasks_router
-from app.presentation.routes.maintenance import (
-    router as maintenance_router,
-)
-from app.presentation.routes.objects import router as objects_router
-from app.presentation.routes.otd import router as otd_router
-from app.presentation.routes.programs import router as programs_router
-from app.presentation.routes.schemes import router as schemes_router
-from app.presentation.routes.settings import router as settings_router
-from app.presentation.routes.substation_documents import (
-    router as substation_documents_router,
-)
-from app.presentation.routes.substation_tasks import router as substation_tasks_router
-from app.presentation.routes.tasks import router as tasks_router
-from app.presentation.routes.urza_instructions import router as urza_instructions_router
-from app.presentation.routes.urza_objects import router as urza_objects_router
-from app.presentation.routes.users import router as users_router
-from app.presentation.routes.notifications import router as notifications_router
-from app.presentation.routes.physical_deletions import router as physical_deletions_router
-from app.presentation.routes.feedback import router as feedback_router
-from app.presentation.routes.equipment_import import (
-    router as equipment_import_router,
-)
-from app.presentation.routes.organization_import import (
-    router as organization_import_router,
-)
 
 
 def _is_api_request(request: Request) -> bool:
