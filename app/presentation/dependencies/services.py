@@ -1,3 +1,5 @@
+"""services: зависимости и DTO presentation-слоя."""
+
 from pathlib import Path
 from typing import Annotated
 
@@ -85,6 +87,8 @@ from app.application.imports.organization import OrganizationImportService
 
 
 def get_object_storage() -> ObjectStorage:
+    """Создаёт адаптер объектного хранилища, настроенный для текущего окружения.
+    """
     return LocalObjectStorage(root=Path("data/uploads"))
 
 
@@ -92,6 +96,8 @@ def get_file_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
 ) -> FileService:
+    """Создаёт сервис загрузки, чтения и архивирования файлов.
+    """
     repository = FileRepository(session)
 
     return FileService(
@@ -101,6 +107,8 @@ def get_file_service(
 
 
 def get_password_service() -> PasswordService:
+    """Создаёт сервис хеширования и проверки паролей.
+    """
     return PasswordService()
 
 
@@ -108,6 +116,8 @@ def get_auth_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     password_service: Annotated[PasswordService, Depends(get_password_service)],
 ) -> AuthService:
+    """Создаёт сервис аутентификации на базе репозитория пользователей и PasswordService.
+    """
     return AuthService(
         user_repository=UserRepository(session),
         password_service=password_service,
@@ -118,6 +128,8 @@ def get_user_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     password_service: Annotated[PasswordService, Depends(get_password_service)],
 ) -> UserService:
+    """Создаёт сервис административного управления пользователями.
+    """
     return UserService(
         repository=UserRepository(session),
         enterprise_repository=EnterpriseRepository(session),
@@ -128,6 +140,8 @@ def get_user_service(
 def get_access_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AccessService:
+    """Создаёт централизованный сервис проверки прав доступа к предприятиям и оборудованию.
+    """
     return AccessService(
         user_repository=UserRepository(session),
         substation_repository=SubstationRepository(session),
@@ -142,6 +156,8 @@ def get_physical_deletion_service(
     access_service: Annotated[AccessService, Depends(get_access_service)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
 ) -> PhysicalDeletionService:
+    """Создаёт сервис физического удаления документных записей и освобождённых файлов.
+    """
     return PhysicalDeletionService(
         session=session,
         access_service=access_service,
@@ -153,6 +169,8 @@ def get_physical_deletion_service(
 def get_organization_import_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> OrganizationImportService:
+    """Создаёт сервис предварительной проверки и импорта организационной структуры.
+    """
     return OrganizationImportService(
         repository=EnterpriseRepository(session),
     )
@@ -162,6 +180,8 @@ def get_equipment_import_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> EquipmentImportService:
+    """Создаёт сервис предварительной проверки и импорта оборудования РЗА.
+    """
     return EquipmentImportService(
         session=session,
         access_service=access_service,
@@ -172,6 +192,8 @@ def get_file_access_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> FileAccessService:
+    """Создаёт сервис проверки доступа к файлам через их доменных владельцев.
+    """
     return FileAccessService(
         file_repository=FileRepository(session),
         owner_resolver=FileOwnerResolver(FileOwnerRepository(session)),
@@ -183,6 +205,8 @@ def get_tree_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> TreeService:
+    """Создаёт сервис формирования дерева предприятий и оборудования.
+    """
     return TreeService(
         enterprise_repository=EnterpriseRepository(session),
         substation_repository=SubstationRepository(session),
@@ -195,6 +219,8 @@ def get_tree_service(
 def get_document_form_service(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ) -> DocumentTemplateService:
+    """Создаёт сервис формирования DOCX-документов из шаблонов.
+    """
     return DocumentTemplateService(
         tree_service=tree_service,
         templates_dir=get_settings().document_templates_dir,
@@ -204,6 +230,8 @@ def get_document_form_service(
 def get_object_resolver(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ObjectResolver:
+    """Создаёт резолвер типов и идентификаторов доменных объектов.
+    """
     return ObjectResolver(
         substation_repository=SubstationRepository(session),
         connection_repository=ConnectionRepository(session),
@@ -216,6 +244,8 @@ def get_object_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> ObjectService:
+    """Создаёт сервис проверки доступа и получения выбранного объекта.
+    """
     return ObjectService(
         access_service=access_service,
         object_resolver=ObjectResolver(
@@ -231,6 +261,8 @@ def get_archive_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> ArchiveService:
+    """Создаёт сервис архивирования и восстановления объектов.
+    """
     return ArchiveService(
         repository=ArchiveRepository(session),
         access_service=access_service,
@@ -240,6 +272,8 @@ def get_archive_service(
 def get_substation_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SubstationService:
+    """Создаёт сервис подстанций.
+    """
     return SubstationService(
         repository=SubstationRepository(session),
     )
@@ -248,6 +282,8 @@ def get_substation_service(
 def get_enterprise_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> EnterpriseService:
+    """Создаёт сервис производственных отделений.
+    """
     return EnterpriseService(
         repository=EnterpriseRepository(session),
     )
@@ -256,6 +292,8 @@ def get_enterprise_service(
 def get_connection_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ConnectionService:
+    """Создаёт сервис присоединений.
+    """
     return ConnectionService(
         repository=ConnectionRepository(session),
     )
@@ -264,6 +302,8 @@ def get_connection_service(
 def get_urza_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> URZAService:
+    """Создаёт сервис устройств РЗА.
+    """
     return URZAService(
         repository=URZARepository(session),
     )
@@ -272,6 +312,8 @@ def get_urza_service(
 def get_inspection_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> InspectionService:
+    """Создаёт сервис результатов осмотров подстанций.
+    """
     return InspectionService(
         repository=InspectionRepository(session),
     )
@@ -280,6 +322,8 @@ def get_inspection_service(
 def get_inspection_task_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> InspectionTaskService:
+    """Создаёт сервис жизненного цикла задач осмотра.
+    """
     return InspectionTaskService(
         repository=InspectionTaskRepository(session),
         user_repository=UserRepository(session),
@@ -290,12 +334,16 @@ def get_inspection_task_service(
 def get_inspection_task_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> InspectionTaskRepository:
+    """Создаёт репозиторий задач осмотра на текущей SQLAlchemy-сессии.
+    """
     return InspectionTaskRepository(session)
 
 
 def get_rza_instruction_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RZAInstructionService:
+    """Создаёт сервис инструкций РЗА подстанций.
+    """
     return RZAInstructionService(
         repository=RZAInstructionRepository(session),
         access_service=AccessService(
@@ -311,6 +359,8 @@ def get_rza_instruction_service(
 def get_selectivity_scheme_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SelectivitySchemeService:
+    """Создаёт сервис схем селективности подстанций.
+    """
     return SelectivitySchemeService(
         repository=SelectivitySchemeRepository(session),
         access_service=AccessService(
@@ -327,6 +377,8 @@ def get_otd_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> OTDService:
+    """Создаёт сервис формуляров ОТД и их версий.
+    """
     return OTDService(
         repository=OTDRepository(session),
         access_service=access_service,
@@ -338,6 +390,8 @@ def get_settings_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> SettingsService:
+    """Создаёт сервис формуляров уставок и записей изменений.
+    """
     return SettingsService(
         repository=SettingsRepository(session),
         access_service=access_service,
@@ -348,6 +402,8 @@ def get_schema_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> SchemaService:
+    """Создаёт сервис формуляров схем и записей изменений.
+    """
     return SchemaService(
         repository=SchemaRepository(session),
         access_service=access_service,
@@ -358,6 +414,8 @@ def get_schema_service(
 def get_notification_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TaskNotificationRepository:
+    """Создаёт репозиторий уведомлений на текущей SQLAlchemy-сессии.
+    """
     return TaskNotificationRepository(session)
 
 
@@ -367,12 +425,16 @@ def get_notification_service(
         Depends(get_notification_repository),
     ],
 ) -> NotificationService:
+    """Создаёт сервис внутренних уведомлений пользователей.
+    """
     return NotificationService(repository=repository)
 
 
 def get_task_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TaskRepository:
+    """Создаёт репозиторий задач и истории на текущей SQLAlchemy-сессии.
+    """
     return TaskRepository(session)
 
 
@@ -385,6 +447,8 @@ def get_task_service(
         Depends(get_notification_service),
     ],
 ) -> TaskService:
+    """Создаёт сервис управления жизненным циклом задач.
+    """
     return TaskService(
         task_repository=task_repository,
         access_service=access_service,
@@ -399,6 +463,8 @@ def get_maintenance_service(
     task_repository: Annotated[TaskRepository, Depends(get_task_repository)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TORecordService:
+    """Создаёт сервис записей технического обслуживания.
+    """
     return TORecordService(
         repository=TORecordRepository(session),
         access_service=access_service,
@@ -425,6 +491,8 @@ def get_passport_protocol_service(
     ],
     file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> PassportProtocolService:
+    """Создаёт сервис подготовки комплекта документов паспорта УРЗА.
+    """
     return PassportProtocolService(
         otd_service=otd_service,
         settings_service=settings_service,
@@ -442,6 +510,8 @@ def get_program_service(
     access_service: Annotated[AccessService, Depends(get_access_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> ProgramService:
+    """Создаёт сервис программ УРЗА и их согласования.
+    """
     return ProgramService(
         repository=ProgramRepository(session),
         access_service=access_service,
@@ -456,6 +526,8 @@ def get_urza_instruction_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     access_service: Annotated[AccessService, Depends(get_access_service)],
 ) -> URZAInstructionService:
+    """Создаёт сервис версионируемых инструкций УРЗА.
+    """
     return URZAInstructionService(
         repository=URZAInstructionRepository(session),
         access_service=access_service,
@@ -475,6 +547,8 @@ def get_work_item_service(
         Depends(get_maintenance_service),
     ],
 ) -> WorkItemService:
+    """Создаёт агрегатор рабочего списка из специализированных источников.
+    """
     settings_service = SettingsService(
         repository=SettingsRepository(session),
         access_service=access_service,
@@ -529,6 +603,8 @@ def get_inspection_work_item_source(
         Depends(get_inspection_task_service),
     ],
 ) -> InspectionTaskWorkItemSource:
+    """Создаёт источник элементов рабочего списка для задач осмотра.
+    """
     return InspectionTaskWorkItemSource(
         repository=inspection_repository,
         access_service=access_service,
@@ -548,6 +624,8 @@ def get_task_statistics_service(
         Depends(get_inspection_work_item_source),
     ],
 ) -> TaskStatisticsService:
+    """Создаёт сервис статистики задач с учётом области доступа.
+    """
     return TaskStatisticsService(
         task_repository=TaskRepository(session),
         inspection_repository=InspectionTaskRepository(session),
@@ -559,6 +637,8 @@ def get_task_statistics_service(
 
 
 def get_feedback_service() -> FeedbackService:
+    """Создаёт сервис отправки обратной связи по электронной почте.
+    """
     settings = get_settings()
 
     if not settings.feedback_email:
@@ -585,4 +665,6 @@ def get_feedback_service() -> FeedbackService:
 def get_enterprise_repository(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> EnterpriseRepository:
+    """Создаёт репозиторий организационной структуры на текущей SQLAlchemy-сессии.
+    """
     return EnterpriseRepository(session)
