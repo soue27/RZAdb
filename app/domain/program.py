@@ -17,6 +17,12 @@ from app.infrastructure.database.mixins import (
 
 
 class Program(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Представляет программу работ для устройства РЗА.
+
+    Хранит тип и номер программы, статус, скан документа
+    и необязательный редактируемый файл. Может быть связана
+    с задачей, в рамках которой программа подготовлена.
+    """
     __tablename__ = "programs"
 
     urza_id: Mapped[UUID] = mapped_column(
