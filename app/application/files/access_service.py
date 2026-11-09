@@ -47,7 +47,7 @@ class FileAccessService:
             file_id: Идентификатор файла.
 
         Returns:
-        Метаданные доступного файла.
+            Метаданные доступного файла.
 
         Raises:
             ObjectNotFoundError: Если файл или его владелец не найдены.
