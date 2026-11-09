@@ -1,3 +1,5 @@
+"""request_context: контекст и логирование HTTP-запросов."""
+
 import logging
 import time
 
@@ -11,10 +13,26 @@ logger = logging.getLogger("app.http")
 
 
 class RequestContextMiddleware:
+    """ASGI middleware, создающий request_id, добавляющий его в ответ и журналирующий длительность HTTP-запроса.
+    """
     def __init__(self, app: ASGIApp) -> None:
+        """Сохраняет ASGI-приложение, которое будет обёрнуто middleware.
+
+        Args:
+            app: Следующее ASGI-приложение в цепочке.
+        """
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Обрабатывает HTTP-запрос с контекстом request_id и структурированным логированием.
+
+        Для не-HTTP scope передаёт управление приложению без дополнительной обработки.
+
+        Args:
+            scope: ASGI scope.
+            receive: Канал получения ASGI-сообщений.
+            send: Канал отправки ASGI-сообщений.
+        """
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -67,4 +85,12 @@ class RequestContextMiddleware:
 
 
 def _duration_ms(started_at: float) -> float:
+    """Возвращает длительность операции в миллисекундах с округлением до тысячных.
+
+    Args:
+        started_at: Значение time.perf_counter() в момент начала.
+
+    Returns:
+        Длительность в миллисекундах.
+    """
     return round((time.perf_counter() - started_at) * 1000, 3)
