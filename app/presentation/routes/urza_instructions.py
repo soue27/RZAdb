@@ -1,39 +1,3 @@
-import logging
-from datetime import date
-from typing import Annotated
-from uuid import UUID
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    File as FastAPIFile,
-    Form,
-    HTTPException,
-    Query,
-    Request,
-    UploadFile,
-)
-from fastapi.templating import Jinja2Templates
-
-from app.application.files.service import FileService
-from app.application.files.validation import FileUploadValidationError
-from app.application.objects.exceptions import (
-    ObjectAccessDeniedError,
-    ObjectNotFoundError,
-)
-from app.application.objects.service import ObjectService
-from app.application.tasks.service import TaskService
-from app.application.urza_instructions.service import URZAInstructionService
-from app.domain.enums import UserRole
-from app.domain.user import User
-from app.presentation.auth.dependencies import get_current_user
-from app.presentation.dependencies.services import (
-    get_file_service,
-    get_object_service,
-    get_task_service,
-    get_urza_instruction_service,
-)
-from app.presentation.file_uploads import read_upload_content
 """Маршруты управления версиями инструкций устройств РЗА."""
 
 from datetime import date
