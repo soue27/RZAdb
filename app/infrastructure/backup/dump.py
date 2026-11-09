@@ -52,6 +52,11 @@ class DumpCreationError(RuntimeError):
         dump_created: bool = False,
         validation_status: str = "not_run",
     ) -> None:
+        """Сохраняет настройки подключения к PostgreSQL.
+
+        Args:
+            settings: Конфигурация приложения.
+        """
         super().__init__(message)
         self.dump_created = dump_created
         self.validation_status = validation_status
@@ -59,17 +64,23 @@ class DumpCreationError(RuntimeError):
 
 @dataclass
 class DumpArtifact:
+    """Метаданные временного дампа PostgreSQL, прошедшего проверку целостности и формата.
+    """
     path: Path
     size_bytes: int
     sha256: str
     validated: bool = True
 
     def cleanup(self) -> None:
+        """Удаляет временный файл дампа после завершения публикации или обработки ошибки.
+        """
         self.path.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
 class _ConnectionInfo:
+    """Безопасное представление параметров подключения для PostgreSQL CLI.
+    """
     database_uri: str
     password: str | None
 
@@ -81,6 +92,22 @@ class PostgresDumpService:
         self.settings = settings
 
     def create_dump(self, *, backup_dir: Path, stem: str) -> DumpArtifact:
+        """Создаёт Custom Format дамп, проверяет его оглавление и рассчитывает SHA-256.
+
+        Дамп создаётся во временном файле с ограниченными правами доступа.
+        Пароль передаётся дочернему процессу через окружение, а не аргументы команды.
+
+        Args:
+            backup_dir: Каталог временных и итоговых копий.
+            stem: Общая часть имени дампа и манифеста.
+
+        Returns:
+            Проверенный артефакт с размером и SHA-256.
+
+        Raises:
+            DumpCreationError: Если утилиты PostgreSQL отсутствуют, дамп не создан,
+                проверка не пройдена или файл не удалось прочитать.
+        """
         temporary_dump: Path | None = None
         stage = "locate PostgreSQL utilities"
         dump_created = False
@@ -179,6 +206,14 @@ class PostgresDumpService:
 
     @staticmethod
     def _connection_info(database_url: str) -> _ConnectionInfo:
+        """Разбирает DATABASE_URL и формирует параметры для утилит PostgreSQL.
+
+        Args:
+            database_url: URL подключения SQLAlchemy.
+
+        Returns:
+            URI без секрета и пароль отдельно для PGPASSWORD.
+        """
         try:
             url = make_url(database_url)
         except Exception:
@@ -242,6 +277,14 @@ class PostgresDumpService:
 
     @staticmethod
     def _child_environment(password: str | None) -> dict[str, str]:
+        """Создаёт безопасное окружение дочернего процесса PostgreSQL CLI.
+
+        Args:
+            password: Пароль подключения или None.
+
+        Returns:
+            Копия окружения с PGPASSWORD, если пароль задан.
+        """
         environment = os.environ.copy()
         environment.pop("PGPASSWORD", None)
         if password:
@@ -250,6 +293,16 @@ class PostgresDumpService:
 
     @staticmethod
     def _new_temporary_file(directory: Path, prefix: str, suffix: str) -> Path:
+        """Создаёт закрытый временный файл в указанном каталоге.
+
+        Args:
+            directory: Каталог временного файла.
+            prefix: Префикс имени.
+            suffix: Расширение файла.
+
+        Returns:
+            Путь к созданному временному файлу.
+        """
         with tempfile.NamedTemporaryFile(
             prefix=prefix,
             suffix=suffix,
@@ -266,6 +319,14 @@ class PostgresDumpService:
 
     @staticmethod
     def _sha256(path: Path) -> str:
+        """Вычисляет SHA-256 файла потоковым чтением.
+
+        Args:
+            path: Путь к файлу.
+
+        Returns:
+            Хеш в шестнадцатеричном формате.
+        """
         digest = hashlib.sha256()
         with path.open("rb") as dump_file:
             for block in iter(lambda: dump_file.read(1024 * 1024), b""):
@@ -274,6 +335,8 @@ class PostgresDumpService:
 
     @staticmethod
     def _cleanup(path: Path | None) -> None:
+        """Безопасно удаляет временный файл, если путь задан.
+        """
         if path is None:
             return
         try:
