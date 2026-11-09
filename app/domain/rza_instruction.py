@@ -8,7 +8,6 @@ from app.domain.file import File
 from app.domain.substation import Substation
 from app.domain.user import User
 from app.domain.enums import DocumentStatus
-from app.domain.task import Task
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
     SoftDeleteMixin,
