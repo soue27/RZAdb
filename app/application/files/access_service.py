@@ -13,7 +13,7 @@ from app.domain.file import File
 
 class FileAccessService:
     """Проверяет право пользователя читать файл через его доменного владельца.
-"""
+    """
     def __init__(
         self,
         *,
@@ -23,11 +23,11 @@ class FileAccessService:
     ) -> None:
         """Сохраняет зависимости для разрешения владельца файла и проверки доступа.
 
-    Args:
-        file_repository: Репозиторий метаданных файлов.
-        owner_resolver: Сервис определения единственного владельца файла.
-        access_service: Централизованный сервис проверки доступа к объектам.
-    """
+        Args:
+            file_repository: Репозиторий метаданных файлов.
+            owner_resolver: Сервис определения единственного владельца файла.
+            access_service: Централизованный сервис проверки доступа к объектам.
+        """
         self.file_repository = file_repository
         self.owner_resolver = owner_resolver
         self.access_service = access_service
@@ -39,21 +39,21 @@ class FileAccessService:
     ) -> File:
         """Возвращает файл, доступный пользователю для чтения.
 
-    Проверяет наличие и архивный статус файла, определяет владельца через явные
-    внешние ключи и делегирует проверку доступа к УРЗА или подстанции.
+        Проверяет наличие и архивный статус файла, определяет владельца через явные
+        внешние ключи и делегирует проверку доступа к УРЗА или подстанции.
 
-    Args:
-        user_id: Идентификатор пользователя.
-        file_id: Идентификатор файла.
+        Args:
+            user_id: Идентификатор пользователя.
+            file_id: Идентификатор файла.
 
-    Returns:
-    Метаданные доступного файла.
+        Returns:
+        Метаданные доступного файла.
 
-    Raises:
-        ObjectNotFoundError: Если файл или его владелец не найдены.
-        ObjectAccessDeniedError: Если файл архивирован или у пользователя нет доступа.
-        ValueError: Если тип цели доступа не поддерживается.
-    """
+        Raises:
+            ObjectNotFoundError: Если файл или его владелец не найдены.
+            ObjectAccessDeniedError: Если файл архивирован или у пользователя нет доступа.
+            ValueError: Если тип цели доступа не поддерживается.
+        """
         file = await self.file_repository.get_by_id(file_id)
         if file is None:
             raise ObjectNotFoundError
