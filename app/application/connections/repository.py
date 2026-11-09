@@ -15,8 +15,7 @@ class ConnectionRepository:
         """Сохраняет сессию для запросов к присоединениям.
 
         Args:
-        session: Асинхронная SQLAlchemy-сессия текущей транзакции.
-
+            session: Асинхронная SQLAlchemy-сессия текущей транзакции.
         """
         self.session = session
 
@@ -27,11 +26,10 @@ class ConnectionRepository:
         """Находит присоединение по идентификатору, включая архивные записи.
 
         Args:
-        connection_id: Идентификатор присоединения.
+            connection_id: Идентификатор присоединения.
 
         Returns:
-        Присоединение или None, если запись отсутствует.
-
+            Присоединение или None, если запись отсутствует.
         """
         return await self.session.get(Connection, connection_id)
 
@@ -48,13 +46,12 @@ class ConnectionRepository:
         можно исключить из проверки текущее присоединение.
 
         Args:
-        substation_id: Идентификатор подстанции.
-        dispatch_name: Проверяемое диспетчерское наименование.
-        exclude_connection_id: Идентификатор записи, исключаемой из поиска.
+            substation_id: Идентификатор подстанции.
+            dispatch_name: Проверяемое диспетчерское наименование.
+            exclude_connection_id: Идентификатор записи, исключаемой из поиска.
 
         Returns:
-        True, если такое имя уже используется, иначе False.
-
+            True, если такое имя уже используется, иначе False.
         """
         query = select(Connection.id).where(
             Connection.substation_id == substation_id,
@@ -71,11 +68,10 @@ class ConnectionRepository:
         """Проверяет наличие неархивированной подстанции.
 
         Args:
-        substation_id: Идентификатор подстанции.
+            substation_id: Идентификатор подстанции.
 
         Returns:
-        True, если активная подстанция существует.
-
+            True, если активная подстанция существует.
         """
         result = await self.session.scalar(
             select(Substation.id).where(
@@ -89,11 +85,10 @@ class ConnectionRepository:
         """Блокирует подстанцию и проверяет её активность перед созданием связи.
 
         Args:
-        substation_id: Идентификатор подстанции.
+            substation_id: Идентификатор подстанции.
 
         Returns:
-        True, если подстанция существует, не архивирована и заблокирована.
-
+            True, если подстанция существует, не архивирована и заблокирована.
         """
         substation = await lock_owner_row(
             self.session,
@@ -109,11 +104,10 @@ class ConnectionRepository:
         транзакцию.
 
         Args:
-        connection: Создаваемая модель присоединения.
+            connection: Создаваемая модель присоединения.
 
         Returns:
-        Добавленная модель присоединения.
-
+            Добавленная модель присоединения.
         """
         async with self.session.begin_nested():
             self.session.add(connection)
@@ -139,13 +133,12 @@ class ConnectionRepository:
         """Возвращает присоединения выбранных подстанций.
 
         Args:
-        substation_ids: Идентификаторы подстанций.
-        include_archived: Включать ли архивированные присоединения.
+            substation_ids: Идентификаторы подстанций.
+            include_archived: Включать ли архивированные присоединения.
 
         Returns:
-        Присоединения, отсортированные по диспетчерскому наименованию.
-        При пустом наборе идентификаторов возвращает пустой список.
-
+            Присоединения, отсортированные по диспетчерскому наименованию.
+            При пустом наборе идентификаторов возвращает пустой список.
         """
 
         if not substation_ids:
@@ -169,11 +162,10 @@ class ConnectionRepository:
         Транзакция не фиксируется.
 
         Args:
-        connection: Изменённая модель присоединения.
+            connection: Изменённая модель присоединения.
 
         Returns:
-        Та же модель присоединения.
-
+            Та же модель присоединения.
         """
         await self.session.flush()
         return connection
