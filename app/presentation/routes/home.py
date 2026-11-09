@@ -1,3 +1,5 @@
+"""Маршруты главной страницы и статистики задач."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -26,6 +28,8 @@ async def home(
     current_user: Annotated[User, Depends(get_current_user)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает главную страницу с деревом объектов, доступных текущему пользователю.
+    """
     tree = await tree_service.get_tree(
         user_id=current_user.id,
     )
@@ -48,6 +52,8 @@ async def task_statistics(
         Depends(get_task_statistics_service),
     ],
 ):
+    """Возвращает HTML-фрагмент статистики задач для главной страницы.
+    """
     return templates.TemplateResponse(
         request=request,
         name="components/task_statistics_content.html",
