@@ -1,15 +1,3 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, File, Request, UploadFile
-from fastapi.templating import Jinja2Templates
-
-from app.application.imports.organization import OrganizationImportService
-from app.domain.user import User
-from app.presentation.auth.dependencies import require_superadmin
-from app.presentation.dependencies.services import (
-    get_organization_import_service,
-)
-from app.presentation.file_uploads import read_upload_content
 """Маршруты предварительной проверки и подтверждения импорта организационной структуры."""
 
 
