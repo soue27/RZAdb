@@ -12,8 +12,8 @@ class SubstationRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет сессию для запросов к подстанциям.
-
-        Args:
+            
+            Args:
             session: Асинхронная SQLAlchemy-сессия текущей транзакции.
         """
         self.session = session
@@ -23,25 +23,25 @@ class SubstationRepository:
         substation_id: UUID,
     ) -> Substation | None:
         """Находит подстанцию по идентификатору, включая архивные записи.
-
-        Args:
+            
+            Args:
             substation_id: Идентификатор подстанции.
-
-        Returns:
+            
+            Returns:
             Подстанция или None, если запись отсутствует.
         """
         return await self.session.get(Substation, substation_id)
 
     async def lock_active_by_id(self, substation_id: UUID) -> bool:
         """Блокирует строку подстанции и проверяет, что она не архивирована.
-
-        Блокировка защищает последующие операции с владельцем от конкурентного
-        архивирования в рамках текущей транзакции.
-
-        Args:
+            
+            Блокировка защищает последующие операции с владельцем от конкурентного
+            архивирования в рамках текущей транзакции.
+            
+            Args:
             substation_id: Идентификатор подстанции.
-
-        Returns:
+            
+            Returns:
             True, если активная подстанция найдена и заблокирована.
         """
         substation = await lock_owner_row(
@@ -53,13 +53,13 @@ class SubstationRepository:
 
     async def save(self, substation: Substation) -> Substation:
         """Добавляет или сохраняет подстанцию и выполняет flush.
-
-        Транзакция не фиксируется.
-
-        Args:
+            
+            Транзакция не фиксируется.
+            
+            Args:
             substation: Модель подстанции.
-
-        Returns:
+            
+            Returns:
             Та же модель подстанции.
         """
         self.session.add(substation)
@@ -83,12 +83,12 @@ class SubstationRepository:
         include_archived: bool = False,
     ) -> list[Substation]:
         """Возвращает подстанции выбранных предприятий.
-
-        Args:
+            
+            Args:
             enterprise_ids: Идентификаторы предприятий.
             include_archived: Включать ли архивированные подстанции.
-
-        Returns:
+            
+            Returns:
             Подстанции, отсортированные по диспетчерскому наименованию.
             При пустом наборе идентификаторов возвращает пустой список.
         """
