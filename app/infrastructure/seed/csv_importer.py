@@ -29,6 +29,11 @@ class CSVImporter:
     }
 
     def __init__(self, path: Path) -> None:
+        """Сохраняет путь к CSV-файлу.
+
+        Args:
+            path: Путь к файлу с данными.
+        """
         self.path = path
 
     def read_rows(self) -> list[dict[str, str]]:
