@@ -21,6 +21,13 @@ from app.infrastructure.backup.channels import (
     YandexDiskBackupChannel,
 )
 from app.infrastructure.backup.dump import DumpArtifact, DumpCreationError, PostgresDumpService
+    ChannelConfigurationError,
+    ChannelResult,
+    EmailBackupChannel,
+    LocalBackupChannel,
+    YandexDiskBackupChannel,
+)
+from app.infrastructure.backup.dump import DumpArtifact, DumpCreationError, PostgresDumpService
 
 logger = logging.getLogger(__name__)
 
