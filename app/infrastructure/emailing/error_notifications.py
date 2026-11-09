@@ -28,7 +28,7 @@ _DOMAIN_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 
 
 class ErrorEmailConfigurationError(ValueError):
-    """Raised when ERROR_EMAIL_TO is enabled with invalid SMTP settings."""
+    """Настройки SMTP-уведомлений некорректны при включённом ERROR_EMAIL_TO."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +79,7 @@ def _validate_address(value: str | None, setting_name: str) -> None:
 
 
 def validate_error_email_settings(settings: Settings) -> str | None:
-    """Validate alert configuration; return None when alerting is disabled."""
+    """Проверяет настройки email-уведомлений и возвращает None, если канал отключён."""
     recipient = settings.error_email_to
     if recipient is None:
         return None
@@ -111,7 +111,7 @@ def validate_error_email_settings(settings: Settings) -> str | None:
 
 
 class ErrorEmailNotificationHandler(logging.Handler):
-    """Non-blocking ERROR/CRITICAL handler backed by a single worker thread."""
+    """Неблокирующий обработчик ERROR/CRITICAL с отдельным рабочим потоком доставки."""
 
     def __init__(
         self,
@@ -390,7 +390,7 @@ _active_references = 0
 def acquire_error_email_handler(
     settings: Settings,
 ) -> ErrorEmailNotificationHandler | None:
-    """Start and install the per-process handler when configured."""
+    """Создаёт и устанавливает обработчик процесса, если email-уведомления настроены."""
     global _active_handler, _active_references, _active_settings
 
     recipient = validate_error_email_settings(settings)
@@ -433,7 +433,7 @@ def acquire_error_email_handler(
 async def release_error_email_handler(
     handler: ErrorEmailNotificationHandler | None,
 ) -> None:
-    """Uninstall the handler and stop its worker when the last app exits."""
+    """Удаляет обработчик и останавливает worker при завершении последнего приложения."""
     global _active_handler, _active_references, _active_settings
 
     if handler is None:
