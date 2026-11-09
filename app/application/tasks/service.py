@@ -504,7 +504,11 @@ class TaskService:
         closed_at: datetime | None = None,
         comment: str | None = None,
     ) -> Task:
-        """Закрывает задачу после проверки результата MANAGER."""
+        """Закрывает задачу после проверки результата руководителем.
+
+        Для задач по схемам и подстаночным инструкциям дополнительно проверяет,
+        что связанный результат утверждён.
+        """
         task = await self._lock_task_owner(task)
         self._ensure_task_is_active(task)
         validate_transition(task.status, TaskStatus.CLOSED)
