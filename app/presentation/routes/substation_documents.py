@@ -1,3 +1,5 @@
+"""Маршруты создания и согласования инструкций РЗА и схем селективности подстанций."""
+
 import logging
 from datetime import date
 from typing import Annotated
@@ -111,6 +113,8 @@ async def new_instruction_form(
     new_version: bool = False,
     task_id: UUID | None = None,
 ):
+    """Отображает форму создания инструкции РЗА подстанции.
+    """
     await _check_access(objects, current_user, substation_id)
     if current_user.role not in {
         UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
@@ -139,6 +143,8 @@ async def new_scheme_form(
     new_version: bool = False,
     task_id: UUID | None = None,
 ):
+    """Отображает форму создания схемы селективности подстанции.
+    """
     await _check_access(objects, current_user, substation_id)
     if current_user.role not in {
         UserRole.ENGINEER, UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.MANAGER
@@ -393,6 +399,8 @@ async def create_instruction(
     new_version: Annotated[bool, Form()] = False,
     task_id: Annotated[UUID | None, Form()] = None,
 ):
+    """Создаёт инструкцию РЗА подстанции и загружает связанные файлы.
+    """
     return await _create_document(
         request, substation_id, "instruction", effective_date, scan_file,
         editable_file, None, None, change_description, change_justification,
@@ -421,6 +429,8 @@ async def create_selectivity_scheme(
     new_version: Annotated[bool, Form()] = False,
     task_id: Annotated[UUID | None, Form()] = None,
 ):
+    """Создаёт схему селективности подстанции и её первую версию.
+    """
     return await _create_document(
         request, substation_id, "scheme", effective_date, scan_file,
         editable_file, number, name, change_description, change_justification,
@@ -435,6 +445,8 @@ async def instruction_transition(
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[RZAInstructionService, Depends(get_rza_instruction_service)],
 ):
+    """Выполняет действие согласования версии инструкции РЗА.
+    """
     return await _transition(request, substation_id, version_id, action, current_user, service)
 
 
@@ -444,6 +456,8 @@ async def scheme_transition(
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[SelectivitySchemeService, Depends(get_selectivity_scheme_service)],
 ):
+    """Выполняет действие согласования версии схемы селективности.
+    """
     return await _transition(request, substation_id, version_id, action, current_user, service)
 
 
