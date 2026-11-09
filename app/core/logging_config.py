@@ -1,3 +1,5 @@
+"""Конфигурация структурированного JSON-логирования приложения."""
+
 import json
 import logging
 import sys
@@ -13,9 +15,20 @@ _SUPPORTED_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 class JSONFormatter(logging.Formatter):
-    """Format log records as one-line JSON objects with a stable field set."""
+    """Форматирует записи логирования в однострочные JSON-объекты со стабильным набором полей."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """Преобразует LogRecord в JSON с UTC-временем, request context и HTTP-полями.
+
+        При наличии исключения добавляет его тип и traceback. Ошибки форматирования
+        сообщения или traceback не должны ломать сам процесс логирования.
+
+        Args:
+            record: Запись стандартного logging.
+
+        Returns:
+            JSON-строка для вывода в stdout.
+        """
         timestamp = datetime.fromtimestamp(record.created, tz=UTC)
         try:
             message = record.getMessage()
