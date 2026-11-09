@@ -5,11 +5,15 @@ from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.enums import MaintenanceType, TaskStatus, TaskWorkType
-from app.domain.urza import URZA
 from app.domain.substation import Substation
+from app.domain.urza import URZA
 from app.domain.user import User
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
     SoftDeleteMixin,
     TimestampMixin,
     UUIDMixin,
