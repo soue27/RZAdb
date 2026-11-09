@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -492,7 +492,7 @@ async def test_get_details_returns_current_version_and_history(
         otd_id=otd_id,
         version_number=2,
         effective_date=date(2026, 1, 1),
-        created_at=datetime(2026, 8, 20, 10, 0),
+        created_at=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
         panel_cabinet_type="Шкаф РЗА",
         terminal_type="МП терминал",
         urza_service_life=12,
@@ -507,7 +507,7 @@ async def test_get_details_returns_current_version_and_history(
         otd_id=otd_id,
         version_number=1,
         effective_date=date(2025, 1, 1),
-        created_at=datetime(2025, 3, 15, 10, 0),
+        created_at=datetime(2025, 3, 15, 10, 0, tzinfo=UTC),
         panel_cabinet_type="Шкаф РЗА",
         terminal_type="МП терминал",
         urza_service_life=10,
@@ -588,7 +588,7 @@ async def test_get_details_returns_selected_version(system_user_id) -> None:
         otd_id=otd_id,
         version_number=2,
         effective_date=date(2026, 1, 1),
-        created_at=datetime(2026, 8, 20, 10, 0),
+        created_at=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
         urza_service_life=12,
         urza_purpose=OTDPurpose.RZA,
         created_by=system_user_id,
@@ -601,7 +601,7 @@ async def test_get_details_returns_selected_version(system_user_id) -> None:
         otd_id=otd_id,
         version_number=1,
         effective_date=date(2025, 1, 1),
-        created_at=datetime(2025, 3, 15, 10, 0),
+        created_at=datetime(2025, 3, 15, 10, 0, tzinfo=UTC),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
         created_by=system_user_id,
@@ -671,7 +671,7 @@ async def test_get_details_returns_none_when_selected_version_not_found(
         otd_id=otd_id,
         version_number=1,
         effective_date=date(2025, 1, 1),
-        created_at=datetime(2025, 3, 15, 10, 0),
+        created_at=datetime(2025, 3, 15, 10, 0, tzinfo=UTC),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
         created_by=system_user_id,
@@ -733,7 +733,7 @@ async def test_get_details_does_not_select_version_from_another_otd(
         otd_id=otd_id,
         version_number=1,
         effective_date=date(2025, 1, 1),
-        created_at=datetime(2025, 3, 15, 10, 0),
+        created_at=datetime(2025, 3, 15, 10, 0, tzinfo=UTC),
         urza_service_life=10,
         urza_purpose=OTDPurpose.RZA,
         created_by=system_user_id,
@@ -826,7 +826,7 @@ async def test_get_version_details_returns_version_when_access_allowed(
         otd_id=otd_id,
         version_number=2,
         effective_date=date(2026, 1, 1),
-        created_at=datetime(2026, 8, 20, 10, 0),
+        created_at=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
         urza_service_life=12,
         urza_purpose=OTDPurpose.RZA,
         created_by=system_user_id,

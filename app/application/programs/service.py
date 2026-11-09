@@ -125,17 +125,19 @@ class ProgramService:
             }:
                 actions.update({"submit", "edit"})
 
-        elif program.status is DocumentStatus.UNDER_REVIEW:
-            if user.role is UserRole.MANAGER:
-                try:
-                    await self._check_manager_reviewer(
-                        user_id=user_id,
-                        urza_id=program.urza_id,
-                    )
-                except (PermissionError, ValueError):
-                    pass
-                else:
-                    actions.update({"approve", "return"})
+        elif (
+            program.status is DocumentStatus.UNDER_REVIEW
+            and user.role is UserRole.MANAGER
+        ):
+            try:
+                await self._check_manager_reviewer(
+                    user_id=user_id,
+                    urza_id=program.urza_id,
+                )
+            except (PermissionError, ValueError):
+                pass
+            else:
+                actions.update({"approve", "return"})
 
         return actions
 

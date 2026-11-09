@@ -175,7 +175,7 @@ def _read_backup_status(settings: Settings) -> dict[str, Any]:
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(state, dict):
-            raise ValueError("status must be an object")
+            raise TypeError("status must be an object")
     except FileNotFoundError:
         return _idle_backup_state(settings)
     except (OSError, ValueError, TypeError):
@@ -197,7 +197,7 @@ def _read_backup_status(settings: Settings) -> dict[str, Any]:
                 try:
                     latest_state = json.loads(path.read_text(encoding="utf-8"))
                     if not isinstance(latest_state, dict):
-                        raise ValueError("status must be an object")
+                        raise TypeError("status must be an object")
                 except (OSError, ValueError, TypeError):
                     logger.warning("Could not reread admin backup status under lock")
                 else:
@@ -480,7 +480,7 @@ async def start_admin_backup(
             daemon=True,
         )
         thread.start()
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         lock.release()
         logger.error("Could not start admin backup worker (%s)", type(exc).__name__)
         state.update(

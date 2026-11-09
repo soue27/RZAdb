@@ -11,6 +11,8 @@ from app.infrastructure.backup.coordinator import (
 )
 from app.infrastructure.backup.run_lock import BackupAlreadyRunning, BackupRunLock
 
+logger = logging.getLogger(__name__)
+
 
 async def run() -> int:
     """Выполняет один CLI-запуск резервного копирования PostgreSQL.
@@ -27,10 +29,10 @@ async def run() -> int:
         with BackupRunLock(settings.backup_local_dir):
             result = await BackupCoordinator(settings).run()
     except BackupAlreadyRunning:
-        logging.error("Another PostgreSQL backup is already running")
+        logger.error("Another PostgreSQL backup is already running")
         return 1
     except BackupError as exc:
-        logging.error("Database backup failed: %s", exc)
+        logger.error("Database backup failed: %s", exc)
         return 1
     print(f"Backup run {result['run_id']}: {result['status']}")
     print(f"Manifest: {result['manifest_path']}")

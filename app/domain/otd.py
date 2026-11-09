@@ -22,18 +22,6 @@ from app.infrastructure.database.mixins import (
     TimestampMixin,
     UUIDMixin,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.domain.enums import OTDPurpose, DocumentStatus
-from app.domain.task import Task
-from app.domain.urza import URZA
-from app.domain.user import User
-from app.infrastructure.database.base import Base
-from app.infrastructure.database.mixins import (
-    SoftDeleteMixin,
-    TimestampMixin,
-    UUIDMixin,
-)
 
 
 class OTD(

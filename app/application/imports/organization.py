@@ -4,6 +4,7 @@ from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 from app.application.enterprises.repository import EnterpriseRepository
 from app.domain.enterprise import Enterprise
@@ -202,7 +203,7 @@ class OrganizationImportService:
                 read_only=False,
                 data_only=False,
             )
-        except Exception:
+        except (InvalidFileException, BadZipFile, OSError, ValueError, TypeError):
             return [], [{
                 "message": "Не удалось прочитать XLSX-файл.",
             }]
@@ -592,17 +593,19 @@ class OrganizationImportService:
                         })
                         continue
 
-                    if level == EnterpriseType.HOLDING:
-                        if enterprise.parent_id is not None:
-                            errors.append({
-                                "row": node["rows"][0],
-                                "column": self._full_column(level),
-                                "message": (
-                                    f"Холдинг «{node['full_name']}» "
-                                    "имеет родительское предприятие в БД."
-                                ),
-                            })
-                            continue
+                    if (
+                        level == EnterpriseType.HOLDING
+                        and enterprise.parent_id is not None
+                    ):
+                        errors.append({
+                            "row": node["rows"][0],
+                            "column": self._full_column(level),
+                            "message": (
+                                f"Холдинг «{node['full_name']}» "
+                                "имеет родительское предприятие в БД."
+                            ),
+                        })
+                        continue
 
                     if (
                             enterprise.short_name.strip().casefold()

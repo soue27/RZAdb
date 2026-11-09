@@ -200,7 +200,7 @@ class PostgresDumpService:
                 dump_created=dump_created,
                 validation_status=validation_status,
             ) from None
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — normalize unexpected PostgreSQL tool failures
             self._cleanup(temporary_dump)
             logger.error("PostgreSQL dump failed in %s (%s)", stage, type(exc).__name__)
             raise DumpCreationError(
@@ -221,7 +221,7 @@ class PostgresDumpService:
         """
         try:
             url = make_url(database_url)
-        except Exception:
+        except Exception:  # noqa: BLE001 — expose only the sanitized URL parsing failure
             raise DumpCreationError("DATABASE_URL is invalid") from None
         if not url.drivername.startswith("postgresql"):
             raise DumpCreationError("DATABASE_URL must use a PostgreSQL driver")
@@ -271,7 +271,7 @@ class PostgresDumpService:
                 query=libpq_query,
             )
             uri = libpq_url.render_as_string(hide_password=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 — expose only the sanitized URL conversion failure
             raise DumpCreationError(
                 "DATABASE_URL could not be converted for PostgreSQL utilities"
             ) from None

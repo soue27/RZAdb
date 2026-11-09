@@ -34,7 +34,7 @@ class JSONFormatter(logging.Formatter):
         timestamp = datetime.fromtimestamp(record.created, tz=UTC)
         try:
             message = record.getMessage()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — malformed LogRecord args must not break logging
             message = f"<message formatting failed: {type(exc).__name__}>"
 
         payload: dict[str, Any] = {
@@ -64,7 +64,7 @@ class JSONFormatter(logging.Formatter):
                             exc_traceback,
                         )
                     ).rstrip()
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — broken exception formatting must not break logging
                     traceback_text = (
                         f"<traceback formatting failed: {type(exc).__name__}>"
                     )

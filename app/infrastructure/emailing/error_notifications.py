@@ -178,7 +178,7 @@ class ErrorEmailNotificationHandler(logging.Handler):
         """
         try:
             asyncio.run(self._run_worker())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — worker failure must not escape its daemon thread
             with self.lock:
                 self._delivery_failures += 1
             logger.error(
@@ -215,7 +215,7 @@ class ErrorEmailNotificationHandler(logging.Handler):
 
             self._fingerprints[fingerprint] = now
             self._fingerprints.move_to_end(fingerprint)
-        except Exception:
+        except Exception:  # noqa: BLE001 — logging handlers must never raise into application code
             # Logging handlers must not raise into the application or log recursively.
             self._dropped_notifications += 1
 
@@ -237,7 +237,7 @@ class ErrorEmailNotificationHandler(logging.Handler):
 
         try:
             message = record.getMessage()
-        except Exception:
+        except Exception:  # noqa: BLE001 — malformed LogRecord args must not break logging
             message = "<unformattable-message>"
         normalized_message = re.sub(
             r"\s+",
@@ -321,7 +321,7 @@ class ErrorEmailNotificationHandler(logging.Handler):
                         subject=subject,
                         body=body,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — delivery failures are isolated from the worker
                     with self.lock:
                         self._delivery_failures += 1
                     logger.error(

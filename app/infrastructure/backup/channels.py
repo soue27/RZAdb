@@ -264,7 +264,7 @@ class YandexDiskBackupChannel:
             retention_error = None
             try:
                 self._apply_retention(client, headers, dump_name)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — retention failure must not undo a confirmed upload
                 retention_status = "failed"
                 retention_error = f"Yandex Disk retention failed ({type(exc).__name__})"
                 logger.warning(

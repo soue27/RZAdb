@@ -285,7 +285,7 @@ async def test_maintenance_document_work_item_shows_status_author_and_urza_link(
         urza=SimpleNamespace(dispatch_name="УРЗА-ТО"),
         status=DocumentStatus.DRAFT,
         maintenance_type=SimpleNamespace(value="К"),
-        maintenance_date=datetime(2026, 10, 3).date(),
+        maintenance_date=datetime(2026, 10, 3, tzinfo=UTC).date(),
         created_at=datetime(2026, 10, 4, tzinfo=UTC),
         creator=SimpleNamespace(full_name="Инженер Иванов"),
     )

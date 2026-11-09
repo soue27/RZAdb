@@ -162,7 +162,6 @@ async def _render_settings(
             "actions_by_record": actions_by_record,
             "current_user": current_user,
             "urza_id": urza_id,
-            "is_archived": is_archived,
             "can_issue_task": can_issue_task,
             "error_message": error_message,
             "notice_message": notice_message,
@@ -649,16 +648,20 @@ async def update_urza_settings_record(
 
     notice_message = None
 
-    if new_file and old_file_id and old_file_id != new_file.id:
-        if not await _archive_file_safely(
+    if (
+        new_file
+        and old_file_id
+        and old_file_id != new_file.id
+        and not await _archive_file_safely(
             file_service,
             old_file_id,
             current_user.id,
-        ):
-            notice_message = (
-                "Изменение сохранено, но прежний файл не удалось "
-                "архивировать. Обратитесь к администратору."
-            )
+        )
+    ):
+        notice_message = (
+            "Изменение сохранено, но прежний файл не удалось "
+            "архивировать. Обратитесь к администратору."
+        )
 
     return await _render_settings(
         request,

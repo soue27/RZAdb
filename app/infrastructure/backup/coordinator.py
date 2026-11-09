@@ -20,7 +20,11 @@ from app.infrastructure.backup.channels import (
     LocalBackupChannel,
     YandexDiskBackupChannel,
 )
-from app.infrastructure.backup.dump import DumpArtifact, DumpCreationError, PostgresDumpService
+from app.infrastructure.backup.dump import (
+    DumpArtifact,
+    DumpCreationError,
+    PostgresDumpService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +114,7 @@ class BackupCoordinator:
             try:
                 backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
                 os.chmod(backup_dir, 0o700)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — preserve a manifest for any filesystem failure
                 self._manifest_write_error(run_id, exc)
 
             channel_ready = self._validate_enabled_channels(manifest)
@@ -163,7 +167,7 @@ class BackupCoordinator:
                     self._set_channel_result(
                         manifest, "local", ChannelResult("success", path=dump_name)
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — channel failures must not stop other channels
                     self._set_channel_failure(manifest, "local", exc)
             self._sync_legacy_local_status(manifest)
 
@@ -178,14 +182,14 @@ class BackupCoordinator:
                         dump_name=dump_name,
                     )
                     self._set_channel_result(manifest, "email", result)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — channel failures must not stop other channels
                     self._set_channel_failure(manifest, "email", exc)
 
             if channel_ready.get("yandex_disk"):
                 try:
                     result = self.yandex_disk_channel.upload(delivery_path, dump_name)
                     self._set_channel_result(manifest, "yandex_disk", result)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — channel failures must not stop other channels
                     self._set_channel_failure(manifest, "yandex_disk", exc)
 
             self._sync_legacy_local_status(manifest)
@@ -232,7 +236,7 @@ class BackupCoordinator:
                 continue
             try:
                 validate()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — channel validation failure is reported per channel
                 readiness[name] = False
                 self._set_channel_failure(manifest, name, exc)
         return readiness
@@ -252,14 +256,14 @@ class BackupCoordinator:
         self._sync_legacy_local_status(manifest)
         try:
             self._write_manifest_atomic(manifest_path, manifest)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — manifest write failures become a backup result
             self._manifest_write_error(run_id, exc)
 
         if manifest["channels"]["local"]["status"] == "success":
             try:
                 self.local_channel.apply_retention()
                 manifest["channels"]["local"]["retention_status"] = "success"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — retention must not invalidate a saved backup
                 manifest["channels"]["local"].update(
                     {
                         "retention_status": "failed",
@@ -276,7 +280,7 @@ class BackupCoordinator:
             manifest["status"] = self._overall_status(manifest)
             try:
                 self._write_manifest_atomic(manifest_path, manifest)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — manifest write failures become a backup result
                 self._manifest_write_error(run_id, exc)
 
         return {
@@ -330,9 +334,9 @@ class BackupCoordinator:
     ) -> None:
         """Записывает ошибку канала, не прерывая обработку остальных каналов.
         """
-        if isinstance(error, ChannelConfigurationError):
-            safe_error = str(error)
-        elif isinstance(error, ValueError) and name == "email":
+        if isinstance(error, ChannelConfigurationError) or (
+            isinstance(error, ValueError) and name == "email"
+        ):
             safe_error = str(error)
         elif isinstance(error, httpx.HTTPStatusError):
             safe_error = f"HTTP request failed with status {error.response.status_code}"

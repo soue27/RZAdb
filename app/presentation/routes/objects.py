@@ -164,9 +164,9 @@ async def get_object(
         EnterpriseService,
         Depends(get_enterprise_service),
     ],
-    otd_version: UUID | None = Query(default=None),
-    tab: str | None = Query(default=None),
-    archived: bool = Query(default=False),
+    otd_version: Annotated[UUID | None, Query()] = None,
+    tab: Annotated[str | None, Query()] = None,
+    archived: Annotated[bool, Query()] = False,
 ):
     """Возвращает краткие сведения об объекте после проверки доступа.
     """
@@ -1543,8 +1543,8 @@ async def get_substation_instructions(
         Depends(get_rza_instruction_service),
     ],
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    instruction_version: UUID | None = Query(default=None),
-    archived: bool = Query(default=False),
+    instruction_version: Annotated[UUID | None, Query()] = None,
+    archived: Annotated[bool, Query()] = False,
 ):
     """Отображает инструкцию РЗА, относящуюся к подстанции.
     """

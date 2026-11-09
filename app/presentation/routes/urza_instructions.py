@@ -189,8 +189,8 @@ async def get_urza_instruction(
         TaskService,
         Depends(get_task_service),
     ],
-    instruction_version: UUID | None = Query(default=None),
-    archived: bool = Query(default=False),
+    instruction_version: Annotated[UUID | None, Query()] = None,
+    archived: Annotated[bool, Query()] = False,
 ):
     """Отображает текущую инструкцию УРЗА и историю её версий.
     """

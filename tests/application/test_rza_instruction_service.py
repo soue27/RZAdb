@@ -355,7 +355,7 @@ async def test_get_versions_returns_version_details(
     version_2.change_justification = "Основание 2"
     version_2.created_by = user_id
     version_2.status = None
-    version_2.created_at = datetime(2026, 9, 20, 12, 0, 0)
+    version_2.created_at = datetime(2026, 9, 20, 12, 0, 0, tzinfo=UTC)
     version_2.creator = MagicMock()
     version_2.creator.full_name = "Иванов Иван Иванович"
     version_2.scan_file_id = uuid7()
@@ -373,7 +373,7 @@ async def test_get_versions_returns_version_details(
     version_1.change_justification = "Создание инструкции"
     version_1.created_by = user_id
     version_1.status = None
-    version_1.created_at = datetime(2026, 1, 1, 10, 0, 0)
+    version_1.created_at = datetime(2026, 1, 1, 10, 0, 0, tzinfo=UTC)
     version_1.creator = MagicMock()
     version_1.creator.full_name = "Петров Пётр Петрович"
     version_1.scan_file_id = uuid7()
@@ -396,8 +396,8 @@ async def test_get_versions_returns_version_details(
     )
 
     assert len(result) == 2
-    assert result[0].created_at == datetime(2026, 9, 20, 12, 0, 0)
-    assert result[1].created_at == datetime(2026, 1, 1, 10, 0, 0)
+    assert result[0].created_at == datetime(2026, 9, 20, 12, 0, 0, tzinfo=UTC)
+    assert result[1].created_at == datetime(2026, 1, 1, 10, 0, 0, tzinfo=UTC)
     assert result[0].version_number == 2
     assert result[0].created_by_full_name == "Иванов Иван Иванович"
     assert result[0].scan_file_name == "instruction_v2.pdf"

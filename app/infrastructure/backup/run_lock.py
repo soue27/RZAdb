@@ -3,6 +3,7 @@ from __future__ import annotations
 import fcntl
 import os
 from pathlib import Path
+from typing import Self
 
 
 class BackupAlreadyRunning(RuntimeError):
@@ -51,7 +52,7 @@ class BackupRunLock:
         os.close(self._descriptor)
         self._descriptor = None
 
-    def __enter__(self) -> BackupRunLock:
+    def __enter__(self) -> Self:
         """Захватывает блокировку при входе в контекстный менеджер.
 
         Returns:

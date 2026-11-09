@@ -16,10 +16,6 @@ from app.domain.enums import (
 from app.domain.task import Task
 from app.domain.task_history import TaskHistory
 from app.domain.user import User
-from app.domain.task import Task
-from app.domain.task_history import TaskHistory
-from app.domain.user import User
-from app.application.notifications.service import NotificationService
 
 
 class TaskService:
@@ -537,11 +533,13 @@ class TaskService:
                         "активного утверждённого результата."
                     )
 
-        if task.work_type is TaskWorkType.INSTRUCTION:
-            if getattr(task, "substation_id", None) is not None:
-                instruction_version = await self.task_repository.get_substation_instruction_version_by_task_id(task.id)
-                if instruction_version is None or instruction_version.status is not DocumentStatus.APPROVED:
-                    raise ValueError("Закрыть задачу можно после утверждения инструкции РЗА.")
+        if (
+            task.work_type is TaskWorkType.INSTRUCTION
+            and getattr(task, "substation_id", None) is not None
+        ):
+            instruction_version = await self.task_repository.get_substation_instruction_version_by_task_id(task.id)
+            if instruction_version is None or instruction_version.status is not DocumentStatus.APPROVED:
+                raise ValueError("Закрыть задачу можно после утверждения инструкции РЗА.")
 
         review_time = closed_at or datetime.now().astimezone()
         old_status = task.status
@@ -882,10 +880,12 @@ class TaskService:
 
         # Подстаночная инструкция связана с заданием. Инструкция URZA
         # является независимым процессом и не проверяется здесь.
-        if task.work_type == TaskWorkType.INSTRUCTION:
-            if getattr(task, "substation_id", None) is not None:
-                if await self.task_repository.get_substation_instruction_version_by_task_id(task.id) is None:
-                    raise ValueError("Создайте версию инструкции РЗА для этой задачи.")
+        if (
+            task.work_type == TaskWorkType.INSTRUCTION
+            and getattr(task, "substation_id", None) is not None
+            and await self.task_repository.get_substation_instruction_version_by_task_id(task.id) is None
+        ):
+            raise ValueError("Создайте версию инструкции РЗА для этой задачи.")
 
         completion_time = completed_at or datetime.now().astimezone()
 

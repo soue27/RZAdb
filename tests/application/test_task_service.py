@@ -397,7 +397,7 @@ async def test_reassign_executor_locks_current_owner_before_mutation() -> None:
         assigned_to=previous_assignee_id,
         status=TaskStatus.ASSIGNED,
         deleted_at=None,
-        deadline_at=datetime(2026, 9, 20, 10, 0),
+        deadline_at=datetime(2026, 9, 20, 10, 0, tzinfo=UTC),
     )
     service = make_task_service(repository, access_service)
 
@@ -405,7 +405,7 @@ async def test_reassign_executor_locks_current_owner_before_mutation() -> None:
         task=task,
         assigned_to=new_assignee_id,
         actor_id=manager_id,
-        assigned_at=datetime(2026, 9, 14, 9, 30),
+        assigned_at=datetime(2026, 9, 14, 9, 30, tzinfo=UTC),
     )
 
     assert calls == [
@@ -501,7 +501,7 @@ def service(
 async def test_create_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    now = datetime(2026, 9, 13, 10, 0)
+    now = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
 
     urza_id = uuid4()
     created_by = system_user_id
@@ -519,7 +519,7 @@ async def test_create_task(
     assert task.updated_by == created_by
     assert task.status == TaskStatus.CREATED
     assert task.created_at == now
-    assert task.deadline_at == datetime(2026, 9, 20, 10, 0)
+    assert task.deadline_at == datetime(2026, 9, 20, 10, 0, tzinfo=UTC)
     assert task.maintenance_type is None
 
     assert len(repository.history) == 1
@@ -543,7 +543,7 @@ async def test_create_task(
         (UserRole.ADMIN, True, None, True, False),
         (UserRole.ENGINEER, True, None, True, False),
         (UserRole.MANAGER, False, None, True, False),
-        (UserRole.MANAGER, True, datetime(2026, 1, 1), True, False),
+        (UserRole.MANAGER, True, datetime(2026, 1, 1, tzinfo=UTC), True, False),
         (UserRole.MANAGER, True, None, False, False),
     ],
 )
@@ -582,7 +582,7 @@ async def test_cannot_issue_task_for_archived_urza() -> None:
 
     class _URZARepository:
         async def get_by_id(self, _urza_id):
-            return SimpleNamespace(deleted_at=datetime(2026, 1, 1))
+            return SimpleNamespace(deleted_at=datetime(2026, 1, 1, tzinfo=UTC))
 
     class _Access:
         user_repository = _UserRepository()
@@ -929,8 +929,8 @@ async def test_create_maintenance_task(service: TaskService, system_user_id) -> 
 async def test_assign_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    assigned_at = datetime(2026, 9, 14, 15, 30)
+    created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    assigned_at = datetime(2026, 9, 14, 15, 30, tzinfo=UTC)
 
 
 
@@ -964,7 +964,7 @@ async def test_assign_task(
     assert task.updated_by == actor_id
     assert task.assigned_to == assigned_to
     assert task.assigned_at == assigned_at
-    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 15, 30)
+    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 15, 30, tzinfo=UTC)
 
     # Основной deadline считается от создания и при назначении не меняется.
     assert task.deadline_at == original_deadline
@@ -994,7 +994,7 @@ async def test_assign_task_rejects_invalid_status(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
         created_by=system_user_id,
-        now=datetime(2026, 9, 13, 10, 0),
+        now=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
     )
 
     assigned_to = uuid4()
@@ -1009,7 +1009,7 @@ async def test_assign_task_rejects_invalid_status(
         task=task,
         assigned_to=assigned_to,
         actor_id=system_user_id,
-        assigned_at=datetime(2026, 9, 13, 12, 0),
+        assigned_at=datetime(2026, 9, 13, 12, 0, tzinfo=UTC),
     )
 
     with pytest.raises(ValueError, match="Недопустимый переход"):
@@ -1017,7 +1017,7 @@ async def test_assign_task_rejects_invalid_status(
             task=task,
             assigned_to=uuid4(),
             actor_id=system_user_id,
-            assigned_at=datetime(2026, 9, 13, 13, 0),
+            assigned_at=datetime(2026, 9, 13, 13, 0, tzinfo=UTC),
         )
 
 
@@ -1025,9 +1025,9 @@ async def test_assign_task_rejects_invalid_status(
 async def test_accept_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    assigned_at = datetime(2026, 9, 13, 12, 0)
-    accepted_at = datetime(2026, 9, 14, 9, 30)
+    created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
+    accepted_at = datetime(2026, 9, 14, 9, 30, tzinfo=UTC)
 
     engineer_id = uuid4()
 
@@ -1060,10 +1060,10 @@ async def test_accept_task(
     assert task.status == TaskStatus.IN_PROGRESS
 
     # Acceptance deadline не меняется после принятия.
-    assert task.acceptance_deadline_at == datetime(2026, 9, 14, 12, 0)
+    assert task.acceptance_deadline_at == datetime(2026, 9, 14, 12, 0, tzinfo=UTC)
 
     # Основной deadline также остаётся от даты создания.
-    assert task.deadline_at == datetime(2026, 9, 20, 10, 0)
+    assert task.deadline_at == datetime(2026, 9, 20, 10, 0, tzinfo=UTC)
 
     assert len(repository.history) == 4
 
@@ -1092,7 +1092,7 @@ async def test_accept_task_only_by_assigned_engineer(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
         created_by=system_user_id,
-        now=datetime(2026, 9, 13, 10, 0),
+        now=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
     )
 
     configure_available_assignee(
@@ -1105,7 +1105,7 @@ async def test_accept_task_only_by_assigned_engineer(
         task=task,
         assigned_to=engineer_id,
         actor_id=system_user_id,
-        assigned_at=datetime(2026, 9, 13, 12, 0),
+        assigned_at=datetime(2026, 9, 13, 12, 0, tzinfo=UTC),
     )
 
     with pytest.raises(ValueError, match="назначенный инженер"):
@@ -1125,7 +1125,7 @@ async def test_accept_task_rejects_invalid_status(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
         created_by=system_user_id,
-        now=datetime(2026, 9, 13, 10, 0),
+        now=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
     )
 
     configure_available_assignee(
@@ -1138,7 +1138,7 @@ async def test_accept_task_rejects_invalid_status(
         task=task,
         assigned_to=engineer_id,
         actor_id=system_user_id,
-        assigned_at=datetime(2026, 9, 13, 12, 0),
+        assigned_at=datetime(2026, 9, 13, 12, 0, tzinfo=UTC),
     )
 
     await service.accept_task(
@@ -1159,9 +1159,9 @@ async def test_accept_task_rejects_invalid_status(
 async def test_reject_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    assigned_at = datetime(2026, 9, 13, 12, 0)
-    rejected_at = datetime(2026, 9, 14, 9, 30)
+    created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
+    rejected_at = datetime(2026, 9, 14, 9, 30, tzinfo=UTC)
 
     engineer_id = uuid4()
 
@@ -1320,9 +1320,9 @@ async def test_reject_task_only_by_assigned_engineer(
 async def test_reassign_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    first_assigned_at = datetime(2026, 9, 13, 12, 0)
-    reassigned_at = datetime(2026, 9, 14, 9, 30)
+    created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    first_assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
+    reassigned_at = datetime(2026, 9, 14, 9, 30, tzinfo=UTC)
 
     first_engineer_id = uuid4()
     second_engineer_id = uuid4()
@@ -1386,7 +1386,7 @@ async def test_reassign_task(
     assert task.assigned_at == reassigned_at
 
     # Срок принятия начинается заново для нового назначения.
-    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 9, 30)
+    assert task.acceptance_deadline_at == datetime(2026, 9, 15, 9, 30, tzinfo=UTC)
 
     # Срок выполнения всей задачи от создания НЕ меняется.
     assert task.deadline_at == original_deadline
@@ -1555,13 +1555,13 @@ async def test_reassign_task_rejects_unavailable_assignee_without_mutation(
 ) -> None:
     engineer_id = uuid4()
     unavailable_engineer_id = uuid4()
-    assigned_at = datetime(2026, 9, 13, 12, 0)
+    assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
         created_by=system_user_id,
-        now=datetime(2026, 9, 13, 10, 0),
+        now=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
     )
 
     configure_available_assignee(
@@ -1590,7 +1590,7 @@ async def test_reassign_task_rejects_unavailable_assignee_without_mutation(
             task=task,
             assigned_to=unavailable_engineer_id,
             actor_id=system_user_id,
-            assigned_at=datetime(2026, 9, 14, 9, 30),
+            assigned_at=datetime(2026, 9, 14, 9, 30, tzinfo=UTC),
         )
 
     assert task.assigned_to == original_assigned_to
@@ -1611,13 +1611,13 @@ async def test_reassign_task_rejects_unauthorized_actor_without_mutation(
 ) -> None:
     engineer_id = uuid4()
     unauthorized_actor_id = uuid4()
-    assigned_at = datetime(2026, 9, 13, 12, 0)
+    assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
 
     task = await service.create_task(
         urza_id=uuid4(),
         work_type=TaskWorkType.OTD,
         created_by=system_user_id,
-        now=datetime(2026, 9, 13, 10, 0),
+        now=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
     )
 
     configure_available_assignee(
@@ -1646,7 +1646,7 @@ async def test_reassign_task_rejects_unauthorized_actor_without_mutation(
             task=task,
             assigned_to=uuid4(),
             actor_id=unauthorized_actor_id,
-            assigned_at=datetime(2026, 9, 14, 9, 30),
+            assigned_at=datetime(2026, 9, 14, 9, 30, tzinfo=UTC),
         )
 
     assert task.assigned_to == original_assigned_to
@@ -1663,9 +1663,9 @@ async def test_reassign_task_rejects_unauthorized_actor_without_mutation(
 async def test_complete_task(
     service: TaskService, repository: FakeTaskRepository, system_user_id
 ) -> None:
-    created_at = datetime(2026, 9, 13, 10, 0)
-    assigned_at = datetime(2026, 9, 13, 12, 0)
-    completed_at = datetime(2026, 9, 15, 14, 30)
+    created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    assigned_at = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
+    completed_at = datetime(2026, 9, 15, 14, 30, tzinfo=UTC)
 
     engineer_id = uuid4()
 
@@ -1844,7 +1844,7 @@ async def test_complete_otd_task_with_otd_version(
 ) -> None:
     """Проверяет завершение ОТД-задачи при наличии результата ОТД."""
     engineer_id = uuid4()
-    completed_at = datetime(2026, 9, 15, 14, 30)
+    completed_at = datetime(2026, 9, 15, 14, 30, tzinfo=UTC)
 
     task = await service.create_task(
         urza_id=uuid4(),
@@ -3141,9 +3141,9 @@ def _instruction_review_dependencies(task: Task, system_user_id):
     ("version_status", "version_created_at"),
     [
         (None, None),
-        (DocumentStatus.DRAFT, datetime(2026, 9, 12, 10, 0)),
-        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 14, 10, 0)),
-        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0)),
+        (DocumentStatus.DRAFT, datetime(2026, 9, 12, 10, 0, tzinfo=UTC)),
+        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 14, 10, 0, tzinfo=UTC)),
+        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0, tzinfo=UTC)),
     ],
 )
 @pytest.mark.asyncio
@@ -3152,7 +3152,7 @@ async def test_complete_urza_instruction_task_ignores_instruction_versions(
     version_status,
     version_created_at,
 ) -> None:
-    task_created_at = datetime(2026, 9, 13, 10, 0)
+    task_created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
     task = _instruction_task(task_created_at, system_user_id)
     instruction_repository = FakeURZAInstructionRepository()
     if version_status is not None:
@@ -3180,9 +3180,9 @@ async def test_complete_urza_instruction_task_ignores_instruction_versions(
     ("version_status", "version_created_at"),
     [
         (None, None),
-        (DocumentStatus.DRAFT, datetime(2026, 9, 14, 10, 0)),
-        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 12, 10, 0)),
-        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0)),
+        (DocumentStatus.DRAFT, datetime(2026, 9, 14, 10, 0, tzinfo=UTC)),
+        (DocumentStatus.UNDER_REVIEW, datetime(2026, 9, 12, 10, 0, tzinfo=UTC)),
+        (DocumentStatus.APPROVED, datetime(2026, 9, 12, 10, 0, tzinfo=UTC)),
     ],
 )
 @pytest.mark.asyncio
@@ -3191,7 +3191,7 @@ async def test_close_urza_instruction_task_ignores_instruction_versions(
     version_status,
     version_created_at,
 ) -> None:
-    task_created_at = datetime(2026, 9, 13, 10, 0)
+    task_created_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
     task = _instruction_review_task(task_created_at, system_user_id)
     repository, access_service, manager_id, instruction_repository = (
         _instruction_review_dependencies(task, system_user_id)
@@ -3224,7 +3224,7 @@ async def test_substation_instruction_task_still_requires_task_result(
         created_by=system_user_id,
         assigned_to=system_user_id,
         status=TaskStatus.IN_PROGRESS,
-        created_at=datetime(2026, 9, 13, 10, 0),
+        created_at=datetime(2026, 9, 13, 10, 0, tzinfo=UTC),
         updated_by=system_user_id,
         deleted_at=None,
     )
@@ -3451,7 +3451,7 @@ async def test_assign_task_rejects_unavailable_assignee(
     ("active", "deleted_at"),
     [
         (False, None),
-        (True, datetime(2026, 1, 1)),
+        (True, datetime(2026, 1, 1, tzinfo=UTC)),
     ],
 )
 async def test_accept_task_rejects_inactive_or_deleted_assignee(
@@ -3518,11 +3518,11 @@ async def test_accept_task_rejects_inactive_or_deleted_assignee(
     ("method_name", "status", "active", "deleted_at"),
     [
         ("reject_task", TaskStatus.ASSIGNED, False, None),
-        ("reject_task", TaskStatus.ASSIGNED, True, datetime(2026, 1, 1)),
+        ("reject_task", TaskStatus.ASSIGNED, True, datetime(2026, 1, 1, tzinfo=UTC)),
         ("complete_task", TaskStatus.IN_PROGRESS, False, None),
-        ("complete_task", TaskStatus.IN_PROGRESS, True, datetime(2026, 1, 1)),
+        ("complete_task", TaskStatus.IN_PROGRESS, True, datetime(2026, 1, 1, tzinfo=UTC)),
         ("submit_for_review", TaskStatus.COMPLETED, False, None),
-        ("submit_for_review", TaskStatus.COMPLETED, True, datetime(2026, 1, 1)),
+        ("submit_for_review", TaskStatus.COMPLETED, True, datetime(2026, 1, 1, tzinfo=UTC)),
     ],
 )
 async def test_executor_actions_reject_inactive_or_deleted_assignee(

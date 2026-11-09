@@ -651,9 +651,12 @@ class SchemaService:
                 pass
             else:
                 actions.update({"approve", "return"})
-        elif record.status is DocumentStatus.APPROVED and user.role in _RECORD_ROLES:
-            if await self.repository.get_unfinished(schema_form.id) is None:
-                actions.add("new_record")
+        elif (
+            record.status is DocumentStatus.APPROVED
+            and user.role in _RECORD_ROLES
+            and await self.repository.get_unfinished(schema_form.id) is None
+        ):
+            actions.add("new_record")
 
         if user.role in {UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN}:
             actions.add("delete")
