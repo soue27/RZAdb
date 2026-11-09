@@ -56,16 +56,40 @@ _ACTION_LABELS = {
 
 
 def _action_labels(actions: set[str]) -> tuple[str, ...]:
+    """Преобразует коды доступных действий в подписи интерфейса.
+
+    Args:
+        actions: Множество кодов действий.
+
+    Returns:
+        Подписи в стабильном алфавитном порядке.
+    """
     return tuple(_ACTION_LABELS[action] for action in sorted(actions))
 
 
 def _document_work_item_status(status: DocumentStatus) -> tuple[str, str]:
+    """Возвращает подпись и CSS-класс статуса документной записи.
+
+    Args:
+        status: Статус документа.
+
+    Returns:
+        Пара из текстовой подписи и CSS-класса.
+    """
     if status is DocumentStatus.APPROVED:
         return _TASK_STATUS_LABELS["closed"], _TASK_STATUS_BADGES["closed"]
     return status.label, status.badge_class
 
 
 def _task_tab(status: TaskStatus) -> str:
+    """Определяет вкладку списка задач по статусу.
+
+    Args:
+        status: Статус задачи.
+
+    Returns:
+        Код вкладки work, review или completed.
+    """
     if status is TaskStatus.UNDER_REVIEW:
         return "review"
 
@@ -76,6 +100,14 @@ def _task_tab(status: TaskStatus) -> str:
 
 
 def _document_tab(status: DocumentStatus) -> str:
+    """Определяет вкладку списка документов по статусу.
+
+    Args:
+        status: Статус документа.
+
+    Returns:
+        Код вкладки work, review или completed.
+    """
     if status is DocumentStatus.UNDER_REVIEW:
         return "review"
 
@@ -87,6 +119,8 @@ def _document_tab(status: DocumentStatus) -> str:
 
 @dataclass(frozen=True)
 class WorkItem:
+    """Единый элемент рабочего списка, объединяющий задачи и документные действия разных типов.
+    """
     item_type: str
     title: str
     status: str
@@ -105,6 +139,8 @@ class WorkItem:
 
 
 class WorkItemSource(Protocol):
+    """Контракт источника, который формирует рабочие элементы для пользователя.
+    """
     async def list_for_user(
         self,
         user_id: UUID,
@@ -113,12 +149,21 @@ class WorkItemSource(Protocol):
 
 
 class TaskWorkItemSource:
+    """Формирует рабочие элементы из задач с учётом доступа и доступных действий.
+    """
     def __init__(
         self,
         repository: TaskRepository,
         access_service: AccessService,
         task_service: TaskService,
     ) -> None:
+        """Сохраняет репозитории и сервисы доступа и управления задачами.
+
+        Args:
+            repository: Репозиторий задач.
+            access_service: Сервис проверки доступа.
+            task_service: Сервис доступных действий и жизненного цикла задач.
+        """
         self.repository = repository
         self.access_service = access_service
         self.task_service = task_service
@@ -128,6 +173,15 @@ class TaskWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы задач, доступных пользователю.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы для исключения повторов.
+
+        Returns:
+            Задачи с подписями статусов, сроками, ссылками и доступными действиями.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return []
@@ -210,12 +264,16 @@ _INSPECTION_STATUS_LABELS = {
 
 
 class InspectionTaskWorkItemSource:
+    """Формирует рабочие элементы из задач осмотра подстанций.
+    """
     def __init__(
         self,
         repository: InspectionTaskRepository,
         access_service: AccessService,
         inspection_service: InspectionTaskService,
     ) -> None:
+        """Сохраняет репозитории и сервисы задач осмотра и проверки доступа.
+        """
         self.repository = repository
         self.access_service = access_service
         self.inspection_service = inspection_service
@@ -227,6 +285,16 @@ class InspectionTaskWorkItemSource:
         *,
         role: UserRole | None = None,
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы задач осмотра в области доступа пользователя.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+            role: Необязательная роль для уточнения набора элементов.
+
+        Returns:
+            Задачи осмотра с действиями и ссылками на результат.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return []
@@ -295,7 +363,14 @@ class InspectionTaskWorkItemSource:
 
 
 class ProgramWorkItemSource:
+    """Формирует рабочие элементы из программ УРЗА.
+    """
     def __init__(self, service: ProgramService) -> None:
+        """Сохраняет сервис программ УРЗА.
+
+        Args:
+            service: Сервис программ.
+        """
         self.service = service
 
     async def list_for_user(
@@ -303,6 +378,15 @@ class ProgramWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы программ УРЗА, ожидающих действий пользователя.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Программы с подписями статусов и доступными действиями.
+        """
         items = []
         for program in await self.service.list_standalone_work_items(user_id):
             actions = await self.service.get_available_actions(user_id, program)
@@ -330,7 +414,14 @@ class ProgramWorkItemSource:
 
 
 class MaintenanceWorkItemSource:
+    """Формирует рабочие элементы из записей технического обслуживания.
+    """
     def __init__(self, service: TORecordService) -> None:
+        """Сохраняет сервис технического обслуживания.
+
+        Args:
+            service: Сервис записей ТО.
+        """
         self.service = service
 
     async def list_for_user(
@@ -338,6 +429,15 @@ class MaintenanceWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы записей технического обслуживания.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Записи ТО с доступными действиями.
+        """
         items = []
         for record in await self.service.list_standalone_work_items(user_id):
             actions = await self.service.get_available_actions(user_id, record)
@@ -367,7 +467,14 @@ class MaintenanceWorkItemSource:
 
 
 class OTDWorkItemSource:
+    """Формирует рабочие элементы из версий формуляров ОТД.
+    """
     def __init__(self, service: OTDService) -> None:
+        """Сохраняет сервис формуляров ОТД.
+
+        Args:
+            service: Сервис ОТД.
+        """
         self.service = service
 
     async def list_for_user(
@@ -375,6 +482,15 @@ class OTDWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы версий ОТД.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Версии ОТД с доступными действиями.
+        """
         items = []
         for version in await self.service.repository.list_standalone_work_items():
             otd = version.otd
@@ -422,7 +538,14 @@ class OTDWorkItemSource:
 
 
 class SettingsWorkItemSource:
+    """Формирует рабочие элементы из записей изменений уставок.
+    """
     def __init__(self, service: SettingsService) -> None:
+        """Сохраняет сервис уставок.
+
+        Args:
+            service: Сервис формуляров и записей уставок.
+        """
         self.service = service
 
     async def list_for_user(
@@ -430,6 +553,15 @@ class SettingsWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы записей изменений уставок.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Записи уставок с доступными действиями.
+        """
         items = []
         for record in await self.service.repository.list_standalone_work_items():
             form = record.settings_form
@@ -479,7 +611,14 @@ class SettingsWorkItemSource:
 
 
 class SchemaWorkItemSource:
+    """Формирует рабочие элементы из записей схем УРЗА.
+    """
     def __init__(self, service: SchemaService) -> None:
+        """Сохраняет сервис схем УРЗА.
+
+        Args:
+            service: Сервис формуляров и записей схем.
+        """
         self.service = service
 
     async def list_for_user(
@@ -487,6 +626,15 @@ class SchemaWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы записей схем УРЗА.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Записи схем с доступными действиями.
+        """
         items = []
         for record in await self.service.repository.list_standalone_work_items():
             form = record.schema_form
@@ -535,7 +683,14 @@ class SchemaWorkItemSource:
 
 
 class InstructionWorkItemSource:
+    """Формирует рабочие элементы из версий инструкции УРЗА.
+    """
     def __init__(self, service: URZAInstructionService) -> None:
+        """Сохраняет сервис инструкций УРЗА.
+
+        Args:
+            service: Сервис версий инструкции.
+        """
         self.service = service
 
     async def list_for_user(
@@ -543,6 +698,15 @@ class InstructionWorkItemSource:
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы версий инструкции УРЗА.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Версии инструкции с доступными действиями.
+        """
         items = []
         for version in await self.service.repository.list_standalone_work_items():
             instruction = version.urza_instruction
@@ -584,12 +748,28 @@ class InstructionWorkItemSource:
 
 
 class RZAInstructionWorkItemSource:
+    """Формирует рабочие элементы из версий инструкции РЗА подстанции.
+    """
     def __init__(self, service: RZAInstructionService) -> None:
+        """Сохраняет сервис инструкции РЗА подстанции.
+
+        Args:
+            service: Сервис инструкции РЗА.
+        """
         self.service = service
 
     async def list_for_user(
         self, user_id: UUID, prior_items: tuple[WorkItem, ...] = ()
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы версий инструкции РЗА.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Версии инструкции с доступными действиями.
+        """
         items = []
         for version in await self.service.repository.list_standalone_work_items():
             instruction = version.rza_instruction
@@ -629,12 +809,28 @@ class RZAInstructionWorkItemSource:
 
 
 class SelectivitySchemeWorkItemSource:
+    """Формирует рабочие элементы из версий схем селективности подстанций.
+    """
     def __init__(self, service: SelectivitySchemeService) -> None:
+        """Сохраняет сервис схем селективности.
+
+        Args:
+            service: Сервис схем селективности.
+        """
         self.service = service
 
     async def list_for_user(
         self, user_id: UUID, prior_items: tuple[WorkItem, ...] = ()
     ) -> list[WorkItem]:
+        """Формирует рабочие элементы версий схем селективности.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы.
+
+        Returns:
+            Версии схем с доступными действиями.
+        """
         items = []
         for version in await self.service.repository.list_standalone_work_items():
             scheme = version.selectivity_scheme
@@ -677,9 +873,22 @@ class WorkItemService:
     """Собирает список рабочих элементов из независимых источников."""
 
     def __init__(self, sources: list[WorkItemSource]) -> None:
+        """Сохраняет набор источников рабочего списка.
+
+        Args:
+            sources: Специализированные источники задач и документных действий.
+        """
         self.sources = sources
 
     async def list_for_user(self, user_id: UUID) -> list[WorkItem]:
+        """Собирает и объединяет рабочие элементы всех подключённых источников.
+
+        Args:
+            user_id: Идентификатор пользователя.
+
+        Returns:
+            Общий список элементов, отсортированный для отображения в интерфейсе.
+        """
         items = []
         for source in self.sources:
             source_items = await source.list_for_user(user_id, tuple(items))
