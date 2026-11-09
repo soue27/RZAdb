@@ -16,9 +16,22 @@ class InspectionTaskRepository:
     """Работа с задачами осмотров через SQLAlchemy."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию для работы с задачами осмотров.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def create(self, task: InspectionTask) -> InspectionTask:
+        """Добавляет задачу осмотра и выполняет flush с обновлением серверных полей.
+
+        Args:
+            task: Создаваемая задача осмотра.
+
+        Returns:
+            Сохранённая модель задачи. Транзакция остаётся открытой.
+        """
         # Репозиторий сохраняет сущность, но не содержит бизнес-правил.
         self.session.add(task)
         await self.session.flush()
@@ -26,6 +39,14 @@ class InspectionTaskRepository:
         return task
 
     async def get_by_id(self, task_id: UUID) -> InspectionTask | None:
+        """Находит задачу осмотра по идентификатору без фильтрации по архивному статусу.
+
+        Args:
+            task_id: Идентификатор задачи.
+
+        Returns:
+            Задача осмотра или None.
+        """
         return await self.session.get(InspectionTask, task_id)
 
     async def refresh_for_mutation(
@@ -37,6 +58,14 @@ class InspectionTaskRepository:
         return task
 
     async def get_active_by_id(self, task_id: UUID) -> InspectionTask | None:
+        """Находит активную задачу осмотра и загружает связанные объекты и пользователей.
+
+        Args:
+            task_id: Идентификатор задачи.
+
+        Returns:
+            Активная задача с загруженными связями или None.
+        """
         result = await self.session.execute(
             select(InspectionTask)
             .options(
@@ -50,6 +79,11 @@ class InspectionTaskRepository:
         return result.scalar_one_or_none()
 
     async def list_active(self) -> list[InspectionTask]:
+        """Возвращает активные задачи осмотра с данными подстанций и участников.
+
+        Returns:
+            Список задач осмотра.
+        """
         result = await self.session.scalars(
             select(InspectionTask)
             .options(
@@ -63,6 +97,14 @@ class InspectionTaskRepository:
         return list(result.all())
 
     async def list_by_substation(self, substation_id: UUID) -> list[InspectionTask]:
+        """Возвращает задачи осмотра указанной подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Задачи подстанции в порядке, заданном запросом.
+        """
         result = await self.session.scalars(
             select(InspectionTask)
             .options(
@@ -86,6 +128,17 @@ class InspectionTaskRepository:
         enterprise_ids: set[UUID],
         now: datetime,
     ) -> tuple[dict[TaskStatus, int], int]:
+        """Подсчитывает задачи осмотра по статусам и число просроченных задач для панели.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            role: Роль пользователя.
+            enterprise_ids: Доступные предприятия.
+            now: Момент времени для расчёта просрочки.
+
+        Returns:
+            Словарь количества задач по статусам и число просроченных задач.
+        """
         if not enterprise_ids:
             return {}, 0
 
@@ -141,6 +194,14 @@ class InspectionTaskRepository:
         row = (await self.session.execute(query)).one()
         return dict(zip(statuses, row[:-1], strict=True)), row[-1]
     async def get_history(self, task_id: UUID) -> list[InspectionHistory]:
+        """Возвращает историю изменений задачи осмотра.
+
+        Args:
+            task_id: Идентификатор задачи.
+
+        Returns:
+            События истории в порядке, заданном запросом.
+        """
         result = await self.session.scalars(
             select(InspectionHistory)
             .options(selectinload(InspectionHistory.actor))
@@ -150,12 +211,28 @@ class InspectionTaskRepository:
         return list(result.all())
 
     async def save(self, task: InspectionTask) -> InspectionTask:
+        """Синхронизирует изменения задачи осмотра с базой данных без commit.
+
+        Args:
+            task: Изменённая задача.
+
+        Returns:
+            Та же модель задачи.
+        """
         # flush сохраняет изменения в текущей транзакции; commit выполняет сервис.
         await self.session.flush()
         await self.session.refresh(task)
         return task
 
     async def add_history(self, history: InspectionHistory) -> InspectionHistory:
+        """Добавляет событие истории задачи осмотра и выполняет flush без commit.
+
+        Args:
+            history: Создаваемое событие истории.
+
+        Returns:
+            Добавленное событие.
+        """
         # История нужна для аудита каждого изменения состояния задачи.
         self.session.add(history)
         await self.session.flush()
@@ -165,6 +242,14 @@ class InspectionTaskRepository:
             self,
             inspection: Inspection,
     ) -> Inspection:
+        """Добавляет результат осмотра и выполняет flush без commit.
+
+        Args:
+            inspection: Создаваемый результат осмотра.
+
+        Returns:
+            Добавленная запись осмотра.
+        """
         # Результат осмотра сохраняем вместе с задачей в одной транзакции.
         self.session.add(inspection)
         await self.session.flush()
@@ -175,6 +260,14 @@ class InspectionTaskRepository:
             self,
             actor_id: UUID,
     ) -> set[UUID]:
+        """Возвращает идентификаторы задач осмотра, по которым пользователь уже принимал решение проверки.
+
+        Args:
+            actor_id: Идентификатор проверяющего.
+
+        Returns:
+            Множество идентификаторов проверенных задач.
+        """
         result = await self.session.scalars(
             select(InspectionHistory.inspection_task_id)
             .where(
