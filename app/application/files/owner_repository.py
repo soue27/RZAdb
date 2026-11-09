@@ -32,9 +32,25 @@ class FileOwnerRepository:
     """Finds domain records that reference a file through explicit FKs."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию для поиска владельцев файлов.
+
+    Args:
+        session: Сессия текущей транзакции.
+    """
         self.session = session
 
     async def get_owners_by_file_id(self, file_id: UUID) -> list[FileOwner]:
+        """Находит все доменные записи, которые ссылаются на файл через явные внешние ключи.
+
+    Проверяются документные сущности УРЗА и подстанций; полиморфные
+    owner_type/owner_id не используются.
+
+    Args:
+        file_id: Идентификатор файла.
+
+    Returns:
+    Список владельцев с типом доменной записи и целью проверки доступа.
+    """
         owners: list[FileOwner] = []
 
         queries = (
