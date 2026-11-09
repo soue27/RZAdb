@@ -9,13 +9,13 @@ from app.domain.otd import OTD, OTDVersion
 
 class OTDRepository:
     """Выполняет запросы к формулярам ОТД и их версиям.
-"""
+    """
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет асинхронную SQLAlchemy-сессию.
 
         Args:
-        session: Сессия текущей транзакции.
-    """
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def get_by_id(
@@ -25,11 +25,11 @@ class OTDRepository:
         """Находит активный формуляр ОТД по идентификатору.
 
         Args:
-        otd_id: Идентификатор формуляра.
+            otd_id: Идентификатор формуляра.
 
         Returns:
-        Формуляр или None.
-    """
+            Формуляр или None.
+        """
         query = select(OTD).where(
             OTD.id == otd_id,
             OTD.deleted_at.is_(None),
@@ -43,11 +43,11 @@ class OTDRepository:
         """Находит активный формуляр ОТД устройства.
 
         Args:
-        urza_id: Идентификатор УРЗА.
+            urza_id: Идентификатор УРЗА.
 
         Returns:
-        Формуляр ОТД или None.
-    """
+            Формуляр ОТД или None.
+        """
         query = select(OTD).where(
             OTD.urza_id == urza_id,
             OTD.deleted_at.is_(None),
@@ -61,11 +61,11 @@ class OTDRepository:
         """Находит активную версию ОТД и загружает сведения о её авторе.
 
         Args:
-        version_id: Идентификатор версии.
+            version_id: Идентификатор версии.
 
         Returns:
-        Версия ОТД или None.
-    """
+            Версия ОТД или None.
+        """
         query = (
             select(OTDVersion)
             .options(selectinload(OTDVersion.created_by_user))
@@ -84,11 +84,11 @@ class OTDRepository:
         """Добавляет формуляр ОТД и выполняет flush без commit.
 
         Args:
-        otd: Создаваемый формуляр.
+            otd: Создаваемый формуляр.
 
         Returns:
-        Добавленная модель формуляра.
-    """
+            Добавленная модель формуляра.
+        """
         self.session.add(otd)
         await self.session.flush()
         return otd
@@ -100,11 +100,11 @@ class OTDRepository:
         """Добавляет новую версию ОТД и выполняет flush без commit.
 
         Args:
-        version: Создаваемая версия формуляра.
+            version: Создаваемая версия формуляра.
 
         Returns:
-        Добавленная версия.
-    """
+            Добавленная версия.
+        """
         self.session.add(version)
         await self.session.flush()
         return version
@@ -113,11 +113,11 @@ class OTDRepository:
         """Синхронизирует изменения версии ОТД и обновляет серверные поля.
 
         Args:
-        version: Изменённая версия.
+            version: Изменённая версия.
 
         Returns:
-        Та же модель версии.
-    """
+            Та же модель версии.
+        """
         await self.session.flush()
         await self.session.refresh(version)
         return version
@@ -129,11 +129,11 @@ class OTDRepository:
         """Возвращает последнюю активную версию формуляра ОТД.
 
         Args:
-        otd_id: Идентификатор формуляра.
+            otd_id: Идентификатор формуляра.
 
         Returns:
-        Версия с наибольшим номером или None.
-    """
+            Версия с наибольшим номером или None.
+        """
         query = (
             select(OTDVersion)
             .options(selectinload(OTDVersion.created_by_user))
@@ -150,11 +150,11 @@ class OTDRepository:
         """Возвращает все активные версии формуляра ОТД в обратном порядке нумерации.
 
         Args:
-        otd_id: Идентификатор формуляра.
+            otd_id: Идентификатор формуляра.
 
         Returns:
-        Список версий с загруженными сведениями об авторах.
-    """
+            Список версий с загруженными сведениями об авторах.
+        """
         query = (
             select(OTDVersion)
             .options(selectinload(OTDVersion.created_by_user))
@@ -171,11 +171,11 @@ class OTDRepository:
         """Возвращает максимальный номер версии формуляра.
 
         Args:
-        otd_id: Идентификатор формуляра.
+            otd_id: Идентификатор формуляра.
 
         Returns:
-        Максимальный номер или None, если версий нет.
-    """
+            Максимальный номер или None, если версий нет.
+        """
         query = select(func.max(OTDVersion.version_number)).where(
             OTDVersion.otd_id == otd_id
         )
@@ -185,11 +185,11 @@ class OTDRepository:
         """Находит активную версию ОТД, созданную в рамках задачи.
 
         Args:
-        task_id: Идентификатор задачи.
+            task_id: Идентификатор задачи.
 
         Returns:
-        Версия ОТД или None.
-    """
+            Версия ОТД или None.
+        """
         query = select(OTDVersion).where(
             OTDVersion.task_id == task_id,
             OTDVersion.deleted_at.is_(None),
@@ -200,8 +200,8 @@ class OTDRepository:
         """Возвращает версии ОТД без связанной задачи для самостоятельного рабочего списка.
 
         Returns:
-        Активные версии с загруженными формуляром, УРЗА и автором.
-    """
+            Активные версии с загруженными формуляром, УРЗА и автором.
+        """
         query = (
             select(OTDVersion)
             .options(
