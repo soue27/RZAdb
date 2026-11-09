@@ -17,7 +17,12 @@ from app.infrastructure.database.mixins import (
 
 
 class InspectionTask(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
-    """Задача на проведение осмотра подстанции."""
+    """Представляет задачу на проведение осмотра подстанции.
+
+    Хранит подстанцию, назначенного исполнителя, статус,
+    сроки назначения, принятия и выполнения, а также связь
+    с результатом проведённого осмотра.
+    """
 
     __tablename__ = "inspection_tasks"
 
