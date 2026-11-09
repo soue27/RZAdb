@@ -1,3 +1,5 @@
+"""Маршрут получения сведений о текущем пользователе."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -16,4 +18,6 @@ router = APIRouter(
 async def get_me(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> CurrentUserResponse:
+    """Возвращает публичные сведения о текущем пользователе.
+    """
     return CurrentUserResponse.model_validate(current_user)
