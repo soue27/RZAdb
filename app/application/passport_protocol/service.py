@@ -30,11 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 class PassportProtocolNotReadyError(Exception):
-    """The approved OTD project is missing or incomplete."""
+    """Утверждённый проект ОТД отсутствует или заполнен не полностью."""
 
 
 class PassportProtocolSourceError(Exception):
-    """A required source document is missing or cannot be read."""
+    """Обязательный исходный документ отсутствует или не может быть прочитан."""
 
 
 @dataclass(frozen=True)
