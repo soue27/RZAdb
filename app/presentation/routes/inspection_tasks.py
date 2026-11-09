@@ -1,3 +1,5 @@
+"""Маршруты создания, назначения, выполнения и проверки задач осмотра подстанций."""
+
 import logging
 from datetime import date
 from typing import Annotated
@@ -105,6 +107,8 @@ async def new_inspection_task(
     service: Annotated[InspectionTaskService, Depends(get_inspection_task_service)],
     tree: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму создания задачи осмотра подстанции.
+    """
     try:
         await objects.get_object(
             user_id=current_user.id, object_type="substation", object_id=substation_id
@@ -134,6 +138,8 @@ async def inspection_task_detail(
     service: Annotated[InspectionTaskService, Depends(get_inspection_task_service)],
     tree: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает сведения о задаче осмотра и доступные пользователю действия.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     can_manage = current_user.role is UserRole.MANAGER
     assignees = (
@@ -180,6 +186,8 @@ async def create_inspection_task(
     tree: Annotated[TreeService, Depends(get_tree_service)],
     assignee_id: Annotated[str, Form()] = "",
 ):
+    """Создаёт задачу осмотра подстанции.
+    """
     try:
         await objects.get_object(user_id=current_user.id, object_type="substation", object_id=substation_id)
     except ObjectAccessDeniedError as exc:
@@ -237,6 +245,8 @@ async def assign_inspection_task(
     repository: Annotated[InspectionTaskRepository, Depends(get_inspection_task_repository)],
     assignee_id: Annotated[UUID, Form()],
 ):
+    """Назначает задачу осмотра выбранному исполнителю.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     if current_user.role is not UserRole.MANAGER:
         raise HTTPException(
@@ -264,6 +274,8 @@ async def accept_inspection_task(
     service: Annotated[InspectionTaskService, Depends(get_inspection_task_service)],
     repository: Annotated[InspectionTaskRepository, Depends(get_inspection_task_repository)],
 ):
+    """Принимает назначенную задачу осмотра от имени исполнителя.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     try:
         await service.accept(task_id, actor_id=current_user.id)
@@ -301,6 +313,8 @@ async def complete_inspection_task(
     scan_file: Annotated[UploadFile | None, File()] = None,
     editable_file: Annotated[UploadFile | None, File()] = None,
 ):
+    """Принимает результат осмотра и завершает работу исполнителя.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     try:
         await service.validate_completion(
@@ -425,6 +439,8 @@ async def send_inspection_for_review(
     service: Annotated[InspectionTaskService, Depends(get_inspection_task_service)],
     repository: Annotated[InspectionTaskRepository, Depends(get_inspection_task_repository)],
 ):
+    """Передаёт результат осмотра руководителю на проверку.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     try:
         await service.send_to_review(task_id, actor_id=current_user.id)
@@ -444,6 +460,8 @@ async def review_inspection(
     repository: Annotated[InspectionTaskRepository, Depends(get_inspection_task_repository)],
     approve: Annotated[bool, Form()], reason: Annotated[str, Form()] = "",
 ):
+    """Утверждает результат осмотра или возвращает его на доработку.
+    """
     task = await _accessible_task(objects, repository, current_user, task_id)
     if current_user.role is not UserRole.MANAGER:
         raise HTTPException(
