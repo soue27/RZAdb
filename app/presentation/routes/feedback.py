@@ -1,3 +1,5 @@
+"""Маршруты отправки обратной связи с CSRF-защитой."""
+
 import logging
 import secrets
 from typing import Annotated
@@ -76,6 +78,8 @@ async def feedback_page(
     current_user: Annotated[User, Depends(get_current_user)],
     sent: bool = False,
 ):
+    """Отображает форму обратной связи и выдаёт CSRF-токен.
+    """
     return _render_feedback(
         request,
         current_user,
@@ -98,6 +102,8 @@ async def submit_feedback(
     message: Annotated[str, Form()],
     csrf_token: Annotated[str, Form()],
 ):
+    """Проверяет CSRF-токен и отправляет сообщение пользователя администрации.
+    """
     _validate_csrf_token(request, csrf_token)
 
     message = message.strip()
