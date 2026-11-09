@@ -7,13 +7,12 @@ from uuid import UUID
 from uuid6 import uuid7
 
 from app.application.files.repository import FileRepository
-from app.domain.file import File
-from app.infrastructure.storage.base import ObjectStorage
-
 from app.application.files.validation import (
     MIME_TYPES_BY_EXTENSION,
     validate_upload,
 )
+from app.domain.file import File
+from app.infrastructure.storage.base import ObjectStorage
 
 logger = logging.getLogger(__name__)
 
