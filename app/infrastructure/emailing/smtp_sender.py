@@ -13,6 +13,14 @@ class SMTPEmailSender:
     """Отправка email через SMTP без блокировки event loop."""
 
     def __init__(self, settings: Settings) -> None:
+        """Проверяет SMTP-конфигурацию и сохраняет настройки отправителя.
+
+        Args:
+            settings: Настройки SMTP-подключения.
+
+        Raises:
+            ValueError: Если отсутствуют обязательные параметры или несовместимы режимы TLS.
+        """
         self.settings = settings
 
         if not settings.smtp_host:
@@ -64,6 +72,16 @@ class SMTPEmailSender:
         attachments: Sequence[Path],
         attachment_name: str | None,
     ) -> None:
+        """Собирает EmailMessage и передаёт его синхронному SMTP-клиенту.
+
+        Args:
+            to: Адрес получателя.
+            subject: Тема.
+            body: Текст письма.
+            html_body: HTML-версия или None.
+            attachments: Пути к вложениям.
+            attachment_name: Имя единственного вложения или None.
+        """
         message = EmailMessage()
         message["From"] = self.settings.smtp_from_email
         message["To"] = to
@@ -84,6 +102,11 @@ class SMTPEmailSender:
         self._send_sync(message)
 
     def _send_sync(self, message: EmailMessage) -> None:
+        """Открывает SMTP-соединение, выполняет TLS/аутентификацию и отправляет письмо.
+
+        Args:
+            message: Подготовленное email-сообщение.
+        """
         host = self.settings.smtp_host
         port = self.settings.smtp_port
 
@@ -108,6 +131,12 @@ class SMTPEmailSender:
         client: smtplib.SMTP | smtplib.SMTP_SSL,
         message: EmailMessage,
     ) -> None:
+        """Выполняет SMTP-аутентификацию при необходимости и передаёт письмо серверу.
+
+        Args:
+            client: Подключённый SMTP- или SMTP_SSL-клиент.
+            message: Подготовленное email-сообщение.
+        """
         if self.settings.smtp_username:
             client.login(
                 self.settings.smtp_username,
