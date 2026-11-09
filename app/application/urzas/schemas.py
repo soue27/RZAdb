@@ -12,16 +12,19 @@ from app.domain.enums import (
 
 
 class URZAConnectionInfo(BaseModel):
+    """Краткие сведения о присоединении устройства РЗА."""
     id: UUID
     dispatch_name: str
 
 
 class URZASubstationInfo(BaseModel):
+    """Краткие сведения о подстанции установки устройства РЗА."""
     id: UUID
     dispatch_name: str
 
 
 class URZACreate(BaseModel):
+    """Проверяемые поля для создания и обновления устройства РЗА."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
     dispatch_name: str = Field(min_length=1, max_length=255)
@@ -37,12 +40,14 @@ class URZACreate(BaseModel):
     @field_validator("inventory_number", mode="before")
     @classmethod
     def empty_inventory_number_to_none(cls, value):
+        """Преобразует пустой инвентарный номер в None."""
         if isinstance(value, str) and not value.strip():
             return None
         return value
 
 
 class URZADetails(BaseModel):
+    """Сведения об устройстве РЗА вместе с присоединением и подстанцией."""
     id: UUID
     dispatch_name: str
     rdu_subordination: bool
