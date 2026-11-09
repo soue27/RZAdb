@@ -117,7 +117,7 @@ class UserService:
         Raises:
             UserOperationError: При недостатке прав, попытке изменить себя,
                 отсутствии пользователя/предприятия, некорректных данных
-                или занятом email.
+            или занятом email.
         """
         self._require_superadmin(actor)
         if user_id == actor.id:
