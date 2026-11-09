@@ -19,11 +19,29 @@ class URZAService:
     """Бизнес-логика работы с устройствами РЗА."""
 
     def __init__(self, repository: URZARepository) -> None:
+        """Сохраняет репозиторий устройств РЗА.
+            
+            Args:
+            repository: Репозиторий для чтения и сохранения устройств.
+        """
         self.repository = repository
 
     async def get_details(
         self, urza_id: UUID, *, include_archived: bool = False
     ) -> URZADetails:
+        """Возвращает подробные сведения об устройстве РЗА.
+            
+            Args:
+            urza_id: Идентификатор устройства.
+            include_archived: Разрешает получить архивную запись.
+            
+            Returns:
+            DTO устройства с краткими сведениями о присоединении и подстанции.
+            
+            Raises:
+            ObjectNotFoundError: Если устройство не найдено или архивировано,
+                а include_archived не установлен.
+        """
         urza = (
             await self.repository.get_by_id_including_deleted(urza_id)
             if include_archived
@@ -61,6 +79,25 @@ class URZAService:
             actor_id: UUID,
             data: URZACreate,
     ) -> URZADetails:
+        """Создаёт устройство РЗА в активном присоединении.
+            
+            Перед созданием блокирует присоединение и проверяет, что оно и его
+            подстанция активны. Диспетчерское имя должно быть уникальным в пределах
+            присоединения.
+            
+            Args:
+            connection_id: Идентификатор присоединения-владельца.
+            actor_id: Идентификатор пользователя, создающего запись.
+            data: Проверенные характеристики нового устройства.
+            
+            Returns:
+            DTO созданного устройства.
+            
+            Raises:
+            ObjectNotFoundError: Если присоединение или подстанция отсутствуют
+                либо архивированы.
+            URZANameConflictError: Если имя уже занято активным устройством.
+        """
         if not await self.repository.lock_active_connection(connection_id):
             raise ObjectNotFoundError
         if not await self.repository.has_active_connection(connection_id):
@@ -99,6 +136,24 @@ class URZAService:
         actor_id: UUID,
         data: URZACreate,
     ) -> URZADetails:
+        """Обновляет характеристики существующего активного устройства РЗА.
+            
+            Проверяет активность устройства и его цепочки владельца, а также
+            уникальность диспетчерского имени в пределах присоединения.
+            
+            Args:
+            urza_id: Идентификатор изменяемого устройства.
+            actor_id: Идентификатор пользователя, выполняющего изменение.
+            data: Проверенные новые характеристики устройства.
+            
+            Returns:
+            DTO обновлённого устройства.
+            
+            Raises:
+            ObjectNotFoundError: Если устройство или его владелец отсутствуют
+                либо архивированы.
+            URZANameConflictError: Если имя уже занято другим активным устройством.
+        """
         urza = await self.repository.get_by_id(urza_id)
 
         if urza is None:
