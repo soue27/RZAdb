@@ -7,6 +7,8 @@ from app.domain.enums import HighestVoltage, OperationalCurrentType
 
 
 class SubstationDetails(BaseModel):
+    """Данные подстанции, используемые для отображения."""
+
     id: UUID
     dispatch_name: str
     highest_voltage: HighestVoltage
@@ -19,6 +21,8 @@ class SubstationDetails(BaseModel):
 
 
 class SubstationCreate(BaseModel):
+    """Проверяемые поля для создания подстанции."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     dispatch_name: str = Field(min_length=1, max_length=255)
@@ -33,12 +37,15 @@ class SubstationCreate(BaseModel):
     @field_validator("sap_code", "asureo_code", "address", mode="before")
     @classmethod
     def empty_optional_strings_to_none(cls, value):
+        """Преобразует пустые необязательные строки в None."""
         if isinstance(value, str) and not value.strip():
             return None
         return value
 
 
 class SubstationUpdate(BaseModel):
+    """Проверяемые поля для обновления сведений о подстанции."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     dispatch_name: str = Field(min_length=1, max_length=255)
@@ -53,6 +60,7 @@ class SubstationUpdate(BaseModel):
     @field_validator("sap_code", "asureo_code", "address", mode="before")
     @classmethod
     def empty_optional_strings_to_none(cls, value):
+        """Преобразует пустые необязательные строки в None."""
         if isinstance(value, str) and not value.strip():
             return None
         return value
