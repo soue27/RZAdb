@@ -18,6 +18,11 @@ class SettingsForm(
     SoftDeleteMixin,
     Base,
 ):
+    """Объединяет записи об изменениях уставок устройства РЗА.
+
+    Для одного устройства предусмотрена одна запись формуляра;
+    отдельные изменения параметров хранятся в SettingsRecord.
+    """
     __tablename__ = "settings_forms"
 
     urza_id: Mapped[UUID] = mapped_column(
