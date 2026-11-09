@@ -39,16 +39,22 @@ class PassportProtocolSourceError(Exception):
 
 @dataclass(frozen=True)
 class PreparedPassportDocument:
+    """Имя и бинарное содержимое одного подготовленного документа паспорта.
+    """
     filename: str
     content: bytes
 
 
 @dataclass(frozen=True)
 class PreparedPassportProtocol:
+    """Набор документов, подготовленных для выдачи паспорта УРЗА.
+    """
     documents: tuple[PreparedPassportDocument, ...]
 
 
 class PassportProtocolService:
+    """Собирает документы ОТД, уставок, схем и ТО в комплект паспорта УРЗА.
+    """
     def __init__(
         self,
         *,
@@ -62,6 +68,19 @@ class PassportProtocolService:
         file_service: FileService,
         otd_template_path: Path = Path("docs/OTD.docx"),
     ) -> None:
+        """Сохраняет сервисы документов, файлов и шаблонов, необходимые для сборки паспорта.
+
+        Args:
+            otd_service: Сервис формуляра ОТД.
+            settings_service: Сервис уставок.
+            schema_service: Сервис схем.
+            maintenance_service: Сервис технического обслуживания.
+            urza_service: Сервис устройств РЗА.
+            document_template_service: Сервис DOCX-шаблонов.
+            file_access_service: Сервис проверки доступа к исходным файлам.
+            file_service: Сервис чтения бинарного содержимого.
+            otd_template_path: Путь к шаблону титульного/основного документа ОТД.
+        """
         self.otd_service = otd_service
         self.settings_service = settings_service
         self.schema_service = schema_service
@@ -78,6 +97,22 @@ class PassportProtocolService:
         user_id: UUID,
         urza_id: UUID,
     ) -> PreparedPassportProtocol:
+        """Подготавливает комплект документов паспорта указанного УРЗА.
+
+        Проверяет доступ пользователя, получает утверждённые и связанные документы,
+        формирует DOCX и собирает бинарные вложения в единый результат.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            urza_id: Идентификатор устройства.
+
+        Returns:
+            Набор подготовленных документов с именами и содержимым.
+
+        Raises:
+            PassportProtocolNotReadyError: Если обязательный утверждённый проект ОТД отсутствует.
+            PassportProtocolSourceError: Если исходный документ отсутствует или не читается.
+        """
         versions = await self.otd_service.get_versions(user_id, urza_id)
         approved_otd = next(
             (version for version in versions if version.status is DocumentStatus.APPROVED),
@@ -132,6 +167,16 @@ class PassportProtocolService:
         return PreparedPassportProtocol(tuple(documents))
 
     def _prepare_otd(self, version, hierarchy, urza) -> bytes:
+        """Формирует DOCX-документ ОТД на основе утверждённой версии и иерархии УРЗА.
+
+        Args:
+            version: Утверждённая версия ОТД.
+            hierarchy: Наименования объектов иерархии.
+            urza: Устройство, для которого формируется паспорт.
+
+        Returns:
+            Бинарное содержимое сформированного DOCX.
+        """
         values = {
             "$Холдинг": hierarchy.holding,
             "$Филиал": hierarchy.branch,
@@ -172,6 +217,21 @@ class PassportProtocolService:
         hierarchy: DocumentFormHierarchy,
         user_id: UUID,
     ) -> PreparedPassportDocument:
+        """Подготавливает документный раздел паспорта из записи и её файла.
+
+        Args:
+            base_filename: Базовое имя результирующего файла.
+            form_type: Тип документа для выбора шаблона.
+            record: Утверждённая запись документа.
+            hierarchy: Иерархические наименования для шаблона.
+            user_id: Идентификатор пользователя, от имени которого читается файл.
+
+        Returns:
+            Подготовленный документ с именем и бинарным содержимым.
+
+        Raises:
+            PassportProtocolSourceError: Если требуемый исходный файл отсутствует или не читается.
+        """
         if record is None:
             temporary_path: Path | None = None
             try:
