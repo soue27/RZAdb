@@ -1,3 +1,5 @@
+"""Маршруты получения объектов, дерева, сведений о подстанциях, присоединениях и устройствах РЗА."""
+
 import logging
 import re
 from pathlib import Path
@@ -98,6 +100,8 @@ CONNECTION_CREATE_ROLES = {
 
 
 def can_edit_substation(user: User) -> bool:
+    """Определяет, может ли пользователь редактировать сведения подстанции по своей роли.
+    """
     return user.role in {
         UserRole.ADMIN,
         UserRole.MANAGER,
@@ -164,6 +168,8 @@ async def get_object(
     tab: str | None = Query(default=None),
     archived: bool = Query(default=False),
 ):
+    """Возвращает краткие сведения об объекте после проверки доступа.
+    """
     try:
         selected_object = await object_service.get_object(
             user_id=current_user.id,
@@ -416,6 +422,8 @@ async def download_passport_protocol(
         Depends(get_passport_protocol_service),
     ],
 ):
+    """Формирует комплект документов паспорта УРЗА и возвращает его ZIP-архивом.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -475,6 +483,8 @@ async def get_sidebar_tree(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
     archive_only: bool = Query(default=False),
 ):
+    """Возвращает HTML-фрагмент дерева объектов для боковой панели.
+    """
     tree = await tree_service.get_tree(
         user_id=current_user.id,
         archive_only=archive_only,
@@ -499,6 +509,8 @@ async def search_sidebar_tree(
     archive_only: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
 ):
+    """Выполняет поиск по доступным объектам дерева и возвращает страницу результатов.
+    """
     normalized_query = query.strip()
     page = None
     if len(normalized_query) >= 2:
@@ -531,6 +543,8 @@ async def get_substation_inspections(
     ],
     archived: bool = Query(default=False),
 ):
+    """Возвращает список результатов осмотров выбранной подстанции.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -576,6 +590,8 @@ async def download_substation_inspection_template(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     archived: bool = Query(default=False),
 ):
+    """Возвращает шаблон документа осмотра подстанции для скачивания.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -622,6 +638,8 @@ async def get_substation_details(
     ],
     archived: bool = Query(default=False),
 ):
+    """Отображает подробную информацию о подстанции и связанные разделы.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -878,6 +896,8 @@ async def get_new_connection_form(
     substation_service: Annotated[SubstationService, Depends(get_substation_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму создания присоединения в подстанции.
+    """
     await _get_accessible_substation(
         object_service, substation_service, current_user, substation_id
     )
@@ -901,6 +921,8 @@ async def post_new_connection(
     sap_code: Annotated[str, Form()] = "",
     asureo_code: Annotated[str, Form()] = "",
 ):
+    """Создаёт присоединение в выбранной подстанции.
+    """
     await _get_accessible_substation(
         object_service, substation_service, current_user, substation_id
     )
@@ -961,6 +983,8 @@ async def get_edit_connection_form(
     connection_service: Annotated[ConnectionService, Depends(get_connection_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму редактирования присоединения.
+    """
     await _check_connection_access(object_service, current_user, connection_id)
     _require_connection_create_role(current_user)
 
@@ -1002,6 +1026,8 @@ async def post_edit_connection(
     sap_code: Annotated[str, Form()] = "",
     asureo_code: Annotated[str, Form()] = "",
 ):
+    """Сохраняет изменения присоединения.
+    """
     await _check_connection_access(object_service, current_user, connection_id)
     _require_connection_create_role(current_user)
 
@@ -1075,6 +1101,8 @@ async def get_new_urza_form(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму создания устройства РЗА в присоединении.
+    """
     await _check_connection_access(
         object_service,
         current_user,
@@ -1108,6 +1136,8 @@ async def post_new_urza(
     room_category: Annotated[str, Form()] = "",
     complexity: Annotated[str, Form()] = "",
 ):
+    """Создаёт устройство РЗА в выбранном присоединении.
+    """
     await _check_connection_access(
         object_service,
         current_user,
@@ -1186,6 +1216,8 @@ async def get_new_department_substation_form(
     enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму создания подстанции для производственного отделения.
+    """
     await _check_department_access(object_service, current_user, enterprise_id)
     _require_substation_create_role(current_user)
 
@@ -1234,6 +1266,8 @@ async def post_new_department_substation(
     latitude: Annotated[str, Form()] = "",
     longitude: Annotated[str, Form()] = "",
 ):
+    """Создаёт подстанцию в производственном отделении.
+    """
     await _check_department_access(object_service, current_user, enterprise_id)
     _require_substation_create_role(current_user)
 
@@ -1311,6 +1345,8 @@ async def get_department_edit_form(
     enterprise_service: Annotated[EnterpriseService, Depends(get_enterprise_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму редактирования производственного отделения.
+    """
     await _check_department_access(object_service, current_user, enterprise_id)
     _require_department_edit_role(current_user)
 
@@ -1350,6 +1386,8 @@ async def post_department_edit_form(
     short_name: Annotated[str, Form()] = "",
     sap_code: Annotated[str, Form()] = "",
 ):
+    """Сохраняет изменения производственного отделения.
+    """
     await _check_department_access(object_service, current_user, enterprise_id)
     _require_department_edit_role(current_user)
 
@@ -1418,6 +1456,8 @@ async def get_substation_edit_form(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     substation_service: Annotated[SubstationService, Depends(get_substation_service)],
 ):
+    """Отображает форму редактирования подстанции.
+    """
     await _check_substation_access(object_service, current_user, substation_id)
     _require_substation_edit_role(current_user)
     substation = await substation_service.get_details(substation_id)
@@ -1444,6 +1484,8 @@ async def post_substation_edit_form(
     latitude: Annotated[str, Form()] = "",
     longitude: Annotated[str, Form()] = "",
 ):
+    """Сохраняет изменения подстанции.
+    """
     await _check_substation_access(object_service, current_user, substation_id)
     _require_substation_edit_role(current_user)
 
@@ -1504,6 +1546,8 @@ async def get_substation_instructions(
     instruction_version: UUID | None = Query(default=None),
     archived: bool = Query(default=False),
 ):
+    """Отображает инструкцию РЗА, относящуюся к подстанции.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -1593,6 +1637,8 @@ async def get_substation_selectivity_schemes(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     archived: bool = Query(default=False),
 ):
+    """Отображает схемы селективности подстанции и историю их версий.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
