@@ -15,8 +15,8 @@ class SubstationService:
 
     def __init__(self, repository: SubstationRepository) -> None:
         """Сохраняет репозиторий подстанций.
-
-        Args:
+            
+            Args:
             repository: Репозиторий для чтения и сохранения подстанций.
         """
         self.repository = repository
@@ -29,16 +29,16 @@ class SubstationService:
         data: SubstationUpdate,
     ) -> SubstationDetails:
         """Обновляет основные сведения существующей активной подстанции.
-
-        Args:
+            
+            Args:
             substation_id: Идентификатор подстанции.
             actor_id: Идентификатор пользователя, выполнившего изменение.
             data: Проверенные новые значения полей.
-
-        Returns:
+            
+            Returns:
             Обновлённые сведения о подстанции.
-
-        Raises:
+            
+            Raises:
             ObjectNotFoundError: Если подстанция отсутствует или архивирована.
         """
         substation = await self.repository.get_by_id(substation_id)
@@ -58,15 +58,15 @@ class SubstationService:
         self, substation_id: UUID, *, include_archived: bool = False
     ) -> SubstationDetails:
         """Возвращает сведения о подстанции.
-
-        Args:
+            
+            Args:
             substation_id: Идентификатор подстанции.
             include_archived: Разрешает получить сведения об архивной записи.
-
-        Returns:
+            
+            Returns:
             DTO с основными сведениями и техническими характеристиками.
-
-        Raises:
+            
+            Raises:
             ObjectNotFoundError: Если подстанция не найдена или архивирована,
                 а include_archived не установлен.
         """
@@ -94,13 +94,13 @@ class SubstationService:
             data: SubstationCreate,
     ) -> SubstationDetails:
         """Создаёт подстанцию в указанном предприятии.
-
-        Args:
+            
+            Args:
             enterprise_id: Идентификатор предприятия-владельца.
             actor_id: Идентификатор пользователя, создающего запись.
             data: Проверенные поля новой подстанции.
-
-        Returns:
+            
+            Returns:
             DTO созданной подстанции.
         """
         substation = Substation(
