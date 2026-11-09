@@ -14,8 +14,7 @@ class SubstationRepository:
         """Сохраняет сессию для запросов к подстанциям.
 
         Args:
-        session: Асинхронная SQLAlchemy-сессия текущей транзакции.
-
+            session: Асинхронная SQLAlchemy-сессия текущей транзакции.
         """
         self.session = session
 
@@ -26,11 +25,10 @@ class SubstationRepository:
         """Находит подстанцию по идентификатору, включая архивные записи.
 
         Args:
-        substation_id: Идентификатор подстанции.
+            substation_id: Идентификатор подстанции.
 
         Returns:
-        Подстанция или None, если запись отсутствует.
-
+            Подстанция или None, если запись отсутствует.
         """
         return await self.session.get(Substation, substation_id)
 
@@ -41,11 +39,10 @@ class SubstationRepository:
         архивирования в рамках текущей транзакции.
 
         Args:
-        substation_id: Идентификатор подстанции.
+            substation_id: Идентификатор подстанции.
 
         Returns:
-        True, если активная подстанция найдена и заблокирована.
-
+            True, если активная подстанция найдена и заблокирована.
         """
         substation = await lock_owner_row(
             self.session,
@@ -60,11 +57,10 @@ class SubstationRepository:
         Транзакция не фиксируется.
 
         Args:
-        substation: Модель подстанции.
+            substation: Модель подстанции.
 
         Returns:
-        Та же модель подстанции.
-
+            Та же модель подстанции.
         """
         self.session.add(substation)
         await self.session.flush()
@@ -89,13 +85,12 @@ class SubstationRepository:
         """Возвращает подстанции выбранных предприятий.
 
         Args:
-        enterprise_ids: Идентификаторы предприятий.
-        include_archived: Включать ли архивированные подстанции.
+            enterprise_ids: Идентификаторы предприятий.
+            include_archived: Включать ли архивированные подстанции.
 
         Returns:
-        Подстанции, отсортированные по диспетчерскому наименованию.
-        При пустом наборе идентификаторов возвращает пустой список.
-
+            Подстанции, отсортированные по диспетчерскому наименованию.
+            При пустом наборе идентификаторов возвращает пустой список.
         """
 
         if not enterprise_ids:
