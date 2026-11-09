@@ -7,6 +7,8 @@ from uuid6 import uuid7
 
 
 class UUIDMixin:
+    """Добавляет модели первичный ключ UUID7."""
+
     id: Mapped[UUID] = mapped_column(
         Uuid,
         primary_key=True,
@@ -15,6 +17,8 @@ class UUIDMixin:
 
 
 class TimestampMixin:
+    """Добавляет временные метки создания и изменения с авторами операций."""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -42,6 +46,8 @@ class TimestampMixin:
 
 
 class SoftDeleteMixin:
+    """Добавляет поля мягкого удаления и пользователя, выполнившего его."""
+
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
