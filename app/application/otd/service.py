@@ -23,17 +23,34 @@ _AUTHOR_ROLES = {
 
 
 class OTDService:
+    """Управляет формуляром ОТД, его версиями и процессом согласования.
+    """
     def __init__(
         self,
         repository: OTDRepository,
         access_service: AccessService,
         task_repository: TaskRepository | None = None,
     ) -> None:
+        """Сохраняет зависимости для работы с ОТД, проверки доступа и задач.
+
+        Args:
+        repository: Репозиторий формуляров и версий ОТД.
+        access_service: Централизованный сервис проверки доступа.
+        task_repository: Необязательный репозиторий для проверки связанных задач.
+        """
         self.repository = repository
         self.access_service = access_service
         self.task_repository = task_repository
 
     def _to_version_details(self, version: OTDVersion) -> OTDVersionDetails:
+        """Преобразует доменную версию ОТД в DTO для отображения.
+
+        Args:
+        version: Версия формуляра.
+
+        Returns:
+            DTO с характеристиками версии и сведениями об авторе.
+        """
         return OTDVersionDetails(
             id=version.id,
             version_number=version.version_number,
@@ -64,6 +81,15 @@ class OTDService:
         user_id: UUID,
         urza_id: UUID,
     ) -> OTD | None:
+        """Возвращает формуляр ОТД устройства, если пользователь имеет право чтения.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Формуляр ОТД или None при отсутствии доступа либо формуляра.
+        """
         if not await self.access_service.can_access_urza(
             user_id,
             urza_id,
@@ -77,6 +103,15 @@ class OTDService:
             user_id: UUID,
             urza_id: UUID,
     ) -> OTDVersion | None:
+        """Возвращает текущую версию ОТД после проверки доступа к устройству.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Последняя активная версия или None.
+        """
         if not await self.access_service.can_access_urza(
                 user_id,
                 urza_id,
@@ -95,6 +130,16 @@ class OTDService:
             user_id: UUID,
             urza_id: UUID,
     ) -> list[OTDVersion]:
+        """Возвращает историю активных версий ОТД устройства.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Версии ОТД в порядке, заданном репозиторием; при отсутствии доступа
+            или формуляра возвращает пустой список.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return []
 
@@ -114,6 +159,27 @@ class OTDService:
         task_id: UUID | None = None,
         **version_fields,
     ) -> OTD:
+        """Создаёт формуляр ОТД и его первую версию.
+
+        Проверяет право изменения, роль автора и отсутствие существующего формуляра.
+        Если передана задача, проверяет, что она подходит для создания результата ОТД.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        effective_date: Дата вступления версии в силу.
+        urza_service_life: Срок службы устройства.
+        urza_purpose: Назначение устройства по ОТД.
+        task_id: Необязательная задача, в рамках которой создаётся результат.
+            **version_fields: Дополнительные технические характеристики версии.
+
+        Returns:
+            Созданный формуляр ОТД.
+
+        Raises:
+        PermissionError: Если пользователь не имеет права изменения.
+        ValueError: Если формуляр уже существует или автор/задача не подходят.
+        """
         if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
@@ -159,6 +225,15 @@ class OTDService:
             user_id: UUID,
             version_id: UUID,
     ) -> OTDVersionDetails | None:
+        """Возвращает DTO версии ОТД после проверки принадлежности версии устройству.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        version_id: Идентификатор версии.
+
+        Returns:
+            DTO версии или None, если версия недоступна.
+        """
         version = await self.repository.get_version_by_id(version_id)
 
         if version is None:
@@ -186,6 +261,23 @@ class OTDService:
             urza_purpose: OTDPurpose,
             **kwargs,
     ) -> OTDVersion:
+        """Создаёт следующую версию существующего формуляра ОТД.
+
+        Args:
+        user_id: Идентификатор автора.
+        otd_id: Идентификатор формуляра.
+        effective_date: Дата вступления версии в силу.
+        urza_service_life: Срок службы устройства.
+        urza_purpose: Назначение устройства по ОТД.
+            **kwargs: Дополнительные характеристики новой версии.
+
+        Returns:
+            Созданная версия ОТД.
+
+        Raises:
+        PermissionError: Если пользователь не имеет права изменения.
+        ValueError: Если формуляр или автор не подходят для операции.
+        """
         otd = await self.repository.get_by_id(otd_id)
 
         if otd is None:
@@ -228,6 +320,20 @@ class OTDService:
         urza_id: UUID,
         task_id: UUID,
     ):
+        """Проверяет, что задача допускает создание результата ОТД.
+
+        Args:
+        user_id: Идентификатор исполнителя.
+        urza_id: Идентификатор устройства.
+        task_id: Идентификатор задачи.
+
+        Returns:
+            Проверенная задача.
+
+        Raises:
+        PermissionError: Если пользователь не имеет доступа или не назначен исполнителем.
+        ValueError: Если задача не относится к ОТД или не находится в работе.
+        """
         if self.task_repository is None:
             raise RuntimeError("TaskRepository не настроен для результата ОТД.")
         task = await self.task_repository.get_by_id(task_id)
@@ -253,6 +359,19 @@ class OTDService:
         version_id: UUID,
         urza_id: UUID,
     ) -> OTDVersion:
+        """Находит версию ОТД и проверяет её принадлежность указанному устройству.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        version_id: Идентификатор версии.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Доступная версия ОТД.
+
+        Raises:
+        ValueError: Если версия не найдена или относится к другому устройству.
+        """
         version = await self.repository.get_version_by_id(version_id)
         if version is None:
             raise ValueError("Версия ОТД не найдена.")
@@ -266,6 +385,16 @@ class OTDService:
     async def submit_for_review(
         self, user_id: UUID, urza_id: UUID, version_id: UUID
     ) -> OTDVersion:
+        """Отправляет версию ОТД на согласование после проверки автора и доступа.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        version_id: Идентификатор версии.
+
+        Returns:
+            Версия ОТД в статусе UNDER_REVIEW.
+        """
         version = await self._get_accessible_version(user_id, version_id, urza_id)
         if version.status is not DocumentStatus.DRAFT:
             raise ValueError("На согласование можно отправить только черновик.")
@@ -279,6 +408,19 @@ class OTDService:
     async def approve(
         self, user_id: UUID, urza_id: UUID, version_id: UUID
     ) -> OTDVersion:
+        """Утверждает версию ОТД руководителем соответствующего предприятия.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        version_id: Идентификатор версии.
+
+        Returns:
+            Утверждённая версия ОТД.
+
+        Raises:
+        PermissionError: Если пользователь не является допустимым проверяющим.
+        """
         version = await self._get_accessible_version(user_id, version_id, urza_id)
         if version.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Утвердить можно только версию на согласовании.")
@@ -290,6 +432,16 @@ class OTDService:
     async def return_to_draft(
         self, user_id: UUID, urza_id: UUID, version_id: UUID
     ) -> OTDVersion:
+        """Возвращает версию ОТД с согласования на доработку.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        version_id: Идентификатор версии.
+
+        Returns:
+            Версия ОТД в статусе DRAFT.
+        """
         version = await self._get_accessible_version(user_id, version_id, urza_id)
         if version.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Вернуть можно только версию на согласовании.")
@@ -299,6 +451,15 @@ class OTDService:
         return await self.repository.save_version(version)
 
     async def _check_manager_reviewer(self, user_id: UUID, urza_id: UUID) -> None:
+        """Проверяет, что пользователь — руководитель предприятия, которому принадлежит УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Raises:
+        PermissionError: Если пользователь не имеет роли или области ответственности MANAGER.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             raise PermissionError("Пользователь неактивен.")
@@ -308,6 +469,14 @@ class OTDService:
             raise PermissionError("Нет доступа к активной URZA в зоне ответственности.")
 
     async def _check_author(self, user_id: UUID) -> None:
+        """Проверяет, что пользователь имеет роль, допускающую создание или изменение ОТД.
+
+        Args:
+        user_id: Идентификатор пользователя.
+
+        Raises:
+        PermissionError: Если роль пользователя не входит в список разрешённых.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if (
             user is None
@@ -320,6 +489,15 @@ class OTDService:
     async def get_available_actions(
         self, user_id: UUID, version: OTDVersion
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для конкретной версии ОТД.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        version: Проверяемая версия.
+
+        Returns:
+            Множество кодов действий с учётом статуса, роли и области доступа.
+        """
         if version.deleted_at is not None:
             return set()
         user = await self.access_service.user_repository.get_by_id(user_id)
@@ -347,6 +525,15 @@ class OTDService:
     async def get_available_create_actions(
         self, user_id: UUID, urza_id: UUID
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю при создании ОТД для устройства.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Множество кодов доступных действий.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if (
             user is None
@@ -370,6 +557,16 @@ class OTDService:
             urza_id: UUID,
             version_id: UUID | None = None,
     ) -> OTDDetails | None:
+        """Возвращает формуляр ОТД с текущей, выбранной и историческими версиями.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        version_id: Необязательная версия, которую требуется выбрать в деталях.
+
+        Returns:
+            DTO формуляра или None, если формуляр недоступен.
+        """
         if not await self.access_service.can_access_urza(
                 user_id,
                 urza_id,
