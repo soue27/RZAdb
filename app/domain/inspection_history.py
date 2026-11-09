@@ -12,7 +12,11 @@ from app.infrastructure.database.mixins import UUIDMixin
 
 
 class InspectionHistory(UUIDMixin, Base):
-    """Неизменяемая история работы с задачей осмотра."""
+    """Фиксирует историю изменений задачи осмотра подстанции.
+
+    Сохраняет тип события, прежний и новый статусы,
+    инициатора, комментарий и время события.
+    """
 
     __tablename__ = "inspection_history"
 
