@@ -1,3 +1,5 @@
+"""Маршруты просмотра, создания, изменения и согласования записей технического обслуживания."""
+
 import logging
 from datetime import date
 from typing import Annotated
@@ -70,6 +72,8 @@ async def get_maintenance_form(
     form_service: Annotated[DocumentTemplateService, Depends(get_document_form_service)],
     archived: bool = Query(default=False),
 ):
+    """Возвращает форму создания или редактирования записи технического обслуживания.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -242,6 +246,8 @@ async def get_urza_maintenance(
     ],
     archived: bool = Query(default=False),
 ):
+    """Отображает список записей ТО выбранного УРЗА.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -293,6 +299,8 @@ async def get_new_urza_maintenance_form(
     ],
     task_id: UUID | None = None,
 ):
+    """Отображает форму создания записи ТО для устройства.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -356,6 +364,8 @@ async def get_edit_urza_maintenance_form(
     maintenance_service: Annotated[TORecordService, Depends(get_maintenance_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму редактирования черновика записи ТО.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -450,6 +460,8 @@ async def create_urza_maintenance(
     ] = None,
     task_id: Annotated[UUID | None, Form()] = None,
 ):
+    """Создаёт запись технического обслуживания и сохраняет загруженные файлы.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -712,6 +724,8 @@ async def update_urza_maintenance(
     scan_protocol_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     editable_protocol_file: Annotated[UploadFile | None, FastAPIFile()] = None,
 ):
+    """Обновляет черновик записи технического обслуживания.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -959,6 +973,8 @@ async def submit_maintenance_for_review(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отправляет запись ТО на согласование.
+    """
     return await _run_maintenance_transition(
         request=request,
         urza_id=urza_id,
@@ -983,6 +999,8 @@ async def approve_maintenance(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Утверждает запись ТО от имени руководителя.
+    """
     return await _run_maintenance_transition(
         request=request,
         urza_id=urza_id,
@@ -1008,6 +1026,8 @@ async def return_maintenance_for_revision(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Возвращает запись ТО на доработку с комментарием.
+    """
     return await _run_maintenance_transition(
         request=request,
         urza_id=urza_id,
