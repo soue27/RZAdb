@@ -50,6 +50,11 @@ class OrganizationImportService:
     """Импорт организационной структуры из XLSX."""
 
     def __init__(self, repository: EnterpriseRepository) -> None:
+        """Сохраняет репозиторий организационной структуры.
+
+        Args:
+            repository: Репозиторий предприятий.
+        """
         self.repository = repository
 
     async def preview(self, content: bytes) -> dict:
@@ -212,6 +217,14 @@ class OrganizationImportService:
             workbook.close()
 
     def _extract_rows(self, workbook) -> tuple[list[dict], list[dict]]:
+        """Извлекает строки ожидаемого листа и проверяет заголовки.
+
+        Args:
+            workbook: Открытая книга openpyxl.
+
+        Returns:
+            Строки предприятий и ошибки структуры файла.
+        """
         errors: list[dict] = []
 
         if len(workbook.worksheets) != 1:
@@ -624,6 +637,8 @@ class OrganizationImportService:
 
     @staticmethod
     def _make_summary(plan: dict) -> dict:
+        """Подсчитывает количество новых предприятий по уровням организационной структуры.
+        """
         return {
             "holdings": OrganizationImportService._level_summary(
                 plan[EnterpriseType.HOLDING]
@@ -638,6 +653,8 @@ class OrganizationImportService:
 
     @staticmethod
     def _level_summary(items: list[dict]) -> dict:
+        """Формирует счётчики элементов одного уровня иерархии.
+        """
         return {
             "create": sum(
                 item["enterprise"] is None
@@ -651,6 +668,8 @@ class OrganizationImportService:
 
     @staticmethod
     def _failure(errors: list[dict]) -> dict:
+        """Формирует единый ответ об ошибках проверки или импорта.
+        """
         return {
             "success": False,
             "summary": None,
@@ -663,6 +682,8 @@ class OrganizationImportService:
         parent_key: tuple | None,
         full_name: str,
     ) -> tuple:
+        """Строит ключ узла с учётом уровня, родителя и полного наименования.
+        """
         return (
             level,
             parent_key,
@@ -671,16 +692,22 @@ class OrganizationImportService:
 
     @staticmethod
     def _normalize(value: str) -> str:
+        """Нормализует строку для сопоставления названий предприятий.
+        """
         return re.sub(r"\s+", " ", value.strip()).casefold()
 
     @staticmethod
     def _has_value(value) -> bool:
+        """Проверяет, содержит ли значение полезное непустое содержимое.
+        """
         return value is not None and (
             not isinstance(value, str) or bool(value.strip())
         )
 
     @staticmethod
     def _full_column(level: EnterpriseType) -> str:
+        """Возвращает название столбца полного наименования для уровня предприятия.
+        """
         return {
             EnterpriseType.HOLDING: HEADERS[0],
             EnterpriseType.BRANCH: HEADERS[2],
@@ -689,6 +716,8 @@ class OrganizationImportService:
 
     @staticmethod
     def _short_column(level: EnterpriseType) -> str:
+        """Возвращает название столбца краткого наименования для уровня предприятия.
+        """
         return {
             EnterpriseType.HOLDING: HEADERS[1],
             EnterpriseType.BRANCH: HEADERS[3],
