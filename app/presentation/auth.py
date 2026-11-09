@@ -1,3 +1,5 @@
+"""auth: получение текущего пользователя."""
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -12,6 +14,19 @@ async def get_current_user(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> User:
+    """Получает текущего пользователя из сессии и проверяет его актуальность.
+
+    Args:
+        request: HTTP-запрос с пользовательской сессией.
+        session: Асинхронная SQLAlchemy-сессия.
+
+    Returns:
+        Активная учётная запись пользователя.
+
+    Raises:
+        HTTPException: Если сессия отсутствует, пользователь недействителен
+            или требуется обязательная смена пароля.
+    """
     user_id = request.session.get("user_id")
 
     if user_id is None:
