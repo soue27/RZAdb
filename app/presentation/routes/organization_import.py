@@ -1,3 +1,5 @@
+"""Маршруты предварительной проверки и подтверждения импорта организационной структуры."""
+
 
 from typing import Annotated
 
@@ -47,6 +49,8 @@ async def preview_organization_import(
     ],
     file: Annotated[UploadFile, File()],
 ):
+    """Проверяет XLSX-файл организационной структуры и показывает план изменений без записи в БД.
+    """
     content = await read_upload_content(file)
 
     result = await service.preview(content=content)
@@ -68,6 +72,8 @@ async def confirm_organization_import(
     ],
     file: Annotated[UploadFile, File()],
 ):
+    """Повторно проверяет файл и подтверждает создание организационных узлов.
+    """
     content = await read_upload_content(file)
 
     result = await service.confirm(
