@@ -11,13 +11,28 @@ from app.domain.rza_instruction import (
 
 
 class RZAInstructionRepository:
+    """Выполняет запросы к инструкциям РЗА подстанций и их версиям.
+    """
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def get_by_id(
         self,
         instruction_id: UUID,
     ) -> RZAInstruction | None:
+        """Находит инструкцию РЗА по идентификатору.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Инструкция или None.
+        """
         return await self.session.get(
             RZAInstruction,
             instruction_id,
@@ -27,6 +42,14 @@ class RZAInstructionRepository:
         self,
         substation_id: UUID,
     ) -> RZAInstruction | None:
+        """Находит инструкцию РЗА подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Инструкция или None.
+        """
         query = select(RZAInstruction).where(
             RZAInstruction.substation_id == substation_id,
         )
@@ -36,6 +59,14 @@ class RZAInstructionRepository:
         self,
         version_id: UUID,
     ) -> RZAInstructionVersion | None:
+        """Находит версию инструкции РЗА по идентификатору.
+
+        Args:
+            version_id: Идентификатор версии.
+
+        Returns:
+            Версия инструкции или None.
+        """
         return await self.session.get(
             RZAInstructionVersion,
             version_id,
@@ -45,6 +76,14 @@ class RZAInstructionRepository:
         self,
         instruction: RZAInstruction,
     ) -> RZAInstruction:
+        """Добавляет инструкцию РЗА и выполняет flush без commit.
+
+        Args:
+            instruction: Создаваемая инструкция.
+
+        Returns:
+            Добавленная модель инструкции.
+        """
         self.session.add(instruction)
         await self.session.flush()
         return instruction
@@ -53,6 +92,14 @@ class RZAInstructionRepository:
         self,
         version: RZAInstructionVersion,
     ) -> RZAInstructionVersion:
+        """Добавляет версию инструкции РЗА и выполняет flush без commit.
+
+        Args:
+            version: Создаваемая версия.
+
+        Returns:
+            Добавленная версия инструкции.
+        """
         self.session.add(version)
         await self.session.flush()
         return version
@@ -61,6 +108,14 @@ class RZAInstructionRepository:
             self,
             instruction_id: UUID,
     ) -> RZAInstructionVersion | None:
+        """Возвращает последнюю версию инструкции РЗА с данными связанных файлов.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Версия с наибольшим номером или None.
+        """
         query = (
             select(RZAInstructionVersion)
             .options(
@@ -82,6 +137,14 @@ class RZAInstructionRepository:
             self,
             instruction_id: UUID,
     ) -> list[RZAInstructionVersion]:
+        """Возвращает версии инструкции с авторами и связанными файлами.
+
+        Args:
+            instruction_id: Идентификатор инструкции.
+
+        Returns:
+            Список версий в порядке нумерации.
+        """
         query = (
             select(RZAInstructionVersion)
             .options(
@@ -101,11 +164,24 @@ class RZAInstructionRepository:
         return list(result.all())
 
     async def save(self, version: RZAInstructionVersion) -> RZAInstructionVersion:
+        """Синхронизирует изменения версии инструкции с базой данных без commit.
+
+        Args:
+            version: Изменённая версия.
+
+        Returns:
+            Та же модель версии.
+        """
         await self.session.flush()
         await self.session.refresh(version)
         return version
 
     async def list_standalone_work_items(self) -> list[RZAInstructionVersion]:
+        """Возвращает самостоятельные версии инструкций РЗА для рабочего списка.
+
+        Returns:
+            Версии, не связанные с задачами, в рабочих статусах.
+        """
         latest = (
             select(
                 RZAInstructionVersion.rza_instruction_id.label("instruction_id"),
