@@ -20,20 +20,54 @@ class InspectionTaskService:
             user_repository: UserRepository,
             substation_repository: SubstationRepository,
     ) -> None:
+        """Сохраняет репозитории задач, пользователей и подстанций.
+
+        Args:
+            repository: Репозиторий задач осмотра и истории.
+            user_repository: Репозиторий пользователей.
+            substation_repository: Репозиторий подстанций.
+        """
         self.repository = repository
         self.user_repository = user_repository
         self.substation_repository = substation_repository
 
     async def _ensure_substation_active(self, substation_id: UUID) -> None:
+        """Проверяет, что подстанция не архивирована.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Raises:
+            PermissionError: Если подстанция архивирована.
+        """
         substation = await self.substation_repository.get_by_id(substation_id)
         if substation is not None and substation.deleted_at is not None:
             raise PermissionError("Нельзя изменять осмотр архивной подстанции.")
 
     async def _lock_active_substation(self, substation_id: UUID) -> None:
+        """Блокирует активную подстанцию перед изменением процесса осмотра.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Raises:
+            PermissionError: Если подстанция отсутствует или архивирована.
+        """
         if not await self.substation_repository.lock_active_by_id(substation_id):
             raise PermissionError("Нельзя изменять осмотр архивной подстанции.")
 
     async def _lock_task_owner(self, task_id: UUID) -> InspectionTask:
+        """Блокирует подстанцию-владельца задачи и перечитывает задачу.
+
+        Args:
+            task_id: Идентификатор задачи осмотра.
+
+        Returns:
+            Актуальная модель задачи.
+
+        Raises:
+            ValueError: Если задача не найдена или её владелец изменился.
+        """
         task = await self.repository.get_by_id(task_id)
         if task is None:
             raise ValueError("Задача осмотра не найдена.")
