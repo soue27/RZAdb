@@ -99,7 +99,7 @@ class TORecordService:
             for_update: Блокировать запись для изменения.
 
         Returns:
-        Запись ТО, принадлежащая указанному устройству.
+            Запись ТО, принадлежащая указанному устройству.
 
         Raises:
             ValueError: Если запись не найдена или относится к другому УРЗА.
@@ -158,7 +158,7 @@ class TORecordService:
             record: Запись ТО.
 
         Returns:
-        Связанная активная задача или None, если запись самостоятельная.
+            Связанная активная задача или None, если запись самостоятельная.
 
         Raises:
             ValueError: Если связанная задача отсутствует или не соответствует записи.
@@ -194,7 +194,7 @@ class TORecordService:
             task_id: Идентификатор задачи.
 
         Returns:
-        Проверенная задача.
+            Проверенная задача.
 
         Raises:
             PermissionError: При недостатке прав.
@@ -233,7 +233,7 @@ class TORecordService:
             urza_id: Идентификатор устройства.
 
         Returns:
-        Записи ТО указанного УРЗА.
+            Записи ТО указанного УРЗА.
         """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
@@ -251,7 +251,7 @@ class TORecordService:
             urza_id: Идентификатор устройства.
 
         Returns:
-        Актуальная утверждённая запись или None.
+            Актуальная утверждённая запись или None.
         """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
@@ -271,7 +271,7 @@ class TORecordService:
             urza_id: Идентификатор ожидаемого УРЗА.
 
         Returns:
-        Запись ТО или None.
+            Запись ТО или None.
 
         Raises:
             ValueError: Если найденная запись принадлежит другому устройству.
@@ -317,7 +317,7 @@ class TORecordService:
             task_id: Необязательная связанная задача.
 
         Returns:
-        Созданная запись ТО.
+            Созданная запись ТО.
 
         Raises:
             PermissionError: Если роль или доступ не позволяют создавать запись.
@@ -375,7 +375,7 @@ class TORecordService:
             urza_id: Идентификатор устройства.
 
         Returns:
-        Запись ТО или None.
+            Запись ТО или None.
 
         Raises:
             PermissionError: Если нет доступа к устройству.
@@ -422,7 +422,7 @@ class TORecordService:
             historical_data: Признак исторической записи.
 
         Returns:
-        Обновлённая запись ТО.
+            Обновлённая запись ТО.
 
         Raises:
             PermissionError: Если у пользователя нет права редактирования.
@@ -476,7 +476,7 @@ class TORecordService:
             record: Проверяемая запись ТО.
 
         Returns:
-        Множество кодов действий; при отсутствии прав возвращает пустое множество.
+            Множество кодов действий; при отсутствии прав возвращает пустое множество.
         """
         if record.deleted_at is not None:
             return set()
@@ -517,7 +517,7 @@ class TORecordService:
             urza_id: Идентификатор устройства.
 
         Returns:
-        Запись ТО в статусе UNDER_REVIEW.
+            Запись ТО в статусе UNDER_REVIEW.
         """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
@@ -571,7 +571,7 @@ class TORecordService:
             urza_id: Идентификатор устройства.
 
         Returns:
-        Утверждённая запись ТО.
+            Утверждённая запись ТО.
 
         Raises:
             PermissionError: Если пользователь не является допустимым проверяющим.
@@ -623,7 +623,7 @@ class TORecordService:
             comment: Причина возврата.
 
         Returns:
-        Запись ТО в статусе DRAFT.
+            Запись ТО в статусе DRAFT.
         """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
@@ -666,7 +666,7 @@ class TORecordService:
             user_id: Идентификатор пользователя.
 
         Returns:
-        Список записей, для которых пользователь имеет право проверки.
+            Список записей, для которых пользователь имеет право проверки.
         """
         try:
             user = await self._get_active_user(user_id)
@@ -695,7 +695,7 @@ class TORecordService:
             user_id: Идентификатор пользователя.
 
         Returns:
-        Список записей, для которых доступны просмотр или дальнейшие действия.
+            Список записей, для которых доступны просмотр или дальнейшие действия.
         """
         try:
             await self._get_active_user(user_id)
