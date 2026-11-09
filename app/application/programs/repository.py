@@ -9,13 +9,28 @@ from app.domain.program import Program
 
 
 class ProgramRepository:
+    """Выполняет запросы к программам и связанным с ними файлам.
+"""
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+        session: Сессия текущей транзакции.
+    """
         self.session = session
 
     async def get_by_id(
             self,
             program_id: UUID,
     ) -> Program | None:
+        """Находит программу по идентификатору и загружает связанные файлы.
+
+        Args:
+        program_id: Идентификатор программы.
+
+        Returns:
+        Программа или None.
+    """
         query = (
             select(Program)
             .options(
@@ -33,6 +48,14 @@ class ProgramRepository:
             self,
             urza_id: UUID,
     ) -> list[Program]:
+        """Возвращает программы указанного УРЗА с данными авторов.
+
+        Args:
+        urza_id: Идентификатор устройства.
+
+        Returns:
+        Программы в порядке номера программы.
+    """
         query = (
             select(Program)
             .options(
@@ -54,6 +77,14 @@ class ProgramRepository:
         self,
         task_id: UUID,
     ) -> Program | None:
+        """Находит программу, связанную с задачей.
+
+        Args:
+        task_id: Идентификатор задачи.
+
+        Returns:
+        Программа или None.
+    """
         query = select(Program).where(
             Program.task_id == task_id,
         )
@@ -64,6 +95,14 @@ class ProgramRepository:
         self,
         program: Program,
     ) -> Program:
+        """Добавляет программу и выполняет flush без commit.
+
+        Args:
+        program: Создаваемая программа.
+
+        Returns:
+        Добавленная модель программы.
+    """
         self.session.add(program)
         await self.session.flush()
 
@@ -73,11 +112,24 @@ class ProgramRepository:
         self,
         program: Program,
     ) -> Program:
+        """Синхронизирует изменения программы с базой данных без commit.
+
+        Args:
+        program: Изменённая программа.
+
+        Returns:
+        Та же модель программы.
+    """
         await self.session.flush()
 
         return program
 
     async def list_standalone_under_review(self) -> list[Program]:
+        """Возвращает самостоятельные программы на согласовании.
+
+        Returns:
+        Активные программы без связанной задачи с загруженными УРЗА и автором.
+    """
         query = (
             select(Program)
             .options(
@@ -96,6 +148,13 @@ class ProgramRepository:
         return list(result.all())
 
     async def list_standalone_work_items(self) -> list[Program]:
+        """Возвращает самостоятельные программы для рабочего списка.
+
+        Включает активные записи в статусах DRAFT, UNDER_REVIEW и APPROVED.
+
+        Returns:
+        Программы с загруженными УРЗА и автором.
+    """
         query = (
             select(Program)
             .options(
