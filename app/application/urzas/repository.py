@@ -15,9 +15,10 @@ class URZARepository:
 
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет асинхронную SQLAlchemy-сессию для запросов к устройствам РЗА.
-            
-            Args:
-            session: Сессия текущей транзакции.
+
+        Args:
+        session: Сессия текущей транзакции.
+
         """
         self.session = session
 
@@ -26,15 +27,16 @@ class URZARepository:
             urza_id: UUID,
     ) -> URZA | None:
         """Находит активное устройство с загруженной цепочкой владельца.
-            
-            Связи с присоединением и подстанцией загружаются заранее для построения
-            DTO и проверок доступа без дополнительных обращений к сессии.
-            
-            Args:
-            urza_id: Идентификатор устройства РЗА.
-            
-            Returns:
-            Активное устройство или None.
+
+        Связи с присоединением и подстанцией загружаются заранее для построения
+        DTO и проверок доступа без дополнительных обращений к сессии.
+
+        Args:
+        urza_id: Идентификатор устройства РЗА.
+
+        Returns:
+        Активное устройство или None.
+
         """
         result = await self.session.scalars(
             select(URZA)
@@ -56,12 +58,13 @@ class URZARepository:
             urza_id: UUID,
     ) -> URZA | None:
         """Находит устройство с загруженной цепочкой владельца, включая архивное.
-            
-            Args:
-            urza_id: Идентификатор устройства РЗА.
-            
-            Returns:
-            Устройство независимо от признака архивирования или None.
+
+        Args:
+        urza_id: Идентификатор устройства РЗА.
+
+        Returns:
+        Устройство независимо от признака архивирования или None.
+
         """
         result = await self.session.scalars(
             select(URZA)
@@ -77,24 +80,26 @@ class URZARepository:
 
     async def lock_active_by_id(self, urza_id: UUID) -> bool:
         """Блокирует устройство и проверяет, что оно не архивировано.
-            
-            Args:
-            urza_id: Идентификатор устройства РЗА.
-            
-            Returns:
-            True, если активное устройство найдено и заблокировано.
+
+        Args:
+        urza_id: Идентификатор устройства РЗА.
+
+        Returns:
+        True, если активное устройство найдено и заблокировано.
+
         """
         urza = await lock_owner_row(self.session, URZA, urza_id)
         return urza is not None and urza.deleted_at is None
 
     async def lock_active_connection(self, connection_id: UUID) -> bool:
         """Блокирует присоединение и проверяет его активность.
-            
-            Args:
-            connection_id: Идентификатор присоединения.
-            
-            Returns:
-            True, если активное присоединение найдено и заблокировано.
+
+        Args:
+        connection_id: Идентификатор присоединения.
+
+        Returns:
+        True, если активное присоединение найдено и заблокировано.
+
         """
         connection = await lock_owner_row(
             self.session,
@@ -138,14 +143,15 @@ class URZARepository:
 
     async def add(self, urza: URZA) -> URZA:
         """Добавляет устройство в отдельной вложенной транзакции.
-            
-            Выполняет flush внутри savepoint, не фиксируя внешнюю транзакцию.
-            
-            Args:
-            urza: Создаваемая модель устройства РЗА.
-            
-            Returns:
-            Добавленная модель устройства.
+
+        Выполняет flush внутри savepoint, не фиксируя внешнюю транзакцию.
+
+        Args:
+        urza: Создаваемая модель устройства РЗА.
+
+        Returns:
+        Добавленная модель устройства.
+
         """
         async with self.session.begin_nested():
             self.session.add(urza)
@@ -154,12 +160,13 @@ class URZARepository:
 
     async def update(self, urza: URZA) -> URZA:
         """Синхронизирует изменения устройства с базой данных без commit.
-            
-            Args:
-            urza: Изменённая модель устройства РЗА.
-            
-            Returns:
-            Та же модель устройства.
+
+        Args:
+        urza: Изменённая модель устройства РЗА.
+
+        Returns:
+        Та же модель устройства.
+
         """
         await self.session.flush()
         return urza
@@ -172,17 +179,18 @@ class URZARepository:
         exclude_id: UUID | None = None,
     ) -> bool:
         """Проверяет уникальность диспетчерского имени в пределах присоединения.
-            
-            Архивные устройства не занимают имя. При обновлении текущую запись
-            можно исключить из проверки.
-            
-            Args:
-            connection_id: Идентификатор присоединения.
-            dispatch_name: Проверяемое диспетчерское наименование.
-            exclude_id: Идентификатор исключаемого устройства.
-            
-            Returns:
-            True, если имя уже занято активным устройством.
+
+        Архивные устройства не занимают имя. При обновлении текущую запись
+        можно исключить из проверки.
+
+        Args:
+        connection_id: Идентификатор присоединения.
+        dispatch_name: Проверяемое диспетчерское наименование.
+        exclude_id: Идентификатор исключаемого устройства.
+
+        Returns:
+        True, если имя уже занято активным устройством.
+
         """
         query = select(URZA.id).where(
             URZA.connection_id == connection_id,
@@ -198,12 +206,13 @@ class URZARepository:
 
     async def has_active_connection(self, connection_id: UUID) -> bool:
         """Проверяет активность присоединения и его подстанции.
-            
-            Args:
-            connection_id: Идентификатор присоединения.
-            
-            Returns:
-            True, если оба объекта существуют и не архивированы.
+
+        Args:
+        connection_id: Идентификатор присоединения.
+
+        Returns:
+        True, если оба объекта существуют и не архивированы.
+
         """
         result = await self.session.scalar(
             select(Connection.id)
