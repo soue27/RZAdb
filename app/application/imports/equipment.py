@@ -143,6 +143,12 @@ class EquipmentImportService:
         session,
         access_service: AccessService,
     ) -> None:
+        """Сохраняет сессию и зависимости для проверки доступа и работы с объектами.
+
+        Args:
+            session: Асинхронная SQLAlchemy-сессия.
+            access_service: Централизованный сервис проверки доступа.
+        """
         self.session = session
         self.access_service = access_service
 
@@ -319,6 +325,17 @@ class EquipmentImportService:
         }
 
     async def _get_actor(self, actor_id):
+        """Находит пользователя и проверяет его активность и полномочия на импорт.
+
+        Args:
+            actor_id: Идентификатор пользователя.
+
+        Returns:
+            Активная учётная запись.
+
+        Raises:
+            PermissionError: Если пользователь не имеет права выполнять импорт.
+        """
         user = await self.access_service.user_repository.get_by_id(actor_id)
 
         if user is None or not user.active or user.deleted_at is not None:
@@ -359,6 +376,14 @@ class EquipmentImportService:
         return user, []
 
     def _read_rows(self, content: bytes) -> tuple[list[dict], list[dict]]:
+        """Проверяет контейнер XLSX и извлекает строки листа оборудования.
+
+        Args:
+            content: Бинарное содержимое файла.
+
+        Returns:
+            Пара из нормализованных строк и списка ошибок файла.
+        """
         if not content:
             return [], [self._error(message="Файл пуст.")]
 
@@ -427,6 +452,14 @@ class EquipmentImportService:
             workbook.close()
 
     def _extract_rows(self, workbook) -> tuple[list[dict], list[dict]]:
+        """Извлекает и предварительно проверяет строки ожидаемого листа книги.
+
+        Args:
+            workbook: Открытая книга openpyxl.
+
+        Returns:
+            Строки данных и ошибки структуры/содержимого листа.
+        """
         if len(workbook.worksheets) != 1:
             return [], [
                 self._error(message="В книге должен быть ровно один лист.")
@@ -580,6 +613,15 @@ class EquipmentImportService:
         return rows, errors
 
     def _parse_row(self, row_number: int, values: list) -> tuple[dict, list[dict]]:
+        """Преобразует строку таблицы в набор полей подстанции, присоединения и УРЗА.
+
+        Args:
+            row_number: Номер строки исходного листа.
+            values: Значения ячеек строки.
+
+        Returns:
+            Распознанная запись и ошибки конкретной строки.
+        """
         errors = []
 
         def report(index: int, message: str):
@@ -762,6 +804,16 @@ class EquipmentImportService:
         enterprises: list[Enterprise],
         actor,
     ) -> tuple[list[dict], list[dict]]:
+        """Строит план создания оборудования с разрешением ссылок на организационные узлы.
+
+        Args:
+            rows: Распознанные строки файла.
+            enterprises: Существующие предприятия.
+            actor: Проверенный инициатор импорта.
+
+        Returns:
+            План создания объектов и ошибки бизнес-валидации.
+        """
         errors = []
 
         enterprise_index = defaultdict(list)
@@ -954,6 +1006,14 @@ class EquipmentImportService:
         return list(plan_by_substation.values()), []
 
     async def _check_existing_substations(self, plan: list[dict]) -> list[dict]:
+        """Проверяет план на совпадения с существующими подстанциями и их присоединениями.
+
+        Args:
+            plan: Планируемые объекты.
+
+        Returns:
+            Список конфликтов и предупреждений.
+        """
         department_ids = {item["department"].id for item in plan}
 
         existing = await self.substation_repository.get_by_enterprise_ids(
@@ -1002,6 +1062,8 @@ class EquipmentImportService:
 
     @staticmethod
     def _same_substation(left: dict, right: dict) -> bool:
+        """Сравнивает две записи подстанций по нормализованным идентифицирующим полям.
+        """
         fields = (
             "highest_voltage",
             "operational_current_type",
@@ -1015,6 +1077,8 @@ class EquipmentImportService:
 
     @staticmethod
     def _same_connection(left: dict, right: dict) -> bool:
+        """Сравнивает две записи присоединений по нормализованным идентифицирующим полям.
+        """
         fields = (
             "sap_code",
             "asureo_code",
@@ -1024,6 +1088,14 @@ class EquipmentImportService:
 
     @staticmethod
     def _make_summary(plan: list[dict]) -> dict:
+        """Формирует счётчики объектов, которые будут созданы по плану импорта.
+
+        Args:
+            plan: Проверенный план.
+
+        Returns:
+            Словарь агрегированных количеств.
+        """
         connections = [
             connection
             for item in plan
@@ -1038,6 +1110,8 @@ class EquipmentImportService:
 
     @staticmethod
     def _decimal_value(value, index: int, report):
+        """Преобразует значение ячейки в Decimal и добавляет диагностическую ошибку при некорректном вводе.
+        """
         if value is None or (isinstance(value, str) and not value.strip()):
             return None
 
@@ -1055,10 +1129,14 @@ class EquipmentImportService:
 
     @staticmethod
     def _normalize(value: str) -> str:
+        """Нормализует строку для сравнения и поиска совпадений.
+        """
         return re.sub(r"\s+", " ", value.strip()).casefold()
 
     @staticmethod
     def _has_value(value) -> bool:
+        """Проверяет, содержит ли значение полезное непустое содержимое.
+        """
         return value is not None and (
             not isinstance(value, str) or bool(value.strip())
         )
@@ -1073,6 +1151,19 @@ class EquipmentImportService:
         expected=None,
         actual=None,
     ) -> dict:
+        """Создаёт структурированное описание ошибки импорта.
+
+        Args:
+            message: Текст ошибки.
+            row: Номер строки, если применимо.
+            column: Название столбца, если применимо.
+            context: Контекст ошибки.
+            expected: Ожидаемое значение.
+            actual: Фактическое значение.
+
+        Returns:
+            Словарь ошибки для preview/confirm.
+        """
         result = {"message": message}
 
         if row is not None:
@@ -1089,6 +1180,16 @@ class EquipmentImportService:
         return result
 
     def _row_error(self, row: dict, index: int, message: str) -> dict:
+        """Формирует ошибку, привязанную к исходной строке плана.
+
+        Args:
+            row: Данные строки.
+            index: Индекс поля или столбца.
+            message: Текст ошибки.
+
+        Returns:
+            Структурированная ошибка импорта.
+        """
         return self._error(
             row=row["row"],
             column=HEADERS[index],
@@ -1103,6 +1204,14 @@ class EquipmentImportService:
         )
 
     def _failure(self, errors: list[dict]) -> dict:
+        """Формирует единый неуспешный результат предварительной проверки или импорта.
+
+        Args:
+            errors: Список диагностик.
+
+        Returns:
+            Словарь результата с признаком неуспеха и ошибками.
+        """
         return {
             "success": False,
             "summary": None,
