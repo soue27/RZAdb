@@ -17,6 +17,11 @@ from app.infrastructure.database.mixins import (
 
 
 class URZAInstruction(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Объединяет версии инструкции конкретного устройства РЗА.
+
+    Для одного устройства предусмотрена одна запись инструкции;
+    содержание и история изменений хранятся в версиях.
+    """
     __tablename__ = "urza_instructions"
 
     urza_id: Mapped[UUID] = mapped_column(
@@ -34,6 +39,12 @@ class URZAInstructionVersion(
     SoftDeleteMixin,
     Base,
 ):
+    """Хранит отдельную версию инструкции устройства РЗА.
+
+    Содержит номер и срок действия версии, статус,
+    сведения об изменениях, скан и необязательный
+    редактируемый файл документа.
+    """
     __tablename__ = "urza_instruction_versions"
     __table_args__ = (
         UniqueConstraint(
