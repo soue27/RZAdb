@@ -8,12 +8,25 @@ class InspectionService:
     """Бизнес-логика работы с результатами осмотров."""
 
     def __init__(self, repository: InspectionRepository) -> None:
+        """Сохраняет репозиторий результатов осмотров.
+
+        Args:
+            repository: Репозиторий результатов осмотров.
+        """
         self.repository = repository
 
     async def get_by_substation_id(
         self,
         substation_id: UUID,
     ) -> list[InspectionListItem]:
+        """Возвращает результаты осмотров подстанции в формате DTO.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Список кратких DTO с датами, замечаниями и сведениями о файлах.
+        """
         inspections = await self.repository.get_by_substation_id(
             substation_id,
         )
