@@ -145,7 +145,17 @@ class WorkItemSource(Protocol):
         self,
         user_id: UUID,
         prior_items: tuple[WorkItem, ...] = (),
-    ) -> list[WorkItem]: ...
+    ) -> list[WorkItem]:
+        """Формирует элементы этого источника для пользователя.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            prior_items: Уже собранные элементы, которые источник должен учитывать.
+
+        Returns:
+            Список рабочих элементов данного типа.
+        """
+        ...
 
 
 class TaskWorkItemSource:
