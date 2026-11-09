@@ -29,7 +29,7 @@ from app.domain.urza_instruction import (
 
 
 class FileOwnerRepository:
-    """Finds domain records that reference a file through explicit FKs."""
+    """Находит доменные записи, ссылающиеся на файл через явные внешние ключи."""
 
     def __init__(self, session: AsyncSession) -> None:
         """Сохраняет асинхронную SQLAlchemy-сессию для поиска владельцев файлов.
