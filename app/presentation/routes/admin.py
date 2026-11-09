@@ -1,3 +1,5 @@
+"""Маршруты административной панели, управления пользователями и запуска резервного копирования."""
+
 import asyncio
 import contextvars
 import json
@@ -361,6 +363,8 @@ async def admin_dashboard(
     status_filter: str | None = None,
     enterprise_filter: str | None = None,
 ):
+    """Отображает административную панель и список пользователей.
+    """
     settings = get_settings()
 
     allowed_statuses = {"active", "inactive", "archived"}
@@ -431,6 +435,11 @@ async def start_admin_backup(
     request: Request,
     current_user: Annotated[User, Depends(require_superadmin)],
 ):
+    """Запускает резервное копирование PostgreSQL в фоновом потоке.
+
+    Возвращает текущий статус запуска; длительная операция не выполняется
+    непосредственно внутри HTTP-запроса.
+    """
     settings = get_settings()
     lock = BackupRunLock(settings.backup_local_dir)
     try:
@@ -489,6 +498,8 @@ async def admin_backup_status(
     request: Request,
     current_user: Annotated[User, Depends(require_superadmin)],
 ):
+    """Возвращает актуальное состояние резервного копирования для административного интерфейса.
+    """
     settings = get_settings()
     return _backup_status_response(request, _read_backup_status(settings), settings)
 
@@ -499,6 +510,8 @@ async def new_user_page(
     current_user: Annotated[User, Depends(require_superadmin)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
+    """Отображает форму создания новой учётной записи.
+    """
     return await _user_form(request, session, current_user)
 
 
@@ -515,6 +528,11 @@ async def create_user(
     temporary_password: Annotated[str, Form()],
     enterprise_id: Annotated[str, Form()] = "",
 ):
+    """Создаёт пользователя по данным административной формы.
+
+    Проверяет входные поля через UserService и возвращает форму с ошибкой
+    либо перенаправляет к списку пользователей.
+    """
     try:
         await service.create(
             actor=current_user,
@@ -549,6 +567,8 @@ async def edit_user_page(
     current_user: Annotated[User, Depends(require_superadmin)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
+    """Отображает форму редактирования выбранной учётной записи.
+    """
     if user_id == current_user.id:
         raise HTTPException(status_code=403, detail="Редактирование своего профиля запрещено.")
     user = await UserRepository(session).get_managed_by_id(user_id)
@@ -570,6 +590,8 @@ async def update_user(
     access_category: Annotated[AccessCategory, Form()],
     enterprise_id: Annotated[str, Form()] = "",
 ):
+    """Обновляет основные сведения и область ответственности пользователя.
+    """
     user = await UserRepository(session).get_managed_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
@@ -608,6 +630,8 @@ async def reset_user_password(
     service: Annotated[UserService, Depends(get_user_service)],
     temporary_password: Annotated[str, Form()],
 ):
+    """Устанавливает пользователю временный пароль с обязательной сменой при входе.
+    """
     try:
         await service.reset_password(
             actor=current_user,
@@ -626,6 +650,8 @@ async def set_user_active(
     current_user: Annotated[User, Depends(require_superadmin)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
+    """Включает или отключает учётную запись пользователя.
+    """
     try:
         await service.set_active(actor=current_user, user_id=user_id, active=active)
     except UserOperationError as exc:
@@ -639,6 +665,8 @@ async def archive_user(
     current_user: Annotated[User, Depends(require_superadmin)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
+    """Архивирует учётную запись пользователя без физического удаления.
+    """
     try:
         await service.archive(actor=current_user, user_id=user_id)
     except UserOperationError as exc:
