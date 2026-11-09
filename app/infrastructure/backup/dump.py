@@ -89,6 +89,11 @@ class PostgresDumpService:
     """Создаёт временный дамп PostgreSQL в Custom Format и проверяет его."""
 
     def __init__(self, settings: Settings) -> None:
+        """Сохраняет конфигурацию подключения к PostgreSQL для создания дампов.
+
+        Args:
+            settings: Настройки приложения.
+        """
         self.settings = settings
 
     def create_dump(self, *, backup_dir: Path, stem: str) -> DumpArtifact:
