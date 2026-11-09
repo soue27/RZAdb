@@ -26,7 +26,7 @@ class TaskStatisticsService:
         inspection_work_item_source: InspectionTaskWorkItemSource,
     ) -> None:
         """Сохраняет зависимости для подсчёта статистики задач.
-    """
+        """
         self.task_repository = task_repository
         self.inspection_repository = inspection_repository
         self.enterprise_repository = enterprise_repository
@@ -37,12 +37,12 @@ class TaskStatisticsService:
     async def get_for_user(self, user_id: UUID) -> dict[str, int]:
         """Возвращает статистику задач, доступных пользователю.
 
-    Args:
-        user_id: Идентификатор пользователя.
+        Args:
+            user_id: Идентификатор пользователя.
 
-    Returns:
-    Словарь агрегированных счётчиков по статусам и просроченным задачам.
-    """
+        Returns:
+        Словарь агрегированных счётчиков по статусам и просроченным задачам.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return self._empty_stats()
@@ -93,7 +93,7 @@ class TaskStatisticsService:
 
     async def _accessible_enterprise_ids(self, user) -> set[UUID]:
         """Определяет предприятия, задачи которых входят в область видимости пользователя.
-    """
+        """
         if user.role in {UserRole.MANAGER, UserRole.ADMIN, UserRole.ENGINEER}:
             if user.enterprise_id is None:
                 return set()
@@ -128,7 +128,7 @@ class TaskStatisticsService:
     @staticmethod
     def _empty_stats() -> dict[str, int]:
         """Создаёт словарь статистики с нулевыми значениями.
-    """
+        """
         return {
             "in_progress": 0,
             "under_review": 0,
