@@ -25,6 +25,8 @@ _OPTIONAL_PROTOCOL_TYPES = {
 
 
 class TORecordService:
+    """Управляет записями технического обслуживания УРЗА, их результатами и согласованием.
+"""
     def __init__(
         self,
         repository: TORecordRepository,
@@ -34,6 +36,16 @@ class TORecordService:
         urza_repository: URZARepository,
         task_service: TaskService,
     ) -> None:
+        """Сохраняет зависимости для проверки доступа, работы с записями ТО и связанными задачами.
+
+    Args:
+        repository: Репозиторий записей ТО.
+        access_service: Централизованный сервис проверки доступа.
+        task_repository: Репозиторий задач.
+        user_repository: Репозиторий пользователей.
+        urza_repository: Репозиторий устройств РЗА.
+        task_service: Сервис жизненного цикла задач.
+    """
         self.repository = repository
         self.access_service = access_service
         self.task_repository = task_repository
@@ -42,6 +54,14 @@ class TORecordService:
         self.task_service = task_service
 
     async def _get_active_user(self, user_id: UUID):
+        """Возвращает активного пользователя.
+
+    Args:
+        user_id: Идентификатор пользователя.
+
+    Raises:
+        PermissionError: Если пользователь отсутствует, отключён или архивирован.
+    """
         user = await self.user_repository.get_by_id(user_id)
         if user is None:
             raise PermissionError("Пользователь не найден.")
@@ -50,6 +70,15 @@ class TORecordService:
         return user
 
     async def _ensure_modify_access(self, user_id: UUID, urza_id: UUID) -> None:
+        """Проверяет право пользователя изменять документы указанного УРЗА.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+    Raises:
+        PermissionError: Если у пользователя нет права изменения.
+    """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено.")
 
@@ -61,6 +90,20 @@ class TORecordService:
         *,
         for_update: bool = False,
     ) -> TORecord:
+        """Находит запись ТО указанного УРЗА и при необходимости блокирует её.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        record_id: Идентификатор записи ТО.
+        urza_id: Идентификатор устройства-владельца.
+        for_update: Блокировать запись для изменения.
+
+    Returns:
+    Запись ТО, принадлежащая указанному устройству.
+
+    Raises:
+        ValueError: Если запись не найдена или относится к другому УРЗА.
+    """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
         record = (
@@ -79,6 +122,16 @@ class TORecordService:
         user_id: UUID,
         urza_id: UUID,
     ) -> None:
+        """Проверяет, что пользователь является руководителем предприятия УРЗА.
+
+    Args:
+        user_id: Идентификатор проверяющего.
+        urza_id: Идентификатор устройства.
+
+    Raises:
+        PermissionError: Если роль или область ответственности не подходят.
+        ValueError: Если пользователь или устройство не найдены.
+    """
         user = await self._get_active_user(user_id)
         if user.role is not UserRole.MANAGER:
             raise PermissionError("Согласовывать ТО может только руководитель.")
@@ -97,6 +150,20 @@ class TORecordService:
         urza_id: UUID,
         record: TORecord,
     ):
+        """Находит и проверяет задачу, связанную с записью ТО.
+
+    Args:
+        user_id: Идентификатор пользователя, выполняющего действие.
+        urza_id: Идентификатор устройства.
+        record: Запись ТО.
+
+    Returns:
+    Связанная активная задача или None, если запись самостоятельная.
+
+    Raises:
+        ValueError: Если связанная задача отсутствует или не соответствует записи.
+        PermissionError: Если действие выполняет не назначенный исполнитель.
+    """
         if record.task_id is None:
             return None
         task = await self.task_repository.get_by_id(record.task_id)
@@ -116,6 +183,23 @@ class TORecordService:
         urza_id: UUID,
         task_id: UUID,
     ):
+        """Проверяет, что задача допускает создание связанного результата ТО.
+
+    Проверяет доступ, роль исполнителя, вид работы, владельца, статус задачи
+    и отсутствие уже созданной активной записи.
+
+    Args:
+        user_id: Идентификатор исполнителя.
+        urza_id: Идентификатор устройства.
+        task_id: Идентификатор задачи.
+
+    Returns:
+    Проверенная задача.
+
+    Raises:
+        PermissionError: При недостатке прав.
+        ValueError: Если задача не подходит для создания результата ТО.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         user = await self._get_active_user(user_id)
         if user.role not in _SUBMIT_ROLES:
@@ -142,6 +226,15 @@ class TORecordService:
         user_id: UUID,
         urza_id: UUID,
     ) -> list[TORecord]:
+        """Возвращает записи ТО устройства после проверки права чтения.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+    Returns:
+    Записи ТО указанного УРЗА.
+    """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
         return await self.repository.get_by_urza_id(urza_id)
@@ -151,6 +244,15 @@ class TORecordService:
         user_id: UUID,
         urza_id: UUID,
     ) -> TORecord | None:
+        """Возвращает текущую утверждённую запись ТО устройства.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+    Returns:
+    Актуальная утверждённая запись или None.
+    """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
         return await self.repository.get_current_approved(urza_id)
@@ -161,6 +263,19 @@ class TORecordService:
         task_id: UUID,
         urza_id: UUID,
     ) -> TORecord | None:
+        """Возвращает запись ТО, связанную с задачей, после проверки доступа.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        task_id: Идентификатор задачи.
+        urza_id: Идентификатор ожидаемого УРЗА.
+
+    Returns:
+    Запись ТО или None.
+
+    Raises:
+        ValueError: Если найденная запись принадлежит другому устройству.
+    """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
         record = await self.repository.get_by_task_id(task_id)
@@ -182,6 +297,32 @@ class TORecordService:
         historical_data: bool = False,
         task_id: UUID | None = None,
     ) -> TORecord:
+        """Создаёт запись технического обслуживания.
+
+    Требует скан подписанной формы. Для видов ТО, не входящих в список
+    исключений, также обязателен скан протокола. Руководитель создаёт
+    утверждённую запись, остальные разрешённые роли — черновик.
+
+    Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        maintenance_date: Дата выполнения ТО.
+        maintenance_type: Вид технического обслуживания.
+        signed_form_file_id: Идентификатор подписанной формы.
+        scan_protocol_id: Необязательный идентификатор скана протокола.
+        editable_protocol_id: Необязательный редактируемый протокол.
+        detected_deviations: Выявленные отклонения.
+        measures_taken: Принятые меры.
+        historical_data: Признак исторической записи.
+        task_id: Необязательная связанная задача.
+
+    Returns:
+    Созданная запись ТО.
+
+    Raises:
+        PermissionError: Если роль или доступ не позволяют создавать запись.
+        ValueError: Если отсутствуют обязательные файлы или задача некорректна.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         user = await self._get_active_user(user_id)
         if user.role not in {
@@ -226,6 +367,20 @@ class TORecordService:
         record_id: UUID,
         urza_id: UUID,
     ) -> TORecord | None:
+        """Возвращает запись ТО по идентификатору в контексте указанного УРЗА.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        record_id: Идентификатор записи.
+        urza_id: Идентификатор устройства.
+
+    Returns:
+    Запись ТО или None.
+
+    Raises:
+        PermissionError: Если нет доступа к устройству.
+        ValueError: Если запись принадлежит другому устройству.
+    """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён.")
         record = await self.repository.get_by_id(record_id)
@@ -247,6 +402,32 @@ class TORecordService:
         measures_taken: str = "Не требуется",
         historical_data: bool = False,
     ) -> TORecord:
+        """Изменяет черновик записи ТО.
+
+    Редактирование ограничено разрешёнными ролями; инженер может изменять
+    только собственный черновик. Обязательность подписанной формы и протокола
+    проверяется с учётом уже сохранённых файлов.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+        maintenance_date: Новая дата ТО.
+        maintenance_type: Новый вид ТО.
+        signed_form_file_id: Новый скан подписанной формы или None.
+        scan_protocol_id: Новый скан протокола или None.
+        editable_protocol_id: Новый редактируемый протокол или None.
+        detected_deviations: Выявленные отклонения.
+        measures_taken: Принятые меры.
+        historical_data: Признак исторической записи.
+
+    Returns:
+    Обновлённая запись ТО.
+
+    Raises:
+        PermissionError: Если у пользователя нет права редактирования.
+        ValueError: Если запись не является черновиком или не заполнены обязательные данные.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
             user_id, record_id, urza_id, for_update=True
@@ -285,6 +466,18 @@ class TORecordService:
         user_id: UUID,
         record: TORecord,
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для записи ТО.
+
+    Учитывает архивирование, права изменения, авторство черновика и роль
+    проверяющего.
+
+    Args:
+        user_id: Идентификатор пользователя.
+        record: Проверяемая запись ТО.
+
+    Returns:
+    Множество кодов действий; при отсутствии прав возвращает пустое множество.
+    """
         if record.deleted_at is not None:
             return set()
         try:
@@ -312,6 +505,20 @@ class TORecordService:
         record_id: UUID,
         urza_id: UUID,
     ) -> TORecord:
+        """Отправляет черновик ТО на согласование.
+
+    Если запись связана с задачей, синхронно переводит связанную задачу
+    в завершённое состояние и на проверку. При ошибке откатывает текущую
+    транзакцию.
+
+    Args:
+        user_id: Идентификатор отправителя.
+        record_id: Идентификатор записи ТО.
+        urza_id: Идентификатор устройства.
+
+    Returns:
+    Запись ТО в статусе UNDER_REVIEW.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
             user_id, record_id, urza_id, for_update=True
@@ -353,6 +560,23 @@ class TORecordService:
         record_id: UUID,
         urza_id: UUID,
     ) -> TORecord:
+        """Утверждает запись ТО после проверки руководителем.
+
+    При наличии связанной задачи закрывает её в рамках того же сценария.
+    При ошибке откатывает текущую транзакцию.
+
+    Args:
+        user_id: Идентификатор руководителя.
+        record_id: Идентификатор записи.
+        urza_id: Идентификатор устройства.
+
+    Returns:
+    Утверждённая запись ТО.
+
+    Raises:
+        PermissionError: Если пользователь не является допустимым проверяющим.
+        ValueError: Если запись не находится на согласовании или отсутствует подписанная форма.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
             user_id, record_id, urza_id, for_update=True
@@ -387,6 +611,20 @@ class TORecordService:
         urza_id: UUID,
         comment: str,
     ) -> TORecord:
+        """Возвращает запись ТО с согласования на доработку.
+
+    Требует непустой комментарий. Если запись связана с задачей, возвращает
+    на доработку и задачу; при ошибке откатывает текущую транзакцию.
+
+    Args:
+        user_id: Идентификатор руководителя.
+        record_id: Идентификатор записи.
+        urza_id: Идентификатор устройства.
+        comment: Причина возврата.
+
+    Returns:
+    Запись ТО в статусе DRAFT.
+    """
         await self._ensure_modify_access(user_id, urza_id)
         record = await self._get_record_for_urza(
             user_id, record_id, urza_id, for_update=True
@@ -422,6 +660,14 @@ class TORecordService:
         self,
         user_id: UUID,
     ) -> list[TORecord]:
+        """Возвращает самостоятельные записи ТО на согласовании, доступные руководителю.
+
+    Args:
+        user_id: Идентификатор пользователя.
+
+    Returns:
+    Список записей, для которых пользователь имеет право проверки.
+    """
         try:
             user = await self._get_active_user(user_id)
         except PermissionError:
@@ -443,6 +689,14 @@ class TORecordService:
         self,
         user_id: UUID,
     ) -> list[TORecord]:
+        """Возвращает самостоятельные записи ТО, доступные пользователю в рабочем списке.
+
+    Args:
+        user_id: Идентификатор пользователя.
+
+    Returns:
+    Список записей, для которых доступны просмотр или дальнейшие действия.
+    """
         try:
             await self._get_active_user(user_id)
         except PermissionError:
