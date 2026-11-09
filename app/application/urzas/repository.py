@@ -17,8 +17,7 @@ class URZARepository:
         """Сохраняет асинхронную SQLAlchemy-сессию для запросов к устройствам РЗА.
 
         Args:
-        session: Сессия текущей транзакции.
-
+            session: Сессия текущей транзакции.
         """
         self.session = session
 
@@ -32,11 +31,10 @@ class URZARepository:
         DTO и проверок доступа без дополнительных обращений к сессии.
 
         Args:
-        urza_id: Идентификатор устройства РЗА.
+            urza_id: Идентификатор устройства РЗА.
 
         Returns:
-        Активное устройство или None.
-
+            Активное устройство или None.
         """
         result = await self.session.scalars(
             select(URZA)
@@ -60,11 +58,10 @@ class URZARepository:
         """Находит устройство с загруженной цепочкой владельца, включая архивное.
 
         Args:
-        urza_id: Идентификатор устройства РЗА.
+            urza_id: Идентификатор устройства РЗА.
 
         Returns:
-        Устройство независимо от признака архивирования или None.
-
+            Устройство независимо от признака архивирования или None.
         """
         result = await self.session.scalars(
             select(URZA)
@@ -82,11 +79,10 @@ class URZARepository:
         """Блокирует устройство и проверяет, что оно не архивировано.
 
         Args:
-        urza_id: Идентификатор устройства РЗА.
+            urza_id: Идентификатор устройства РЗА.
 
         Returns:
-        True, если активное устройство найдено и заблокировано.
-
+            True, если активное устройство найдено и заблокировано.
         """
         urza = await lock_owner_row(self.session, URZA, urza_id)
         return urza is not None and urza.deleted_at is None
@@ -95,11 +91,10 @@ class URZARepository:
         """Блокирует присоединение и проверяет его активность.
 
         Args:
-        connection_id: Идентификатор присоединения.
+            connection_id: Идентификатор присоединения.
 
         Returns:
-        True, если активное присоединение найдено и заблокировано.
-
+            True, если активное присоединение найдено и заблокировано.
         """
         connection = await lock_owner_row(
             self.session,
@@ -147,11 +142,10 @@ class URZARepository:
         Выполняет flush внутри savepoint, не фиксируя внешнюю транзакцию.
 
         Args:
-        urza: Создаваемая модель устройства РЗА.
+            urza: Создаваемая модель устройства РЗА.
 
         Returns:
-        Добавленная модель устройства.
-
+            Добавленная модель устройства.
         """
         async with self.session.begin_nested():
             self.session.add(urza)
@@ -162,11 +156,10 @@ class URZARepository:
         """Синхронизирует изменения устройства с базой данных без commit.
 
         Args:
-        urza: Изменённая модель устройства РЗА.
+            urza: Изменённая модель устройства РЗА.
 
         Returns:
-        Та же модель устройства.
-
+            Та же модель устройства.
         """
         await self.session.flush()
         return urza
@@ -184,13 +177,12 @@ class URZARepository:
         можно исключить из проверки.
 
         Args:
-        connection_id: Идентификатор присоединения.
-        dispatch_name: Проверяемое диспетчерское наименование.
-        exclude_id: Идентификатор исключаемого устройства.
+            connection_id: Идентификатор присоединения.
+            dispatch_name: Проверяемое диспетчерское наименование.
+            exclude_id: Идентификатор исключаемого устройства.
 
         Returns:
-        True, если имя уже занято активным устройством.
-
+            True, если имя уже занято активным устройством.
         """
         query = select(URZA.id).where(
             URZA.connection_id == connection_id,
@@ -208,11 +200,10 @@ class URZARepository:
         """Проверяет активность присоединения и его подстанции.
 
         Args:
-        connection_id: Идентификатор присоединения.
+            connection_id: Идентификатор присоединения.
 
         Returns:
-        True, если оба объекта существуют и не архивированы.
-
+            True, если оба объекта существуют и не архивированы.
         """
         result = await self.session.scalar(
             select(Connection.id)
