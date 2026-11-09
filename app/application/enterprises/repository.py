@@ -14,8 +14,7 @@ class EnterpriseRepository:
         """Сохраняет сессию для запросов к организационной структуре.
 
         Args:
-        session: Асинхронная SQLAlchemy-сессия текущей транзакции.
-
+            session: Асинхронная SQLAlchemy-сессия текущей транзакции.
         """
         self.session = session
 
@@ -23,11 +22,10 @@ class EnterpriseRepository:
         """Находит предприятие по идентификатору, включая архивные записи.
 
         Args:
-        enterprise_id: Идентификатор предприятия.
+            enterprise_id: Идентификатор предприятия.
 
         Returns:
-        Предприятие или None, если запись отсутствует.
-
+            Предприятие или None, если запись отсутствует.
         """
         return await self.session.get(Enterprise, enterprise_id)
 
@@ -48,8 +46,7 @@ class EnterpriseRepository:
         учитывать существующие записи независимо от признака архивирования.
 
         Returns:
-        Список предприятий, отсортированный по полному наименованию.
-
+            Список предприятий, отсортированный по полному наименованию.
         """
         result = await self.session.scalars(
             select(Enterprise).order_by(Enterprise.full_name)
@@ -68,13 +65,12 @@ class EnterpriseRepository:
         чтобы сама запись существовала и не была архивирована.
 
         Args:
-        ancestor_id: Идентификатор предполагаемого предка.
-        enterprise_id: Идентификатор проверяемого предприятия.
+            ancestor_id: Идентификатор предполагаемого предка.
+            enterprise_id: Идентификатор проверяемого предприятия.
 
         Returns:
-        True, если предок совпадает с предприятием или находится выше
-        него в активной иерархии, иначе False.
-
+            True, если предок совпадает с предприятием или находится выше
+            него в активной иерархии, иначе False.
         """
 
         if ancestor_id == enterprise_id:
@@ -119,11 +115,10 @@ class EnterpriseRepository:
         Транзакция не фиксируется; commit выполняется внешним уровнем.
 
         Args:
-        enterprise: Модель предприятия.
+            enterprise: Модель предприятия.
 
         Returns:
-        Та же модель предприятия.
-
+            Та же модель предприятия.
         """
         self.session.add(enterprise)
         await self.session.flush()
@@ -138,12 +133,11 @@ class EnterpriseRepository:
         """Возвращает предприятия с указанным родителем и типом.
 
         Args:
-        parent_id: Идентификатор родителя; None для корневых предприятий.
-        enterprise_type: Тип предприятия.
+            parent_id: Идентификатор родителя; None для корневых предприятий.
+            enterprise_type: Тип предприятия.
 
         Returns:
-        Подходящие предприятия, отсортированные по полному наименованию.
-
+            Подходящие предприятия, отсортированные по полному наименованию.
         """
         result = await self.session.scalars(
             select(Enterprise)
