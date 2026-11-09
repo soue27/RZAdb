@@ -22,6 +22,12 @@ class RZACSVSeedService:
             session: AsyncSession,
             actor_id: UUID,
     ) -> None:
+        """Сохраняет сессию и идентификатор системного пользователя, от имени которого создаются записи.
+
+        Args:
+            session: Асинхронная SQLAlchemy-сессия.
+            actor_id: Идентификатор пользователя-инициатора.
+        """
         self.session = session
         self.actor_id = actor_id
 
@@ -339,6 +345,8 @@ class RZACSVSeedService:
 
     @staticmethod
     def _optional_string(value: str | None) -> str | None:
+        """Очищает необязательное строковое значение и преобразует пустую строку в None.
+        """
         if value is None:
             return None
 
