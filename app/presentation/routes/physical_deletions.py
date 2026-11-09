@@ -1,3 +1,5 @@
+"""Маршруты физического удаления документных записей через общий сервис."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -24,6 +26,16 @@ async def _delete(
     user: User,
     service: PhysicalDeletionService,
 ):
+    """Выполняет физическое удаление документной записи через общий сервис удаления.
+
+    Args:
+    kind: Ключ типа удаляемой записи.
+    record_id: Идентификатор записи.
+    user: Пользователь, выполняющий удаление.
+
+    Returns:
+    HTTP-ответ с результатом операции.
+    """
     try:
         result = await service.delete(kind=kind, record_id=record_id, user_id=user.id)
     except PermissionError as exc:
@@ -67,6 +79,14 @@ async def _delete(
 
 
 def _endpoint(kind: str):
+    """Создаёт обработчик маршрута физического удаления для заданного типа записи.
+
+    Args:
+    kind: Ключ типа удаления из конфигурации сервиса.
+
+    Returns:
+    Асинхронный endpoint, принимающий идентификатор записи.
+    """
     async def endpoint(request: Request, record_id: UUID,
                        user: Annotated[User, Depends(get_current_user)],
                        service: Annotated[PhysicalDeletionService, Depends(get_physical_deletion_service)]):
