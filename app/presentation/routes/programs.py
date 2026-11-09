@@ -1,3 +1,5 @@
+"""Маршруты просмотра, редактирования и согласования программ УРЗА."""
+
 import logging
 from typing import Annotated
 from uuid import UUID
@@ -124,6 +126,8 @@ async def get_urza_programs(
     ],
     archived: bool = Query(default=False),
 ):
+    """Отображает программы выбранного УРЗА.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -170,6 +174,8 @@ async def get_new_urza_program_form(
     ],
     task_id: UUID | None = None,
 ):
+    """Отображает форму создания программы УРЗА.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -266,6 +272,8 @@ async def get_edit_urza_program_form(
     ],
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
 ):
+    """Отображает форму редактирования черновика программы.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -366,6 +374,8 @@ async def create_urza_program(
         FastAPIFile(),
     ] = None,
 ):
+    """Создаёт программу УРЗА и сохраняет обязательный скан.
+    """
     # Проверяем доступ к URZA.
     try:
         await object_service.get_object(
@@ -592,6 +602,8 @@ async def update_urza_program(
         Form(),
     ] = False,
 ):
+    """Обновляет черновик программы и связанные файлы.
+    """
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -815,6 +827,8 @@ async def submit_urza_program(
 
 
 ):
+    """Отправляет программу на согласование.
+    """
     try:
         await program_service.submit_for_review(
             user_id=current_user.id,
@@ -862,6 +876,8 @@ async def approve_urza_program(
     ],
 
 ):
+    """Утверждает программу от имени руководителя.
+    """
     try:
         await program_service.approve(
             user_id=current_user.id,
@@ -910,6 +926,8 @@ async def return_urza_program(
     ],
     comment: Annotated[str | None, Form()] = None,
 ):
+    """Возвращает программу на доработку.
+    """
     try:
         await program_service.return_to_draft(
             user_id=current_user.id,
