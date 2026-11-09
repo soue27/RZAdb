@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class URZATreeNode(BaseModel):
+    """Узел устройства РЗА в дереве подстанции и присоединения.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -13,6 +15,8 @@ class URZATreeNode(BaseModel):
 
 
 class ConnectionTreeNode(BaseModel):
+    """Узел присоединения с вложенным списком устройств РЗА.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -22,6 +26,8 @@ class ConnectionTreeNode(BaseModel):
 
 
 class SubstationTreeNode(BaseModel):
+    """Узел подстанции с вложенными присоединениями.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -33,6 +39,8 @@ class SubstationTreeNode(BaseModel):
 
 
 class EnterpriseTreeAncestor(BaseModel):
+    """Краткое представление предка предприятия в иерархии.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -41,6 +49,8 @@ class EnterpriseTreeAncestor(BaseModel):
 
 
 class EnterpriseTreeNode(BaseModel):
+    """Узел организационной структуры с предками, дочерними предприятиями и подстанциями.
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -57,6 +67,8 @@ class EnterpriseTreeNode(BaseModel):
 
 
 class TreeSearchResult(BaseModel):
+    """Результат поиска объекта с полем совпадения и путём в иерархии.
+    """
     id: UUID
     object_type: str
     type_label: str
@@ -71,6 +83,8 @@ class TreeSearchResult(BaseModel):
 
 
 class TreeSearchPage(BaseModel):
+    """Страница результатов поиска по дереву с общим количеством и параметрами пагинации.
+    """
     items: list[TreeSearchResult]
     total: int
     offset: int
