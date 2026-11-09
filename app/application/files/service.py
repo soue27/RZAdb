@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class QuarantinedObject:
+    """Описывает перемещение объекта из исходного ключа в карантин хранилища.
+"""
     original_key: str
     quarantine_key: str
 
@@ -28,9 +30,26 @@ class FileQuarantine:
     """Moves storage objects aside until the database deletion is committed."""
 
     def __init__(self, storage: ObjectStorage) -> None:
+        """Сохраняет репозиторий метаданных и адаптер объектного хранилища.
+
+    Args:
+        repository: Репозиторий файлов.
+        storage: Объектное хранилище бинарного содержимого.
+    """
         self.storage = storage
 
     async def prepare(self, keys: list[str]) -> list[QuarantinedObject]:
+        """Перемещает уникальные объекты в карантин до фиксации удаления в базе данных.
+
+    Если перемещение любого объекта завершается ошибкой, ранее перемещённые
+    объекты восстанавливаются.
+
+    Args:
+        keys: Ключи объектов, которые требуется временно изолировать.
+
+    Returns:
+    Список соответствий исходных и карантинных ключей.
+    """
         moved: list[QuarantinedObject] = []
         try:
             for key in dict.fromkeys(keys):
@@ -46,6 +65,11 @@ class FileQuarantine:
         return moved
 
     async def restore(self, items: list[QuarantinedObject]) -> None:
+        """Возвращает объекты из карантина на исходные ключи в обратном порядке.
+
+    Args:
+        items: Результат предварительного перемещения.
+    """
         for item in reversed(items):
             try:
                 if await self.storage.exists(key=item.quarantine_key):
@@ -58,6 +82,13 @@ class FileQuarantine:
                 raise
 
     async def purge(self, items: list[QuarantinedObject]) -> None:
+        """Окончательно удаляет объекты из карантина.
+
+    Вызывается после успешной фиксации удаления метаданных в базе данных.
+
+    Args:
+        items: Объекты, которые требуется удалить из карантина.
+    """
         for item in items:
             try:
                 await self.storage.delete(key=item.quarantine_key)
@@ -66,6 +97,8 @@ class FileQuarantine:
                 raise
 
 class FileService:
+    """Управляет загрузкой, чтением и архивированием файловых объектов и их метаданных.
+"""
     def __init__(
         self,
         repository: FileRepository,
@@ -84,6 +117,26 @@ class FileService:
         extension: str,
         mime_type: str,
     ) -> File:
+        """Проверяет и загружает файл в хранилище, затем создаёт его метаданные.
+
+    Ключ формируется приложением. Если загрузка или сохранение метаданных
+    завершается ошибкой, выполняется попытка удалить загруженный объект.
+
+    Args:
+        actor_id: Идентификатор пользователя, загрузившего файл.
+        content: Бинарное содержимое.
+        original_name: Исходное имя файла.
+        display_name: Имя для отображения в интерфейсе.
+        extension: Заявленное расширение.
+        mime_type: Переданный MIME-тип; фактический тип определяется по разрешённому расширению.
+
+    Returns:
+    Созданные метаданные файла.
+
+    Raises:
+        FileUploadValidationError: Если расширение или размер не допускаются.
+        Exception: Если хранилище или репозиторий не смогли завершить операцию.
+    """
         uploaded_at = datetime.now(UTC)
 
         normalized_extension = validate_upload(
@@ -151,6 +204,14 @@ class FileService:
         await self.storage.delete(key=file.s3_key)
 
     async def read(self, file: File) -> bytes:
+        """Скачивает бинарное содержимое файла из объектного хранилища.
+
+    Args:
+        file: Метаданные файла.
+
+    Returns:
+    Содержимое файла в байтах.
+    """
         return await self.storage.download(key=file.s3_key)
 
     async def archive(
@@ -159,6 +220,19 @@ class FileService:
         file_id: UUID,
         user_id: UUID,
     ) -> File:
+        """Помечает метаданные файла как архивные без физического удаления объекта.
+
+    Args:
+        file_id: Идентификатор файла.
+        user_id: Идентификатор пользователя, выполняющего архивирование.
+
+    Returns:
+    Обновлённые метаданные файла.
+
+    Raises:
+        FileNotFoundError: Если файл не найден.
+        ValueError: Если файл уже находится в архиве.
+    """
         file = await self.repository.get_by_id(file_id)
 
         if file is None:
