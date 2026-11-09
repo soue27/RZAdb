@@ -1,3 +1,5 @@
+"""app: создание и настройка FastAPI-приложения."""
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -47,8 +49,6 @@ from app.presentation.routes.tasks import router as tasks_router
 from app.presentation.routes.urza_instructions import router as urza_instructions_router
 from app.presentation.routes.urza_objects import router as urza_objects_router
 from app.presentation.routes.users import router as users_router
-"""app: создание и настройка FastAPI-приложения."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
