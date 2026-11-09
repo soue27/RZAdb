@@ -11,7 +11,19 @@ async def lock_owner_row[Owner: Base](
     model: type[Owner],
     owner_id: UUID,
 ) -> Owner | None:
-    """Lock and refresh an owner row in the current transaction."""
+    """Блокирует строку владельца и перечитывает её в текущей транзакции.
+
+    Использует SELECT FOR UPDATE и populate_existing, чтобы после ожидания
+    блокировки получить актуальное состояние ORM-объекта.
+
+    Args:
+        session: Асинхронная SQLAlchemy-сессия.
+        model: ORM-модель владельца.
+        owner_id: Идентификатор владельца.
+
+    Returns:
+        Актуальная заблокированная модель или None.
+    """
     result = await session.scalars(
         select(model)
         .where(model.id == owner_id)
