@@ -27,7 +27,7 @@ class FileRepository:
             file_id: Идентификатор файла.
 
         Returns:
-        Файл или None.
+            Файл или None.
         """
         return await self.session.get(
             File,
@@ -44,7 +44,7 @@ class FileRepository:
             s3_key: Ключ объекта.
 
         Returns:
-        Файл или None.
+            Файл или None.
         """
         query = select(File).where(
             File.s3_key == s3_key,
@@ -62,7 +62,7 @@ class FileRepository:
             file: Создаваемая модель файла.
 
         Returns:
-        Добавленная модель файла.
+            Добавленная модель файла.
         """
         self.session.add(file)
         await self.session.flush()
@@ -79,7 +79,7 @@ class FileRepository:
             file: Изменённая модель файла.
 
         Returns:
-        Та же модель файла.
+            Та же модель файла.
         """
         await self.session.flush()
         return file
