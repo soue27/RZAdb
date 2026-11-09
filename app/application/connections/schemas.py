@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ConnectionListItem(BaseModel):
+    """Краткие сведения о присоединении для списков."""
+
     id: UUID
     dispatch_name: str
     sap_code: str | None
@@ -12,6 +14,8 @@ class ConnectionListItem(BaseModel):
 
 
 class ConnectionDetails(BaseModel):
+    """Полные сведения о присоединении для операций чтения и изменения."""
+
     id: UUID
     dispatch_name: str
     sap_code: str | None
@@ -21,6 +25,8 @@ class ConnectionDetails(BaseModel):
 
 
 class ConnectionCreate(BaseModel):
+    """Проверяемые поля для создания присоединения."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     dispatch_name: str = Field(min_length=1, max_length=255)
@@ -31,6 +37,7 @@ class ConnectionCreate(BaseModel):
     @field_validator("sap_code", "asureo_code", mode="before")
     @classmethod
     def empty_optional_codes_to_none(cls, value):
+        """Преобразует пустые необязательные коды в None."""
         if isinstance(value, str) and not value.strip():
             return None
         return value
