@@ -26,15 +26,15 @@ logger = logging.getLogger(__name__)
 
 
 class BackupError(RuntimeError):
-    """Base error for a backup run that could not be completed."""
+    """Базовая ошибка незавершённого запуска резервного копирования."""
 
 
 class BackupDisabledError(BackupError):
-    """Raised when the global backup switch is off."""
+    """Резервное копирование отключено общим переключателем настроек."""
 
 
 class BackupManifestError(BackupError):
-    """The final run manifest could not be committed to disk."""
+    """Итоговый манифест запуска не удалось надёжно записать на диск."""
 
 
 class BackupCoordinator:
