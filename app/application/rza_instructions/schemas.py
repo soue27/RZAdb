@@ -6,6 +6,8 @@ from app.domain.enums import DocumentStatus
 
 
 class RZAInstructionDetails(BaseModel):
+    """Сводные данные инструкции РЗА подстанции и выбранной версии.
+    """
     instruction_id: UUID
     version_id: UUID
     version_number: int
@@ -19,6 +21,8 @@ class RZAInstructionDetails(BaseModel):
 
 
 class RZAInstructionVersionDetails(BaseModel):
+    """Данные версии инструкции РЗА для истории и согласования.
+    """
     id: UUID
     version_number: int
     effective_date: date
