@@ -7,7 +7,23 @@ from app.application.passport_protocol.service import PreparedPassportProtocol
 
 
 class PassportProtocolZipExporter:
+    """Упаковывает четыре подготовленных документа паспорта УРЗА в ZIP-архив.
+    """
     def export(self, package: PreparedPassportProtocol) -> bytes:
+        """Формирует ZIP-архив паспорта из четырёх документов в установленном порядке.
+
+        Проверяет количество документов, допустимость имён, ожидаемые префиксы
+        и уникальность имён файлов.
+
+        Args:
+            package: Подготовленный комплект документов паспорта.
+
+        Returns:
+            Бинарное содержимое ZIP-архива.
+
+        Raises:
+            ValueError: Если комплект неполный, имена небезопасны или порядок неверен.
+        """
         expected = ("01_ОТД.docx", "02_Уставки", "03_Схемы", "04_ТО")
         if len(package.documents) != 4:
             raise ValueError("Passport package must contain four documents")
