@@ -1,3 +1,5 @@
+"""Маршруты предварительного просмотра, архивирования, восстановления и истории объектов."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -167,6 +169,10 @@ async def preview_archive(
         InspectionTaskRepository, Depends(get_inspection_task_repository)
     ],
 ):
+    """Формирует предварительный просмотр архивирования объекта.
+
+    Показывает каскад потомков и процессы, блокирующие операцию.
+    """
     kind = _object_type(object_type)
     try:
         preview = await archive_service.preview(
@@ -207,6 +213,8 @@ async def archive_object(
     ],
     reason: Annotated[str, Form()],
 ):
+    """Архивирует объект и его активных потомков после подтверждения пользователя.
+    """
     kind = _object_type(object_type)
     try:
         await archive_service.archive(
@@ -256,6 +264,8 @@ async def restore_object(
     archive_service: Annotated[ArchiveService, Depends(get_archive_service)],
     reason: Annotated[str | None, Form()] = None,
 ):
+    """Восстанавливает архивированный объект через общий сервис архивирования.
+    """
     kind = _object_type(object_type)
     try:
         await archive_service.restore(
@@ -282,6 +292,8 @@ async def get_archive_history(
     current_user: Annotated[User, Depends(get_current_user)],
     archive_service: Annotated[ArchiveService, Depends(get_archive_service)],
 ):
+    """Возвращает историю архивирования и восстановления выбранного объекта.
+    """
     kind = _object_type(object_type)
     try:
         events = await archive_service.get_history(
