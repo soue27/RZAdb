@@ -54,11 +54,11 @@ class DocumentFormHierarchy:
 
 
 class DocumentTemplateError(Exception):
-    """A runtime DOCX template is unavailable or invalid."""
+    """Runtime DOCX-шаблон отсутствует или имеет некорректный формат."""
 
 
 class DocxProcessor:
-    """Replace known placeholders while retaining the surrounding run styles."""
+    """Заменяет известные маркеры, сохраняя форматирование окружающих фрагментов текста."""
 
     @staticmethod
     def replace_markers(document, values: dict[str, str]) -> None:
