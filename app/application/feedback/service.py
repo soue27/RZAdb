@@ -20,6 +20,13 @@ class FeedbackService:
         recipient: str,
         app_base_url: str | None = None,
     ) -> None:
+        """Сохраняет SMTP-отправителя, адрес получателя и необязательный адрес приложения.
+
+        Args:
+            sender: SMTP-адаптер отправки писем.
+            recipient: Адрес администрации, принимающей обратную связь.
+            app_base_url: Базовый URL приложения для включения в сообщение.
+        """
         self.sender = sender
         self.recipient = recipient
         self.app_base_url = app_base_url
@@ -34,6 +41,19 @@ class FeedbackService:
         enterprise_name: str | None,
         message: str,
     ) -> None:
+        """Отправляет администрации сообщение обратной связи от пользователя.
+
+        В письмо включаются сведения об отправителе, предприятии, времени отправки,
+        текст сообщения и адрес приложения.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            full_name: ФИО отправителя.
+            email: Email отправителя.
+            role: Роль пользователя.
+            enterprise_name: Наименование предприятия или None.
+            message: Текст обратной связи.
+        """
         submitted_at = datetime.now(EKATERINBURG_TZ)
 
         text_body = "\n".join(
