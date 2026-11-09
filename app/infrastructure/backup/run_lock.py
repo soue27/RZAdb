@@ -13,10 +13,23 @@ class BackupRunLock:
     """A process-wide advisory lock shared by the CLI and web interface."""
 
     def __init__(self, backup_dir: Path) -> None:
+        """Формирует путь lock-файла в каталоге резервных копий.
+
+        Args:
+            backup_dir: Каталог резервных копий.
+        """
         self.path = backup_dir / ".backup-run.lock"
         self._descriptor: int | None = None
 
     def acquire(self) -> BackupRunLock:
+        """Создаёт lock-файл с ограниченными правами и захватывает неблокирующую блокировку.
+
+        Returns:
+            Текущий экземпляр блокировки.
+
+        Raises:
+            BackupAlreadyRunning: Если другой процесс уже выполняет резервирование.
+        """
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
         descriptor = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
@@ -30,6 +43,8 @@ class BackupRunLock:
         return self
 
     def release(self) -> None:
+        """Освобождает advisory-блокировку и закрывает файловый дескриптор.
+        """
         if self._descriptor is None:
             return
         fcntl.flock(self._descriptor, fcntl.LOCK_UN)
@@ -37,7 +52,14 @@ class BackupRunLock:
         self._descriptor = None
 
     def __enter__(self) -> BackupRunLock:
+        """Захватывает блокировку при входе в контекстный менеджер.
+
+        Returns:
+            Текущий экземпляр блокировки.
+        """
         return self.acquire()
 
     def __exit__(self, *_: object) -> None:
+        """Освобождает блокировку при выходе из контекстного менеджера.
+        """
         self.release()
