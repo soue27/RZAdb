@@ -1,3 +1,5 @@
+"""Маршруты чтения уведомлений текущего пользователя."""
+
 import secrets
 from typing import Annotated
 from uuid import UUID
@@ -106,6 +108,8 @@ async def notifications_page(
     ],
     offset: int = 0,
 ):
+    """Отображает список непрочитанных уведомлений текущего пользователя.
+    """
     notifications = await service.get_unread(
         recipient_id=current_user.id,
         limit=PAGE_SIZE,
@@ -141,6 +145,8 @@ async def notifications_count(
         Depends(get_notification_service),
     ],
 ):
+    """Возвращает количество непрочитанных уведомлений для обновления интерфейса.
+    """
     count = await service.count_unread(recipient_id=current_user.id)
 
     return templates.TemplateResponse(
@@ -161,6 +167,8 @@ async def open_notification(
     ],
     csrf_token: Annotated[str, Form()],
 ):
+    """Помечает уведомление прочитанным и открывает связанный объект или задачу.
+    """
     _validate_csrf_token(request, csrf_token)
 
     notification = await service.get_by_id(
