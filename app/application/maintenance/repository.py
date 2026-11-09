@@ -27,7 +27,7 @@ class TORecordRepository:
             record_id: Идентификатор записи.
 
         Returns:
-        Запись ТО или None.
+            Запись ТО или None.
         """
         return await self.session.scalar(
             select(TORecord).where(
@@ -49,7 +49,7 @@ class TORecordRepository:
             record_id: Идентификатор записи.
 
         Returns:
-        Заблокированная запись ТО или None.
+            Заблокированная запись ТО или None.
         """
         statement = (
             select(TORecord)
@@ -78,7 +78,7 @@ class TORecordRepository:
             urza_id: Идентификатор УРЗА.
 
         Returns:
-        Записи ТО устройства в порядке, заданном запросом.
+            Записи ТО устройства в порядке, заданном запросом.
         """
         query = (
             select(TORecord)
@@ -103,7 +103,7 @@ class TORecordRepository:
         """Возвращает записи ТО без связанной задачи, ожидающие проверки.
 
         Returns:
-        Активные самостоятельные записи в статусе UNDER_REVIEW.
+            Активные самостоятельные записи в статусе UNDER_REVIEW.
         """
         statement = (
             select(TORecord)
@@ -128,7 +128,7 @@ class TORecordRepository:
         """Возвращает самостоятельные записи ТО, доступные для рабочего списка.
 
         Returns:
-        Активные записи ТО без связанной задачи в рабочих статусах.
+            Активные записи ТО без связанной задачи в рабочих статусах.
         """
         statement = (
             select(TORecord)
@@ -162,7 +162,7 @@ class TORecordRepository:
             urza_id: Идентификатор УРЗА.
 
         Returns:
-        Текущая утверждённая запись или None.
+            Текущая утверждённая запись или None.
         """
         statement = (
             select(TORecord)
@@ -191,7 +191,7 @@ class TORecordRepository:
             task_id: Идентификатор задачи.
 
         Returns:
-        Запись ТО или None.
+            Запись ТО или None.
         """
         query = select(TORecord).where(
             TORecord.task_id == task_id,
@@ -210,7 +210,7 @@ class TORecordRepository:
             record: Создаваемая запись ТО.
 
         Returns:
-        Добавленная модель записи.
+            Добавленная модель записи.
         """
         self.session.add(record)
         await self.session.flush()
@@ -224,7 +224,7 @@ class TORecordRepository:
             record: Изменённая запись ТО.
 
         Returns:
-        Та же модель записи.
+            Та же модель записи.
         """
         await self.session.flush()
         return record
