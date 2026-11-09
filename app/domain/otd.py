@@ -12,6 +12,26 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.domain.enums import DocumentStatus, OTDPurpose
+from app.domain.task import Task
+from app.domain.urza import URZA
+from app.domain.user import User
+from app.infrastructure.database.base import Base
+from app.infrastructure.database.mixins import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UUIDMixin,
+)
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.domain.enums import OTDPurpose, DocumentStatus
 from app.domain.task import Task
 from app.domain.urza import URZA
