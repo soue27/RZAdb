@@ -1,3 +1,5 @@
+"""app: создание и настройка FastAPI-приложения."""
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -50,6 +52,8 @@ from app.presentation.routes.organization_import import (
 
 
 def _is_api_request(request: Request) -> bool:
+    """Определяет, относится ли HTTP-запрос к API по пути или заголовкам клиента.
+    """
     route = request.scope.get("route")
     if getattr(route, "response_model", None) is not None:
         return True
@@ -62,6 +66,15 @@ async def _handle_auth_http_exception(
     request: Request,
     exc: HTTPException,
 ) -> Response:
+    """Преобразует HTTP-ошибки аутентификации в подходящий ответ для API или HTML-интерфейса.
+
+    Args:
+        request: Текущий HTTP-запрос.
+        exc: Исключение FastAPI.
+
+    Returns:
+        Ответ с кодом и содержимым, соответствующим типу клиента.
+    """
     is_authentication_failure = exc.status_code == status.HTTP_401_UNAUTHORIZED
     is_password_change_required = isinstance(exc, PasswordChangeRequired)
     is_login_submission = request.url.path == "/auth/login"
@@ -86,6 +99,14 @@ async def _handle_auth_http_exception(
 
 
 def create_app() -> FastAPI:
+    """Создаёт и настраивает экземпляр FastAPI.
+
+    Регистрирует middleware, обработчики исключений, статические файлы,
+    шаблоны и маршруты приложения.
+
+    Returns:
+        Настроенный экземпляр FastAPI.
+    """
     settings = get_settings()
     configure_logging(settings.log_level)
 
