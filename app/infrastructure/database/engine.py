@@ -1,3 +1,5 @@
+"""Создание асинхронного SQLAlchemy engine и фабрики сессий приложения."""
+
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
