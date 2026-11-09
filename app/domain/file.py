@@ -12,6 +12,12 @@ from app.infrastructure.database.mixins import (
 
 
 class File(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
+    """Хранит метаданные файла, загруженного в файловое хранилище.
+
+    Содержит ключ объекта в хранилище, исходное и отображаемое
+    имена, расширение, размер, MIME-тип и время загрузки.
+    Бинарное содержимое файла в этой модели не хранится.
+    """
     __tablename__ = "files"
 
     s3_key: Mapped[str] = mapped_column(
