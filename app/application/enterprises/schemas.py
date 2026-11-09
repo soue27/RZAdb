@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class EnterpriseDetails(BaseModel):
+    """Данные предприятия для отображения в интерфейсе."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -13,10 +15,13 @@ class EnterpriseDetails(BaseModel):
 
 
 class EnterpriseUpdate(BaseModel):
+    """Поля, разрешённые для изменения производственного отделения."""
+
     @field_validator("sap_code", mode="before")
 
     @classmethod
     def empty_sap_code_to_none(cls, value):
+        """Преобразует пустой SAP-код в None перед валидацией."""
         if isinstance(value, str) and not value.strip():
             return None
         return value
