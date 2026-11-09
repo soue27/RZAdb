@@ -18,6 +18,8 @@ from app.domain.program import Program
 
 
 class ProgramService:
+    """Управляет программами УРЗА, их файлами и процессом согласования.
+    """
     def __init__(
         self,
         repository: ProgramRepository,
@@ -27,6 +29,16 @@ class ProgramService:
         task_repository: TaskRepository,
         task_service: TaskService,
     ) -> None:
+        """Сохраняет репозитории и сервисы для управления программами и связанными задачами.
+
+        Args:
+        repository: Репозиторий программ.
+        access_service: Централизованный сервис проверки доступа.
+        user_repository: Репозиторий пользователей.
+        urza_repository: Репозиторий устройств РЗА.
+        task_repository: Репозиторий задач.
+        task_service: Сервис жизненного цикла задач.
+        """
         self.repository = repository
         self.access_service = access_service
         self.user_repository = user_repository
@@ -39,6 +51,16 @@ class ProgramService:
             user_id: UUID,
             urza_id: UUID,
     ) -> None:
+        """Проверяет, что согласование программы выполняет руководитель предприятия УРЗА.
+
+        Args:
+        user_id: Идентификатор проверяющего.
+        urza_id: Идентификатор устройства.
+
+        Raises:
+        ValueError: Если пользователь или устройство не найдены либо не определена подстанция.
+        PermissionError: Если пользователь неактивен, не MANAGER или не отвечает за предприятие.
+        """
         user = await self.user_repository.get_by_id(user_id)
 
         if user is None:
@@ -75,6 +97,15 @@ class ProgramService:
         user_id: UUID,
         program: Program,
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для программы.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        program: Проверяемая программа.
+
+        Returns:
+            Множество кодов действий с учётом статуса, роли и доступа.
+        """
         user = await self.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return set()
@@ -113,6 +144,18 @@ class ProgramService:
         user_id: UUID,
         urza_id: UUID,
     ) -> list[Program]:
+        """Возвращает программы указанного УРЗА после проверки права чтения.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Список программ.
+
+        Raises:
+        PermissionError: Если доступ к УРЗА запрещён.
+        """
         if not await self.access_service.can_access_urza(
             user_id,
             urza_id,
@@ -129,6 +172,16 @@ class ProgramService:
         program_id: UUID,
         urza_id: UUID,
     ) -> Program | None:
+        """Возвращает программу по идентификатору в контексте указанного УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        program_id: Идентификатор программы.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Программа или None.
+        """
         if not await self.access_service.can_access_urza(
             user_id,
             urza_id,
@@ -145,6 +198,16 @@ class ProgramService:
         task_id: UUID,
         urza_id: UUID,
     ) -> Program | None:
+        """Возвращает программу, связанную с задачей, после проверки доступа к УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        task_id: Идентификатор задачи.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Программа или None.
+        """
         if not await self.access_service.can_access_urza(
             user_id,
             urza_id,
@@ -225,6 +288,23 @@ class ProgramService:
         editable_file_id: UUID | None = None,
         task_id: UUID | None = None,
     ) -> Program:
+        """Создаёт программу для УРЗА.
+
+        Скан программы обязателен. При наличии task_id проверяет, что задача относится
+        к созданию программы и находится в работе у текущего исполнителя.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        program_type: Назначение программы.
+        program_number: Номер программы.
+        scan_file_id: Идентификатор обязательного скана.
+        editable_file_id: Необязательный редактируемый файл.
+        task_id: Необязательная связанная задача.
+
+        Returns:
+            Созданная программа.
+        """
         if not await self.access_service.can_modify_urza(
             user_id,
             urza_id,
@@ -351,6 +431,16 @@ class ProgramService:
             program_id: UUID,
             urza_id: UUID,
     ) -> Program:
+        """Отправляет черновик программы на согласование.
+
+        Args:
+        user_id: Идентификатор автора.
+        program_id: Идентификатор программы.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Программа в статусе UNDER_REVIEW.
+        """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено")
 
@@ -421,6 +511,16 @@ class ProgramService:
             program_id: UUID,
             urza_id: UUID,
     ) -> Program:
+        """Утверждает программу руководителем предприятия УРЗА.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        program_id: Идентификатор программы.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Утверждённая программа.
+        """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено")
 
@@ -471,6 +571,17 @@ class ProgramService:
             urza_id: UUID,
             comment: str | None = None,
     ) -> Program:
+        """Возвращает программу с согласования на доработку.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        program_id: Идентификатор программы.
+        urza_id: Идентификатор устройства.
+        comment: Необязательный комментарий к возврату.
+
+        Returns:
+            Программа в статусе DRAFT.
+        """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено")
 
@@ -522,6 +633,14 @@ class ProgramService:
         self,
         user_id: UUID,
     ) -> list[Program]:
+        """Возвращает самостоятельные программы на согласовании, доступные руководителю.
+
+        Args:
+        user_id: Идентификатор пользователя.
+
+        Returns:
+            Список доступных для проверки программ.
+        """
         user = await self.user_repository.get_by_id(user_id)
 
         if user is None or not user.active or user.deleted_at is not None:
@@ -556,6 +675,14 @@ class ProgramService:
         self,
         user_id: UUID,
     ) -> list[Program]:
+        """Возвращает самостоятельные программы, доступные пользователю в рабочем списке.
+
+        Args:
+        user_id: Идентификатор пользователя.
+
+        Returns:
+            Список программ с доступными действиями.
+        """
         user = await self.user_repository.get_by_id(user_id)
         if user is None or not user.active or user.deleted_at is not None:
             return []
