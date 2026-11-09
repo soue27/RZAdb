@@ -1,3 +1,42 @@
+import logging
+from datetime import date
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import RedirectResponse, Response
+from fastapi.templating import Jinja2Templates
+
+from app.application.files.service import FileService
+from app.application.files.validation import FileUploadValidationError
+from app.application.inspections.repository import InspectionTaskRepository
+from app.application.inspections.service import InspectionTaskService
+from app.application.objects.exceptions import (
+    ObjectAccessDeniedError,
+    ObjectNotFoundError,
+)
+from app.application.objects.service import ObjectService
+from app.application.tree.service import TreeService
+from app.domain.enums import UserRole
+from app.domain.user import User
+from app.presentation.auth.dependencies import get_current_user
+from app.presentation.dependencies.services import (
+    get_file_service,
+    get_inspection_task_repository,
+    get_inspection_task_service,
+    get_object_service,
+    get_tree_service,
+)
+from app.presentation.file_uploads import read_upload_content
 """Маршруты создания, назначения, выполнения и проверки задач осмотра подстанций."""
 
 import logging
