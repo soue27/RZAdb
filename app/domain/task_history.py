@@ -12,6 +12,12 @@ from app.infrastructure.database.mixins import UUIDMixin
 
 
 class TaskHistory(UUIDMixin, Base):
+    """Фиксирует историю изменений рабочей задачи.
+
+    Сохраняет тип события, прежний и новый статусы,
+    инициатора, прежнего и нового исполнителей, комментарий
+    и время события.
+    """
     __tablename__ = "task_history"
 
     task_id: Mapped[UUID] = mapped_column(
