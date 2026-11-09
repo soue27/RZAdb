@@ -16,6 +16,12 @@ class AuthService:
         user_repository: UserRepository,
         password_service: PasswordService,
     ) -> None:
+        """Сохраняет зависимости, необходимые для аутентификации.
+
+        Args:
+            user_repository: Репозиторий для поиска учётной записи.
+            password_service: Сервис проверки пароля по хешу.
+        """
         self.user_repository = user_repository
         self.password_service = password_service
 
@@ -25,6 +31,19 @@ class AuthService:
         email: str,
         password: str,
     ) -> User:
+        """Проверяет учётные данные и возвращает активного пользователя.
+
+        Args:
+            email: Email учётной записи.
+            password: Пароль в открытом виде.
+
+        Returns:
+            Найденная активная учётная запись пользователя.
+
+        Raises:
+            InvalidCredentialsError: Если пользователь не найден, архивирован,
+                отключён или пароль не соответствует сохранённому хешу.
+        """
         user = await self.user_repository.get_by_email(email)
 
         if user is None:
