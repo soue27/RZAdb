@@ -4,8 +4,6 @@ from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
-from openpyxl.utils.exceptions import InvalidFileException
-from sqlalchemy import text
 
 from app.application.enterprises.repository import EnterpriseRepository
 from app.domain.enterprise import Enterprise
