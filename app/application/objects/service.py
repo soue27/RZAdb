@@ -10,11 +10,19 @@ from app.application.objects.schemas import SelectedObject
 
 
 class ObjectService:
+    """Проверяет доступ к выбранному объекту и возвращает его краткое представление.
+    """
     def __init__(
         self,
         access_service: AccessService,
         object_resolver: ObjectResolver,
     ) -> None:
+        """Сохраняет сервис проверки доступа и резолвер объектов.
+
+        Args:
+            access_service: Централизованный сервис проверки доступа.
+            object_resolver: Сервис разрешения типа и идентификатора объекта.
+        """
         self.access_service = access_service
         self.object_resolver = object_resolver
 
@@ -26,6 +34,21 @@ class ObjectService:
         *,
         include_archived: bool = False,
     ) -> SelectedObject:
+        """Возвращает объект после проверки права пользователя на его чтение.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            object_type: Тип объекта.
+            object_id: Идентификатор объекта.
+            include_archived: Разрешает получать архивные объекты там, где это поддержано.
+
+        Returns:
+            Унифицированное краткое представление объекта.
+
+        Raises:
+            ObjectNotFoundError: Если тип не поддерживается или объект не найден.
+            ObjectAccessDeniedError: Если у пользователя нет доступа.
+        """
         if object_type == "substation":
             has_access = await self.access_service.can_access_substation(
                 user_id=user_id,
