@@ -1,3 +1,5 @@
+"""Маршруты просмотра, изменения и согласования записей уставок УРЗА."""
+
 import logging
 from datetime import date
 from typing import Annotated
@@ -53,6 +55,8 @@ async def get_settings_form_pdf(
     form_service: Annotated[DocumentTemplateService, Depends(get_document_form_service)],
     archived: bool = Query(default=False),
 ):
+    """Формирует PDF/документный шаблон формуляра уставок для скачивания.
+    """
     await _check_urza_access(
         object_service, current_user.id, urza_id, include_archived=archived
     )
@@ -264,6 +268,8 @@ async def get_urza_settings(
     ],
     archived: bool = Query(default=False),
 ):
+    """Отображает формуляр уставок и историю записей изменений выбранного УРЗА.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
@@ -294,6 +300,8 @@ async def get_new_urza_settings_form(
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
 ):
+    """Отображает форму создания записи изменения уставок.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
@@ -334,6 +342,8 @@ async def create_urza_settings_record(
         FastAPIFile(),
     ] = None,
 ):
+    """Создаёт запись изменения уставок и сохраняет подписанную форму.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
@@ -444,6 +454,8 @@ async def get_edit_urza_settings_form(
         Depends(get_settings_service),
     ],
 ):
+    """Отображает форму редактирования черновика уставок.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
@@ -513,6 +525,8 @@ async def update_urza_settings_record(
         FastAPIFile(),
     ] = None,
 ):
+    """Обновляет черновик записи уставок и при необходимости заменяет подписанную форму.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
@@ -703,6 +717,8 @@ async def submit_urza_settings_record(
         Depends(get_task_service),
     ],
 ):
+    """Отправляет запись уставок на согласование.
+    """
     return await _run_workflow_action(
         request,
         urza_id,
@@ -729,6 +745,8 @@ async def approve_urza_settings_record(
         Depends(get_task_service),
     ],
 ):
+    """Утверждает запись уставок от имени руководителя.
+    """
     return await _run_workflow_action(
         request,
         urza_id,
@@ -755,6 +773,8 @@ async def return_urza_settings_record(
         Depends(get_task_service),
     ],
 ):
+    """Возвращает запись уставок на доработку.
+    """
     return await _run_workflow_action(
         request,
         urza_id,
@@ -789,6 +809,8 @@ async def delete_urza_settings_record(
         Depends(get_physical_deletion_service),
     ],
 ):
+    """Архивирует запись уставок после проверки доступа.
+    """
     await _check_urza_access(
         object_service,
         current_user.id,
