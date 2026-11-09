@@ -119,11 +119,27 @@ class EmailDigestFormatter:
 
     @staticmethod
     def _validate_now(now: datetime) -> None:
+        """Проверяет, что переданный момент времени содержит часовой пояс.
+
+        Args:
+            now: Проверяемый момент времени.
+
+        Raises:
+            ValueError: Если datetime не содержит часового пояса.
+        """
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("now must be timezone-aware")
 
     @staticmethod
     def _to_local(value: datetime) -> datetime:
+        """Преобразует момент времени в часовой пояс Екатеринбурга.
+
+        Args:
+            value: Исходный момент времени.
+
+        Returns:
+            Момент времени в Asia/Yekaterinburg.
+        """
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("deadline_at must be timezone-aware")
 
@@ -134,6 +150,15 @@ class EmailDigestFormatter:
         task: DigestTask,
         now: datetime,
     ) -> TaskDigestInfo:
+        """Рассчитывает отображаемый срок и признаки просрочки задачи.
+
+        Args:
+            task: Данные задачи.
+            now: Текущий момент времени.
+
+        Returns:
+            Подготовленные данные задачи для шаблона письма.
+        """
         local_now = self._to_local(now)
         status_label = STATUS_LABELS.get(task.status, task.status)
 
@@ -169,6 +194,15 @@ class EmailDigestFormatter:
         *,
         own_tasks: list[TaskDigestInfo] | None = None,
     ) -> DigestCounters:
+        """Рассчитывает общие и, при необходимости, персональные счётчики задач.
+
+        Args:
+            task_infos: Подготовленные задачи.
+            own_tasks: Необязательная выборка собственных задач руководителя.
+
+        Returns:
+            Счётчики общего количества, просрочки и задач без срока.
+        """
         overdue = sum(info.is_overdue for info in task_infos)
         without_deadline = sum(info.task.deadline_at is None for info in task_infos)
 
@@ -197,6 +231,19 @@ class EmailDigestFormatter:
         now: datetime,
         role: str,
     ) -> EmailDigestMessage:
+        """Формирует текстовую и HTML-версии email-сводки.
+
+        Args:
+            title: Заголовок сводки.
+            recipient_name: Имя получателя.
+            task_infos: Подготовленные задачи.
+            counters: Агрегированные счётчики.
+            now: Текущий момент времени.
+            role: Роль получателя для оформления.
+
+        Returns:
+            Готовое письмо.
+        """
         local_now = self._to_local(now)
         subject = f"{title} — {local_now.strftime('%d.%m.%Y')}"
 
