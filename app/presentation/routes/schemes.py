@@ -1,3 +1,5 @@
+"""Маршруты управления записями схем УРЗА и связанными файлами."""
+
 import logging
 from datetime import date
 from typing import Annotated
@@ -56,6 +58,8 @@ async def get_schemes_form_pdf(
     form_service: Annotated[DocumentTemplateService, Depends(get_document_form_service)],
     archived: bool = Query(default=False),
 ):
+    """Возвращает файл шаблона формуляра схем для скачивания.
+    """
     await _check_urza_access(
         object_service, current_user.id, urza_id, include_archived=archived
     )
@@ -299,6 +303,8 @@ async def get_urza_schemas(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     archived: bool = Query(default=False),
 ):
+    """Отображает формуляр схем и записи изменений выбранного УРЗА.
+    """
     await _check_urza_access(
         object_service, current_user.id, urza_id, include_archived=archived
     )
@@ -327,6 +333,8 @@ async def get_new_urza_schema_form(
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_id: UUID | None = None,
 ):
+    """Отображает форму создания записи схем.
+    """
     await _check_urza_access(object_service, current_user.id, urza_id)
     if task_id is not None:
         try:
@@ -374,6 +382,8 @@ async def create_urza_schema_record(
     editable_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     task_id: Annotated[UUID | None, Form()] = None,
 ):
+    """Создаёт запись схем и сохраняет связанные файлы.
+    """
     await _check_urza_access(object_service, current_user.id, urza_id)
     values = _form_values(
         schema_number,
@@ -520,6 +530,8 @@ async def get_edit_urza_schema_form(
     object_service: Annotated[ObjectService, Depends(get_object_service)],
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
 ):
+    """Отображает форму редактирования черновика схемы.
+    """
     await _check_urza_access(object_service, current_user.id, urza_id)
     record = await _get_active_record(
         schema_service,
@@ -555,6 +567,8 @@ async def update_urza_schema_record(
     scan_file: Annotated[UploadFile | None, FastAPIFile()] = None,
     editable_file: Annotated[UploadFile | None, FastAPIFile()] = None,
 ):
+    """Обновляет черновик записи схем и связанные файлы.
+    """
     await _check_urza_access(object_service, current_user.id, urza_id)
     record = await _get_active_record(
         schema_service,
@@ -746,6 +760,8 @@ async def submit_urza_schema_record(
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
+    """Отправляет запись схем на согласование.
+    """
     return await _run_workflow_action(
         request, urza_id, record_id, current_user, schema_service,
         task_service,
@@ -762,6 +778,8 @@ async def approve_urza_schema_record(
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
+    """Утверждает запись схем от имени руководителя.
+    """
     return await _run_workflow_action(
         request, urza_id, record_id, current_user, schema_service,
         task_service,
@@ -778,6 +796,8 @@ async def return_urza_schema_record(
     schema_service: Annotated[SchemaService, Depends(get_schema_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ):
+    """Возвращает запись схем на доработку.
+    """
     return await _run_workflow_action(
         request, urza_id, record_id, current_user,
         schema_service,
@@ -797,6 +817,8 @@ async def delete_urza_schema_record(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     deletion_service: Annotated[PhysicalDeletionService, Depends(get_physical_deletion_service)],
 ):
+    """Архивирует запись схем после проверки доступа.
+    """
     await _check_urza_access(object_service, current_user.id, urza_id)
     try:
         deletion_result = await deletion_service.delete(
