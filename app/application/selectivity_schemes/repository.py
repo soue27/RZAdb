@@ -14,12 +14,25 @@ class SelectivitySchemeRepository:
     """Работа со схемами селективности через SQLAlchemy."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Сохраняет асинхронную SQLAlchemy-сессию.
+
+        Args:
+            session: Сессия текущей транзакции.
+        """
         self.session = session
 
     async def get_by_id(
         self,
         scheme_id: UUID,
     ) -> SelectivityScheme | None:
+        """Находит схему селективности по идентификатору.
+
+        Args:
+            scheme_id: Идентификатор схемы.
+
+        Returns:
+            Схема селективности или None.
+        """
         return await self.session.get(
             SelectivityScheme,
             scheme_id,
@@ -29,6 +42,14 @@ class SelectivitySchemeRepository:
         self,
         substation_id: UUID,
     ) -> SelectivityScheme | None:
+        """Находит схему селективности подстанции.
+
+        Args:
+            substation_id: Идентификатор подстанции.
+
+        Returns:
+            Схема селективности или None.
+        """
         query = (
             select(SelectivityScheme)
             .where(
@@ -41,6 +62,14 @@ class SelectivitySchemeRepository:
         self,
         version_id: UUID,
     ) -> SelectivitySchemeVersion | None:
+        """Находит версию схемы селективности по идентификатору.
+
+        Args:
+            version_id: Идентификатор версии.
+
+        Returns:
+            Версия или None.
+        """
         return await self.session.get(
             SelectivitySchemeVersion,
             version_id,
@@ -50,6 +79,14 @@ class SelectivitySchemeRepository:
         self,
         scheme_id: UUID,
     ) -> SelectivitySchemeVersion | None:
+        """Возвращает последнюю версию схемы селективности с данными автора и файлов.
+
+        Args:
+            scheme_id: Идентификатор схемы.
+
+        Returns:
+            Версия с наибольшим номером или None.
+        """
         query = (
             select(SelectivitySchemeVersion)
             .options(
@@ -71,6 +108,14 @@ class SelectivitySchemeRepository:
         self,
         scheme_id: UUID,
     ) -> list[SelectivitySchemeVersion]:
+        """Возвращает версии схемы селективности с данными авторов и файлов.
+
+        Args:
+            scheme_id: Идентификатор схемы.
+
+        Returns:
+            Список версий в порядке убывания номера.
+        """
         query = (
             select(SelectivitySchemeVersion)
             .options(
@@ -92,6 +137,14 @@ class SelectivitySchemeRepository:
         self,
         scheme: SelectivityScheme,
     ) -> SelectivityScheme:
+        """Добавляет схему селективности и выполняет flush без commit.
+
+        Args:
+            scheme: Создаваемая схема.
+
+        Returns:
+            Добавленная модель схемы.
+        """
         self.session.add(scheme)
         await self.session.flush()
         return scheme
@@ -100,6 +153,14 @@ class SelectivitySchemeRepository:
         self,
         version: SelectivitySchemeVersion,
     ) -> SelectivitySchemeVersion:
+        """Добавляет версию схемы селективности и выполняет flush без commit.
+
+        Args:
+            version: Создаваемая версия.
+
+        Returns:
+            Добавленная версия.
+        """
         self.session.add(version)
         await self.session.flush()
         return version
@@ -108,11 +169,24 @@ class SelectivitySchemeRepository:
         self,
         version: SelectivitySchemeVersion,
     ) -> SelectivitySchemeVersion:
+        """Синхронизирует изменения версии схемы с базой данных без commit.
+
+        Args:
+            version: Изменённая версия.
+
+        Returns:
+            Та же модель версии.
+        """
         await self.session.flush()
         await self.session.refresh(version)
         return version
 
     async def list_standalone_work_items(self) -> list[SelectivitySchemeVersion]:
+        """Возвращает самостоятельные версии схем селективности для рабочего списка.
+
+        Returns:
+            Версии, не связанные с задачами.
+        """
         latest = (
             select(
                 SelectivitySchemeVersion.selectivity_scheme_id.label("scheme_id"),
