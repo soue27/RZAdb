@@ -1,3 +1,5 @@
+"""file_uploads: чтение и проверка загружаемых файлов."""
+
 
 from fastapi import UploadFile
 
