@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentFormType(StrEnum):
+    """Тип документа Word, который формируется из шаблона.
+    """
     MAINTENANCE = "maintenance"
     SETTINGS = "settings"
     SCHEMES = "schemes"
@@ -26,6 +28,8 @@ class DocumentFormType(StrEnum):
 
 @dataclass(frozen=True)
 class DocumentFormHierarchy:
+    """Иерархические наименования объектов, подставляемые в маркеры DOCX-шаблона.
+    """
     holding: str = ""
     branch: str = ""
     production_department: str = ""
@@ -34,6 +38,11 @@ class DocumentFormHierarchy:
     urza: str = ""
 
     def marker_values(self) -> dict[str, str]:
+        """Возвращает соответствие маркеров шаблона значениям из иерархии.
+
+        Returns:
+            Словарь маркер → текст для подстановки в документ.
+        """
         return {
             "$холдинг": self.holding,
             "$филиал": self.branch,
@@ -53,6 +62,18 @@ class DocxProcessor:
 
     @staticmethod
     def replace_markers(document, values: dict[str, str]) -> None:
+        """Заменяет известные маркеры во всех абзацах документа.
+
+        Проверяет, что каждый обязательный маркер найден и после обработки
+        в документе не осталось его незаменённых вхождений.
+
+        Args:
+            document: Открытый DOCX-документ.
+            values: Словарь маркеров и значений для подстановки.
+
+        Raises:
+            DocumentTemplateError: Если обязательные маркеры отсутствуют или остались в документе.
+        """
         required = set(values)
         found: set[str] = set()
         paragraphs = list(DocxProcessor._document_paragraphs(document))
@@ -81,6 +102,14 @@ class DocxProcessor:
 
     @staticmethod
     def _document_paragraphs(document):
+        """Обходит абзацы документа, включая вложенные таблицы и контейнеры DOCX.
+
+        Args:
+            document: Открытый DOCX-документ.
+
+        Yields:
+            Абзацы документа без повторного обхода одного контейнера.
+        """
         visited_containers: set[int] = set()
 
         def visit(container):
@@ -110,6 +139,15 @@ class DocxProcessor:
         paragraph: Paragraph,
         values: dict[str, str],
     ) -> set[str]:
+        """Заменяет маркеры внутри абзаца с сохранением форматирования runs.
+
+        Args:
+            paragraph: Обрабатываемый абзац.
+            values: Словарь маркеров и значений.
+
+        Returns:
+            Множество маркеров, найденных и заменённых в абзаце.
+        """
         runs = paragraph.runs
         if not runs:
             return set()
@@ -154,11 +192,19 @@ class DocxProcessor:
 
 
 class DocumentTemplateService:
+    """Готовит DOCX-документы из runtime-шаблонов и данных иерархии РЗА.
+    """
     def __init__(
         self,
         tree_service: TreeService,
         templates_dir: Path,
     ) -> None:
+        """Сохраняет сервис дерева и каталог runtime-шаблонов.
+
+        Args:
+            tree_service: Сервис получения иерархии объектов.
+            templates_dir: Каталог файлов DOCX-шаблонов.
+        """
         self.tree_service = tree_service
         self.templates_dir = templates_dir
 
@@ -167,6 +213,15 @@ class DocumentTemplateService:
         form_type: DocumentFormType,
         hierarchy: DocumentFormHierarchy,
     ) -> str:
+        """Формирует имя файла для скачивания с учётом типа документа и объекта.
+
+        Args:
+            form_type: Тип формируемого документа.
+            hierarchy: Наименования объектов иерархии.
+
+        Returns:
+            Безопасное имя DOCX-файла.
+        """
         labels = {
             DocumentFormType.MAINTENANCE: "ТО",
             DocumentFormType.SETTINGS: "уставок",
@@ -186,6 +241,19 @@ class DocumentTemplateService:
         *,
         archive_only: bool = False,
     ) -> DocumentFormHierarchy:
+        """Получает иерархию УРЗА для подстановки в документ.
+
+        Args:
+            user_id: Идентификатор пользователя.
+            urza_id: Идентификатор устройства.
+            archive_only: Разрешает использовать архивный объект при подготовке документа.
+
+        Returns:
+            Наименования холдинга, филиала, отделения, подстанции, присоединения и УРЗА.
+
+        Raises:
+            DocumentTemplateError: Если иерархию невозможно определить.
+        """
         tree = await self.tree_service.get_tree(
             user_id=user_id,
             archive_only=archive_only,
@@ -231,6 +299,18 @@ class DocumentTemplateService:
         form_type: DocumentFormType,
         hierarchy: DocumentFormHierarchy,
     ) -> Path:
+        """Создаёт DOCX-файл из шаблона, подставляя маркеры иерархии.
+
+        Args:
+            form_type: Тип документа.
+            hierarchy: Значения иерархии для заполнения шаблона.
+
+        Returns:
+            Путь к временному сформированному DOCX-файлу.
+
+        Raises:
+            DocumentTemplateError: Если шаблон отсутствует, некорректен или содержит незаполненные маркеры.
+        """
         template_path = self.templates_dir / f"{form_type.value}.docx"
         if not template_path.is_file():
             raise DocumentTemplateError(f"DOCX template not found: {template_path}")
