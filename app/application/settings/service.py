@@ -19,15 +19,32 @@ _UNFINISHED_INDEX = "uq_settings_records_one_active_unfinished_per_form"
 
 
 class SettingsService:
+    """Управляет формуляром уставок, записями изменений и их согласованием.
+    """
     def __init__(
         self,
         repository: SettingsRepository,
         access_service: AccessService,
     ) -> None:
+        """Сохраняет репозиторий и сервис проверки доступа.
+
+        Args:
+        repository: Репозиторий формуляров и записей уставок.
+        access_service: Централизованный сервис проверки доступа.
+        """
         self.repository = repository
         self.access_service = access_service
 
     async def _get_user(self, user_id: UUID):
+        """Возвращает активного пользователя.
+
+        Args:
+        user_id: Идентификатор пользователя.
+
+        Raises:
+        ValueError: Если пользователь не найден.
+        PermissionError: Если пользователь отключён или архивирован.
+        """
         user = await self.access_service.user_repository.get_by_id(user_id)
         if user is None:
             raise ValueError("Пользователь не найден.")
@@ -36,6 +53,15 @@ class SettingsService:
         return user
 
     async def _ensure_access(self, user_id: UUID, urza_id: UUID) -> None:
+        """Проверяет право пользователя изменять уставки указанного УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Raises:
+        PermissionError: Если у пользователя нет права изменения.
+        """
         if not await self.access_service.can_modify_urza(user_id, urza_id):
             raise PermissionError("Изменение архивной URZA запрещено")
 
@@ -45,6 +71,19 @@ class SettingsService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SettingsRecord:
+        """Находит запись уставок и проверяет её принадлежность формуляру указанного УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Запись уставок.
+
+        Raises:
+        ValueError: Если запись или формуляр не найдены либо принадлежат другому УРЗА.
+        """
         await self._ensure_access(user_id, urza_id)
         record = await self.repository.get_record_by_id(record_id)
         if record is None:
@@ -63,6 +102,8 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> None:
+        """Проверяет полномочия руководителя на согласование уставок указанного УРЗА.
+        """
         user = await self._get_user(user_id)
         if user.role is not UserRole.MANAGER:
             raise PermissionError("Согласовывать уставки может только Manager.")
@@ -73,6 +114,15 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SettingsForm | None:
+        """Возвращает формуляр уставок устройства после проверки доступа.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Формуляр уставок или None.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return None
         return await self.repository.get_form_by_urza_id(urza_id)
@@ -82,6 +132,15 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> tuple[SettingsForm | None, list[SettingsRecord]]:
+        """Возвращает формуляр уставок и список его активных записей.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Пара из формуляра (или None) и списка записей уставок.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             return None, []
         settings_form = await self.repository.get_form_by_urza_id(urza_id)
@@ -95,6 +154,15 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SettingsRecord | None:
+        """Возвращает последнюю утверждённую запись уставок устройства.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Текущая утверждённая запись или None.
+        """
         if not await self.access_service.can_access_urza(user_id, urza_id):
             raise PermissionError("Доступ к URZA запрещён")
         settings_form = await self.repository.get_form_by_urza_id(urza_id)
@@ -107,6 +175,15 @@ class SettingsService:
         user_id: UUID,
         urza_id: UUID,
     ) -> SettingsForm:
+        """Создаёт формуляр уставок для устройства, если он ещё не создан.
+
+        Args:
+        user_id: Идентификатор инициатора.
+        urza_id: Идентификатор устройства.
+
+        Returns:
+            Созданный или существующий формуляр в соответствии с реализацией сервиса.
+        """
         await self._ensure_access(user_id, urza_id)
         existing_form = await self.repository.get_form_by_urza_id(urza_id)
         if existing_form is not None:
@@ -131,6 +208,25 @@ class SettingsService:
         signed_form_file_id: UUID,
         task_id: UUID | None = None,
     ) -> SettingsRecord:
+        """Создаёт новую запись изменения уставок.
+
+        Требует подписанную форму; при наличии task_id проверяет связь с подходящей
+        задачей. Новая запись создаётся в статусе, определяемом ролью автора.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        change_date: Дата изменения уставок.
+        parameter_name: Наименование изменяемого параметра.
+        initial_setting: Исходное значение.
+        new_setting: Новое значение.
+        change_reason: Причина изменения.
+        signed_form_file_id: Идентификатор подписанной формы.
+        task_id: Необязательная связанная задача.
+
+        Returns:
+            Созданная запись уставок.
+        """
         await self._ensure_access(user_id, urza_id)
         if signed_form_file_id is None:
             raise ValueError("Подписанный формуляр уставок обязателен.")
@@ -190,6 +286,22 @@ class SettingsService:
         change_reason: str,
         signed_form_file_id: UUID | None = None,
     ) -> SettingsRecord:
+        """Изменяет существующую запись уставок в статусе черновика.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+        change_date: Новая дата изменения.
+        parameter_name: Наименование параметра.
+        initial_setting: Исходное значение.
+        new_setting: Новое значение.
+        change_reason: Причина изменения.
+        signed_form_file_id: Новый файл подписанной формы или None для сохранения текущего.
+
+        Returns:
+            Обновлённая запись уставок.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in _RECORD_ROLES:
@@ -215,6 +327,16 @@ class SettingsService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SettingsRecord:
+        """Отправляет черновик уставок на согласование.
+
+        Args:
+        user_id: Идентификатор автора.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Запись уставок в статусе UNDER_REVIEW.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in _RECORD_ROLES:
@@ -234,6 +356,16 @@ class SettingsService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SettingsRecord:
+        """Утверждает запись уставок руководителем.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Утверждённая запись уставок.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         if record.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Утвердить можно только запись на согласовании.")
@@ -251,6 +383,16 @@ class SettingsService:
         urza_id: UUID,
         record_id: UUID,
     ) -> SettingsRecord:
+        """Возвращает запись уставок с согласования на доработку.
+
+        Args:
+        user_id: Идентификатор руководителя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+
+        Returns:
+            Запись уставок в статусе DRAFT.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         if record.status is not DocumentStatus.UNDER_REVIEW:
             raise ValueError("Вернуть в черновик можно только запись на согласовании.")
@@ -266,6 +408,13 @@ class SettingsService:
         urza_id: UUID,
         record_id: UUID,
     ) -> None:
+        """Архивирует запись уставок после проверки прав и принадлежности УРЗА.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        urza_id: Идентификатор устройства.
+        record_id: Идентификатор записи.
+        """
         record = await self._get_record_for_urza(user_id, urza_id, record_id)
         user = await self._get_user(user_id)
         if user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN}:
@@ -280,6 +429,15 @@ class SettingsService:
         user_id: UUID,
         record: SettingsRecord,
     ) -> set[str]:
+        """Возвращает действия, доступные пользователю для записи уставок.
+
+        Args:
+        user_id: Идентификатор пользователя.
+        record: Проверяемая запись.
+
+        Returns:
+            Множество кодов действий с учётом статуса, роли и доступа.
+        """
         if record.deleted_at is not None:
             return set()
         try:
