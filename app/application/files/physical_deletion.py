@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DeletionTarget:
+    """Описание модели и полей, необходимых для удаления конкретного типа документной записи.
+"""
     model: type
     parent_field: str | None
     parent_model: type | None
@@ -36,6 +38,8 @@ class DeletionTarget:
 
 @dataclass(frozen=True)
 class DeletionResult:
+    """Результат удаления доменной записи и признак ошибки очистки бинарного файла.
+"""
     owner_id: UUID
     file_cleanup_failed: bool
 
@@ -60,6 +64,8 @@ TARGETS = {
 
 
 class PhysicalDeletionService:
+    """Физически удаляет документные записи и больше не используемые ими файлы с проверкой прав доступа.
+"""
     def __init__(
         self,
         *,
@@ -68,6 +74,14 @@ class PhysicalDeletionService:
         file_owners: FileOwnerRepository,
         storage: ObjectStorage,
     ) -> None:
+        """Сохраняет зависимости для транзакционного удаления записей и очистки хранилища.
+
+    Args:
+        session: Асинхронная SQLAlchemy-сессия.
+        access_service: Сервис проверки доступа к владельцам.
+        file_owners: Репозиторий для проверки оставшихся ссылок на файлы.
+        storage: Адаптер объектного хранилища.
+    """
         self.session = session
         self.access_service = access_service
         self.file_owners = file_owners
@@ -77,6 +91,27 @@ class PhysicalDeletionService:
         self, *, kind: str, record_id: UUID, user_id: UUID,
         expected_owner_id: UUID | None = None,
     ) -> DeletionResult:
+        """Удаляет документную запись и очищает связанные файлы, если они больше не используются.
+
+    Проверяет роль и доступ пользователя, блокирует удаляемую запись и её родителя,
+    проверяет ожидаемого владельца. Сначала фиксирует удаление в БД, затем удаляет
+    освободившиеся бинарные объекты из хранилища.
+
+    Args:
+        kind: Ключ типа удаляемой записи из TARGETS.
+        record_id: Идентификатор записи.
+        user_id: Идентификатор пользователя, выполняющего удаление.
+        expected_owner_id: Необязательный ожидаемый идентификатор владельца.
+
+    Returns:
+    Идентификатор владельца и признак неудачной очистки файлов.
+
+    Raises:
+        PermissionError: Если роль или область доступа не позволяют удаление.
+        LookupError: Если запись, документ или ожидаемый владелец не найдены.
+        IntegrityError: Если удаление блокируется ограничением целостности.
+        RuntimeError: Если другая ошибка не позволяет завершить удаление.
+    """
         target = TARGETS[kind]
         model = target.model
         user = await self.access_service.user_repository.get_by_id(user_id)
@@ -151,6 +186,18 @@ class PhysicalDeletionService:
         return DeletionResult(owner_id, file_cleanup_failed)
 
     async def _lock_parent(self, target: DeletionTarget, parent_id: UUID):
+        """Блокирует родительскую документную сущность перед удалением версии.
+
+    Args:
+        target: Описание типа удаляемой версии.
+        parent_id: Идентификатор родительской сущности.
+
+    Returns:
+    Заблокированная родительская модель.
+
+    Raises:
+        LookupError: Если родительский документ не найден.
+    """
         query = (
             select(target.parent_model)
             .where(target.parent_model.id == parent_id)
