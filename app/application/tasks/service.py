@@ -2,10 +2,20 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.application.access.service import AccessService
+from app.application.notifications.service import NotificationService
 from app.application.tasks.repository import TaskRepository
 from app.application.tasks.workflow import validate_reason, validate_transition
 from app.application.urza_instructions.repository import URZAInstructionRepository
 from app.domain.enums import (
+    DocumentStatus,
+    MaintenanceType,
+    TaskStatus,
+    TaskWorkType,
+    UserRole,
+)
+from app.domain.task import Task
+from app.domain.task_history import TaskHistory
+from app.domain.user import User
     DocumentStatus,
     MaintenanceType,
     TaskStatus,
