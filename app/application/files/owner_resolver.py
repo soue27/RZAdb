@@ -17,7 +17,20 @@ class FileOwnerResolver:
         self.repository = repository
 
     async def resolve(self, file_id: UUID) -> FileOwner | None:
-        """Return the unique domain owner, or None when no owner references it."""
+        """Возвращает единственного владельца файла или None, если ссылок нет.
+
+        Если файл связан с несколькими разными владельцами, выбрасывает исключение,
+        поскольку однозначно определить область доступа невозможно.
+
+        Args:
+            file_id: Идентификатор файла.
+
+        Returns:
+            Единственный владелец или None.
+
+        Raises:
+            AmbiguousFileOwnershipError: Если найдено несколько разных владельцев.
+        """
 
         owners = await self.repository.get_owners_by_file_id(file_id)
         unique_owners = {
