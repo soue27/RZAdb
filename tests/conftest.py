@@ -17,7 +17,13 @@ from app.infrastructure.database.test_safety import assert_test_database
 assert_test_database(get_settings().database_url)
 
 from app.domain.user import User
-from app.infrastructure.database.engine import async_session_factory, engine
+from app.infrastructure.database.engine import async_session_factory
+
+test_engine = create_async_engine(
+    get_settings().database_url,
+    poolclass=NullPool,
+)
+async_session_factory.configure(bind=test_engine)
 
 
 @pytest.fixture
@@ -57,4 +63,4 @@ async def db_session() -> AsyncSession:
 @pytest_asyncio.fixture(autouse=True)
 async def dispose_engine():
     yield
-    await engine.dispose()
+    await test_engine.dispose()

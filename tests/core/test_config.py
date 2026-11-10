@@ -6,7 +6,17 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 
-def test_smtp_settings_have_safe_defaults() -> None:
+def test_smtp_settings_have_safe_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "SMTP_HOST",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_FROM_EMAIL",
+        "SMTP_PORT",
+        "ERROR_EMAIL_TO",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
     settings = Settings(
         _env_file=None,
         database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
@@ -67,7 +77,12 @@ def test_document_templates_directory_can_be_configured() -> None:
     assert str(settings.document_templates_dir) == "/opt/rzadb/templates"
 
 
-def test_backup_settings_have_safe_local_defaults() -> None:
+def test_backup_settings_have_safe_local_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("BACKUP_ENABLED", raising=False)
+    monkeypatch.delenv("BACKUP_LOCAL_ENABLED", raising=False)
+
     settings = Settings(
         _env_file=None,
         database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",

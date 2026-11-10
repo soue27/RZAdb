@@ -137,7 +137,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.session_secret,
-        https_only=False,
+        https_only=settings.session_cookie_secure,
         same_site="lax",
     )
     # Starlette inserts each newly-added middleware at the front of the stack.
