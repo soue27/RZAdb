@@ -22,6 +22,12 @@ from app.infrastructure.database.engine import async_session_factory
 from app.infrastructure.seed.csv_importer import CSVImporter
 from app.infrastructure.seed.service import RZACSVSeedService
 
+TEST_CSV = (
+    Path(__file__).resolve().parents[2]
+    / "fixtures"
+    / "rza_seed_synthetic.csv"
+)
+
 
 def make_row(
     *,
@@ -1124,7 +1130,7 @@ async def test_import_row_is_idempotent(system_user_id: UUID) -> None:
 
 @pytest.mark.asyncio
 async def test_import_rows_creates_full_dataset(system_user_id: UUID) -> None:
-    importer = CSVImporter(Path("data/rzadb_test_data.csv"))
+    importer = CSVImporter(TEST_CSV)
     rows = importer.read_rows()
 
     async with async_session_factory() as session:
@@ -1144,7 +1150,7 @@ async def test_import_rows_creates_full_dataset(system_user_id: UUID) -> None:
             holding = await session.scalar(
                 select(Enterprise).where(
                     Enterprise.type == EnterpriseType.HOLDING,
-                    Enterprise.full_name == "Россети Урал",
+                    Enterprise.full_name == "СИНТЕТИЧЕСКИЙ-ХОЛДИНГ-01",
                     Enterprise.deleted_at.is_(None),
                 )
             )
@@ -1227,7 +1233,7 @@ async def test_import_rows_creates_full_dataset(system_user_id: UUID) -> None:
 
 @pytest.mark.asyncio
 async def test_import_rows_is_idempotent(system_user_id: UUID) -> None:
-    importer = CSVImporter(Path("data/rzadb_test_data.csv"))
+    importer = CSVImporter(TEST_CSV)
     rows = importer.read_rows()
 
     async with async_session_factory() as session:
@@ -1248,7 +1254,7 @@ async def test_import_rows_is_idempotent(system_user_id: UUID) -> None:
             holding = await session.scalar(
                 select(Enterprise).where(
                     Enterprise.type == EnterpriseType.HOLDING,
-                    Enterprise.full_name == "Россети Урал",
+                    Enterprise.full_name == "СИНТЕТИЧЕСКИЙ-ХОЛДИНГ-01",
                     Enterprise.deleted_at.is_(None),
                 )
             )
