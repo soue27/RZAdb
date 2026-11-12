@@ -24,3 +24,6 @@ wheels/
 .DS_Store
 /data/rzadb_test_data.csv
 /data/Книга1.xlsx
+
+# Temporary Office files
+~$*

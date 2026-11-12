@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:ci-only-password@localhost:5432/rzadb_test
+      SESSION_SECRET: ci-only-session-secret
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: rzadb_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rzadb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13.7"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.8"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Ruff
+        run: uv run --locked ruff check .
+        continue-on-error: true
+
+      - name: List Alembic heads
+        run: uv run --locked alembic heads
+
+      - name: Apply migrations to CI database
+        run: uv run --locked alembic -x environment=test upgrade head
+
+      - name: Check current Alembic revision
+        run: uv run --locked alembic -x environment=test current
+
+      - name: Check model and database schema
+        run: uv run --locked alembic -x environment=test check
+
+      - name: Run tests
+        run: uv run --locked pytest -q
+
+      - name: Build Docker image
+        run: docker build --file Dockerfile --tag rzadb:ci .

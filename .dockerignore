@@ -11,3 +11,5 @@ data/backups
 *.dump
 *.dump.tmp
 *.log
+# Temporary Office files
+~$*
