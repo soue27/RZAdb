@@ -240,11 +240,13 @@ class OrganizationImportService:
                 "message": "Внешние ссылки в файле запрещены.",
             }]
 
-        if workbook.security.lockStructure:
+        if (
+                workbook.security is not None
+                and workbook.security.lockStructure
+        ):
             return [], [{
                 "message": "Защита структуры книги запрещена.",
             }]
-
         worksheet = workbook.worksheets[0]
 
         if worksheet.title != SHEET_NAME:

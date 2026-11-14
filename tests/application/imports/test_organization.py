@@ -387,3 +387,37 @@ async def test_preview_matches_short_name_without_case_sensitivity():
         "create": 0,
         "reuse": 1,
     }
+
+
+def test_extract_rows_allows_workbook_without_security_settings():
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = SHEET_NAME
+    worksheet.append(HEADERS)
+    worksheet.append([
+        "Холдинг",
+        "Х",
+        "Филиал",
+        "Ф",
+        "Производственное отделение",
+        "ПО",
+    ])
+
+    workbook.security = None
+
+    service = make_service()
+
+    rows, errors = service._extract_rows(workbook)
+
+    assert errors == []
+    assert len(rows) == 1
+    assert rows[0]["values"] == [
+        "Холдинг",
+        "Х",
+        "Филиал",
+        "Ф",
+        "Производственное отделение",
+        "ПО",
+    ]
+
+    workbook.close()
