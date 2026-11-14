@@ -37,7 +37,7 @@ async def test_tree_service_builds_full_enterprise_tree(
     holding = Enterprise(
         type=EnterpriseType.HOLDING,
         full_name="Тестовый Холдинг",
-        short_name="Тестовый Холдинг",
+        short_name="ТХ",
         created_by=system_user_id,
         updated_by=system_user_id,
     )
@@ -45,7 +45,7 @@ async def test_tree_service_builds_full_enterprise_tree(
     branch = Enterprise(
         type=EnterpriseType.BRANCH,
         full_name="Тестовый филиал",
-        short_name="Тестовый филиал",
+        short_name="ТФ",
         parent=holding,
         created_by=system_user_id,
         updated_by=system_user_id,
@@ -145,6 +145,7 @@ async def test_tree_service_builds_full_enterprise_tree(
     assert holding_node.id == holding.id
     assert holding_node.type == EnterpriseType.HOLDING.value
     assert holding_node.full_name == "Тестовый Холдинг"
+    assert holding_node.short_name == "ТХ"
 
     assert len(holding_node.children) == 1
 
@@ -152,6 +153,8 @@ async def test_tree_service_builds_full_enterprise_tree(
 
     assert branch_node.id == branch.id
     assert branch_node.type == EnterpriseType.BRANCH.value
+    assert branch_node.full_name == "Тестовый филиал"
+    assert branch_node.short_name == "ТФ"
 
     assert len(branch_node.children) == 1
 
@@ -159,6 +162,8 @@ async def test_tree_service_builds_full_enterprise_tree(
 
     assert department_node.id == department.id
     assert department_node.type == EnterpriseType.DEPARTMENT.value
+    assert department_node.full_name == "Тестовое ПО"
+    assert department_node.short_name == "ТПО"
 
     assert len(department_node.substations) == 1
 
