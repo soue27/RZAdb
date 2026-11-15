@@ -35,6 +35,20 @@ def test_smtp_settings_have_safe_defaults(monkeypatch: pytest.MonkeyPatch) -> No
     assert settings.log_level == "INFO"
 
 
+def test_api_documentation_is_disabled_when_setting_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("API_DOCS_ENABLED", raising=False)
+
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql+asyncpg://user:password@localhost:5432/rzadb",
+        session_secret="test-secret",
+    )
+
+    assert settings.api_docs_enabled is False
+
+
 @pytest.mark.parametrize(
     ("configured", "expected"),
     [

@@ -27,6 +27,60 @@ def test_health() -> None:
     assert request_id.version == 7
 
 
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_api_documentation_routes_are_disabled_by_default(path: str) -> None:
+    settings = _settings()
+    with (
+        patch.object(app_module, "get_settings", return_value=settings),
+        patch.object(app_module, "configure_logging"),
+    ):
+        web_app = create_app()
+
+    with TestClient(web_app) as client:
+        assert client.get(path).status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_api_documentation_routes_are_available_when_explicitly_enabled(
+    path: str,
+) -> None:
+    settings = _settings(api_docs_enabled=True)
+    with (
+        patch.object(app_module, "get_settings", return_value=settings),
+        patch.object(app_module, "configure_logging"),
+    ):
+        web_app = create_app()
+
+    with TestClient(web_app) as client:
+        response = client.get(path)
+        assert response.status_code == 200
+        if path == "/openapi.json":
+            assert response.json()["info"]["title"] == settings.app_name
+
+
+def test_production_example_disables_api_documentation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("API_DOCS_ENABLED", raising=False)
+
+    settings = Settings(_env_file=".env.production.example")
+
+    assert settings.api_docs_enabled is False
+
+
+def test_health_and_login_remain_available_when_docs_are_disabled() -> None:
+    settings = _settings(api_docs_enabled=False)
+    with (
+        patch.object(app_module, "get_settings", return_value=settings),
+        patch.object(app_module, "configure_logging"),
+    ):
+        web_app = create_app()
+
+    with TestClient(web_app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/auth/login").status_code == 200
+
+
 @pytest.mark.asyncio
 async def test_readiness_executes_read_only_database_query(monkeypatch):
     class Session:
@@ -77,6 +131,7 @@ def _settings(**overrides):
         "_env_file": None,
         "database_url": "postgresql+asyncpg://user:password@localhost:5432/rzadb",
         "session_secret": "test-secret",
+        "api_docs_enabled": False,
     }
     values.update(overrides)
     return Settings(**values)

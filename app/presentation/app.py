@@ -124,6 +124,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         debug=settings.debug,
+        docs_url="/docs" if settings.api_docs_enabled else None,
+        redoc_url="/redoc" if settings.api_docs_enabled else None,
+        openapi_url="/openapi.json" if settings.api_docs_enabled else None,
         lifespan=lifespan,
     )
     app.add_exception_handler(HTTPException, _handle_auth_http_exception)

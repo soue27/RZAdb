@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     """
     app_name: str = "RZAdb"
     debug: bool = False
+    api_docs_enabled: bool = False
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     database_url: str
     session_secret: str
