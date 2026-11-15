@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily RZAdb background-job health check at 08:30 Asia/Yekaterinburg
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Yekaterinburg
+Persistent=true
+Unit=rzadb-monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check RZAdb scheduled jobs and backup health
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rzadb
+Environment=TZ=Asia/Yekaterinburg
+ExecStart=/usr/bin/python3 /opt/rzadb/deploy/systemd/rzadb_monitor.py --trigger=scheduled
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=5min

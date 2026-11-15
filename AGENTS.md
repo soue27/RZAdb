@@ -4030,7 +4030,9 @@ restore-тест выполненными.
 - PostgreSQL: база `rzadb`, пользователь `rzadb`; пароль задаётся только в production-конфигурации.
 - Внешние каналы backup (Email/Yandex Disk) пока отключены.
 - Локальный backup включён; расписание systemd ещё не настроено.
-- SMTP-параметры пока не настроены для production.
+- На момент первоначальной подготовки production SMTP-параметры ещё не были
+  настроены; их последующее включение и проверка отражены в актуализации
+  раздела 41.
 - Не выводить полную конфигурацию Compose или `.env.production` в общедоступные логи/сообщения.
 
 Каталоги:
@@ -4327,3 +4329,135 @@ authorization перенесено в первую версию после де�
 
 Пункты, перечисленные как завершённые в актуальном плане завершения
 проекта, повторно в TODO не включать.
+
+------------------------------------------------------------------------
+
+## 41. Фоновые production-задачи: backup, Email Digest и мониторинг (15.11.2026)
+
+### Расписание и реализация
+
+- Единый часовой пояс: `Asia/Yekaterinburg`.
+- PostgreSQL backup: ежедневно в 03:00, systemd timer с `Persistent=true`.
+- Email Digest: ПН–ПТ в 07:30; `Persistent=false`, чтобы пропущенная
+  пятничная рассылка не выполнялась в выходные.
+- Health monitor: ежедневно в 08:30, `Persistent=true` — часовой запас
+  после запуска Email Digest в 07:30.
+- Unit-файлы хранятся в `deploy/systemd/`; эксплуатационные команды —
+  в `OPERATIONS.md`.
+- Backup использует существующий CLI `python -m app.infrastructure.backup`,
+  локальный канал `/srv/rzadb/backups`, custom dump, `pg_restore --list`,
+  SHA-256, JSON manifest и существующую ротацию.
+- Dump PostgreSQL не включает `/srv/rzadb/uploads`; резервирование uploads
+  не входит в эту реализацию.
+- Health monitor проверяет дневной backup, manifest и SHA-256,
+  `pg_restore --list`, будничный marker Email Digest, timers, Compose
+  services и свободное место. Недостаток места определяется как менее
+  2 GiB или менее 10% доступного тома.
+- Оповещения предназначены только единственной активной и неархивированной
+  записи `SUPERADMIN`, найденной в модели пользователей. Техническая запись
+  `SYSTEM` и другие роли адресатами не являются. Повторный одинаковый сбой
+  подавляется; переход к восстановленному состоянию отправляет отдельное
+  уведомление. Сбой SMTP не скрывает исходную ошибку и записывается в
+  journald без диагностического текста ответа SMTP.
+
+### Статус на 15.11.2026
+
+Ниже приведён статус первоначальной установки monitor до переноса SMTP.
+Последующие изменения состояния приведены в актуализациях этого раздела;
+последняя актуализация определяет текущую конфигурацию.
+
+- Локально подготовлены monitor/notifier, systemd units и `OPERATIONS.md`.
+- Целевые тесты backup, Email Digest, SMTP и monitor после корректировки:
+  128 passed; Ruff для изменённых Python-файлов и `git diff --check`
+  пройдены. Полный pytest после корректировки: 1788 passed, 6 warnings.
+  Общий `ruff check` репозитория ранее выявил 73
+  существующих нарушения вне изменённых файлов.
+- На VPS `VM-CPU2-RAM4-DISK50-eb0a` контейнеры `web` и `db` healthy.
+  Все шесть RZAdb units установлены и проверены через
+  `systemd-analyze verify`; backup и monitor timers включены и active.
+  Digest unit установлен, но timer оставлен disabled до настройки SMTP.
+- Для notifier был пересобран и перезапущен только `web`; Compose `db`
+  не пересоздавался, миграции не запускались, readiness после запуска
+  `web` вернул HTTP 200.
+- Фактический production backup запущен 15.11.2026 в 12:53
+  `Asia/Yekaterinburg`: manifest сообщает success, local channel success,
+  dump 225908 bytes, SHA-256 совпадает, `pg_restore --list` завершился
+  с кодом 0. Удерживаются 4 dump/manifest пары при retention 7.
+- Эффективные production Settings не содержат SMTP host/from, поэтому
+  Email Digest и email-оповещения пока не могут отправляться. Фактическая
+  маршрутизация `@rzadb.ru`, включая catch-all и пересылки, не подтверждена.
+- `rzadb-backup.service` дополнительно успешно выполнен через systemd;
+  текущая коллекция содержит 5 dump/manifest пар при retention 7.
+  Следующие активные срабатывания: backup 16.11.2026 03:00 и monitor
+  16.11.2026 08:30 `Asia/Yekaterinburg`. Digest timer остаётся disabled.
+- После корректировки production Monitor завершился `success`: в journald
+  записано `Email Digest monitoring status: DEFERRED` и `Health check passed`;
+  актуальный backup обнаружен и прошёл manifest/SHA-256/`pg_restore --list`
+  проверки. Письма не отправлялись.
+- Публичный DNS `rzadb.ru`: MX и AAAA отсутствуют, A ведёт на VPS;
+  на VPS нет локального listener порта 25. Маршрут к демонстрационным
+  адресам и возможные внутренние правила провайдера не подтверждены;
+  писем не отправляли.
+- Reboot VPS выполнен 15.11.2026 около 08:10 UTC. После загрузки systemd
+  находится в `running`, backup и monitor timers остаются `enabled/active`,
+  контейнеры `web`/`db` healthy, readiness вернул HTTP 200. Это подтверждает
+  восстановление этих двух расписаний после reboot; Digest timer всё ещё
+  disabled и его рабочий запуск не проверен.
+- Корректировка мониторинга: выключенный Email Digest теперь имеет статус
+  `DEFERRED` без аварии и без recovery-письма о прежнем ложном состоянии;
+  после включения timer контроль запуска активен. В выходные и до 07:30
+  статус `NOT_DUE`, выполняющийся service — `RUNNING`. Monitor timer на VPS
+  перенесён на 08:30 `Asia/Yekaterinburg` и остался active.
+- После настройки SMTP и подтверждения адресного маршрута включить Digest
+  timer, проверить первый будничный запуск и фактическую доставку только
+  SUPERADMIN health notification. Не считать эти проверки завершёнными,
+  пока нет фактического результата.
+- Обновление 15.11.2026: production SMTP перенесён из локального `.env`
+  только по параметрам `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_STARTTLS`, `SMTP_USE_SSL`.
+  До изменения создана резервная копия вне проекта: каталог mode `700`, файл
+  mode `600`; `.env.production` также mode `600`. Все остальные строки
+  production env сохранены, SMTP-ключи не дублируются.
+- В production Settings проверены без вывода credentials. DNS, TCP, TLS с
+  проверкой сертификата и SMTP AUTH успешны; sender соответствует SMTP
+  аккаунту. Штатным sender отправлено ровно одно тестовое письмо единственной
+  активной неархивированной записи SUPERADMIN. SMTP принял сообщение, но
+  фактическая доставка в ящик не подтверждена.
+- Актуальный DNS `rzadb.ru` по-прежнему не содержит MX; A указывает на VPS,
+  AAAA отсутствует, локальный listener порта 25 на VPS не найден. Семь
+  получателей Digest — 5 ENGINEER и 2 MANAGER с адресами домена `rzadb.ru`;
+  их маршрутизация не подтверждена. Поэтому `rzadb-email-digest.timer`
+  намеренно оставлен disabled, массовая рассылка не запускалась. Пробный
+  расчёт существующего сервиса с sink sender выбрал 7 адресатов, но отправил
+  0 писем и пропустил 7 пустых сводок.
+- Последний production Monitor завершился с кодом 0: Digest отмечен
+  `DEFERRED`, актуальный Backup прошёл проверки. Backup и Monitor timers
+  enabled/active; Digest timer disabled/inactive. Следующие запуски:
+  Backup — 16.11.2026 03:00, Monitor — 16.11.2026 08:30
+  `Asia/Yekaterinburg`; у отключённого Digest следующего запуска нет.
+  `web` и `db` healthy; для загрузки SMTP settings пересоздан только `web`,
+  PostgreSQL не перезапускался, БД и схема не изменялись, миграции не запускались.
+- Пароли, SMTP credentials и адрес SUPERADMIN не включать в документацию,
+  команды или отчёты. Digest timer включать только после подтверждения
+  маршрутизации каждого выбранного ENGINEER/MANAGER адреса.
+- План завершения проекта находится только в ChatGPT Project. Не создавать
+  его копию или новый файл плана в репозитории.
+
+### Актуализация после включения Email Digest (15.11.2026)
+
+- Production `rzadb-email-digest.timer` включён и active. Его расписание:
+  понедельник–пятница, 07:30 `Asia/Yekaterinburg`, `Persistent=false`.
+  Следующий запуск назначен на 16.11.2026 07:30 местного времени.
+- SMTP Settings в production загружаются; ранее проверенные соединение,
+  TLS и аутентификация остаются подтверждёнными. Credentials не записывать
+  в документацию.
+- После включения timer Monitor выполнен вручную штатным systemd service:
+  `Result=success`, exit code 0, Digest status `NOT_DUE`, Backup проверен.
+  `DEFERRED` для Digest не отображался.
+- Backup и Monitor timers остались enabled/active; `web` и `db` healthy.
+- Email Digest service вручную не запускался, массовая рассылка и новые
+  тестовые письма не выполнялись. Получатели пока тестовые; доставка на их
+  адреса намеренно не проверялась и будет проверена после согласования
+  реальных пользователей.
+- Изменения БД, схемы и пользователей не выполнялись; миграции, commit и
+  push не запускались.

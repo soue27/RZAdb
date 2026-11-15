@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily RZAdb PostgreSQL backup at 03:00 Asia/Yekaterinburg
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Yekaterinburg
+Persistent=true
+Unit=rzadb-backup.service
+
+[Install]
+WantedBy=timers.target

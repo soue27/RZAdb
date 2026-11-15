@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekday RZAdb Email Digest at 07:30 Asia/Yekaterinburg
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 07:30:00 Asia/Yekaterinburg
+Persistent=false
+Unit=rzadb-email-digest.service
+
+[Install]
+WantedBy=timers.target

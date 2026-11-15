@@ -1,0 +1,16 @@
+[Unit]
+Description=Send RZAdb weekday Email Digest
+Requires=docker.service
+After=docker.service
+OnFailure=rzadb-monitor.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rzadb
+Environment=TZ=Asia/Yekaterinburg
+UMask=0077
+ExecStart=/usr/bin/docker compose --env-file /opt/rzadb/.env.production -f /opt/rzadb/compose.production.yaml exec -T web python -m app.infrastructure.emailing.send_email_digest
+ExecStartPost=/usr/bin/touch /srv/rzadb/monitor/email-digest.success
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=15min
