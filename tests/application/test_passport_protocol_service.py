@@ -32,7 +32,10 @@ class FakeOTDService:
 
 class FakeTemplates(DocumentTemplateService):
     def __init__(self, temporary_path=None):
-        super().__init__(tree_service=None, templates_dir=Path("data/document_templates"))
+        super().__init__(
+            tree_service=None,
+            templates_dir=Path("app/infrastructure/document_templates/urza"),
+        )
         self.temporary_path = temporary_path
         self.temporary_content = (
             temporary_path.read_bytes() if temporary_path is not None else None
@@ -122,6 +125,7 @@ def _make_service(*, versions=None, section_records=None, template_service=None)
         document_template_service=template_service or FakeTemplates(),
         file_access_service=file_access,
         file_service=file_service,
+        otd_template_path=Path("app/infrastructure/document_templates/urza/OTD.docx"),
     )
     return service, user_id, urza_id, file_access, file_service
 

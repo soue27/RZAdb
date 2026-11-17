@@ -215,7 +215,7 @@ async def test_get_current_approved_denies_without_access(
 def test_runtime_template_generates_personalized_docx_without_changing_source(
     form_type, tmp_path,
 ):
-    source = Path("data/document_templates") / f"{form_type.value}.docx"
+    source = Path("app/infrastructure/document_templates/urza") / f"{form_type.value}.docx"
     template_copy = tmp_path / source.name
     template_copy.write_bytes(source.read_bytes())
     hierarchy = DocumentFormHierarchy(
@@ -245,9 +245,177 @@ def test_runtime_template_generates_personalized_docx_without_changing_source(
         ))
         assert all(marker not in text for marker in hierarchy.marker_values())
         assert template_copy.read_bytes() == source.read_bytes()
-        assert Path("docs", source.name).read_bytes() == source.read_bytes()
+        assert source.read_bytes() == template_copy.read_bytes()
     finally:
         generated.unlink(missing_ok=True)
+
+
+def test_inspection_docx_replaces_station_markers_and_preserves_source_content():
+    source = Path(
+        "app/infrastructure/document_templates/inspections/"
+        "Шаблон_осмотра_подстанции.docx"
+    )
+    source_bytes = source.read_bytes()
+    source_document = Document(source)
+
+    def document_text(document):
+        result = [paragraph.text for paragraph in document.paragraphs]
+        for table in document.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    result.extend(paragraph.text for paragraph in cell.paragraphs)
+        for section in document.sections:
+            for container in (section.header, section.footer):
+                result.extend(paragraph.text for paragraph in container.paragraphs)
+                for table in container.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            result.extend(
+                                paragraph.text for paragraph in cell.paragraphs
+                            )
+        return result
+
+    original_text = document_text(source_document)
+    original_tables = [
+        (len(table.rows), len(table.columns)) for table in source_document.tables
+    ]
+    hierarchy = DocumentFormHierarchy(
+        holding="Холдинг Север",
+        branch="Филиал Северный",
+        production_department="ПО Северное",
+        substation="ПС Северная",
+    )
+    service = DocumentTemplateService(
+        tree_service=None,
+        templates_dir=Path("app/infrastructure/document_templates/urza"),
+        inspection_template_path=source,
+    )
+
+    generated_path = service.create_inspection_document(
+        hierarchy,
+        highest_voltage="220",
+    )
+    try:
+        generated = Document(generated_path)
+        generated_text = document_text(generated)
+        expected_text = original_text[:]
+        replacements = {
+            "$Холдинг": hierarchy.holding,
+            "$Филиал": hierarchy.branch,
+            "$Название производственного отделения": hierarchy.production_department,
+            "$Substation. highest_voltage": "220",
+            "$Substation. dispatch_name": hierarchy.substation,
+        }
+        for index, paragraph_text in enumerate(expected_text):
+            for marker, value in replacements.items():
+                expected_text[index] = expected_text[index].replace(marker, value)
+
+        actual_tables = [
+            (len(table.rows), len(table.columns)) for table in generated.tables
+        ]
+        point_numbers = {
+            row.cells[0].text.strip()
+            for row in generated.tables[1].rows
+            if row.cells[0].text.strip() in {f"{number}." for number in range(1, 26)}
+        }
+
+        assert generated_text == expected_text
+        assert actual_tables == original_tables
+        assert point_numbers == {f"{number}." for number in range(1, 26)}
+        assert not any("$" in text for text in generated_text)
+        assert source.read_bytes() == source_bytes
+    finally:
+        generated_path.unlink(missing_ok=True)
+
+
+def test_inspection_docx_uses_blank_values_without_inventing_data():
+    service = DocumentTemplateService(
+        tree_service=None,
+        templates_dir=Path("app/infrastructure/document_templates/urza"),
+        inspection_template_path=Path(
+            "app/infrastructure/document_templates/inspections/"
+            "Шаблон_осмотра_подстанции.docx"
+        ),
+    )
+    generated_path = service.create_inspection_document(
+        DocumentFormHierarchy(),
+        highest_voltage="",
+    )
+    try:
+        generated = Document(generated_path)
+        text = "\n".join(
+            paragraph.text
+            for paragraph in generated.paragraphs
+        ) + "\n" + "\n".join(
+            cell.text
+            for table in generated.tables
+            for row in table.rows
+            for cell in row.cells
+        )
+
+        assert not any(marker in text for marker in (
+            "$Холдинг",
+            "$Филиал",
+            "$Название производственного отделения",
+            "$Substation. highest_voltage",
+            "$Substation. dispatch_name",
+        ))
+        assert "Неизвестно" not in text
+    finally:
+        generated_path.unlink(missing_ok=True)
+
+
+@pytest.mark.asyncio
+async def test_substation_hierarchy_comes_from_selected_tree_node():
+    substation_id = uuid7()
+    tree_service = MagicMock()
+    tree_service.get_tree = AsyncMock(return_value=[
+        EnterpriseTreeNode(
+            id=uuid7(),
+            type="holding",
+            full_name="Холдинг А",
+            short_name="ХА",
+            children=[
+                EnterpriseTreeNode(
+                    id=uuid7(),
+                    type="branch",
+                    full_name="Филиал Б",
+                    short_name="ФБ",
+                    children=[
+                        EnterpriseTreeNode(
+                            id=uuid7(),
+                            type="department",
+                            full_name="ПО В",
+                            short_name="ПОВ",
+                            substations=[SubstationTreeNode(
+                                id=substation_id,
+                                dispatch_name="ПС Г",
+                            )],
+                        )
+                    ],
+                )
+            ],
+        )
+    ])
+    service = DocumentTemplateService(tree_service, Path("."))
+
+    hierarchy = await service.get_substation_hierarchy(uuid7(), substation_id)
+
+    assert hierarchy == DocumentFormHierarchy(
+        holding="Холдинг А",
+        branch="Филиал Б",
+        production_department="ПО В",
+        substation="ПС Г",
+    )
+
+
+def test_inspection_filename_includes_safe_station_name_and_date():
+    filename = DocumentTemplateService.inspection_download_filename(
+        DocumentFormHierarchy(substation="ПС/Северная"),
+        generated_on=date(2026, 11, 17),
+    )
+
+    assert filename == "Шаблон_осмотра_ПС_Северная_20261117.docx"
 
 
 def test_docx_processor_replaces_split_runs_and_preserves_run_formatting():
@@ -302,7 +470,9 @@ def test_runtime_template_service_reports_missing_or_corrupt_templates(tmp_path)
 def test_parallel_document_generations_use_distinct_temporary_files():
     from concurrent.futures import ThreadPoolExecutor
 
-    service = DocumentTemplateService(None, Path("data/document_templates"))
+    service = DocumentTemplateService(
+        None, Path("app/infrastructure/document_templates/urza")
+    )
     hierarchy = DocumentFormHierarchy(holding="Холдинг")
     with ThreadPoolExecutor(max_workers=4) as executor:
         paths = list(executor.map(

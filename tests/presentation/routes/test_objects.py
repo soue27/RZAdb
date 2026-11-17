@@ -1,7 +1,10 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from io import BytesIO
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
+from zipfile import is_zipfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +13,7 @@ from uuid6 import uuid7
 
 from app.application.connections.schemas import ConnectionListItem
 from app.application.connections.service import ConnectionNameConflictError
+from app.application.document_templates.service import DocumentTemplateService
 from app.application.enterprises.schemas import EnterpriseDetails
 from app.application.files.access_service import FileAccessService
 from app.application.files.owners import FileAccessTargetType, FileOwner, FileOwnerType
@@ -49,6 +53,7 @@ from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_access_service,
     get_connection_service,
+    get_document_form_service,
     get_enterprise_service,
     get_file_access_service,
     get_file_service,
@@ -709,6 +714,13 @@ def override_object_service(service: FakeObjectService):
 
 def override_substation_service(service: FakeSubstationService):
     def dependency() -> FakeSubstationService:
+        return service
+
+    return dependency
+
+
+def override_document_form_service(service):
+    def dependency():
         return service
 
     return dependency
@@ -2628,6 +2640,41 @@ def test_get_substation_inspections_returns_inspections(system_user_id) -> None:
 def test_inspection_template_download_requires_substation_access(system_user_id) -> None:
     user = make_user(system_user_id=system_user_id)
     substation_id = uuid7()
+    class FakeTree:
+        async def get_tree(self, **_kwargs):
+            department = SimpleNamespace(
+                type="department",
+                full_name="ПО Центральное",
+                ancestors=[],
+                children=[],
+                substations=[SimpleNamespace(
+                    id=substation_id,
+                    dispatch_name="ПС Центральная",
+                )],
+            )
+            branch = SimpleNamespace(
+                type="branch",
+                full_name="Филиал Центральный",
+                ancestors=[],
+                children=[department],
+                substations=[],
+            )
+            return [SimpleNamespace(
+                type="holding",
+                full_name="Холдинг Центральный",
+                ancestors=[],
+                children=[branch],
+                substations=[],
+            )]
+
+    form_service = DocumentTemplateService(
+        tree_service=FakeTree(),
+        templates_dir=Path("app/infrastructure/document_templates/urza"),
+        inspection_template_path=Path(
+            "app/infrastructure/document_templates/inspections/"
+            "Шаблон_осмотра_подстанции.docx"
+        ),
+    )
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService(
@@ -2636,14 +2683,23 @@ def test_inspection_template_download_requires_substation_access(system_user_id)
             )
         )
     )
+    app.dependency_overrides[get_substation_service] = override_substation_service(
+        FakeSubstationService()
+    )
+    app.dependency_overrides[get_document_form_service] = override_document_form_service(
+        form_service
+    )
     try:
         response = TestClient(app).get(
             f"/objects/substation/{substation_id}/inspection-template"
         )
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/pdf"
+        assert response.headers["content-type"] == (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
         assert "attachment" in response.headers["content-disposition"]
-        assert response.content.startswith(b"%PDF-")
+        assert response.headers["content-disposition"].endswith(".docx")
+        assert is_zipfile(BytesIO(response.content))
     finally:
         app.dependency_overrides.clear()
 
@@ -2651,9 +2707,27 @@ def test_inspection_template_download_requires_substation_access(system_user_id)
 def test_inspection_template_download_denies_inaccessible_substation(system_user_id) -> None:
     user = make_user(system_user_id=system_user_id)
     substation_id = uuid7()
+    class UnusedTree:
+        async def get_tree(self, **_kwargs):
+            raise AssertionError("inaccessible substation hierarchy must not be read")
+
+    form_service = DocumentTemplateService(
+        tree_service=UnusedTree(),
+        templates_dir=Path("app/infrastructure/document_templates/urza"),
+        inspection_template_path=Path(
+            "app/infrastructure/document_templates/inspections/"
+            "Шаблон_осмотра_подстанции.docx"
+        ),
+    )
     app.dependency_overrides[get_current_user] = override_user(user)
     app.dependency_overrides[get_object_service] = override_object_service(
         FakeObjectService(error=ObjectAccessDeniedError())
+    )
+    app.dependency_overrides[get_substation_service] = override_substation_service(
+        FakeSubstationService()
+    )
+    app.dependency_overrides[get_document_form_service] = override_document_form_service(
+        form_service
     )
     try:
         response = TestClient(app).get(

@@ -31,7 +31,7 @@ def test_smtp_settings_have_safe_defaults(monkeypatch: pytest.MonkeyPatch) -> No
     assert settings.smtp_starttls is True
     assert settings.smtp_use_ssl is False
     assert settings.error_email_to is None
-    assert str(settings.document_templates_dir) == "data/document_templates"
+    assert str(settings.document_templates_dir) == "app/infrastructure/document_templates"
     assert settings.log_level == "INFO"
 
 

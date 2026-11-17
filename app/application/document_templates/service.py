@@ -4,6 +4,7 @@ import logging
 import re
 import tempfile
 from dataclasses import dataclass
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 from uuid import UUID
@@ -198,6 +199,7 @@ class DocumentTemplateService:
         self,
         tree_service: TreeService,
         templates_dir: Path,
+        inspection_template_path: Path | None = None,
     ) -> None:
         """Сохраняет сервис дерева и каталог runtime-шаблонов.
 
@@ -207,6 +209,7 @@ class DocumentTemplateService:
         """
         self.tree_service = tree_service
         self.templates_dir = templates_dir
+        self.inspection_template_path = inspection_template_path
 
     @staticmethod
     def download_filename(
@@ -312,27 +315,148 @@ class DocumentTemplateService:
             DocumentTemplateError: Если шаблон отсутствует, некорректен или содержит незаполненные маркеры.
         """
         template_path = self.templates_dir / f"{form_type.value}.docx"
-        if not template_path.is_file():
-            raise DocumentTemplateError(f"DOCX template not found: {template_path}")
+        return self._create_from_template(
+            template_path,
+            hierarchy.marker_values(),
+            prefix=f"rzadb-{form_type.value}-",
+        )
 
-        output_path: Path | None = None
+    async def get_substation_hierarchy(
+        self,
+        user_id: UUID,
+        substation_id: UUID,
+        *,
+        archive_only: bool = False,
+    ) -> DocumentFormHierarchy:
+        """Получает организационную иерархию выбранной подстанции."""
+        tree = await self.tree_service.get_tree(
+            user_id=user_id,
+            archive_only=archive_only,
+        )
+
+        def visit(
+            node: EnterpriseTreeNode,
+            parent_path: list[EnterpriseTreeNode],
+        ) -> DocumentFormHierarchy | None:
+            ancestry = node.ancestors or parent_path
+            path = [*ancestry, node]
+            names = {
+                item.type: item.full_name
+                for item in path
+                if item.type in {"holding", "branch", "department"}
+            }
+            for station in node.substations:
+                if station.id == substation_id:
+                    return DocumentFormHierarchy(
+                        holding=names.get("holding", ""),
+                        branch=names.get("branch", ""),
+                        production_department=names.get("department", ""),
+                        substation=station.dispatch_name,
+                    )
+            for child in node.children:
+                result = visit(child, path)
+                if result is not None:
+                    return result
+            return None
+
+        for root in tree:
+            result = visit(root, [])
+            if result is not None:
+                return result
+        raise DocumentTemplateError("Substation hierarchy was not found")
+
+    def create_inspection_document(
+        self,
+        hierarchy: DocumentFormHierarchy,
+        *,
+        highest_voltage: str,
+    ) -> Path:
+        """Создаёт DOCX-шаблон осмотра с данными организационной иерархии."""
+        template_path = self.inspection_template_path
+        if template_path is None or not template_path.is_file():
+            raise DocumentTemplateError("Inspection DOCX template is unavailable")
+
         try:
             document = Document(template_path)
-            DocxProcessor.replace_markers(document, hierarchy.marker_values())
-            with tempfile.NamedTemporaryFile(
-                prefix=f"rzadb-{form_type.value}-",
-                suffix=".docx",
-                delete=False,
-            ) as temporary:
-                output_path = Path(temporary.name)
-            document.save(output_path)
-            return output_path
+            document_text = "\n".join(
+                paragraph.text
+                for paragraph in DocxProcessor._document_paragraphs(document)
+            )
+            marker_values = {
+                "$Холдинг": hierarchy.holding or "",
+                "$Филиал": hierarchy.branch or "",
+                "$Название производственного отделения": (
+                    hierarchy.production_department or ""
+                ),
+                self._template_marker(document_text, "$Substation.highest_voltage"):
+                    highest_voltage or "",
+                self._template_marker(document_text, "$Substation.dispatch_name"):
+                    hierarchy.substation or "",
+            }
+            DocxProcessor.replace_markers(document, marker_values)
+            return self._save_temporary_document(
+                document,
+                prefix="rzadb-inspection-",
+            )
         except DocumentTemplateError:
-            if output_path is not None:
-                output_path.unlink(missing_ok=True)
             raise
         except Exception as exc:
-            if output_path is not None:
-                output_path.unlink(missing_ok=True)
+            logger.exception("Failed to process inspection DOCX template %s", template_path)
+            raise DocumentTemplateError(
+                "Inspection DOCX template could not be processed"
+            ) from exc
+
+    @staticmethod
+    def inspection_download_filename(
+        hierarchy: DocumentFormHierarchy,
+        *,
+        generated_on: date | None = None,
+    ) -> str:
+        object_name = re.sub(
+            r'[\\/:*?"<>|\x00-\x1f]', "_", hierarchy.substation
+        )
+        object_name = re.sub(r"\s+", "_", object_name).strip("._ ") or "подстанция"
+        generation_date = generated_on or datetime.now().astimezone().date()
+        return f"Шаблон_осмотра_{object_name}_{generation_date:%Y%m%d}.docx"
+
+    @staticmethod
+    def _template_marker(document_text: str, canonical: str) -> str:
+        aliases = (
+            canonical,
+            canonical.replace("$Substation.", "$Substation. "),
+        )
+        return next((marker for marker in aliases if marker in document_text), canonical)
+
+    def _create_from_template(
+        self,
+        template_path: Path,
+        marker_values: dict[str, str],
+        *,
+        prefix: str,
+    ) -> Path:
+        if not template_path.is_file():
+            raise DocumentTemplateError(f"DOCX template not found: {template_path}")
+        try:
+            document = Document(template_path)
+            DocxProcessor.replace_markers(document, marker_values)
+            return self._save_temporary_document(document, prefix=prefix)
+        except DocumentTemplateError:
+            raise
+        except Exception as exc:
             logger.exception("Failed to process DOCX template %s", template_path)
             raise DocumentTemplateError("DOCX template could not be processed") from exc
+
+    @staticmethod
+    def _save_temporary_document(document, *, prefix: str) -> Path:
+        with tempfile.NamedTemporaryFile(
+            prefix=prefix,
+            suffix=".docx",
+            delete=False,
+        ) as temporary:
+            output_path = Path(temporary.name)
+        try:
+            document.save(output_path)
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            raise
+        return output_path

@@ -79,6 +79,7 @@ from app.application.work_items.service import (
 )
 from app.core.config import get_settings
 from app.infrastructure.database.session import get_session
+from app.infrastructure.document_templates.catalog import DocumentTemplateCatalog
 from app.infrastructure.emailing.smtp_sender import SMTPEmailSender
 from app.infrastructure.storage.base import ObjectStorage
 from app.infrastructure.storage.local import LocalObjectStorage
@@ -219,14 +220,24 @@ def get_tree_service(
     )
 
 
+def get_document_template_catalog() -> DocumentTemplateCatalog:
+    """Возвращает централизованный каталог исходных шаблонов документов."""
+    return DocumentTemplateCatalog(root=get_settings().document_templates_dir)
+
+
 def get_document_form_service(
     tree_service: Annotated[TreeService, Depends(get_tree_service)],
+    catalog: Annotated[
+        DocumentTemplateCatalog,
+        Depends(get_document_template_catalog),
+    ],
 ) -> DocumentTemplateService:
     """Создаёт сервис формирования DOCX-документов из шаблонов.
     """
     return DocumentTemplateService(
         tree_service=tree_service,
-        templates_dir=get_settings().document_templates_dir,
+        templates_dir=catalog.urza_directory,
+        inspection_template_path=catalog.inspection,
     )
 
 
@@ -493,6 +504,10 @@ def get_passport_protocol_service(
         Depends(get_file_access_service),
     ],
     file_service: Annotated[FileService, Depends(get_file_service)],
+    catalog: Annotated[
+        DocumentTemplateCatalog,
+        Depends(get_document_template_catalog),
+    ],
 ) -> PassportProtocolService:
     """Создаёт сервис подготовки комплекта документов паспорта УРЗА.
     """
@@ -505,6 +520,7 @@ def get_passport_protocol_service(
         document_template_service=document_template_service,
         file_access_service=file_access_service,
         file_service=file_service,
+        otd_template_path=catalog.otd,
     )
 
 

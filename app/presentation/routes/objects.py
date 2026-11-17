@@ -2,7 +2,6 @@
 
 import logging
 import re
-from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID
@@ -16,7 +15,7 @@ from fastapi import (
     Request,
     status,
 )
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
@@ -27,6 +26,10 @@ from app.application.connections.service import (
 )
 from app.application.enterprises.schemas import EnterpriseUpdate
 from app.application.enterprises.service import EnterpriseService
+from app.application.document_templates.service import (
+    DocumentTemplateError,
+    DocumentTemplateService,
+)
 from app.application.inspections.inspection_service import InspectionService
 from app.application.objects.exceptions import (
     ObjectAccessDeniedError,
@@ -68,6 +71,7 @@ from app.infrastructure.passport_protocol.zip_exporter import (
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.dependencies.services import (
     get_connection_service,
+    get_document_form_service,
     get_enterprise_service,
     get_inspection_service,
     get_object_service,
@@ -81,6 +85,7 @@ from app.presentation.dependencies.services import (
     get_tree_service,
     get_urza_service,
 )
+from app.presentation.responses import TemporaryFileResponse
 
 router = APIRouter(
     prefix="/objects",
@@ -588,10 +593,17 @@ async def download_substation_inspection_template(
     substation_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     object_service: Annotated[ObjectService, Depends(get_object_service)],
+    substation_service: Annotated[
+        SubstationService,
+        Depends(get_substation_service),
+    ],
+    form_service: Annotated[
+        DocumentTemplateService,
+        Depends(get_document_form_service),
+    ],
     archived: bool = Query(default=False),
 ):
-    """Возвращает шаблон документа осмотра подстанции для скачивания.
-    """
+    """Формирует заполненный DOCX-шаблон осмотра выбранной подстанции."""
     try:
         await object_service.get_object(
             user_id=current_user.id,
@@ -610,19 +622,42 @@ async def download_substation_inspection_template(
             detail="Объект не найден.",
         ) from exc
 
-    template_path = (
-        Path(__file__).resolve().parents[2]
-        / "application/document_templates/assets/inspection_template.pdf"
-    )
-    if not template_path.is_file():
+    try:
+        substation = await substation_service.get_details(
+            substation_id,
+            include_archived=archived,
+        )
+        hierarchy = await form_service.get_substation_hierarchy(
+            current_user.id,
+            substation_id,
+            archive_only=archived,
+        )
+        document_path = form_service.create_inspection_document(
+            hierarchy,
+            highest_voltage=substation.highest_voltage.value,
+        )
+    except DocumentTemplateError as exc:
+        logger.exception(
+            "Could not prepare inspection DOCX for substation %s",
+            substation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось сформировать шаблон осмотра.",
+        ) from exc
+    except ObjectNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Шаблон осмотра недоступен.",
-        )
-    return FileResponse(
-        template_path,
-        media_type="application/pdf",
-        filename="inspection_template.pdf",
+            detail="Объект не найден.",
+        ) from exc
+
+    return TemporaryFileResponse(
+        document_path,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        filename=form_service.inspection_download_filename(hierarchy),
     )
 
 

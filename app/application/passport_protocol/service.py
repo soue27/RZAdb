@@ -66,7 +66,7 @@ class PassportProtocolService:
         document_template_service: DocumentTemplateService,
         file_access_service: FileAccessService,
         file_service: FileService,
-        otd_template_path: Path = Path("docs/OTD.docx"),
+        otd_template_path: Path,
     ) -> None:
         """Сохраняет сервисы документов, файлов и шаблонов, необходимые для сборки паспорта.
 

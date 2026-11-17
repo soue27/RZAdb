@@ -40,7 +40,6 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.8 /uv /uvx /usr/local/bin/
 
 COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
-COPY data/document_templates ./data/document_templates
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 

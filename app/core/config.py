@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     database_url: str
     session_secret: str
     session_cookie_secure: bool = False
-    document_templates_dir: Path = Path("data/document_templates")
+    document_templates_dir: Path = Path("app/infrastructure/document_templates")
 
     backup_enabled: bool = False
     backup_local_enabled: bool = True
