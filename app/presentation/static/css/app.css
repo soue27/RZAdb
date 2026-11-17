@@ -76,6 +76,113 @@ body {
    RZAdb buttons
    --------------------------------------------------------- */
 
+.btn {
+    min-height: 38px;
+    padding: 0.45rem 0.8rem;
+    border-width: 1px;
+    border-radius: 0.375rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25;
+    transition: color 120ms ease, background-color 120ms ease,
+        border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.btn-sm {
+    min-height: 32px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8125rem;
+}
+
+.btn:focus-visible {
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgb(0 104 179 / 22%);
+}
+
+.btn:disabled,
+.btn.disabled {
+    cursor: not-allowed;
+}
+
+.btn-primary,
+.rzadb-btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--rzadb-primary);
+    --bs-btn-border-color: var(--rzadb-primary);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--rzadb-primary-hover);
+    --bs-btn-hover-border-color: var(--rzadb-primary-hover);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #004f88;
+    --bs-btn-active-border-color: #004f88;
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: var(--rzadb-primary);
+    --bs-btn-disabled-border-color: var(--rzadb-primary);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--rzadb-primary);
+    --bs-btn-border-color: var(--rzadb-primary);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--rzadb-primary);
+    --bs-btn-hover-border-color: var(--rzadb-primary);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #004f88;
+    --bs-btn-active-border-color: #004f88;
+}
+
+.btn-success {
+    --bs-btn-bg: var(--rzadb-success);
+    --bs-btn-border-color: var(--rzadb-success);
+    --bs-btn-hover-bg: #146c43;
+    --bs-btn-hover-border-color: #146c43;
+    --bs-btn-active-bg: #0f5132;
+    --bs-btn-active-border-color: #0f5132;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-color: #fff;
+}
+
+.btn-outline-success {
+    --bs-btn-color: var(--rzadb-success);
+    --bs-btn-border-color: var(--rzadb-success);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--rzadb-success);
+    --bs-btn-hover-border-color: var(--rzadb-success);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #0f5132;
+    --bs-btn-active-border-color: #0f5132;
+}
+
+.btn-danger {
+    --bs-btn-bg: var(--rzadb-danger);
+    --bs-btn-border-color: var(--rzadb-danger);
+    --bs-btn-hover-bg: #b02a32;
+    --bs-btn-hover-border-color: #b02a32;
+    --bs-btn-active-bg: #842029;
+    --bs-btn-active-border-color: #842029;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-color: #fff;
+}
+
+.btn-outline-danger {
+    --bs-btn-color: var(--rzadb-danger);
+    --bs-btn-border-color: var(--rzadb-danger);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--rzadb-danger);
+    --bs-btn-hover-border-color: var(--rzadb-danger);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #842029;
+    --bs-btn-active-border-color: #842029;
+}
+
+.topbar-icon-control {
+    min-height: 40px;
+    padding: 0;
+}
+
 .rzadb-btn-primary {
     color: #ffffff;
     background-color: var(--rzadb-primary);
@@ -108,9 +215,8 @@ body {
 .rzadb-settings-actions .btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.13rem;
-    padding: 0.15rem 0.33rem;
-    font-size: 0.47rem;
+    justify-content: center;
+    gap: 0.25rem;
 }
 
 .rzadb-file-actions .material-icons,
@@ -790,11 +896,29 @@ body {
     transform: rotate(180deg);
 }
 
-.object-card {
+.object-card,
+.rzadb-object-card {
     background: var(--rzadb-surface);
     border: 1px solid var(--rzadb-border);
     border-radius: 12px;
     padding: 24px;
+}
+
+@media (max-width: 575.98px) {
+    .object-card,
+    .rzadb-object-card {
+        padding: 16px;
+    }
+
+    .object-card > .d-flex.justify-content-between,
+    .rzadb-object-card > .d-flex.justify-content-between {
+        flex-wrap: wrap;
+    }
+
+    .object-card .archive-actions,
+    .rzadb-object-card .archive-actions {
+        justify-content: flex-start;
+    }
 }
 
 
